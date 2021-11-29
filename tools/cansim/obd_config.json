@@ -1,0 +1,54 @@
+{
+    "ecus": [
+        {
+            "name": "engine",
+            "rx_ids": ["0x7DF", "0x7E0"],
+            "tx_id": "0x7E8",
+            "zero_padding": true,
+            "pids": {
+                "ENGINE_LOAD"                        : {"num": "0x04", "scale":    2.55 , "offset":   0.0, "size": 1},
+                "ENGINE_COOLANT_TEMPERATURE"         : {"num": "0x05", "scale":    1.0  , "offset":  40.0, "size": 1},
+                "FUEL_TRIM_SHORT_TERM_BANK_1"        : {"num": "0x06", "scale":    1.28 , "offset": 100.0, "size": 1},
+                "FUEL_TRIM_LONG_TERM_BANK_1"         : {"num": "0x07", "scale":    1.28 , "offset": 100.0, "size": 1},
+                "FUEL_TRIM_SHORT_TERM_BANK_2"        : {"num": "0x08", "scale":    1.28 , "offset": 100.0, "size": 1},
+                "FUEL_TRIM_LONG_TERM_BANK_2"         : {"num": "0x09", "scale":    1.28 , "offset": 100.0, "size": 1},
+                "FUEL_PRESSURE"                      : {"num": "0x0A", "scale":    0.333, "offset":   0.0, "size": 1},
+                "INTAKE_MANIFOLD_ABSOLUTE_PRESSURE"  : {"num": "0x0B", "scale":    1.0  , "offset":   0.0, "size": 1},
+                "ENGINE_SPEED"                       : {"num": "0x0C", "scale":    4.0  , "offset":   0.0, "size": 2},
+                "VEHICLE_SPEED"                      : {"num": "0x0D", "scale":    1.0  , "offset":   0.0, "size": 1},
+                "INTAKE_AIR_FLOW_TEMPERATURE"        : {"num": "0x0F", "scale":    1.0  , "offset":  40.0, "size": 1},
+                "MAF_RATE"                           : {"num": "0x10", "scale":  100.0  , "offset":   0.0, "size": 2},
+                "THROTTLE_POSITION"                  : {"num": "0x11", "scale":    2.55 , "offset":   0.0, "size": 1},
+                "RUNTIME_SINCE_ENGINE_START"         : {"num": "0x1F", "scale":    1.0  , "offset":   0.0, "size": 2},
+                "DISTANCE_TRAVELED_WITH_MIL"         : {"num": "0x21", "scale":    1.0  , "offset":   0.0, "size": 2},
+                "FUEL_TANK_LEVEL"                    : {"num": "0x2F", "scale":    2.55 , "offset":   0.0, "size": 1},
+                "DISTANCE_TRAVELED_SINCE_CLEARED_DTC": {"num": "0x31", "scale":    1.0  , "offset":   0.0, "size": 2},
+                "CONTROL_MODULE_VOLTAGE"             : {"num": "0x42", "scale": 1000.0  , "offset":   0.0, "size": 2},
+                "RELATIVE_THROTTLE_POSITION"         : {"num": "0x45", "scale":    2.55 , "offset":   0.0, "size": 1},
+                "AMBIENT_AIR_TEMPERATURE"            : {"num": "0x46", "scale":    1.0  , "offset":  40.0, "size": 1},
+                "RELATIVE_ACCELERATOR_PEDAL_POSITION": {"num": "0x5A", "scale":    2.55 , "offset":   0.0, "size": 1},
+                "HYBRID_BATTERY_PACK_REMAINING_LIFE" : {"num": "0x5B", "scale":    2.55 , "offset":   0.0, "size": 1},
+                "ENGINE_OIL_TEMPERATURE"             : {"num": "0x5C", "scale":    1.0  , "offset":  40.0, "size": 1}
+            },
+            "dtcs": {
+                "ECM_DTC1": {"num": "0x0123"},
+                "ECM_DTC2": {"num": "0x4567"}
+            }
+        },
+        {
+            "name": "transmission",
+            "rx_ids": ["0x7DF", "0x7E1"],
+            "tx_id": "0x7E9",
+            "zero_padding": true,
+            "pids": {
+                "DRIVER_DEMAND_PERCENT_TORQUE"       : {"num": "0x61", "scale":    1.0  , "offset": 125.0, "size": 1},
+                "ACTUAL_PERCENT_TORQUE"              : {"num": "0x62", "scale":    1.0  , "offset": 125.0, "size": 1},
+                "ENGINE_REFERENCE_PERCENT_TORQUE"    : {"num": "0x63", "scale":    1.0  , "offset":   0.0, "size": 2}
+            },
+            "dtcs": {
+                "TCU_DTC1": {"num": "0x89AB"},
+                "TCU_DTC2": {"num": "0xCDEF"}
+            }
+        }
+    ]
+}

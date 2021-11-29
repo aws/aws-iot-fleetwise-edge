@@ -1,0 +1,16 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - bash ./tools/install-deps-cross.sh
+  build:
+    commands:
+      - bash ./tools/build-fwe-cross.sh
+artifacts:
+  files:
+    - build/src/executionmanagement/aws-iot-fleetwise-edge
+    - appspec.yml
+    - configuration/static-config.json
+    - tools/deploy/*
+  name: aws-iot-fleetwise-edge

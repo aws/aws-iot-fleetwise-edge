@@ -1,0 +1,74 @@
+/**
+ * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
+ * Licensed under the Amazon Software License (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ * http://aws.amazon.com/asl/
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+#pragma once
+
+#include <string>
+
+namespace Aws
+{
+namespace IoTFleetWise
+{
+namespace DataInspection
+{
+
+/**
+ * @brief This is the Geohash module that can convert GPS latitude and longitude to GeoHash
+ *
+ * See more details about Geohash at wikipedia: https://en.wikipedia.org/wiki/Geohash
+ *
+ */
+class Geohash
+{
+public:
+    /**
+     * @brief Encoding function that takes latitude and longitude and precision and output Geohash
+     * in bits format.
+     * Note the LSb is the last bit of Geohash. The unused bits are filled with 0.
+     * @param lat: latitude in Decimal Degree
+     * @param lon: longitude in Decimal Degree
+     * @param precision: In Geohash, precision is the length of hash character.
+     * @param hashBits: pass by reference. Function will set its value with the calculated Geohash
+     * @return True if encode is successful, false is encode failed due to input
+     */
+    static bool encode( double lat, double lon, uint8_t precision, uint64_t &hashBits );
+    /**
+     * @brief Encoding function that takes latitude and longitude and precision and output Geohash
+     * in String (base 32) format.
+     * @param lat: latitude in Decimal Degree
+     * @param lon: longitude in Decimal Degree
+     * @param precision: In Geohash, precision is the length of hash character.
+     * @param hashString: pass by reference. Function will set its value with the calculated Geohash
+     * @return True if encode is successful, false is encode failed due to input
+     */
+    static bool encode( double lat, double lon, uint8_t precision, std::string &hashString );
+
+    // In GeoHash, precision is specified by the length of hash. 9 characters hash can specify a
+    // rectangle area of 4.77m X 4.77m. Here we defined the maximum precision as 9 characters.
+    static constexpr uint8_t MAX_PRECISION = 9;
+
+private:
+    // number of bits in Base32 character
+    static constexpr uint8_t BASE32_BITS = 5;
+    // minimum Latitude
+    static constexpr double LAT_MIN = -90.0;
+    // maximum Latitude
+    static constexpr double LAT_MAX = 90.0;
+    // minimum Longitude
+    static constexpr double LON_MIN = -180.0;
+    // maximum Longitude
+    static constexpr double LON_MAX = 180.0;
+};
+} // namespace DataInspection
+} // namespace IoTFleetWise
+} // namespace Aws

@@ -1,0 +1,11 @@
+[Unit]
+Description=Setup SocketCAN interfaces
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /usr/bin/setup-socketcan.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,30 @@
+/*
+ * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
+ * Licensed under the Amazon Software License (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ * http://aws.amazon.com/asl/
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+syntax = "proto3";
+
+option java_package = "com.amazonaws.iot.autobahn.schemas";
+package Aws.IoTFleetWise.Schemas.CheckinMsg;
+
+message Checkin {
+    /**
+    * List of document arn's the Edge currently has enacted including collectionSchemes (both idle and active) and decoder
+    * manifest.
+    */
+    repeated string document_arns = 1;
+
+    /*
+     * Timestamp of when check in was generated in milliseconds since the Unix epoch
+     */
+    uint64 timestamp_ms_epoch = 2;
+}

@@ -1,0 +1,327 @@
+/**
+ * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
+ * Licensed under the Amazon Software License (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ * http://aws.amazon.com/asl/
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
+// Includes
+#include "CacheAndPersist.h"
+#include <cstdio>
+#include <fstream>
+#include <ios>
+#include <iostream>
+#include <sys/stat.h>
+
+using namespace Aws::IoTFleetWise::Platform::PersistencyManagement;
+
+Aws::IoTFleetWise::Platform::PersistencyManagement::ICacheAndPersist::~ICacheAndPersist()
+{
+}
+
+CacheAndPersist::CacheAndPersist( const std::string &partitionPath, size_t maxPartitionSize )
+{
+    // Define the file paths
+    mDecoderManifestFile = partitionPath + DECODER_MANIFEST_FILE;
+    mCollectionSchemeListFile = partitionPath + COLLECTION_SCHEME_LIST_FILE;
+    mCollectedDataFile = partitionPath + COLLECTED_DATA_FILE;
+
+    mMaxPersistencePartitionSize = maxPartitionSize;
+}
+
+CacheAndPersist::~CacheAndPersist()
+{
+}
+
+bool
+CacheAndPersist::init()
+{
+    if ( createFile( mDecoderManifestFile ) != SUCCESS )
+    {
+        mLogger.error( "PersistencyManagement::init", " Failed to create decoder manifest file " );
+        return false;
+    }
+
+    if ( createFile( mCollectionSchemeListFile ) != SUCCESS )
+    {
+        mLogger.error( "PersistencyManagement::init", " Failed to create collectionScheme list file " );
+        return false;
+    }
+
+    if ( createFile( mCollectedDataFile ) != SUCCESS )
+    {
+        mLogger.error( "PersistencyManagement::init", " Failed to create collected data file " );
+
+        return false;
+    }
+
+    mLogger.info( "PersistencyManagement::init", " Persistency library successfully initialised. " );
+    return true;
+}
+
+ErrorCode
+CacheAndPersist::createFile( const std::string &fileName )
+{
+    ErrorCode status = SUCCESS;
+
+    // Check if the file exists
+    std::ifstream existingFile( fileName.c_str(), std::ios_base::binary );
+
+    if ( !existingFile.is_open() )
+    {
+        // File does not exist, create a new one
+        std::ofstream newFile( fileName.c_str(), std::ios_base::binary | std::ios_base::app );
+        if ( !newFile.is_open() )
+        {
+            status = FILESYSTEM_ERROR;
+        }
+        else
+        {
+            newFile.close();
+            status = SUCCESS;
+        }
+    }
+    else
+    {
+        existingFile.close();
+        status = SUCCESS;
+    }
+
+    return status;
+}
+
+ErrorCode
+CacheAndPersist::write( const uint8_t *bufPtr, size_t size, DataType dataType )
+{
+    ErrorCode status = SUCCESS;
+    std::string fileName;
+    std::ofstream file;
+
+    if ( bufPtr == nullptr )
+    {
+        return INVALID_DATA;
+    }
+
+    if ( getSize( COLLECTION_SCHEME_LIST ) + getSize( DECODER_MANIFEST ) + getSize( EDGE_TO_CLOUD_PAYLOAD ) + size >=
+         mMaxPersistencePartitionSize )
+    {
+        return MEMORY_FULL;
+    }
+
+    switch ( dataType )
+    {
+    case COLLECTION_SCHEME_LIST:
+        fileName = mCollectionSchemeListFile;
+        break;
+
+    case DECODER_MANIFEST:
+        fileName = mDecoderManifestFile;
+        break;
+
+    case EDGE_TO_CLOUD_PAYLOAD:
+        fileName = mCollectedDataFile;
+        break;
+
+    default:
+        status = INVALID_DATATYPE;
+        mLogger.error( "PersistencyManagement::write", " Invalid data type specified " );
+        return status;
+    }
+
+    if ( dataType == EDGE_TO_CLOUD_PAYLOAD )
+    {
+        // Payload is appended to the existing file
+        file.open( fileName.c_str(), std::ios_base::binary | std::ios_base::app );
+    }
+    else
+    {
+        // CollectionScheme list and Decoder Manifest are overwritten
+        file.open( fileName.c_str(), std::ios_base::binary );
+    }
+
+    if ( !file.is_open() )
+    {
+        status = FILESYSTEM_ERROR;
+        mLogger.error( "PersistencyManagement::write", " Could not open file " );
+    }
+    else
+    {
+        file.write( reinterpret_cast<const char *>( bufPtr ), static_cast<std::streamsize>( size ) );
+        if ( !file.good() )
+        {
+            status = FILESYSTEM_ERROR;
+            mLogger.error( "PersistencyManagement::write", " Error writing to the file " );
+        }
+        file.close();
+    }
+    return status;
+}
+
+size_t
+CacheAndPersist::getSize( DataType dataType )
+{
+    // get size of the file specified
+    std::string fileName;
+    size_t size = 0U;
+    struct stat res = {};
+
+    switch ( dataType )
+    {
+    case COLLECTION_SCHEME_LIST:
+        fileName = mCollectionSchemeListFile;
+        break;
+
+    case DECODER_MANIFEST:
+        fileName = mDecoderManifestFile;
+        break;
+
+    case EDGE_TO_CLOUD_PAYLOAD:
+        fileName = mCollectedDataFile;
+        break;
+
+    default:
+        mLogger.error( "PersistencyManagement::getSize", " Invalid data type specified " );
+        return INVALID_FILE_SIZE;
+    }
+
+    // Get the file size
+    if ( stat( fileName.c_str(), &res ) == 0 )
+    {
+        size = static_cast<size_t>( res.st_size );
+    }
+
+    return size;
+}
+
+ErrorCode
+CacheAndPersist::read( uint8_t *const readBufPtr, size_t size, DataType dataType )
+{
+    ErrorCode status = SUCCESS;
+    std::string fileName;
+
+    if ( readBufPtr == nullptr )
+    {
+        return INVALID_DATA;
+    }
+
+    switch ( dataType )
+    {
+    case COLLECTION_SCHEME_LIST:
+        fileName = mCollectionSchemeListFile;
+        break;
+
+    case DECODER_MANIFEST:
+        fileName = mDecoderManifestFile;
+        break;
+
+    case EDGE_TO_CLOUD_PAYLOAD:
+        fileName = mCollectedDataFile;
+        break;
+
+    default:
+        status = INVALID_DATATYPE;
+        mLogger.error( "PersistencyManagement::read", " Invalid data type specified " );
+        return status;
+    }
+
+    std::ifstream file( fileName.c_str(), std::ios_base::binary | std::ios_base::in );
+
+    if ( !file.is_open() )
+    {
+        mLogger.error( "PersistencyManagement::read", " Error opening file" );
+        status = FILESYSTEM_ERROR;
+    }
+    else
+    {
+        size_t fileSize = getSize( dataType );
+        if ( fileSize == 0 )
+        {
+            status = EMPTY;
+        }
+        else
+        {
+            file.read( reinterpret_cast<char *>( readBufPtr ),
+                       static_cast<std::streamsize>( std::min( size, fileSize ) ) );
+            // coverity[uninit_use_in_call : SUPPRESS]
+            if ( file.fail() )
+            {
+                mLogger.error( "PersistencyManagement::read", " Error reading file" );
+                status = FILESYSTEM_ERROR;
+            }
+        }
+        file.close();
+    }
+
+    return status;
+}
+
+ErrorCode
+CacheAndPersist::erase( DataType dataType )
+{
+    ErrorCode status = SUCCESS;
+    std::string fileName;
+
+    switch ( dataType )
+    {
+    case COLLECTION_SCHEME_LIST:
+        fileName = mCollectionSchemeListFile;
+        break;
+
+    case DECODER_MANIFEST:
+        fileName = mDecoderManifestFile;
+        break;
+
+    case EDGE_TO_CLOUD_PAYLOAD:
+        fileName = mCollectedDataFile;
+        break;
+
+    default:
+        status = INVALID_DATATYPE;
+        mLogger.error( "PersistencyManagement::erase", " Invalid data type specified " );
+        return status;
+    }
+
+    // Delete the contents of the file
+    std::ofstream file( fileName.c_str(), std::ios_base::binary | std::ios_base::out | std::ios_base::trunc );
+
+    if ( !file.is_open() )
+    {
+        status = FILESYSTEM_ERROR;
+        mLogger.error( "PersistencyManagement::erase", " Error erasing the file " );
+    }
+    else
+    {
+
+        file.close();
+    }
+
+    return status;
+}
+
+const char *
+ICacheAndPersist::getErrorString( ErrorCode err )
+{
+    switch ( err )
+    {
+    case SUCCESS:
+        return "SUCCESS";
+    case MEMORY_FULL:
+        return "MEMORY_FULL";
+    case EMPTY:
+        return "EMPTY";
+    case FILESYSTEM_ERROR:
+        return "FILESYSTEM_ERROR";
+    case INVALID_DATATYPE:
+        return "INVALID_DATATYPE";
+    case INVALID_DATA:
+        return "INVALID_DATA";
+    default:
+        return "UNKNOWN";
+    }
+}

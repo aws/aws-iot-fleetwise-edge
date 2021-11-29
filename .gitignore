@@ -1,0 +1,7 @@
+*.pyc
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
+build*/
+compile_commands.json

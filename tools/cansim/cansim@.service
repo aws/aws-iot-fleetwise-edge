@@ -1,0 +1,13 @@
+[Unit]
+Description=CAN Simulator #%i
+After=setup-socketcan.service
+Wants=setup-socketcan.service
+
+[Service]
+Restart=always
+RestartSec=1
+ExecStart=/bin/bash /usr/share/cansim/run-cansim.sh %i
+WorkingDirectory=/usr/share/cansim
+
+[Install]
+WantedBy=multi-user.target

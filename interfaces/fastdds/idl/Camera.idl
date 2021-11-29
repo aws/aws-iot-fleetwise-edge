@@ -1,0 +1,44 @@
+// Maximum size of a frame e.g. 1024 * 1024 
+const long MAX_FRAME_SIZE = 1048576;
+const long MAX_FRAME_COUNT = 50;
+
+// A struct representing a single Frame.
+// Consists of the timestamp when the Frame was captured
+// and the actual frame data as a vector of bytes of MAX_FRAME_SIZE
+struct CameraFrame {
+
+    unsigned long long timestamp;
+    sequence<octet, MAX_FRAME_SIZE> frameData;
+};
+
+// A struct representing a Frame snapshot.
+// Consist of a unique identifier of the snapshot ( Event that triggered it)
+// and a vector of Frames of max size of MAX_IMAGES
+struct CameraDataItem {
+
+    // This allows FWE to identify the data item i.e. if it was requested
+    // or simply was put on the topic based on the ADAS system decision e.g. unknown object
+    // set to zero if this was triggered by the ADAS system.
+    string dataItemId;
+    // Metadata if any
+    unsigned long metadata;
+    // Frame Buffer which consists of a sequence of individual frames.
+    sequence <CameraFrame,MAX_FRAME_COUNT> frameBuffer;
+};
+
+
+struct CameraDataRequest {
+
+    // Unique Identifier of the request. Should be kept during response.
+    unsigned long dataItemId;  
+    // Options: Should include settings around compression or cropping if needed. Else default is raw.
+    map<octet, octet> options;
+
+    // Set of offsets building up a time interval.
+    // The frame service should return all frames that were captured by the camera sensor 
+    // between sample info source timestamp - negativeOffsetMs and + positiveOffsetMs
+    // Negative offset representing the number of milliseconds before the Sample Info source timestamp
+    unsigned long negativeOffsetMs;
+    // Positive offset representing the number of milliseconds after the Sample Info source timestamp
+    unsigned long positiveOffsetMs;
+};

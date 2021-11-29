@@ -1,0 +1,12 @@
+[Unit]
+Description=AWS IoT FleetWise Edge #%i
+After=network-online.target
+Wants=network-online.target setup-socketcan.service
+
+[Service]
+Restart=always
+RestartSec=1
+ExecStart=/usr/bin/aws-iot-fleetwise-edge /etc/aws-iot-fleetwise/config-%i.json
+
+[Install]
+WantedBy=multi-user.target

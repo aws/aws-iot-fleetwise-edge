@@ -1,0 +1,16 @@
+version: 0.0
+os: linux
+files:
+  - source: build/src/executionmanagement/aws-iot-fleetwise-edge
+    destination: /usr/bin/
+  - source: tools/deploy/fwe@.service
+    destination: /lib/systemd/system/
+hooks:
+  ApplicationStop:
+    - location: tools/deploy/stop-fwe.sh
+      timeout: 60
+      runas: root
+  ApplicationStart:
+    - location: tools/deploy/start-and-enable-fwe.sh
+      timeout: 60
+      runas: root
