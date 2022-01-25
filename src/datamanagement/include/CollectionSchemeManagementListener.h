@@ -34,7 +34,7 @@ struct CollectionSchemeManagementListener
      * arrives from the Cloud.
      *
      * @param collectionSchemeList ICollectionSchemeList from CollectionScheme Ingestion
-     **/
+     */
     virtual void onCollectionSchemeUpdate( const ICollectionSchemeListPtr &collectionSchemeList ) = 0;
 
     /**
@@ -42,7 +42,7 @@ struct CollectionSchemeManagementListener
      * Manifest arrives from the Cloud.
      *
      * @param decoderManifest IDecoderManifest from CollectionScheme Ingestion
-     **/
+     */
     virtual void onDecoderManifestUpdate( const IDecoderManifestPtr &decoderManifest ) = 0;
 };
 

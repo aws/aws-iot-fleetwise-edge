@@ -33,13 +33,22 @@ parse_args() {
 parse_args "$@"
 
 # Install packages
-apt update && apt install -y build-essential dkms can-utils git linux-modules-extra-`uname -r`
+apt update && apt install -y build-essential dkms can-utils git
+
+# For EC2, the SocketCAN modules vcan and can-gw are included in a separate package:
+if uname -r | grep -q aws; then
+    apt install -y linux-modules-extra-aws
+fi
 
 # Install can-isotp kernel module:
 git clone https://github.com/hartkopp/can-isotp.git
 cd can-isotp
 git checkout beb4650660179963a8ed5b5cbf2085cc1b34f608
 cd ..
+if [ -d /usr/src/can-isotp-1.0 ]; then
+    sudo dkms remove can-isotp/1.0 --all
+    sudo rm -rf /usr/src/can-isotp-1.0
+fi
 sudo mv can-isotp /usr/src/can-isotp-1.0
 sudo sed -e s/else// -e s/shell\ uname\ \-r/KERNELRELEASE/ -i /usr/src/can-isotp-1.0/Makefile
 sudo tee /usr/src/can-isotp-1.0/dkms.conf > /dev/null <<EOT
@@ -58,7 +67,7 @@ sudo dkms install -m can-isotp -v 1.0
 sudo cp /usr/src/can-isotp-1.0/include/uapi/linux/can/isotp.h /usr/include/linux/can
 
 # Load CAN modules, also at startup:
-sudo modprobe can-isotp can-gw
+sudo modprobe -a can-isotp can-gw
 printf "can-isotp\ncan-gw\n" | sudo tee /etc/modules-load.d/can.conf > /dev/null
 
 # Install setup-socketcan

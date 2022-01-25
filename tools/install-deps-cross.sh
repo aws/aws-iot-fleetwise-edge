@@ -93,6 +93,7 @@ git clone https://github.com/hartkopp/can-isotp.git
 cd can-isotp
 git checkout beb4650660179963a8ed5b5cbf2085cc1b34f608
 cp include/uapi/linux/can/isotp.h /usr/include/linux/can
+cd ..
 
 git clone -b v1.10.9 --recursive https://github.com/aws/aws-iot-device-sdk-cpp-v2.git
 cd aws-iot-device-sdk-cpp-v2

@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.10.2)
 
-project(iotfleetwise VERSION 0.1.0)
+project(iotfleetwise VERSION 0.1.1)
 
 # Due to autosar rules, AWS IoT FleetWise Edge will use C++11
 set(CMAKE_CXX_STANDARD 11)
@@ -21,6 +21,7 @@ option(FWE_CODE_COVERAGE "Enables code coverage" OFF)
 option(FWE_BUILD_DOC "Build documentation" ON)
 option(FWE_STRIP_SYMBOLS "Strips symbols from output binaries" OFF)
 option(FWE_FEATURE_CAMERA "Enable Camera Data Collection feature" OFF)
+
 
 option(FWE_SECURITY_COMPILE_FLAGS "Add security related compile options" OFF)
 

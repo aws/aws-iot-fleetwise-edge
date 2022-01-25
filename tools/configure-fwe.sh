@@ -20,6 +20,7 @@ CAN_BUS0="vcan0"
 USE_EXTENDED_IDS=false
 HAS_TRANSMISSION_ECU=false
 PERSISTENCY_PATH="/var/aws-iot-fleetwise/"
+TOPIC_PREFIX="\$aws/iotfleetwise/"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -48,16 +49,20 @@ parse_args() {
         --persistency-path)
             PERSISTENCY_PATH=$2
             ;;
+        --topic-prefix)
+            TOPIC_PREFIX=$2
+            ;;
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --input-config-file <CONFIG_FILE>   Input JSON config file"
             echo "  --output-config-file <CONFIG_FILE>  Output JSON config file"
             echo "  --vehicle-id <ID>                   Vehicle ID"
             echo "  --endpoint-url <URL>                IoT Core MQTT endpoint URL"
-            echo "  --can-bus0                          CAN bus 0, default vcan0"
+            echo "  --can-bus0 <BUS>                    CAN bus 0, default: ${CAN_BUS0}"
             echo "  --use-extended-ids                  Use extended CAN IDs for diagnostic communication"
             echo "  --has-transmission-ecu              Vehicle has automatic transmission"
-            echo "  --persistency-path <PATH>           Desired persistency path, default $PERSISTENCY_PATH"
+            echo "  --persistency-path <PATH>           Desired persistency path, default: ${PERSISTENCY_PATH}"
+            echo "  --topic-prefix <PREFIX>             IoT MQTT topic prefix, default: ${TOPIC_PREFIX}"
             exit 0
             ;;
         esac
@@ -93,10 +98,10 @@ fi
 # Create the config file:
 jq ".staticConfig.mqttConnection.endpointUrl=\"${ENDPOINT_URL}\"" ${INPUT_CONFIG_FILE} \
     | jq ".staticConfig.mqttConnection.clientId=\"${VEHICLE_ID}\"" \
-    | jq ".staticConfig.mqttConnection.collectionSchemeListTopic=\"\$aws/iotfleetwise/vehicles/${VEHICLE_ID}/collection_schemes\"" \
-    | jq ".staticConfig.mqttConnection.decoderManifestTopic=\"\$aws/iotfleetwise/vehicles/${VEHICLE_ID}/decoder_manifests\"" \
-    | jq ".staticConfig.mqttConnection.canDataTopic=\"\$aws/iotfleetwise/vehicles/${VEHICLE_ID}/signals\"" \
-    | jq ".staticConfig.mqttConnection.checkinTopic=\"\$aws/iotfleetwise/vehicles/${VEHICLE_ID}/checkins\"" \
+    | jq ".staticConfig.mqttConnection.collectionSchemeListTopic=\"${TOPIC_PREFIX}vehicles/${VEHICLE_ID}/collection_schemes\"" \
+    | jq ".staticConfig.mqttConnection.decoderManifestTopic=\"${TOPIC_PREFIX}vehicles/${VEHICLE_ID}/decoder_manifests\"" \
+    | jq ".staticConfig.mqttConnection.canDataTopic=\"${TOPIC_PREFIX}vehicles/${VEHICLE_ID}/signals\"" \
+    | jq ".staticConfig.mqttConnection.checkinTopic=\"${TOPIC_PREFIX}vehicles/${VEHICLE_ID}/checkins\"" \
     | jq ".staticConfig.mqttConnection.certificateFilename=\"/etc/aws-iot-fleetwise/certificate.pem\"" \
     | jq ".staticConfig.mqttConnection.privateKeyFilename=\"/etc/aws-iot-fleetwise/private-key.key\"" \
     | jq ".staticConfig.internalParameters.systemWideLogLevel=\"Info\"" \

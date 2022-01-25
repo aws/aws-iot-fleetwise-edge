@@ -17,10 +17,7 @@ option java_package = "com.amazonaws.iot.autobahn.schemas";
 package Aws.IoTFleetWise.Schemas.CollectionSchemesMsg;
 
 /*
- * List of collectionSchemes to be enacted by Edge
- * 
- * TODO: This schema requires all collectionSchemes every time a collectionSchemes changes. This is to be optimized after Alpha
- * to allow for sending or revoking individual
+ * List of collectionSchemes to be enacted by AWS IoT FleetWise Edge
  */
 message CollectionSchemes {
 
@@ -37,8 +34,8 @@ message CollectionSchemes {
 
 /*
  * A definition of an individual collectionScheme containing what/when/how to send vehicle data to cloud. A
- * collectionScheme can be condition based, where data is sent whenever a condition evaluates to true, or it
- * can be time based, where data is sent up at periodic intervals.
+ * collectionScheme can be condition based, with data sent whenever a condition evaluates to true, or it can be time
+ * based, with data sent at periodic intervals.
  */
 message CollectionScheme {
 
@@ -60,7 +57,7 @@ message CollectionScheme {
     /*
      * When collectionScheme should expire in milliseconds since the Unix epoch. This collectionScheme expiration date
      * is meant to serve as an end date for a collectionScheme so it does not keep running forever in the case
-     * that the vehicle permanently loses internet connection to the cloud
+     * that a vehicle permanently loses internet connection to the cloud
      */
     uint64 expiry_time_ms_epoch = 4;
 
@@ -74,15 +71,13 @@ message CollectionScheme {
     }
 
     /* 
-     * This specifies how much time to spend collecting data after a condition evaluates to true.
-     * When after_duration_ms elapses whatever data collected up to that point ( if any was present
-     * on the vehicle ) is sent to the cloud.
+     * This specifies how much time to spend collecting data after a condition evaluates to true. When after_duration_ms
+     * elapses whatever data collected up to that point ( if any was present on the vehicle ) is sent to the cloud.
      */
     uint32 after_duration_ms = 7;
 
     /* 
-     * All active DTCs including the time they were first seen active will be sent when the collectionScheme
-     * triggers. TODO: After alpha allow customer to select which DTCs to send back.
+     * All active DTCs including the time they were first seen active will be sent when the collectionScheme triggers.
      */
     bool include_active_dtcs = 8;
 
@@ -97,32 +92,24 @@ message CollectionScheme {
     repeated RawCanFrame raw_can_frames_to_collect = 10;
 
     /*
-     * When true all data will be written to persistant storage when vehicle doesn't not have an
-     * internet connection
+     * When true, all data will be written to persistent storage when vehicle doesn't not have an internet connection
      */
     bool persist_all_collected_data = 11;
 
     /*
-     * When true, collected data will be compressed and then sent to cloud. TODO: Add type of
-     * compression used.
+     * When true, collected data will be compressed and then sent to cloud.
      */
     bool compress_collected_data = 12;
 
     /*
-     * An integer between describing the priority for the data collection. CollectionSchemes with low
-     * priority numbers will have higher priority and will be processed first.
+     * An integer between describing the priority for the data collection. CollectionSchemes with low priority numbers
+     * will have higher priority and will be processed first.
      */
     uint32 priority = 13;
 
     /*
-    * Only as of protobuf 3.12 the optional keyword was reintroduced into proto3 and since 3.15 the flag
-    * --experimental_allow_proto3_optional has been made default for proto3. As we use an older
-    * version of protobuf the presence check if a field is present is not possible for singular
-    * numeric fields. And the default value for doubles returned if a field is not present is 0.
-    * So to make the presence check possible move the probability in its own message. For singular
-    * message the presence check is always possible.
-    * https://github.com/protocolbuffers/protobuf/blob/master/docs/field_presence.md
-    */
+     * An optional probabilities message indicating the probability that a CollectionScheme be enacted.
+     */
     Probabilities probabilities = 14;
 
     /*
@@ -133,13 +120,8 @@ message CollectionScheme {
 
 message Probabilities{
     /*
-     * Double between 0 and 1 giving the probability after the condition is met
-     * and the minimum interval is over that the message should be actually be sent out
-     * 0: send never, 1: send always. A uniform random number (0-1) is generated before sending the 
-     * data to cloud and compared to this probability. If lower then data will be sent out.
-     * The minimum interval will start again even when the random number decides to not sent out 
-     * the data.
-     * It is both useable for condition and time based collectionSchemes.
+     * Double between 0 and 1 giving the probability after a condition is met.
+     * 0: never send, 1: send always. It is usable for both condition and time based collectionSchemes.
      */
      double probability_to_send = 1;
 }
@@ -150,8 +132,8 @@ message Probabilities{
 message TimeBasedCollectionScheme {
 
     /*
-     * Time in milliseconds that will be interval of a time based collectionScheme if is_time_based_collection_scheme is
-     * set to true. This is not used if is_time_based_collection_scheme is set false.
+     * Time in milliseconds that will be the interval of a time based collectionScheme if is_time_based_collection_scheme is
+     * set to true. This field is unused if is_time_based_collection_scheme is set false.
      */
     uint32 time_based_collection_scheme_period_ms = 1;
 }
@@ -162,14 +144,14 @@ message TimeBasedCollectionScheme {
 message ConditionBasedCollectionScheme {
 
     /*
-     * The minimum time in milliseconds required to elapse between conditions that evaluate to true
-     * for data to be sent to the cloud.
+     * The minimum time in milliseconds required to elapse between conditions that evaluate to true for data to be sent
+     * to the cloud.
      */
     uint32 condition_minimum_interval_ms = 1;
 
     /*
-     * The version number associated with the event condition language used in the abstract syntax
-     * tree. We are starting at 0 for alpha and we will increment as we add features
+     * The version number associated with the event condition language used in the abstract syntax tree. We are starting
+     * at 0 for alpha and we will increment as we add features
      */
     uint32 condition_language_version = 2;
 
@@ -179,8 +161,8 @@ message ConditionBasedCollectionScheme {
     ConditionNode condition_tree = 3;
 
     /*
-     * Edge can monitor the previous state of a condition and use this information to allow the
-     * customer to set a trigger mode similar to an oscillascope trigger.
+     * Edge can monitor the previous state of a condition and use this information to allow the customer to set a
+     * trigger mode similar to an oscilloscope trigger.
      */
     enum ConditionTriggerMode {
 
@@ -190,29 +172,26 @@ message ConditionBasedCollectionScheme {
         TRIGGER_ALWAYS = 0;
 
         /*
-         * Condition will evaluate to true only when it previously evaulated to false
+         * Condition will evaluate to true only when it previously evaluated to false
          */
         TRIGGER_ONLY_ON_RISING_EDGE = 1;
-
-        //TODO: Add support to triggering on falling edge
     }
 
     /*
-     * A triggering mode can be applied to the condition to take in account the previous state of
-     * the condition.
+     * A triggering mode can be applied to the condition to take in account the previous state of the condition.
      */
     ConditionTriggerMode condition_trigger_mode = 4;
 }
 
 /*
- * This message contains information of signals that are to be collected and sent to cloud, or are
- * part of the condition logic and require attribute information.
+ * This message contains information of signals that are to be collected and sent to cloud, or are part of the condition
+ * logic and require attribute information.
  */
 message SignalInformation {
 
     /*
-     * Unique identifier of a Signal. Maps directly to a signal defined in the decoder manifest.
-     * Signal can also be an OBD PID.
+     * Unique identifier of a Signal. Maps directly to a signal defined in the decoder manifest.  Signal can also be an
+     * OBDII PID.
      */
     uint32 signal_id = 1;
 
@@ -222,21 +201,20 @@ message SignalInformation {
     uint32 sample_buffer_size = 2;
 
     /*
-     * Minimum time period in milliseconds that must elapse between collecting samples. Samples
-     * arriving faster than this period will be dropped. A value of 0 will collect samples as fast
-     * as they arrive.
+     * Minimum time period in milliseconds that must elapse between collecting samples. Samples arriving faster than
+     * this period will be dropped. A value of 0 will collect samples as fast as they arrive.
      */
     uint32 minimum_sample_period_ms = 3;
 
     /*
-     * The size of a fixed window in milliseconds which will be used by aggregate condition
-     * functions to calculate min/max/avg etc.
+     * The size of a fixed window in milliseconds which will be used by aggregate condition functions to calculate
+     * min/max/avg etc.
      */
     uint32 fixed_window_period_ms = 4;
 
     /* 
-     * When true, this signal will not be collected and sent to cloud. It will only be used in the
-     * condition logic with its associated fixed_window_period_ms. Default is false.
+     * When true, this signal will not be collected and sent to cloud. It will only be used in the condition logic with
+     * its associated fixed_window_period_ms. Default is false.
      */
     bool condition_only_signal = 5;
 }
@@ -250,6 +228,7 @@ message ConditionNode {
      * Each Abstract Syntax Tree node can be one of the following types
      */
     oneof node {
+
         /*
          * An operator node can perform an operation or comparisons on its child node(s)
          */
@@ -261,27 +240,24 @@ message ConditionNode {
         NodeFunction node_function = 2;
 
         /*
-         * A node containing a floating point constant which can be used as a child node to operator
-         * nodes.
+         * A node containing a floating point constant which can be used as a child node to operator nodes.
          */
         double node_double_value = 3;
 
         /*
-         * A node containing a signal id, whose value will be evaluated every time that signal is
-         * received on the vehicle network bus.
+         * A node containing a signal id, whose value will be evaluated every time that signal is received on the
+         * vehicle network bus.
          */
         uint32 node_signal_id = 4;
 
         /*
-         * A node containing a boolean constant which can be used as a child node to an operator
-         * node.
+         * A node containing a boolean constant which can be used as a child node to an operator node.
          */
-        bool node_boolean_value = 5;
-    }
+        bool node_boolean_value = 5; }
 
     /*
-     * Operator node types contain one or two children. If they are unary operator type nodes, only
-     * the left child will be used
+     * Operator node types contain one or two children. If they are unary operator type nodes, only the left child will
+     * be used
      */
     message NodeOperator{
 
@@ -333,25 +309,25 @@ message ConditionNode {
     }
 
     /*
-     * Function node is a self-contained module that accomplish a specific task. 
-     * It takes inputs provided here and output based on specific logic 
+     * Function node is a self-contained module that accomplish a specific task.  It takes inputs provided here and
+     * output based on specific logic 
      */
     message NodeFunction{
 
         /*
-         * The function node could be one of the following funtion types. 
+         * The function node could be one of the following function types. 
          */
         oneof functionType {
 
             /*
-             * A Window function node will sample a signal for the duration specifed by fixed_window_period_ms
-             * and then run an aggregation funcion over the samples and evaluate to a double.
+             * A Window function node will sample a signal for the duration specified by fixed_window_period_ms and then
+             * run an aggregation function over the samples and evaluate to a double.
              */
             WindowFunction window_function = 1;
 
             /*
-             * Geohash function Node that evaluates whether Edge has changed Geohash
-             * It returns true if the Geohash has changed at given precision. Otherwise return false
+             * Geohash function Node that evaluates whether Edge has changed Geohash. It returns true if the Geohash
+             * has changed at given precision and otherwise return false
              */
             GeohashFunction geohash_function = 2;
         }
@@ -374,23 +350,21 @@ message ConditionNode {
             uint32 longitude_signal_id = 2;
 
             /*
-             * The geohash precision for dynamic data collection
-             * Note geohash precision is defined as the length of hash characters (base 32 encoding). 
-             * Longer hash will have higher precision than shorter hash.
+             * The geohash precision for dynamic data collection Note geohash precision is defined as the length of hash
+             * characters (base 32 encoding).  Longer hash will have higher precision than shorter hash.
              * see more details: https://en.wikipedia.org/wiki/Geohash
              */
             uint32 geohash_precision = 3;
 
             /*
-             * The unit for decoded latitude / longitude signal. GPS Signal might be decoded into different unit 
-             * according to the DBC file. For instance, DBC for Chevy Equinox is using
-             * milliarcsecond. 1 milliarcsecond = 1 / 3600000 degree.
+             * The unit for decoded latitude / longitude signal. GPS Signal might be decoded into different unit
+             * according to the DBC file.
              */
             GPSUnitType gps_unit = 4;
 
             /*
-             * The unit type for decoded latitude / longitude signal. This list might be extended in
-             * future to accommodate different vehicle models.
+             * The unit type for decoded latitude / longitude signal. This list might be extended in future to
+             * accommodate different vehicle models.
              */
             enum GPSUnitType {
                 DECIMAL_DEGREE = 0;
@@ -406,8 +380,8 @@ message ConditionNode {
         message WindowFunction{
 
             /*
-             * signal id of value to run a function on. The fixed_window_period_ms associated in
-             * signalInformation will be used.
+             * signal id of value to run a function on. The fixed_window_period_ms associated in signalInformation will
+             * be used.
              */
             uint32 signal_id = 1;
             
@@ -444,15 +418,14 @@ message ConditionNode {
 message RawCanFrame {
 
     /*
-     * The interface ID speficied by the Decoder Manifest. This will contain the physical channel
-     * id of the hardware CAN Bus the frame is present on.
+     * The interface ID specified by the Decoder Manifest. This will contain the physical channel id of the hardware CAN
+     * Bus the frame is present on.
      */
-
     string can_interface_id = 1;
 
     /*
-     * CAN Message ID to collect. This Raw CAN message will be collected. Whatever number of bytes
-     * present on the bus for this message ID will be collected.
+     * CAN Message ID to collect. This Raw CAN message will be collected. Whatever number of bytes present on the bus
+     * for this message ID will be collected.
      */
     uint32 can_message_id = 2;
 
@@ -462,9 +435,8 @@ message RawCanFrame {
     uint32 sample_buffer_size = 3;
     
     /*
-     * Minimum time period in milliseconds that must elapse between collecting samples. Samples
-     * arriving faster than this period will be dropped. A value of 0 will collect samples as fast
-     * as they arrive.
+     * Minimum time period in milliseconds that must elapse between collecting samples. Samples arriving faster than
+     * this period will be dropped. A value of 0 will collect samples as fast as they arrive.
      */
     uint32 minimum_sample_period_ms = 4;
 }
@@ -474,7 +446,6 @@ message ImageData{
     /*
      * Image Source Node ID which contain network interface information needed to access the image source.
      *
-     * TODO: Add an ImageSourceInterfaceNode in the DecoderManifest. Currently FWE will only use one image source node
      */
     uint32 image_source_node_id = 1;
 
@@ -489,7 +460,7 @@ message ImageData{
     oneof image_collection_method {
 
         /*
-         * A timebased window of before and after time relative to an event trigger.
+         * A time based window of before and after time relative to an event trigger.
          */
         TimeBasedImageData time_based_image_data = 3;
     }

@@ -38,7 +38,8 @@
         },
         "persistency": {
             "persistencyPath": "/path/to/collection-scheme-and-data-persistency",
-            "persistencyPartitionMaxSize": 524288
+            "persistencyPartitionMaxSize": 524288,
+            "persistencyUploadRetryInterval" : 10000
         },
         "internalParameters": {
             "readyToPublishDataBufferSize": 10000,

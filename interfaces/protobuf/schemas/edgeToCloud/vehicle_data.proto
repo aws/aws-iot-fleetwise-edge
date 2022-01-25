@@ -17,8 +17,8 @@ option java_package = "com.amazonaws.iot.autobahn.schemas";
 package Aws.IoTFleetWise.Schemas.VehicleDataMsg;
 
 /*
- * VehicleData payload from IoTFleetWise Edge for all events triggered by CollectionSchemes including
- * condition based events and periodic time based events.
+ * VehicleData payload from IoTFleetWise Edge for all events triggered by CollectionSchemes including condition based
+ * events and periodic time based events.
  */
 message VehicleData {
 
@@ -27,7 +27,8 @@ message VehicleData {
      */
     string campaign_arn = 1;
     
-    /** Amazon Resource Name of the decoder manifest used to decode the signals in this message
+    /*
+     * Amazon Resource Name of the decoder manifest used to decode the signals in this message
      */
     string decoder_arn = 2;
 
@@ -73,15 +74,14 @@ message CapturedSignal {
     sint64 relative_time_ms = 1;
 
     /*
-     * The signal id of the physical value of a signal that was captured. This maps directly to
-     * signal IDs provided in the collection schemes and decoder manifest. Signals can come from
-     * normal CAN traffic or OBD-II PIDs. In the case of OBD-II PIDs, Signal ID will only map to one
-     * of those signals, as per the decoder manifest.
+     * The signal id of the physical value of a signal that was captured. This maps directly to signal IDs provided in
+     * the collection schemes and decoder manifest. Signals can come from normal CAN traffic or OBD-II PIDs. In the case
+     * of OBD-II PIDs, Signal ID will only map to one of those signals, as per the decoder manifest.
      */
     uint32 signal_id = 2;
 
     /*
-     * Datatypes of physical signal values. This can be extended to add other dataypes.
+     * Data types of physical signal values.
      */
     oneof SignalValue {
 
@@ -135,16 +135,13 @@ message DtcData {
 message Geohash {
 
     /*
-     * Geohash in string format. It's encoded in base 32 format. 
-     * Currently we always upload the maximum resolution of geohash.
-     * The string is always 9 characters long.
+     * Geohash in string format. It's encoded in base 32 format. The maximum resolution of geohash is used and the string is always 9 characters long.
      */
     string geohash_string = 1;
 
     /*
-     * Previous  Geohash in string format. It's encoded in base 32 format. 
-     * Currently we always upload the maximum resolution of geohash.
-     * The string is always 9 characters long.
+     * Previous Geohash in string format encoded in base 32 format. The maximum resolution of geohash is used and the
+     * string is always 9 characters long.     
      */
     string prev_reported_geohash_string = 2;
 }

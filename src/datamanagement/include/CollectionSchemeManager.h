@@ -51,13 +51,13 @@ using TimeData = std::pair<TimePointInMsec, std::string>;
  * @brief main CollectionScheme Management entity - responsible for the following:
  * 1. Listens to collectionScheme ingestion to get CollectionSchemeList and DecoderManifest
  * 2. Process CollectionSchemeList to generate timeLine in chronological order, organize CollectionSchemeList into
-Enabled and Idle lists;
+   Enabled and Idle lists;
  * 3. Wait for timer to elapse on TimePointInMsecond along timeLine chronologically, re-org Enabled and Idle list;
  * 4. Extract decoding dictionary and propagate to Network Channel Consumer;
  * 5. Extract Inspection Matrix and propagate to Inspection Engine;
  * 6. Delete expired collectionSchemes from Enabled list, or removed collectionScheme from existing list per Cloud
-request.
- **/
+  request.
+ */
 
 class CollectionSchemeManager : public ICollectionSchemeManager,
                                 public CollectionSchemeManagementListener,

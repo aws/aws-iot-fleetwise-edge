@@ -63,7 +63,7 @@ public:
      * @param endpointUrl the endpoint URL normally in the format like
      *                          "[YOUR-THING]-ats.iot.us-west-2.amazonaws.com"
      * @param clientId the id that is used to identify this connection instance
-     * @param asynchronous if true launch a background thread
+     * @param asynchronous if true launch a background thread.
      * @return True if connecting was successful in the synchronous case or if asynchronous true if the establish
      * connection retry thread was successfully started
      */
@@ -111,6 +111,16 @@ public:
 
     void onFinished( RetryStatus code ) override;
 
+    /**
+     * @brief create a new channel sharing the connection of this module
+     * This call needs to be done before calling connect for all asynchronous subscribe channel
+     * @param payloadManager the payload manager used by the new channel,
+     * @param maximumIotSDKHeapMemoryBytes the iot sdk heap threshold in bytes after which this channel will stop
+     * sending data
+     *
+     * @return a pointer to the newly created channel. A reference to the newly created channel is also hold inside this
+     * module.
+     */
     std::shared_ptr<AwsIotChannel> createNewChannel(
         const std::shared_ptr<PayloadManager> &payloadManager,
         uint64_t maximumIotSDKHeapMemoryBytes = AwsIotChannel::MAXIMUM_IOT_SDK_HEAP_MEMORY_BYTES );

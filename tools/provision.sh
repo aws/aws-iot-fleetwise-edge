@@ -50,12 +50,12 @@ parse_args() {
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --vehicle-id <ID>                     Vehicle ID"
-            echo "  --certificate-pem-outfile <FILENAME>  Certificate output file, default certificate.pem"
-            echo "  --private-key-outfile <FILENAME>      Private key output file, default private-key.key"
+            echo "  --certificate-pem-outfile <FILENAME>  Certificate output file, default: ${CERT_OUT_FILE}"
+            echo "  --private-key-outfile <FILENAME>      Private key output file, default: ${PRIVATE_KEY_OUT_FILE}"
             echo "  --endpoint-url-outfile <FILENAME>     Endpoint URL for MQTT connections output file"
             echo "  --vehicle-id-outfile <FILENAME>       Vehicle ID output file"
             echo "  --endpoint-url <URL>                  The endpoint URL used for AWS CLI calls"
-            echo "  --region                              The region used for AWS CLI calls. Default: us-east-1"
+            echo "  --region                              The region used for AWS CLI calls, default: ${REGION}"
             exit 0
             ;;
         esac

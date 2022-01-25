@@ -31,8 +31,13 @@ using namespace Aws::IoTFleetWise::Platform::PersistencyManagement;
 using Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams;
 using Aws::IoTFleetWise::OffboardConnectivity::ConnectivityError;
 
+const uint32_t IoTFleetWiseEngine::MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG = 6;
+const uint64_t IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 1000;
+const uint64_t IoTFleetWiseEngine::DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 10000;
+
 IoTFleetWiseEngine::IoTFleetWiseEngine()
-    : mAwsIotChannelMetricsUpload( nullptr )
+    : mPersistencyUploadRetryIntervalMs( 0 )
+    , mAwsIotChannelMetricsUpload( nullptr )
     , mAwsIotChannelLogsUpload( nullptr )
 {
     TraceModule::get().sectionBegin( FWE_STARTUP );
@@ -68,7 +73,15 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         {
             mLogger.error( "IoTFleetWiseEngine::connect", " Failed to init persistency library " );
         }
-
+        if ( config["staticConfig"]["persistency"].isMember( "PersistencyUploadRetryIntervalMs" ) )
+        {
+            mPersistencyUploadRetryIntervalMs =
+                static_cast<uint64_t>( config["staticConfig"]["PersistencyUploadRetryIntervalMs"].asInt() );
+        }
+        else
+        {
+            mPersistencyUploadRetryIntervalMs = DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS;
+        }
         // Payload Manager for offline data management
         mPayloadManager = std::make_shared<PayloadManager>( mPersistDecoderManifestCollectionSchemesAndData );
 
@@ -90,11 +103,6 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         /**************************Connectivity bootstrap begin*******************************/
 
         mAwsIotModule = std::make_shared<AwsIotConnectivityModule>();
-        mAwsIotModule->connect( config["staticConfig"]["mqttConnection"]["privateKeyFilename"].asString(),
-                                config["staticConfig"]["mqttConnection"]["certificateFilename"].asString(),
-                                config["staticConfig"]["mqttConnection"]["endpointUrl"].asString(),
-                                config["staticConfig"]["mqttConnection"]["clientId"].asString(),
-                                true );
 
         // Only CAN data channel needs a payloadManager object for persistency and compression support,
         // for other components this will be nullptr
@@ -142,6 +150,13 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             config["staticConfig"]["internalParameters"]["useJsonBasedCollectionScheme"].asBool(),
             config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asUInt(),
             canIDTranslator );
+
+        // For asynchronous connect the call needs to be done after all channels created and setTopic calls
+        mAwsIotModule->connect( config["staticConfig"]["mqttConnection"]["privateKeyFilename"].asString(),
+                                config["staticConfig"]["mqttConnection"]["certificateFilename"].asString(),
+                                config["staticConfig"]["mqttConnection"]["endpointUrl"].asString(),
+                                config["staticConfig"]["mqttConnection"]["clientId"].asString(),
+                                true );
 
         /*************************Connectivity bootstrap end***************************************/
 
@@ -627,10 +642,10 @@ IoTFleetWiseEngine::doWork( void *data )
     IoTFleetWiseEngine *engine = static_cast<IoTFleetWiseEngine *>( data );
     // Time in seconds
     double timeTrigger = 0;
+    bool uploadedPersistedDataOnce = false;
     TraceModule::get().sectionEnd( FWE_STARTUP );
 
-    // Check if data was persisted, Retrieve all the data and send
-    engine->checkAndSendRetrievedData();
+    engine->mRetrySendingPersistedDataTimer.reset();
 
     while ( !engine->shouldStop() )
     {
@@ -644,10 +659,34 @@ IoTFleetWiseEngine::doWork( void *data )
 
         engine->mTimer.reset();
         uint32_t elapsedTimeUs = 0;
+        if ( !uploadedPersistedDataOnce )
+        {
+            // Minimum delay one tenth of FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS
+            uint64_t timeToWaitMs =
+                IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS -
+                std::min( static_cast<uint64_t>( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ),
+                          IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS );
+            timeTrigger = static_cast<double>( std::max(
+                              IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS / 10, timeToWaitMs ) ) /
+                          1000.0;
+        }
+        else if ( engine->mPersistencyUploadRetryIntervalMs > 0 )
+        {
+            uint64_t timeToWaitMs =
+                engine->mPersistencyUploadRetryIntervalMs -
+                std::min( static_cast<uint64_t>( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ),
+                          engine->mPersistencyUploadRetryIntervalMs );
+            timeTrigger = static_cast<double>(
+                              std::max( IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS, timeToWaitMs ) ) /
+                          1000.0;
+        }
         if ( timeTrigger > 0 )
         {
-            engine->mLogger.trace( "IoTFleetWiseEngine::doWork",
-                                   "Waiting for :" + std::to_string( timeTrigger ) + "seconds" );
+            engine->mLogger.trace(
+                "IoTFleetWiseEngine::doWork",
+                "Waiting for :" + std::to_string( timeTrigger ) + "seconds " +
+                    std::to_string( engine->mPersistencyUploadRetryIntervalMs ) + " config" +
+                    std::to_string( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) + " timer" );
             engine->mWait.wait( static_cast<uint32_t>( timeTrigger * 1000 ) );
         }
         else
@@ -687,6 +726,21 @@ IoTFleetWiseEngine::doWork( void *data )
                 engine->mDataCollectionSender->send( triggeredCollectionSchemeDataPtr );
             } );
         TraceModule::get().setVariable( QUEUE_INSPECTION_TO_SENDER, consumedElements );
+
+        if ( ( engine->mPersistencyUploadRetryIntervalMs > 0 &&
+               ( static_cast<uint64_t>( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) >=
+                 engine->mPersistencyUploadRetryIntervalMs ) ) ||
+             ( !uploadedPersistedDataOnce &&
+               ( static_cast<uint64_t>( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) >=
+                 IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS ) ) )
+        {
+            engine->mRetrySendingPersistedDataTimer.reset();
+            if ( engine->mAwsIotModule->isAlive() )
+            {
+                // Check if data was persisted, Retrieve all the data and send
+                uploadedPersistedDataOnce |= engine->checkAndSendRetrievedData();
+            }
+        }
     }
 }
 
@@ -696,7 +750,7 @@ IoTFleetWiseEngine::onDataReadyToPublish()
     mWait.notify();
 }
 
-void
+bool
 IoTFleetWiseEngine::checkAndSendRetrievedData()
 {
     std::vector<std::string> payloads;
@@ -707,8 +761,8 @@ IoTFleetWiseEngine::checkAndSendRetrievedData()
     if ( status == SUCCESS )
     {
         ConnectivityError res = ConnectivityError::Success;
-        mLogger.info( "IoTFleetWiseEngine::checkAndSendRetrievedData",
-                      "Number of Payloads to transmit : " + std::to_string( payloads.size() ) );
+        mLogger.trace( "IoTFleetWiseEngine::checkAndSendRetrievedData",
+                       "Number of Payloads to transmit : " + std::to_string( payloads.size() ) );
 
         for ( const auto &payload : payloads )
         {
@@ -732,16 +786,20 @@ IoTFleetWiseEngine::checkAndSendRetrievedData()
             // All the stored data has been transmitted, erase the file contents
             mPersistDecoderManifestCollectionSchemesAndData->erase( EDGE_TO_CLOUD_PAYLOAD );
             mLogger.info( "IoTFleetWiseEngine::checkAndSendRetrievedData",
-                          "All Payloads successfully successfully sent to the backend" );
+                          "All " + std::to_string( payloads.size() ) + " Payloads successfully sent to the backend" );
+            return true;
         }
+        return false;
     }
     else if ( status == EMPTY )
     {
-        mLogger.info( "IoTFleetWiseEngine::checkAndSendRetrievedData", "No Payloads to Retrieve" );
+        mLogger.trace( "IoTFleetWiseEngine::checkAndSendRetrievedData", "No Payloads to Retrieve" );
+        return true;
     }
     else
     {
         mLogger.error( "IoTFleetWiseEngine::checkAndSendRetrievedData", "Payload Retrieval Failed" );
+        return false;
     }
 }
 

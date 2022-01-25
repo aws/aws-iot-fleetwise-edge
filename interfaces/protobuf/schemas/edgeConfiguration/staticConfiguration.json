@@ -178,6 +178,10 @@
                         "persistencyPartitionMaxSize": {
                             "type": "integer",
                             "description": "Maximum size allocated for persistency (Bytes)"
+                        },
+                        "persistencyUploadRetryIntervalMs": {
+                            "type": "integer",
+                            "description": "Interval to wait before retrying to upload persisted signal data (in milliseconds). After successfully uploading, the persisted signal data will be cleared. Only signal data that could not be uploaded will be persisted. Defaults to 10 seconds."
                         }
                     },
                     "required": [

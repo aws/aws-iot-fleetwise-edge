@@ -239,7 +239,7 @@ CacheAndPersist::read( uint8_t *const readBufPtr, size_t size, DataType dataType
     }
     else
     {
-        size_t fileSize = getSize( dataType );
+        size_t fileSize = std::min( mMaxPersistencePartitionSize, getSize( dataType ) );
         if ( fileSize == 0 )
         {
             status = EMPTY;

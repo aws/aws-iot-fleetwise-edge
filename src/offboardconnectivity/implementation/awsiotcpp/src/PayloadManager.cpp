@@ -58,7 +58,7 @@ PayloadManager::preparePayload( uint8_t *const buf,
     payloadHdr.compressionRequired = collectionSchemeParams.compression;
 
     memcpy( &buf[0], &payloadHdr, hdrSize );
-    strncpy( reinterpret_cast<char *>( &buf[hdrSize] ), data.c_str(), payloadHdr.size );
+    memcpy( reinterpret_cast<char *>( &buf[hdrSize] ), data.data(), payloadHdr.size );
 
     return true;
 }
@@ -113,8 +113,8 @@ PayloadManager::storeData( const std::uint8_t *buf,
             // set the successful storage flag to true
             isDataPersisted = true;
             mLogger.trace( "PayloadManager::storeData",
-                           "Payload of size : " + std::to_string( totalWriteSize ) +
-                               "Bytes has been successfully persisted" );
+                           "Payload of size : " + std::to_string( totalWriteSize ) + " Bytes (header: " +
+                               std::to_string( sizeof( PayloadHeader ) ) + ") has been successfully persisted" );
         }
         else
         {
@@ -178,8 +178,10 @@ PayloadManager::retrieveData( std::vector<std::string> &data )
             if ( !payloadHdr.compressionRequired )
             {
                 mLogger.trace( "PayloadManager::retrieveData",
-                               "CollectionScheme does not require compression, uncompress before transmitting the "
-                               "persisted data." );
+                               "CollectionScheme does not require compression, uncompress " +
+                                   std::to_string( dataString.size() ) +
+                                   " bytes before transmitting the "
+                                   "persisted data." );
                 if ( !snappy::Uncompress( dataString.data(), dataString.size(), &payloadData ) )
                 {
                     mLogger.error(

@@ -68,7 +68,10 @@ using namespace Aws::IoTFleetWise::OffboardConnectivityAwsIot;
 class IoTFleetWiseEngine : public IDataReadyToPublishListener
 {
 public:
-    static const uint32_t MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG = 6;
+    static const uint32_t MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG;
+    static const uint64_t FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS;    // retry every second
+    static const uint64_t DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS; // retry every 10 second
+
     IoTFleetWiseEngine();
     virtual ~IoTFleetWiseEngine();
     bool connect( const Json::Value &config );
@@ -86,9 +89,9 @@ public:
     /**
      * @brief Check if the data was persisted in the last cycle due to no offboardconnectivity,
      *        retrieve all the data and send
-     *
+     * @return true if either no data persisted or all persisted data was handed over to connectivity
      */
-    void checkAndSendRetrievedData();
+    bool checkAndSendRetrievedData();
 
 private:
     // atomic state of the bus. If true, we should stop
@@ -108,6 +111,9 @@ private:
 
     Platform::Signal mWait;
     Timer mTimer;
+    Timer mRetrySendingPersistedDataTimer;
+    uint64_t mPersistencyUploadRetryIntervalMs;
+
     LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     std::unique_ptr<NetworkChannelBinder> mBinder;
@@ -115,9 +121,6 @@ private:
 
     std::shared_ptr<OBDOverCANModule> mOBDOverCANModule;
     std::shared_ptr<DataCollectionSender> mDataCollectionSender;
-
-    EventTriggers mSignalEventTriggers;
-    EventTrigger mTimerBasedTrigger;
 
     std::shared_ptr<AwsIotConnectivityModule> mAwsIotModule;
     std::shared_ptr<AwsIotChannel> mAwsIotChannelSendCanData;

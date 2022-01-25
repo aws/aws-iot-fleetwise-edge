@@ -42,9 +42,8 @@ message CANSignal {
   uint32 signal_id = 1;
 
   /*
-   * Interface ID for CAN network interface this signal is found on.
-   * The CAN network interface details are provided as a part of the edge static
-   * configuration file.
+   * Interface ID for CAN network interface this signal is found on. The CAN network interface details are provided as
+   * a part of the edge static configuration file.
    */
   string interface_id = 2;
 
@@ -85,8 +84,8 @@ message CANSignal {
 }
 
 /*
- * This is the OBDII-PID signal decoding rule. One OBDII-PID could contain
- * multiple signals. Below section is the decoder rule per signal, not per PID
+ * This is the OBDII-PID signal decoding rule. One OBDII-PID could contain multiple signals. Below section is the
+ * decoder rule per signal, not per PID
  */
 message OBDPIDSignal {
 
@@ -96,15 +95,13 @@ message OBDPIDSignal {
   uint32 signal_id = 1;
 
   /*
-   * Interface ID for CAN network interface this signal is found on.
-   * The CAN network interface details are provided as a part of the edge static
-   * configuration file.
+   * Interface ID for CAN network interface this signal is found on. The CAN network interface details are provided as
+   * a part of the edge static configuration file.
    */
   string interface_id = 2;
 
   /*
-   * Length of the PID response. Note this is not the signal byte length as PID
-   * might contain multiple signals
+   * Length of the PID response. Note this is not the signal byte length as PID might contain multiple signals
    */
   uint32 pid_response_length = 3;
 
@@ -120,7 +117,7 @@ message OBDPIDSignal {
 
   /*
    * scaling to decode OBD from raw bytes to double value
-   * e.g. A * 0.0125 - 40. scaling is 0.01
+   * e.g. A * 0.0125 - 40. Scaling is 0.0125
    */
   double scaling = 6;
 
@@ -131,9 +128,8 @@ message OBDPIDSignal {
   double offset = 7;
 
   /*
-   * the start byte order (starting from 0th) for this signal in its PID query
-   * response e.g. PID 0x14 contains two signals. SHRFT is the second byte. Its
-   * startByte is 1
+   * the start byte order (starting from 0th) for this signal in its PID query response 
+   * e.g. PID 0x14 contains two signals, with Signal B located in the 2nd byte startByte is 1
    */
   uint32 start_byte = 8;
 
@@ -144,18 +140,16 @@ message OBDPIDSignal {
   uint32 byte_length = 9;
 
   /*
-   * Right shift on bits to decode this signal from raw bytes. Note the bit
-   * manipulation is only performed when byteLength is 1. e.g. Boost Pressure B
-   * Control Status is bit 2, 3 on byte J. The right shift shall be 2 For
+   * Right shift on bits to decode this signal from raw bytes. Note the bit manipulation is only performed when
+   * byteLength is 1. e.g. Boost Pressure B Control Status is bit 2, 3 on byte J. The right shift shall be 2 For
    * non-bitmask signals, the right shift shall always be 0
    */
   uint32 bit_right_shift = 10;
 
   /*
-   * bit Mask Length to be applied to decode this signal from raw byte. Note the
-   * bit manipulation is only performed when byteLength is 1. e.g. Boost
-   * Pressure B Control Status is bit 2, 3 on byte J. The bit Mask Length would
-   * be 2 For non-bitmask signals, the bit Mask Length shall always be 8.
+   * bit Mask Length to be applied to decode this signal from raw byte. Note the bit manipulation is only performed when
+   * byteLength is 1. e.g. Boost Pressure B Control Status is bit 2, 3 on byte J. The bit Mask Length would be 2 For
+   * non-bitmask signals, the bit Mask Length shall always be 8.
    */
   uint32 bit_mask_length = 11;
 }

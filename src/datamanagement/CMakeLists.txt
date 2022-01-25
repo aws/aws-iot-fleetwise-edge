@@ -19,7 +19,10 @@ add_library(
   src/CollectionSchemeIngestion.cpp
   src/DecoderManifestIngestion.cpp
   src/CollectionSchemeIngestionList.cpp
-  src/CollectionSchemeManager.cpp
+  src/CollectionSchemeManager/CollectionSchemeManager.cpp
+  src/CollectionSchemeManager/CheckinAndPersistency.cpp
+  src/CollectionSchemeManager/DecoderDictionaryExtractor.cpp
+  src/CollectionSchemeManager/InspectionMatrixExtractor.cpp
 )
 
 find_path(JSONCPP_INCLUDE_DIR "json/json.h" PATH_SUFFIXES "jsoncpp")
