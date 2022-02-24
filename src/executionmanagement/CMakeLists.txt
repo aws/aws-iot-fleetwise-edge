@@ -68,3 +68,46 @@ install(
   DESTINATION include
 )
 
+### Tests ###
+
+if(${BUILD_TESTING})
+  message(STATUS "Building tests for ${libraryTargetName}")
+
+  
+
+  find_package(GTest REQUIRED)
+
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/em-example-config.json
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/em-example-config-corrupt.json
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+  set(
+      testSources
+      test/IoTFleetWiseConfigTest.cpp
+      test/IoTFleetWiseEngineTest.cpp
+    )
+   # Add the executable targets
+  foreach(testSource ${testSources})
+    # Need a name for each exec so use filename w/o extension
+    get_filename_component(testName ${testSource} NAME_WE)
+
+    add_executable(${testName} ${testSource})
+
+    # Link to the project library and GTest main
+    target_link_libraries(
+      ${testName}
+      PRIVATE
+      ${libraryTargetName}
+      GTest::Main
+    )
+
+    add_test(NAME ${testName} COMMAND ${testName} --gtest_output=xml:report-${testName}.xml)
+    add_valgrind_test(${testName})
+    install(TARGETS ${testName} RUNTIME DESTINATION bin/tests)
+
+  endforeach()
+
+endif()
+

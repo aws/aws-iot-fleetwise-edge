@@ -91,3 +91,49 @@ if (FWE_FEATURE_CAMERA)
   )
 endif()
 
+### Tests ###
+# This is a list of tests that will compiled.
+# If adding a test, simply add the source file here
+set(
+  testSources
+  test/SocketCANBusChannelTest.cpp
+  test/ISOTPOverCANProtocolTest.cpp
+  test/CANRawMessageTest.cpp
+)
+
+if(FWE_FEATURE_CAMERA)
+  set(
+    testSources
+    ${testSources}
+    test/CameraDataSubscriberTest.cpp
+    test/CameraDataPublisherTest.cpp
+  )
+endif()
+
+if(${BUILD_TESTING})
+  message(STATUS "Building tests for ${libraryTargetName}")
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/CameraSubscriberTestPNG.png
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+  find_package(GTest REQUIRED)
+
+  # Add the executable targets
+  foreach(testSource ${testSources})
+    # Need a name for each exec so use filename w/o extension
+    get_filename_component(testName ${testSource} NAME_WE)
+
+    add_executable(${testName} ${testSource})
+    # Link to the project library and GTest main
+    target_link_libraries(
+      ${testName}
+      PRIVATE
+      ${libraryTargetName}
+      GTest::Main
+    )
+    add_test(NAME ${testName} COMMAND ${testName} --gtest_output=xml:report-${testName}.xml)
+    add_valgrind_test(${testName})
+    install(TARGETS ${testName} RUNTIME DESTINATION bin/tests)
+
+  endforeach()
+else()
+  message(STATUS "Testing not enabled for ${libraryTargetName}")
+endif()
