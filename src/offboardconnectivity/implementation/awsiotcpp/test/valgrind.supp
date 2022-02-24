@@ -1,0 +1,8 @@
+{
+   aws_io_library_init
+   Memcheck:Leak
+   match-leak-kinds: definite,reachable
+   ...
+   fun:aws_io_library_init
+   ...
+}

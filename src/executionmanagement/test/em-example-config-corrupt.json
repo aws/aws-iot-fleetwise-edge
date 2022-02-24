@@ -1,0 +1,16 @@
+
+
+{
+    "version": "1.0",
+    "networkInterfaces": [
+        "FWE Corrupt File test"
+    ],
+    "staticConfig": {
+        "canInterface": [
+            "FWE Corrupt File test"
+        ]
+    }
+
+}
+
+

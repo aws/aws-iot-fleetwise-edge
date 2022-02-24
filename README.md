@@ -1,6 +1,8 @@
 AWS IoT FleetWise Edge
 ======================
 
+> :information_source: To quickly get started, jump to the [Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md).
+
 AWS IoT FleetWise is a service that makes it easy for Automotive OEMs to collect, store, organize, and monitor data from vehicles at scale. AWS IoT FleetWise Edge provides C++ libraries that allow you to run the application on your vehicle. You can then use AWS IoT FleetWise's pre-configured analytic capabilities to process the collected data, gain insights about the vehicle's health and use the service’s visual interface to help diagnose and troubleshoot potential issues with your vehicles. Furthermore, AWS IoT FleetWise's capability to collect ECU data and store them on cloud databases enables you to utilize different AWS services (Analytics Services, ML, etc.) to develop novel use-cases that augment your existing vehicle functionality. 
 
 In particular, AWS IoT FleetWise can leverage fleet data (Big Data) and enable you to develop use cases that create business value, for example: improve electric vehicle range estimation, optimized battery life charging, optimized vehicle routing, etc. AWS IoT FleetWise can be extended to utilize cloud computing capabilities for use-cases such as pet/child detection, Driver Monitoring System applications, Predictive Diagnostics, electric vehicle's battery cells outlier detection, etc.
@@ -21,7 +23,7 @@ The  following diagram illustrates a high-level architecture of the system.
 
 
 
-<img src="./assets/iot-FleetWise-architecture.png" />
+<img src="./docs/iot-FleetWise-architecture.png" />
 
 
 
@@ -31,7 +33,7 @@ The  following diagram illustrates a high-level architecture of the system.
 
 2. *Data Collection Schemes* - this document describes what signals to collect. It also describes the condition logic that defines the enablement of the trigger logic that allows these signals to be collected, for example, when Vehicle Speed > 100 km/Hr and Driver Seatbelt is Off and Ambient Temperature <  0 degree C. 
 
-## AWS IoT FleetWise Edge Deployment & **Supported Platforms**
+## AWS IoT FleetWise Edge Deployment & Supported Platforms
 
 AWS IoT FleetWise Edge functional flexibility and its use of dynamic memory allocation means that it cannot reside in the real-time safe vehicle ECUs. AWS IoT FleetWise Edge must also be connected to the internet and preferably has access to a “good” portion of vehicle ECU data. OEMs have the flexibility to decide  where they can deploy AWS IoT FleetWise Edge binary. Possible options include (if present):
 
@@ -47,7 +49,7 @@ AWS IoT FleetWise Edge was built and tested on 64-bit architectures. It has been
 AWS IoT FleetWise Edge was also tested on an EC2 Instance with the following details:
 
 - **Platform**: Ubuntu
-- **Platform** **Details**: Linux/UNIX
+- **Platform Details**: Linux/UNIX
 - **Server**: AmazonEC2
 - **InstanceType**: c4.8xlarge
 - **AvailabilityZone**: us-east-1
@@ -72,7 +74,7 @@ See [SECURITY](./SECURITY.md) for more information
 ## License Summary and Build Dependencies
 AWS IoT FleetWise Edge depends on the following open source libraries. Refer to the corresponding links for more information.
 
-* [AWS IoT Device SDK for C++ v2 version: v1.10.9](https://github.com/aws/aws-iot-device-sdk-cpp-v2)
+* [AWS IoT Device SDK for C++ v2 version: v1.14.1](https://github.com/aws/aws-iot-device-sdk-cpp-v2)
 * [GoogleTest version: release-1.10.0](https://github.com/google/googletest)
 * [Protobuf version: 3.9.2](https://github.com/protocolbuffers/protobuf)
 * [Boost version 1.65.1](https://github.com/boostorg/boost)
@@ -99,13 +101,5 @@ See [LICENSE](./LICENSE) for more information.
 The following documents  provide more information about AWS IoT FleetWise Edge.
 
 1. [Change Log](./CHANGELOG.md) provides a summary of feature enhancements, updates, and resolved and known issues.
-2. [AWS IoT FleetWise Edge Offboarding](./assets/AWS-IoTFleetWiseOffboarding.md) provides a summary of the steps needed on the Client side to off board from the service.
-
-For more information on the below topics please refer to [AWS_IoT_FleetWise_Edge_Agent_Developer_Guide.html](https://console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=latest%2FAWS_IoT_FleetWise_Edge_Agent_Developer_Guide.html)
-	
-  * AWS IoT FleetWise Getting Started.
-  * Deploy AWS IoT FleetWise demo.
-  * AWS IoT FleetWise Edge Architecture.
-  * AWS IoT FleetWise CloudFormation Quick Start Guide.
-  * Running AWS IoT FleetWise Edge on the NXPS32G.
-
+2. [AWS IoT FleetWise Edge Offboarding](./docs/AWS-IoTFleetWiseOffboarding.md) provides a summary of the steps needed on the Client side to off board from the service.
+3. [AWS IoT FleetWise Edge Agent Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md) provides step-by-step instructions for building and running AWS IoT FleetWise Edge.

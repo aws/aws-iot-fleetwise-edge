@@ -1,0 +1,4402 @@
+[
+    {
+        "fullyQualifiedName": "Vehicle.OBD.PidsA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 4,
+            "offset": 0,
+            "pid": 0,
+            "pidResponseLength": 4,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelStatus",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 3,
+            "pidResponseLength": 2,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineLoad",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 4,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CoolantTemperature",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 5,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ShortTermFuelTrim1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -100,
+            "pid": 6,
+            "pidResponseLength": 1,
+            "scaling": 0.78125,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.LongTermFuelTrim1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -100,
+            "pid": 7,
+            "pidResponseLength": 1,
+            "scaling": 0.78125,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ShortTermFuelTrim2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -100,
+            "pid": 8,
+            "pidResponseLength": 1,
+            "scaling": 0.78125,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.LongTermFuelTrim2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -100,
+            "pid": 9,
+            "pidResponseLength": 1,
+            "scaling": 0.78125,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelPressure",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 10,
+            "pidResponseLength": 1,
+            "scaling": 3,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.MAP",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 11,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineSpeed",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 12,
+            "pidResponseLength": 2,
+            "scaling": 0.25,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.Speed",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 13,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TimingAdvance",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -64,
+            "pid": 14,
+            "pidResponseLength": 1,
+            "scaling": 0.5,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.IntakeTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 15,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.MAF",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 102,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ThrottlePosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 17,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2Support",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 19,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2Bank1Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 20,
+            "pidResponseLength": 2,
+            "scaling": 0.005,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2Bank1Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 21,
+            "pidResponseLength": 2,
+            "scaling": 0.005,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2Bank1Sensor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 22,
+            "pidResponseLength": 2,
+            "scaling": 0.005,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2Bank1Sensor4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 23,
+            "pidResponseLength": 2,
+            "scaling": 0.005,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2Bank2Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 24,
+            "pidResponseLength": 2,
+            "scaling": 0.005,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2Bank2Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 25,
+            "pidResponseLength": 2,
+            "scaling": 0.005,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2Bank2Sensor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 26,
+            "pidResponseLength": 2,
+            "scaling": 0.005,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2Bank2Sensor4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 27,
+            "pidResponseLength": 2,
+            "scaling": 0.005,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.RunTime",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 31,
+            "pidResponseLength": 2,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.PidsB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 4,
+            "offset": 0,
+            "pid": 32,
+            "pidResponseLength": 4,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.DistanceWithMIL",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 33,
+            "pidResponseLength": 2,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelRailPressureVac",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 34,
+            "pidResponseLength": 2,
+            "scaling": 0.079,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelRailPressureDirect",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 35,
+            "pidResponseLength": 2,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2WRSensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 52,
+            "pidResponseLength": 4,
+            "scaling": 0.0000305,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2WRSensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 53,
+            "pidResponseLength": 4,
+            "scaling": 0.0000305,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2WRSensor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 54,
+            "pidResponseLength": 4,
+            "scaling": 0.0000305,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2WRSensor4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 55,
+            "pidResponseLength": 4,
+            "scaling": 0.0000305,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2WRSensor5",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 56,
+            "pidResponseLength": 4,
+            "scaling": 0.0000305,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2WRSensor6",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 57,
+            "pidResponseLength": 4,
+            "scaling": 0.0000305,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2WRSensor7",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 58,
+            "pidResponseLength": 4,
+            "scaling": 0.0000305,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2WRSensor8",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 59,
+            "pidResponseLength": 4,
+            "scaling": 0.0000305,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGRError",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -100,
+            "pid": 45,
+            "pidResponseLength": 1,
+            "scaling": 0.78125,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelLevel",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 47,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.WarmupsSinceDTCClear",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 48,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.DistanceSinceDTCClear",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 49,
+            "pidResponseLength": 2,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EVAPVaporPressure",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 50,
+            "pidResponseLength": 2,
+            "scaling": 0.25,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.BarometricPressure",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 51,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.Bank1Catalyst",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 62,
+            "pidResponseLength": 2,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.Bank2Catalyst",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 63,
+            "pidResponseLength": 2,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.PidsC",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 4,
+            "offset": 0,
+            "pid": 64,
+            "pidResponseLength": 4,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ControlModuleVoltage",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 66,
+            "pidResponseLength": 2,
+            "scaling": 0.001,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.AbsoluteLoad",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 67,
+            "pidResponseLength": 2,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedEquivalenceRatio",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 68,
+            "pidResponseLength": 2,
+            "scaling": 0.0000305,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.RelativeThrottlePosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 69,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.AmbientAirTemperature",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 70,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ThrottlePositionB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 71,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ThrottlePositionC",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 72,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.AcceleratorPositionD",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 73,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.AcceleratorPositionE",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 74,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.AcceleratorPositionF",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 75,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.RunTimeMIL",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 77,
+            "pidResponseLength": 2,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TimeSinceDTCCleared",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 78,
+            "pidResponseLength": 2,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.MaxEquivalenceRatio",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 79,
+            "pidResponseLength": 4,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.MaxOxygenSensorVoltage",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 79,
+            "pidResponseLength": 4,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.MaxOxygenSensorCurrent",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 79,
+            "pidResponseLength": 4,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.MaxIntakeMAP",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 79,
+            "pidResponseLength": 4,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelType",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 81,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EthanolPercent",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 82,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelRailPressureAbsolute",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 89,
+            "pidResponseLength": 2,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.RelativeAcceleratorPosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 90,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.HybridBatteryRemaining",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 91,
+            "pidResponseLength": 1,
+            "scaling": 0.39215686274509803922,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.OilTemperature",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 92,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelInjectionTiming",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -210,
+            "pid": 93,
+            "pidResponseLength": 2,
+            "scaling": 0.0078125,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelRate",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 94,
+            "pidResponseLength": 2,
+            "scaling": 0.05,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.DemandEngineTorque",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -125,
+            "pid": 97,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ActualEngineTorque",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -125,
+            "pid": 98,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ReferenceEngineTorque",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 99,
+            "pidResponseLength": 2,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineTorquePointIdle",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -125,
+            "pid": 100,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineTorquePoint1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -125,
+            "pid": 100,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineTorquePoint2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -125,
+            "pid": 100,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineTorquePoint3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -125,
+            "pid": 100,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineTorquePoint4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -125,
+            "pid": 100,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.MafA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 102,
+            "pidResponseLength": 5,
+            "scaling": 0.03125,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.MafB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 102,
+            "pidResponseLength": 5,
+            "scaling": 0.03125,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineCoolantTemperature",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 103,
+            "pidResponseLength": 3,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineCoolantTemperature1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 103,
+            "pidResponseLength": 3,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineCoolantTemperature2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 103,
+            "pidResponseLength": 3,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.IntakeTemperature",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 104,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.IntakeTemperatureBank1Senor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 104,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.IntakeTemperatureBank1Senor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 104,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.IntakeTemperatureBank1Senor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 104,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.IntakeTemperatureBank2Senor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 104,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.IntakeTemperatureBank2Senor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 104,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.IntakeTemperatureBank2Senor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 104,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 6,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGRSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 105,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedEgrA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 105,
+            "pidResponseLength": 7,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ActualEgrA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 105,
+            "pidResponseLength": 7,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ErrorEgrA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 105,
+            "pidResponseLength": 7,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedEgrB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 105,
+            "pidResponseLength": 7,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ActualEgrB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 105,
+            "pidResponseLength": 7,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ErrorEgrB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 105,
+            "pidResponseLength": 7,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 6,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.IntakeAirFlowSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 106,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedIntakeAirFlowA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 106,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.RelativeIntakeAirFlowA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 106,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedIntakeAirFlowB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 106,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.RelativeIntakeAirFlowB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 106,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGRTempSupported",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 107,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGRTempBank1Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 107,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGRTempBank1Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 107,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGRTempBank2Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 107,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGRTempBank2Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 107,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ThrottleActuatorSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 108,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedThrottleActuatorA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 108,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.RelativePositionThrottleA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 108,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedThrottleActuatorB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 108,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.RelativePositionThrottleB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 108,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelPressureControlSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 109,
+            "pidResponseLength": 11,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedFuelRailPressureA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 109,
+            "pidResponseLength": 11,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelRailPressureA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 109,
+            "pidResponseLength": 11,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelRailTemperatureA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 109,
+            "pidResponseLength": 11,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedFuelRailPressureB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 109,
+            "pidResponseLength": 11,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 6,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelRailPressureB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 109,
+            "pidResponseLength": 11,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 8,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelRailTemperatureB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 109,
+            "pidResponseLength": 11,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 10,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.InjectionPressureControlSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 110,
+            "pidResponseLength": 9,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedInjectionControlPressureA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 110,
+            "pidResponseLength": 9,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.InjectionControlPressureA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 110,
+            "pidResponseLength": 9,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedInjectionControlPressureB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 110,
+            "pidResponseLength": 9,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.InjectionControlPressureB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 110,
+            "pidResponseLength": 9,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurboChargerInletPressureSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 111,
+            "pidResponseLength": 3,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurboChargerInletPressureSensorA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 111,
+            "pidResponseLength": 3,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurboChargerInletPressureSensorB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 111,
+            "pidResponseLength": 3,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.BoostPressureControlSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 112,
+            "pidResponseLength": 10,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedBoostPressureA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 112,
+            "pidResponseLength": 10,
+            "scaling": 0.03125,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.BoostPressureA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 112,
+            "pidResponseLength": 10,
+            "scaling": 0.03125,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedBoostPressureB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 112,
+            "pidResponseLength": 10,
+            "scaling": 0.03125,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.BoostPressureB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 112,
+            "pidResponseLength": 10,
+            "scaling": 0.03125,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.VGTSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 113,
+            "pidResponseLength": 6,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedVgtAPosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 113,
+            "pidResponseLength": 6,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.VgtAPosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 113,
+            "pidResponseLength": 6,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedVgtBPosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 113,
+            "pidResponseLength": 6,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.VgtBPosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 113,
+            "pidResponseLength": 6,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.WastegateControlSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 114,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedWastegateAPosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 114,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.WastegateAPosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 114,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CommandedWastegateBPosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 114,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.WastegateBPosition",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 114,
+            "pidResponseLength": 5,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ExhaustPressureSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 115,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ExhaustPressureBank1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 115,
+            "pidResponseLength": 5,
+            "scaling": 0.01,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ExhaustPressureBank2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 115,
+            "pidResponseLength": 5,
+            "scaling": 0.01,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerRpmSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 116,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerArpm",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 116,
+            "pidResponseLength": 5,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerBrpm",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 116,
+            "pidResponseLength": 5,
+            "scaling": 10,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerATempSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 117,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerACompressorInletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 117,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerACompressorOutletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 117,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerATurbineInletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 117,
+            "pidResponseLength": 7,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerATurbineOutletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 117,
+            "pidResponseLength": 7,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerBTempSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 118,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerBCompressorInletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 118,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerBCompressorOutletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 118,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerBTurbineInletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 118,
+            "pidResponseLength": 7,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TurbochargerBTurbineOutletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 118,
+            "pidResponseLength": 7,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CACTSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 119,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CACTBank1Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 119,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CACTBank1Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 119,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CACTBank2Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 119,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CACTBank2Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 119,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank1Support",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 120,
+            "pidResponseLength": 9,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank1Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 120,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank1Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 120,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank1Sensor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 120,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank1Sensor4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 120,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank2Support",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 121,
+            "pidResponseLength": 9,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank2Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 121,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank2Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 121,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank2Sensor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 121,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank2Sensor4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 121,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ParticulateFilterBank1Support",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 122,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ParticulateFilterBank1DeltaPressure",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 122,
+            "pidResponseLength": 7,
+            "scaling": 0.01,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ParticulateFilterBank1InletPressure",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 122,
+            "pidResponseLength": 7,
+            "scaling": 0.01,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ParticulateFilterBank1OutletPressure",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 122,
+            "pidResponseLength": 7,
+            "scaling": 0.01,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ParticulateFilterBank2Support",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 123,
+            "pidResponseLength": 7,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ParticulateFilterBank2DeltaPressure",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 123,
+            "pidResponseLength": 7,
+            "scaling": 0.01,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ParticulateFilterBank2InletPressure",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 123,
+            "pidResponseLength": 7,
+            "scaling": 0.01,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ParticulateFilterBank2OutletPressure",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 123,
+            "pidResponseLength": 7,
+            "scaling": 0.01,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ParticulateFilterTempSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 124,
+            "pidResponseLength": 9,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.PFBank1InletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 124,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.PFBank1OutletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 124,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.PFBank2InletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 124,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.PFBank2OutletTemp",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 124,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.NTEStatus",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 125,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.NTEControlAreaStatus",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 126,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineRunTimeSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 127,
+            "pidResponseLength": 13,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineRunTime",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 4,
+            "offset": 0,
+            "pid": 127,
+            "pidResponseLength": 13,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineIdleTime",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 4,
+            "offset": 0,
+            "pid": 127,
+            "pidResponseLength": 13,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineRunTimePTOActive",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 4,
+            "offset": 0,
+            "pid": 127,
+            "pidResponseLength": 13,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 9,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.NOxSensorSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 131,
+            "pidResponseLength": 9,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.NOxSensorBank1Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 131,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.NOxSensorBank1Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 131,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.NOxSensorBank2Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 131,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.NOxSensorBank2Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 131,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ManifoldSurfaceTemperature",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 132,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.NOxReagentSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 133,
+            "pidResponseLength": 10,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.AvgReagentConsumption",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 133,
+            "pidResponseLength": 10,
+            "scaling": 0.005,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.AvgDemandedReagentConsumption",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 133,
+            "pidResponseLength": 10,
+            "scaling": 0.005,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ReagentTankLevel",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 133,
+            "pidResponseLength": 10,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineRuneTimeWithNOxWarning",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 4,
+            "offset": 0,
+            "pid": 133,
+            "pidResponseLength": 10,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 6,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.PMSensorSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 134,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.PMSensorBank1Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 134,
+            "pidResponseLength": 5,
+            "scaling": 0.0125,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.PMSensorBank2Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 134,
+            "pidResponseLength": 5,
+            "scaling": 0.0125,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ManifoldAbsolutePressure",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 135,
+            "pidResponseLength": 5,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ManifoldAbsolutePressureA",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 135,
+            "pidResponseLength": 5,
+            "scaling": 0.03125,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ManifoldAbsolutePressureB",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 135,
+            "pidResponseLength": 5,
+            "scaling": 0.03125,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 140,
+            "pidResponseLength": 17,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorConcentrationBank1Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 140,
+            "pidResponseLength": 17,
+            "scaling": 0.001526,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorConcentrationBank1Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 140,
+            "pidResponseLength": 17,
+            "scaling": 0.001526,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorConcentrationBank2Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 140,
+            "pidResponseLength": 17,
+            "scaling": 0.001526,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorConcentrationBank2Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 140,
+            "pidResponseLength": 17,
+            "scaling": 0.001526,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorLambdaBank1Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 140,
+            "pidResponseLength": 17,
+            "scaling": 0.000122,
+            "serviceMode": 1,
+            "startByte": 9,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorLambdaBank1Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 140,
+            "pidResponseLength": 17,
+            "scaling": 0.000122,
+            "serviceMode": 1,
+            "startByte": 11,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorLambdaBank2Sensor1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 140,
+            "pidResponseLength": 17,
+            "scaling": 0.000122,
+            "serviceMode": 1,
+            "startByte": 13,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorLambdaBank2Sensor2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 140,
+            "pidResponseLength": 17,
+            "scaling": 0.000122,
+            "serviceMode": 1,
+            "startByte": 15,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.AbsoluteThrottlePositionG",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 141,
+            "pidResponseLength": 1,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineFriction",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -125,
+            "pid": 142,
+            "pidResponseLength": 1,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelSystemStatusSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 146,
+            "pidResponseLength": 2,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelSystemStatus",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 146,
+            "pidResponseLength": 2,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.WWHOBDSupported",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 147,
+            "pidResponseLength": 3,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CumulativeMICounter",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 147,
+            "pidResponseLength": 3,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.NOxWarningAndInducementSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 148,
+            "pidResponseLength": 12,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.SystemStatus",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 148,
+            "pidResponseLength": 12,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ReagentQualityCounter",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 148,
+            "pidResponseLength": 12,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.ReagentConsumptionCounter",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 148,
+            "pidResponseLength": 12,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.DosingActivityCounter",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 148,
+            "pidResponseLength": 12,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 6,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGRValveCounter",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 148,
+            "pidResponseLength": 12,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 8,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.MonitoringSystemCounter",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 148,
+            "pidResponseLength": 12,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 10,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank1SupportHigherSensors",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 152,
+            "pidResponseLength": 9,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank1Sensor5",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 152,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank1Sensor6",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 152,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank1Sensor7",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 152,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank1Sensor8",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 152,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank2SupportHigherSensors",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 153,
+            "pidResponseLength": 9,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank2Sensor5",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 153,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank2Sensor6",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 153,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank2Sensor7",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 153,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EGTBank2Sensor8",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -40,
+            "pid": 153,
+            "pidResponseLength": 9,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.HybridEvSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 154,
+            "pidResponseLength": 6,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.HybridEvState",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 154,
+            "pidResponseLength": 6,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.HybridEvVoltage",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 154,
+            "pidResponseLength": 6,
+            "scaling": 0.015625,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.HybridEvCurrent",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": -3276.8,
+            "pid": 154,
+            "pidResponseLength": 6,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.DEFSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 155,
+            "pidResponseLength": 4,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.DEFConcentration",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 155,
+            "pidResponseLength": 4,
+            "scaling": 0.25,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.DEFTankTemperature",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": -40,
+            "pid": 155,
+            "pidResponseLength": 4,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.DEFTankLevel",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 155,
+            "pidResponseLength": 4,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SupportWideRange",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 156,
+            "pidResponseLength": 17,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorConcentrationBank1Sensor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 156,
+            "pidResponseLength": 17,
+            "scaling": 0.001526,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorConcentrationBank1Sensor4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 156,
+            "pidResponseLength": 17,
+            "scaling": 0.001526,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorConcentrationBank2Sensor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 156,
+            "pidResponseLength": 17,
+            "scaling": 0.001526,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorConcentrationBank2Sensor4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 156,
+            "pidResponseLength": 17,
+            "scaling": 0.001526,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorLambdaBank1Sensor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 156,
+            "pidResponseLength": 17,
+            "scaling": 0.000122,
+            "serviceMode": 1,
+            "startByte": 9,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorLambdaBank1Sensor4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 156,
+            "pidResponseLength": 17,
+            "scaling": 0.000122,
+            "serviceMode": 1,
+            "startByte": 11,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorLambdaBank2Sensor3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 156,
+            "pidResponseLength": 17,
+            "scaling": 0.000122,
+            "serviceMode": 1,
+            "startByte": 13,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.O2SensorLambdaBank2Sensor4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 156,
+            "pidResponseLength": 17,
+            "scaling": 0.000122,
+            "serviceMode": 1,
+            "startByte": 15,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineFuelRate",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 157,
+            "pidResponseLength": 4,
+            "scaling": 0.02,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.VehicleFuelRate",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 157,
+            "pidResponseLength": 4,
+            "scaling": 0.02,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.EngineExhaustFlowRate",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 158,
+            "pidResponseLength": 2,
+            "scaling": 0.2,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelSystemPercentageUseSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 159,
+            "pidResponseLength": 9,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelPercentageUseSystemABank1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 159,
+            "pidResponseLength": 9,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 1,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelPercentageUseSystemBBank1",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 159,
+            "pidResponseLength": 9,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelPercentageUseSystemABank2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 159,
+            "pidResponseLength": 9,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 3,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelPercentageUseSystemBBank2",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 159,
+            "pidResponseLength": 9,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 4,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelPercentageUseSystemABank3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 159,
+            "pidResponseLength": 9,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 5,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelPercentageUseSystemBBank3",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 159,
+            "pidResponseLength": 9,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 6,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelPercentageUseSystemABank4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 159,
+            "pidResponseLength": 9,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 7,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.FuelPercentageUseSystemBBank4",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 159,
+            "pidResponseLength": 9,
+            "scaling": 0,
+            "serviceMode": 1,
+            "startByte": 8,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.CylinderFuelRate",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 162,
+            "pidResponseLength": 2,
+            "scaling": 0.03125,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TransmissionActualGearStatusSupport",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 1,
+            "offset": 0,
+            "pid": 164,
+            "pidResponseLength": 4,
+            "scaling": 1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.TransmissionActualGearRatio",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 2,
+            "offset": 0,
+            "pid": 164,
+            "pidResponseLength": 4,
+            "scaling": 0.001,
+            "serviceMode": 1,
+            "startByte": 2,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    },
+    {
+        "fullyQualifiedName": "Vehicle.OBD.Odometer",
+        "interfaceId": "0",
+        "type": "OBD_SIGNAL",
+        "obdSignal": {
+            "byteLength": 4,
+            "offset": 0,
+            "pid": 166,
+            "pidResponseLength": 4,
+            "scaling": 0.1,
+            "serviceMode": 1,
+            "startByte": 0,
+            "bitMaskLength": 8,
+            "bitRightShift": 0
+        }
+    }
+]

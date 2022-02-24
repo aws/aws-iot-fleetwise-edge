@@ -59,54 +59,76 @@ apt install -y \
     zlib1g-dev:arm64 \
     libsnappy-dev:arm64
 
-mkdir /tmp/deps && cd /tmp/deps
+mkdir -p deps-cross && cd deps-cross
 
-git clone -b 1.7.4 https://github.com/open-source-parsers/jsoncpp.git
-cd jsoncpp
-mkdir build && cd build
-cmake \
-    -DBUILD_SHARED_LIBS=OFF \
-    -DCMAKE_POSITION_INDEPENDENT_CODE=On \
-    -DJSONCPP_WITH_TESTS=Off \
-    -DJSONCPP_WITH_POST_BUILD_UNITTEST=Off \
-    -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
-    -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
-    ..
-make install -j`nproc`
-cd ../..
+if [ ! -d jsoncpp ]; then
+    git clone -b 1.7.4 https://github.com/open-source-parsers/jsoncpp.git
+    cd jsoncpp
+    mkdir build && cd build
+    cmake \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+        -DJSONCPP_WITH_TESTS=Off \
+        -DJSONCPP_WITH_POST_BUILD_UNITTEST=Off \
+        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
+        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
+        ..
+    cd ../..
+fi
+make install -j`nproc` -C jsoncpp/build
 
-wget -q https://github.com/protocolbuffers/protobuf/releases/download/v3.9.2/protobuf-all-3.9.2.tar.gz
-tar -zxf protobuf-all-3.9.2.tar.gz
-cd protobuf-3.9.2
-mkdir build_amd64 && cd build_amd64
-../configure
-make install -j`nproc`
-cd ..
-mkdir build_arm64 && cd build_arm64
-CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ \
-    ../configure --host=aarch64-linux --prefix=/usr/local/aarch64-linux-gnu
-make install -j`nproc`
-cd ../..
+if [ ! -d protobuf-3.9.2 ]; then
+    wget -q https://github.com/protocolbuffers/protobuf/releases/download/v3.9.2/protobuf-all-3.9.2.tar.gz
+    tar -zxf protobuf-all-3.9.2.tar.gz
+    cd protobuf-3.9.2
+    mkdir build && cd build
+    ../configure
+    cd ..
+    mkdir build_arm64 && cd build_arm64
+    CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ \
+        ../configure --host=aarch64-linux --prefix=/usr/local/aarch64-linux-gnu
+    cd ../..
+fi
+make install -j`nproc` -C protobuf-3.9.2/build
+make install -j`nproc` -C protobuf-3.9.2/build_arm64
 ldconfig
 
-git clone https://github.com/hartkopp/can-isotp.git
-cd can-isotp
-git checkout beb4650660179963a8ed5b5cbf2085cc1b34f608
-cp include/uapi/linux/can/isotp.h /usr/include/linux/can
-cd ..
+if [ ! -d can-isotp ]; then
+    git clone https://github.com/hartkopp/can-isotp.git
+    cd can-isotp
+    git checkout beb4650660179963a8ed5b5cbf2085cc1b34f608
+    cd ..
+fi
+cp can-isotp/include/uapi/linux/can/isotp.h /usr/include/linux/can
 
-git clone -b v1.10.9 --recursive https://github.com/aws/aws-iot-device-sdk-cpp-v2.git
-cd aws-iot-device-sdk-cpp-v2
-mkdir build && cd build
-cmake \
-    -DBUILD_SHARED_LIBS=OFF \
-    -DBUILD_DEPS=ON \
-    -DBUILD_TESTING=OFF \
-    -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
-    -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
-    ..
-make install -j`nproc`
-cd ../..
+if [ ! -d aws-iot-device-sdk-cpp-v2 ]; then
+    git clone -b v1.14.1 --recursive https://github.com/aws/aws-iot-device-sdk-cpp-v2.git
+    cd aws-iot-device-sdk-cpp-v2
+    mkdir build && cd build
+    cmake \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DBUILD_DEPS=ON \
+        -DBUILD_TESTING=OFF \
+        -DUSE_OPENSSL=ON \
+        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
+        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
+        ..
+    cd ../.. 
+fi
+make install -j`nproc` -C aws-iot-device-sdk-cpp-v2/build
+
+if [ ! -d googletest ]; then
+    git clone -b release-1.10.0 https://github.com/google/googletest.git
+    cd googletest
+    mkdir build && cd build
+    cmake \
+        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
+        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
+        ..
+    cd ../.. 
+fi
+make install -j`nproc` -C googletest/build
+sudo ldconfig
 
 # AWS IoT FleetWise Edge camera support requires Fast-DDS and its dependencies:
 if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
@@ -115,63 +137,71 @@ if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
         libasio-dev \
         qemu-user-binfmt
 
-    git clone -b 6.0.0 https://github.com/leethomason/tinyxml2.git
-    cd tinyxml2
-    mkdir build && cd build
-    cmake \
-        -DBUILD_SHARED_LIBS=OFF \
-        -DBUILD_STATIC_LIBS=ON \
-        -DBUILD_TESTS=OFF \
-        -DCMAKE_POSITION_INDEPENDENT_CODE=On \
-        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
-        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
-        ..
-    make install -j`nproc`
-    cd ../..
+    if [ ! -d tinyxml2 ]; then
+        git clone -b 6.0.0 https://github.com/leethomason/tinyxml2.git
+        cd tinyxml2
+        mkdir build && cd build
+        cmake \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_STATIC_LIBS=ON \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
+            -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
+            ..
+        cd ../..
+    fi
+    make install -j`nproc` -C tinyxml2/build
 
-    git clone -b v1.1.0 https://github.com/eProsima/foonathan_memory_vendor.git
-    cd foonathan_memory_vendor
-    mkdir build && cd build
-    cmake \
-        -DBUILD_SHARED_LIBS=OFF \
-        -Dextra_cmake_args="-DCMAKE_CROSSCOMPILING_EMULATOR=qemu-aarch64" \
-        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
-        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
-        ..
-    make -j`nproc`
-    make install
-    cd ../..
-    git clone -b v1.0.21 https://github.com/eProsima/Fast-CDR.git
-    cd Fast-CDR
-    mkdir build && cd build
-    cmake \
-        -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
-        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
-        ..
-    make -j`nproc`
-    make install
-    cd ../..
-    git clone -b v2.3.4 https://github.com/eProsima/Fast-DDS.git
-    cd Fast-DDS
-    mkdir build && cd build
-    cmake \
-        -DBUILD_SHARED_LIBS=OFF \
-        -DCOMPILE_TOOLS=OFF \
-        -DCMAKE_CXX_FLAGS="-DUSE_FOONATHAN_NODE_SIZES=1" \
-        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
-        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
-        ..
-    make -j`nproc`
-    make install
-    cd ../..
-    git clone -b v2.0.1 --recursive https://github.com/eProsima/Fast-DDS-Gen.git
-    cd Fast-DDS-Gen
-    ./gradlew assemble
+    if [ ! -d foonathan_memory_vendor ]; then
+        git clone -b v1.1.0 https://github.com/eProsima/foonathan_memory_vendor.git
+        cd foonathan_memory_vendor
+        mkdir build && cd build
+        cmake \
+            -DBUILD_SHARED_LIBS=OFF \
+            -Dextra_cmake_args="-DCMAKE_CROSSCOMPILING_EMULATOR=qemu-aarch64" \
+            -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
+            -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
+            ..
+        cd ../..
+    fi
+    make install -j`nproc` -C foonathan_memory_vendor/build
+
+    if [ ! -d Fast-CDR ]; then
+        git clone -b v1.0.21 https://github.com/eProsima/Fast-CDR.git
+        cd Fast-CDR
+        mkdir build && cd build
+        cmake \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
+            -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
+            ..
+        cd ../..
+    fi
+    make install -j`nproc` -C Fast-CDR/build
+
+    if [ ! -d Fast-DDS ]; then
+        git clone -b v2.3.4 https://github.com/eProsima/Fast-DDS.git
+        cd Fast-DDS
+        mkdir build && cd build
+        cmake \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCOMPILE_TOOLS=OFF \
+            -DCMAKE_CXX_FLAGS="-DUSE_FOONATHAN_NODE_SIZES=1" \
+            -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
+            -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
+            ..
+        cd ../..
+    fi
+    make install -j`nproc` -C Fast-DDS/build
+
+    if [ ! -d Fast-DDS-Gen ]; then
+        git clone -b v2.0.1 --recursive https://github.com/eProsima/Fast-DDS-Gen.git
+        cd Fast-DDS-Gen
+        ./gradlew assemble
+        cd ..
+    fi
     mkdir -p /usr/local/share/fastddsgen/java
-    cp share/fastddsgen/java/fastddsgen.jar /usr/local/share/fastddsgen/java
-    cp scripts/fastddsgen /usr/local/bin
-    cd ../..
+    cp Fast-DDS-Gen/share/fastddsgen/java/fastddsgen.jar /usr/local/share/fastddsgen/java
+    cp Fast-DDS-Gen/scripts/fastddsgen /usr/local/bin
 fi
-
-rm -rf /tmp/deps
