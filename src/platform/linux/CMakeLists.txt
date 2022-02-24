@@ -74,3 +74,47 @@ install(
   DESTINATION include
 )
 
+### Tests ###
+
+# This is a list of tests that will compiled.
+# If adding a test, simply add the source file here
+set(
+  testSources
+  logmanagement/test/TraceModuleTest.cpp
+  threadingmanagement/test/ThreadTest.cpp
+  timemanagement/test/TimerTest.cpp
+  timemanagement/test/ClockHandlerTest.cpp
+  resourcemanagement/test/CPUUsageInfoTest.cpp
+  resourcemanagement/test/MemoryUsageInfoTest.cpp
+  persistencymanagement/test/CacheAndPersistTest.cpp
+)
+
+
+if(${BUILD_TESTING})
+  message(STATUS "Building tests for ${libraryTargetName}")
+
+  find_package(GTest REQUIRED)
+
+  # Add the executable targets
+  foreach(testSource ${testSources})
+    # Need a name for each exec so use filename w/o extension
+    get_filename_component(testName ${testSource} NAME_WE)
+
+    add_executable(${testName} ${testSource})
+
+    # Link to the project library and GTest main
+    target_link_libraries(
+      ${testName}
+      PRIVATE
+      ${libraryTargetName}
+      GTest::Main
+    )
+
+    add_test(NAME ${testName} COMMAND ${testName} --gtest_output=xml:report-${testName}.xml)
+    add_valgrind_test(${testName})
+    install(TARGETS ${testName} RUNTIME DESTINATION bin/tests)
+
+  endforeach()
+else()
+  message(STATUS "Testing not enabled for ${libraryTargetName}")
+endif()

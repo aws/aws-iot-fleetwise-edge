@@ -1,0 +1,8 @@
+{
+   <sem_open glibc false positive>
+    Memcheck:Param
+    write(buf)
+    ...
+    fun:sem_open
+    ...
+}

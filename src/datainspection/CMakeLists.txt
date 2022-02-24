@@ -60,3 +60,57 @@ install(
 )
 
 
+### Tests ###
+# This is a list of tests that will compiled.
+# If adding a test, simply add the source file here
+set(
+  testSources
+  test/GeohashTest.cpp
+  test/GeohashFunctionNodeTest.cpp
+  test/NetworkChannelBinderTest.cpp
+  test/OBDOverCANModuleTest.cpp
+  test/CollectionInspectionEngineTest.cpp
+  test/CollectionInspectionWorkerThreadTest.cpp
+)
+
+if(FWE_FEATURE_CAMERA)
+  set(
+    testSources
+    ${testSources}
+    test/DataOverDDSModuleTest.cpp
+  )
+endif()
+
+if(${BUILD_TESTING})
+  message(STATUS "Building tests for ${libraryTargetName}")
+
+  find_package(GTest REQUIRED)
+
+  # Copy the json file required for the test application
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/di-collection-scheme-example.json
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/di-collection-scheme-example-reduced.json
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+  # Add the executable targets
+  foreach(testSource ${testSources})
+    # Need a name for each exec so use filename w/o extension
+    get_filename_component(testName ${testSource} NAME_WE)
+
+    add_executable(${testName} ${testSource})
+    # Link to the project library and GTest main
+    target_link_libraries(
+      ${testName}
+      PRIVATE
+      ${libraryTargetName}
+      GTest::Main
+    )
+    add_test(NAME ${testName} COMMAND ${testName} --gtest_output=xml:report-${testName}.xml)
+    add_valgrind_test(${testName})
+    install(TARGETS ${testName} RUNTIME DESTINATION bin/tests)
+
+  endforeach()
+else()
+  message(STATUS "Testing not enabled for ${libraryTargetName}")
+endif()
+

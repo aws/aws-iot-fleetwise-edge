@@ -1,0 +1,471 @@
+# Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
+# Licensed under the Amazon Software License (the "License").
+# You may not use this file except in compliance with the License.
+# A copy of the License is located at
+# http://aws.amazon.com/asl/
+# or in the "license" file accompanying this file. This file is distributed
+# on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied. See the License for the specific language governing
+# permissions and limitations under the License.
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  SourceUrl:
+    Description: Source Git clone URL (leave as default)
+    Type: String
+    Default: https://github.com/aws/aws-iot-fleetwise-edge.git
+  SourceRef:
+    Description: Source Git branch, tag or commit ID (leave blank for HEAD)
+    Type: String
+    Default: ''
+  Ec2KeyPair:
+    Description: Name of SSH key pair (leave blank for none)
+    Type: String
+    Default: ''
+  FleetSize:
+    Description: 'Number of vehicles to create. The EC2 instance type is chosen accordingly: 1-10: m6g.xlarge, 100: m6g.2xlarge, 1000: m6g.16xlarge'
+    Type: String
+    Default: 1
+    AllowedValues:
+      - '1'
+      - '2'
+  IoTCoreRegion:
+    Description: 'Region in which to create IoT Things. This must be the same region used to create IoT FleetWise Vehicles.'
+    Type: String
+    Default: 'us-east-1'
+    AllowedValues:
+      - 'us-east-1'
+      - 'eu-central-1'
+  IoTCoreEndpointUrl:
+    Description: 'Endpoint URL for IoT Core (leave blank for automatic)'
+    Type: String
+    Default: ''
+  IoTMqttTopicPrefix:
+    Description: 'IoT MQTT Topic prefix (leave as default)'
+    Type: String
+    Default: '$aws/iotfleetwise/'
+Conditions:
+  KeyPairSpecifiedCondition: !Not [!Equals [!Ref Ec2KeyPair, '']]
+Resources:
+  Ec2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Instance security group
+  Ec2SecurityGroupSshIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow inbound SSH access
+      GroupId: !GetAtt Ec2SecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: '0.0.0.0/0'
+  Ec2SecurityGroupSelfIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow access in same security group
+      GroupId: !GetAtt Ec2SecurityGroup.GroupId
+      IpProtocol: -1
+      SourceSecurityGroupId: !GetAtt Ec2SecurityGroup.GroupId
+  Ec2ServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-EC2-ServicePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "s3:List*"
+                  - "s3:Get*"
+                Resource:
+                  - arn:aws:s3:::*
+  Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: 
+        - !Ref Ec2ServiceRole
+  Ec2Instance:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT30M
+    Properties:
+      ImageId: !FindInMap [AMIRegionMap, !Ref 'AWS::Region', AMIID]
+      KeyName: !If [KeyPairSpecifiedCondition, !Ref Ec2KeyPair, !Ref 'AWS::NoValue']
+      InstanceType: !FindInMap [FleetSizeEc2InstanceTypeMap, !Ref 'FleetSize', InstanceType]
+      IamInstanceProfile: !Ref Ec2InstanceProfile
+      SecurityGroupIds: !Split [",", !GetAtt Ec2SecurityGroup.GroupId]
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Ec2-Instance
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+
+          # Wait for any existing package install to finish
+          i=0
+          while true; do
+            if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
+              i=0
+            else
+              i=`expr $i + 1`
+              if expr $i \>= 10 > /dev/null; then
+                break
+              fi
+            fi
+            sleep 1
+          done
+
+          # Upgrade system and reboot if required
+          apt update && apt upgrade -y
+          if [ -f /var/run/reboot-required ]; then
+            # Delete the UserData info file so that we run again after reboot
+            rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
+            reboot
+            exit
+          fi
+
+          # Install helper scripts:
+          apt update && apt install -y python3-setuptools
+          mkdir -p /opt/aws/bin
+          wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+          python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
+          rm aws-cfn-bootstrap-py3-latest.tar.gz
+
+          # On error, signal back to cfn:
+          error_handler() {
+            /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+          }
+          trap error_handler ERR
+
+          # Increase pid_max:
+          echo 1048576 > /proc/sys/kernel/pid_max
+          # Disable syslog:
+          systemctl stop syslog.socket rsyslog.service
+          # Remove journald rate limiting and set max size:
+          printf "RateLimitBurst=0\nSystemMaxUse=1G\n" >> /etc/systemd/journald.conf
+
+          # Install packages
+          apt update && apt install -y git ec2-instance-connect htop jq unzip
+
+          # Install AWS CLI:
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          ./aws/install
+          rm awscliv2.zip
+
+          # Download source
+          cd /home/ubuntu
+          if echo ${SourceUrl} | grep -q 's3://'; then
+            sudo -u ubuntu aws s3 cp ${SourceUrl} aws-iot-fleetwise-edge.zip
+            sudo -u ubuntu unzip aws-iot-fleetwise-edge.zip -d aws-iot-fleetwise-edge
+          else
+            sudo -u ubuntu git clone ${SourceUrl} aws-iot-fleetwise-edge
+          fi
+          cd aws-iot-fleetwise-edge
+          if [ '${SourceRef}' != '' ]; then
+            git checkout ${SourceRef}
+          fi
+          
+          # Install SocketCAN modules:
+          ./tools/install-socketcan.sh --bus-count ${FleetSize}
+          
+          # Install CAN Simulator
+          ./tools/install-cansim.sh --bus-count ${FleetSize}
+          
+          # Install FWE credentials and config file
+          mkdir /etc/aws-iot-fleetwise
+          mkdir /var/aws-iot-fleetwise
+          echo -n "${IoTThing.certificatePem}" > /etc/aws-iot-fleetwise/certificate.pem
+          echo -n "${IoTThing.privateKey}" > /etc/aws-iot-fleetwise/private-key.key
+          if ((${FleetSize}==1)); then
+            echo "Configuring ${AWS::StackName}..."
+            ./tools/configure-fwe.sh \
+              --input-config-file "configuration/static-config.json" \
+              --output-config-file "/etc/aws-iot-fleetwise/config-0.json" \
+              --vehicle-id "${AWS::StackName}" \
+              --endpoint-url "${IoTThing.iotEndpoint}" \
+              --topic-prefix '${IoTMqttTopicPrefix}' \
+              --can-bus0 "vcan0"
+          else
+            BATCH_SIZE=$((`nproc`*4))
+            for ((i=0; i<${FleetSize}; i+=${!BATCH_SIZE})); do
+              for ((j=0; j<${!BATCH_SIZE} && i+j<${FleetSize}; j++)); do
+                # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
+                # to print stderr from the output group, but not info about the background process.
+                { \
+                  echo "Configuring ${AWS::StackName}-$((i+j))..."; \
+                  mkdir /var/aws-iot-fleetwise/fwe$((i+j)); \
+                  ./tools/configure-fwe.sh \
+                    --input-config-file "configuration/static-config.json" \
+                    --output-config-file "/etc/aws-iot-fleetwise/config-$((i+j)).json" \
+                    --vehicle-id "${AWS::StackName}-$((i+j))" \
+                    --endpoint-url "${IoTThing.iotEndpoint}" \
+                    --topic-prefix '${IoTMqttTopicPrefix}' \
+                    --can-bus0 "vcan$((i+j))" \
+                    --persistency-path "/var/aws-iot-fleetwise/fwe$((i+j))"; \
+                2>&3 &} 3>&2 2>/dev/null
+              done
+              # Wait for all background processes to finish
+              wait
+            done
+          fi
+
+          # Install source deps
+          ./tools/install-deps-native.sh
+
+          # Build source
+          sudo -u ubuntu ./tools/build-fwe-native.sh
+
+          # Install FWE
+          ./tools/install-fwe.sh
+          
+          # Signal init complete:
+          /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+  IoTThing:
+    Type: Custom::IoTThing
+    Properties:
+      ServiceToken: !GetAtt CreateThingFunction.Arn
+      ThingName: !Ref AWS::StackName
+      FleetSize: !Ref FleetSize
+      IoTCoreRegion: !Ref IoTCoreRegion
+      IoTCoreEndpointUrl: !Ref IoTCoreEndpointUrl
+  CreateThingFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Create thing, certificate, and policy, return cert and private key
+      Handler: index.handler
+      Runtime: python3.6
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: !Sub |
+          import sys
+          import cfnresponse
+          import boto3
+          from botocore.exceptions import ClientError
+          import json
+          import logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def handler(event, context):
+              responseData = {}
+              try:
+                  logger.info('Received event: {}'.format(json.dumps(event)))
+                  result = cfnresponse.FAILED
+                  iotCoreEndpointUrl=event['ResourceProperties']['IoTCoreEndpointUrl']
+                  iotCoreRegion=event['ResourceProperties']['IoTCoreRegion']
+                  client = boto3.client(
+                      'iot',
+                      endpoint_url=None if iotCoreEndpointUrl=='' else iotCoreEndpointUrl,
+                      region_name=iotCoreRegion)
+                  inputThingName=event['ResourceProperties']['ThingName']
+                  fleetSize=int(event['ResourceProperties']['FleetSize'])
+                  if event['RequestType'] == 'Create':
+                      logger.info('Creating cert...')
+                      response = client.create_keys_and_certificate(
+                          setAsActive=True
+                      )
+                      certId = response['certificateId']
+                      certArn = response['certificateArn']
+                      certPem = response['certificatePem']
+                      privateKey = response['keyPair']['PrivateKey']
+                      logger.info('Creating policy...')
+                      policyDocument = '''{
+                          "Version": "2012-10-17",
+                          "Statement": [
+                              {
+                                  "Effect": "Allow",
+                                  "Action": [
+                                      "iot:Connect",
+                                      "iot:Subscribe",
+                                      "iot:Publish",
+                                      "iot:Receive"
+                                  ],
+                                  "Resource": [
+                                      "arn:aws:iot:%s:${AWS::AccountId}:client/${AWS::StackName}*",
+                                      "arn:aws:iot:%s:${AWS::AccountId}:topic/*",
+                                      "arn:aws:iot:%s:${AWS::AccountId}:topicfilter/*"
+                                  ]
+                              }
+                          ]
+                      }''' % (iotCoreRegion, iotCoreRegion, iotCoreRegion)
+                      response = client.create_policy(
+                          policyName=inputThingName+'-policy',
+                          policyDocument=policyDocument
+                      )
+                      for i in range(fleetSize):
+                          thingName = inputThingName+("" if fleetSize==1 else "-"+str(i))
+                          logger.info('Creating thing %s...' % thingName)
+                          thing = client.create_thing(
+                              thingName=thingName
+                          )
+                          response = client.attach_policy(
+                              policyName=inputThingName+'-policy',
+                              target=certArn,
+                          )
+                          response = client.attach_thing_principal(
+                              thingName=thingName,
+                              principal=certArn,
+                          )
+                      responseData['certificateId'] = certId
+                      responseData['certificatePem'] = certPem
+                      responseData['privateKey'] = privateKey
+                      responseData['iotEndpoint'] = client.describe_endpoint(endpointType='iot:Data-ATS')['endpointAddress']
+                      result = cfnresponse.SUCCESS
+                  elif event['RequestType'] == 'Update':
+                      result = cfnresponse.SUCCESS
+                  elif event['RequestType'] == 'Delete':
+                      for i in range(fleetSize):
+                          thingName = inputThingName+("" if fleetSize==1 else "-"+str(i))
+                          logger.info('Deleting thing %s...' % thingName)
+                          response = client.list_thing_principals(
+                              thingName=thingName
+                          )
+                          for j in response['principals']:
+                              response = client.detach_thing_principal(
+                                  thingName=thingName,
+                                  principal=j
+                              )
+                              response = client.detach_policy(
+                                  policyName=inputThingName+'-policy',
+                                  target=j
+                              )
+                              response = client.delete_thing(
+                                  thingName=thingName
+                              )
+                      logger.info('Deleting policy...')
+                      response = client.delete_policy(
+                          policyName=inputThingName+'-policy'
+                      )
+                      certId = j.split('/')[-1]
+                      logger.info('Deleting cert %s...' % certId)
+                      response = client.update_certificate(
+                          certificateId=certId,
+                          newStatus='INACTIVE'
+                      )
+                      response = client.delete_certificate(
+                          certificateId=certId,
+                          forceDelete=True
+                      )
+                      result = cfnresponse.SUCCESS
+              except ClientError as e:
+                  logger.error('Error: {}'.format(e))
+                  result = cfnresponse.FAILED
+              logger.info('Returning response of: {}, with result of: {}'.format(result, responseData))
+              sys.stdout.flush()
+              cfnresponse.send(event, context, result, responseData)
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-Lambda-ExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - 'iot:CreateKeysAndCertificate'
+                  - 'iot:DescribeEndpoint'
+                  - 'iot:AttachThingPrincipal'
+                  - 'iot:DetachThingPrincipal'
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - 'iot:CreateThing'
+                  - 'iot:CreatePolicy'
+                  - 'iot:AttachPolicy'
+                  - 'iot:ListThingPrincipals'
+                  - 'iot:DetachPolicy'
+                  - 'iot:UpdateCertificate'
+                  - 'iot:DeleteCertificate'
+                  - 'iot:DeletePolicy'
+                  - 'iot:DeleteThing'
+                Resource:
+                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:thing/${AWS::StackName}*
+                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:cert/*
+                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:policy/${AWS::StackName}-policy
+Mappings:
+  # Ubuntu 18.04 arm64 AMIs
+  AMIRegionMap:
+    ap-northeast-1:
+      AMIID: ami-078fe86fa4c333481
+    ap-northeast-2:
+      AMIID: ami-08b051fc14e6c551e
+    ap-northeast-3:
+      AMIID: ami-02882efe4f6434b3c
+    ap-south-1:
+      AMIID: ami-04f6f742e1d9012e3
+    ap-southeast-1:
+      AMIID: ami-062e2ec9a8bfa02d6
+    ap-southeast-2:
+      AMIID: ami-0ac142889d7d97567
+    ca-central-1:
+      AMIID: ami-07ba772924ecc689f
+    eu-central-1:
+      AMIID: ami-01bced7e7239dbd82
+    eu-north-1:
+      AMIID: ami-00320b1b198c6f31e
+    eu-west-1:
+      AMIID: ami-07648455888dfc767
+    eu-west-2:
+      AMIID: ami-0fa14d6dc09479348
+    eu-west-3:
+      AMIID: ami-0dc556c21e5099c75
+    sa-east-1:
+      AMIID: ami-0bd03f2c1034d9845
+    us-east-1:
+      AMIID: ami-08353a25e80beea3e
+    us-east-2:
+      AMIID: ami-026141f3d5c6d2d0c
+    us-west-1:
+      AMIID: ami-0437ad1b6a022fafe
+    us-west-2:
+      AMIID: ami-0327006c87b23e535
+  FleetSizeEc2InstanceTypeMap:
+    '1':
+      InstanceType: m6g.xlarge
+    '2':
+      InstanceType: m6g.xlarge
+    '10':
+      InstanceType: m6g.xlarge
+    '100':
+      InstanceType: m6g.2xlarge
+    '1000':
+      InstanceType: m6g.16xlarge
+Outputs:
+  Ec2InstancePublicIp:
+    Condition: KeyPairSpecifiedCondition
+    Description: 'EC2 instance public IP address'
+    Value: !GetAtt Ec2Instance.PublicIp

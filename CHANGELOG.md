@@ -1,5 +1,27 @@
 # Change Log
 
+## v0.1.2 (February 24, 2022)
+https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.2/aws-iot-fleetwise-edge.zip
+
+Features:
+* No new features.
+
+Bugfixes/Improvements:
+* Unit tests added to release, including clang-format and clang-tidy tests.
+* Source code now available on GitHub: https://github.com/aws/aws-iot-fleetwise-edge
+  * GitHub CI job added that runs subset of unit tests that do not require SocketCAN.
+* Edge agent source code:
+  * No changes.
+* Edge agent developer guide and associated scripts:
+  * Cloud demo script `demo.sh`:
+    * Fixed bug that caused the Timestream query to fail.
+    * Script and files moved under edge source tree: `tools/cloud/`.
+  * Dependency installation scripts:
+    * AWS IoT C++ SDK updated to v1.14.1
+    * Support for GitHub CI caching added.
+  * CloudFormation template `fwdemo.yml` updated to pull source from GitHub instead of S3.
+  * Developer guide converted to Markdown.
+
 ## v0.1.1 (January 25, 2022)
 https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.1/aws-iot-fleetwise-edge.zip
 

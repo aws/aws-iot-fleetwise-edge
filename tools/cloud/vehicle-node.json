@@ -1,0 +1,10 @@
+[
+    {
+        "type": "Branch",
+        "branch": {
+            "name": "Vehicle",
+            "fullyQualifiedName": "Vehicle",
+            "description": "Vehicle"
+        }
+    }
+]
