@@ -33,3 +33,5 @@ if(${PLATFORM_TYPE} STREQUAL Linux)
   message(STATUS "Adding Linux platform")
   add_subdirectory( linux )
 endif()
+
+add_subdirectory( utility )

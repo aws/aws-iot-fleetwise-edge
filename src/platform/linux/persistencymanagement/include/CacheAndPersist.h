@@ -38,6 +38,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 namespace PersistencyManagement
 {
 /**
@@ -58,11 +60,6 @@ public:
      * @param maxPartitionSize Partition size should not exceed this.
      */
     CacheAndPersist( const std::string &partitionPath, size_t maxPartitionSize );
-
-    /**
-     * @brief destructor
-     */
-    ~CacheAndPersist();
 
     /**
      * @brief Writes to the non volatile memory(NVM).
@@ -131,9 +128,10 @@ private:
      * @param fileName  Absolute file path along with the filename to be created
      * @return SUCCESS if the file is created, FILESYSTEM_ERROR if not.
      */
-    ErrorCode createFile( const std::string &fileName );
+    static ErrorCode createFile( const std::string &fileName );
 };
 } // namespace PersistencyManagement
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

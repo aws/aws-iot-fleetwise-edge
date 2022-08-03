@@ -26,15 +26,21 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 /**
  * @brief This logger instance logs messages to the standard output.
  */
 class ConsoleLogger : public ILogger
 {
 public:
-    ConsoleLogger();
+    ~ConsoleLogger() override = default;
+    ConsoleLogger() = default;
+    ConsoleLogger( const ConsoleLogger & ) = delete;
+    ConsoleLogger &operator=( const ConsoleLogger & ) = delete;
+    ConsoleLogger( ConsoleLogger && ) = delete;
+    ConsoleLogger &operator=( ConsoleLogger && ) = delete;
 
-    virtual ~ConsoleLogger() = default;
     /**
      * @brief Logs a log message to the standard output. Includes current Thread ID and timestamp.
      *        The log message has this structure : [Thread : ID] [Time] [Level] [function]: [Message]
@@ -56,8 +62,9 @@ private:
      * @brief Current Thread ID that's logging the message.
      * @return Thread ID.
      */
-    uint64_t currentThreadId();
+    static uint64_t currentThreadId();
 };
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

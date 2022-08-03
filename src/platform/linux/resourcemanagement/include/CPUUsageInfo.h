@@ -16,7 +16,7 @@
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
 
-#include <math.h>
+#include <cmath>
 #include <string>
 #include <thread>
 #include <vector>
@@ -27,13 +27,15 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 /**
  * @brief Utility class to track and report CPU commutative time usage.
  */
 class CPUUsageInfo
 {
 public:
-    static const int MAX_PROC_STAT_FILE_SIZE_READ = 300;
+    static constexpr int MAX_PROC_STAT_FILE_SIZE_READ = 300;
     using ThreadId = unsigned long;
     struct ThreadCPUUsageInfo
     {
@@ -59,8 +61,6 @@ public:
         }
     };
     using ThreadCPUUsageInfos = std::vector<ThreadCPUUsageInfo>;
-
-    CPUUsageInfo();
 
     /**
      * @brief Gets the amount of time spent in user space.
@@ -123,19 +123,11 @@ public:
     bool reportCPUUsageInfo();
 
 private:
-    double mUserSpaceTime;
-    double mKernelSpaceTime;
-    double mIdleTime;
-    uint32_t mNumCPUCores;
+    double mUserSpaceTime{ 0 };
+    double mKernelSpaceTime{ 0 };
+    double mIdleTime{ 0 };
+    uint32_t mNumCPUCores{ std::max( std::thread::hardware_concurrency(), 1U ) };
 };
-
-inline CPUUsageInfo::CPUUsageInfo()
-    : mUserSpaceTime( 0 )
-    , mKernelSpaceTime( 0 )
-    , mIdleTime( 0 )
-    , mNumCPUCores( std::max( std::thread::hardware_concurrency(), 1U ) )
-{
-}
 
 inline double
 CPUUsageInfo::getUserSpaceTime() const
@@ -182,7 +174,7 @@ CPUUsageInfo::getTotalCPUPercentage( const CPUUsageInfo &previousUsage, const do
     double systemTime = ( mKernelSpaceTime - previousUsage.getKernelSpaceTime() ) / mNumCPUCores;
     return round( ( userTime + systemTime ) / elapsedSeconds * 10000.0 ) / 100.0;
 }
-
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

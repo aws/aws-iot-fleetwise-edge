@@ -86,5 +86,5 @@ ExecStart=/bin/sh /usr/local/bin/setup-socketcan.sh
 [Install]
 WantedBy=multi-user.target
 EOT
-sudo systemctl start setup-socketcan
 sudo systemctl enable setup-socketcan
+sudo systemctl start setup-socketcan

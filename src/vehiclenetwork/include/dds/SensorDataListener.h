@@ -23,12 +23,7 @@ namespace VehicleNetwork
 
 struct SensorArtifactMetadata
 {
-    SensorArtifactMetadata()
-        : sourceID( 0 )
-        , path( "" )
-    {
-    }
-    uint32_t sourceID;
+    uint32_t sourceID{ 0 };
     std::string path;
 };
 

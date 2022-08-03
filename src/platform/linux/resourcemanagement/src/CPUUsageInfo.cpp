@@ -29,6 +29,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 bool
 CPUUsageInfo::reportCPUUsageInfo()
 {
@@ -96,7 +98,7 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
             if ( fp != nullptr )
             {
                 CPUUsageInfo::ThreadId tid =
-                    static_cast<CPUUsageInfo::ThreadId>( strtol( taskFileName.c_str(), NULL, 10 ) );
+                    static_cast<CPUUsageInfo::ThreadId>( strtol( taskFileName.c_str(), nullptr, 10 ) );
                 char statContent[MAX_PROC_STAT_FILE_SIZE_READ];
                 if ( fgets( statContent, MAX_PROC_STAT_FILE_SIZE_READ - 1, fp ) != nullptr )
                 {
@@ -122,10 +124,10 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
                     uint32_t currentField = 1; // start at 1 like proc man page
                     // as short string optimization often preallocates 15 characters most likely string will not use
                     // heap allocation as strings will by < 15 chars
-                    std::string comm = "";
+                    std::string comm;
                     bool commStringFinished = false;
-                    std::string utimeString = "";
-                    std::string stimeString = "";
+                    std::string utimeString;
+                    std::string stimeString;
 
                     while ( *c != '\0' )
                     {
@@ -159,8 +161,8 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
                         c++;
                     }
 
-                    int64_t uTime = strtoll( utimeString.c_str(), NULL, 10 );
-                    int64_t sTime = strtoll( stimeString.c_str(), NULL, 10 );
+                    int64_t uTime = strtoll( utimeString.c_str(), nullptr, 10 );
+                    int64_t sTime = strtoll( stimeString.c_str(), nullptr, 10 );
                     if ( uTime != LONG_MAX && uTime >= 0 && sTime != LONG_MAX && sTime >= 0 )
                     {
                         threadCPUUsageInfos.emplace_back(
@@ -177,7 +179,7 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
     closedir( taskDir );
     return true;
 }
-
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

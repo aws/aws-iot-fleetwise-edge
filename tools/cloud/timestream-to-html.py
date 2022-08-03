@@ -12,7 +12,7 @@
 
 import sys
 import json
-import plotly.express as px
+import plotly.graph_objects as go
 import pandas as pd
 
 if len(sys.argv) < 2:
@@ -43,7 +43,10 @@ for row in data['Rows']:
         val=get_val(row, 'measure_value::boolean') != 'false'
     df.at[ts, signal_name] = float(val)
 
-fig = px.scatter(df)
+fig = go.Figure()
+for column in df.columns:
+    fig.add_trace(go.Scatter(x=df.index, y=df[column], mode='markers', name=column))
+
 if len(sys.argv) < 3:
     fig.show()
 else:

@@ -8,6 +8,6 @@ add_library(${libraryTargetName}  INTERFACE)
 
 target_include_directories(${libraryTargetName} INTERFACE include)
 
-target_link_libraries(${libraryTargetName} INTERFACE IoTFleetWise::Platform)
+target_link_libraries(${libraryTargetName} INTERFACE IoTFleetWise::Platform::Linux)
 
 add_library(${libraryAliasName} ALIAS ${libraryTargetName})

@@ -29,12 +29,10 @@ namespace ExecutionManagement
 class IoTFleetWiseConfig
 {
 public:
+    IoTFleetWiseConfig() = delete;
     static bool read( const std::string &filename, Json::Value &config );
 
 private:
-    IoTFleetWiseConfig()
-    {
-    }
 };
 
 } // namespace ExecutionManagement

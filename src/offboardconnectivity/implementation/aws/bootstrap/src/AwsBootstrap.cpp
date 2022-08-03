@@ -1,0 +1,112 @@
+#include "AwsBootstrap.h"
+#include "AwsSDKMemoryManager.h"
+#include "LoggingModule.h"
+
+#include <aws/core/Aws.h>
+#include <aws/crt/Api.h>
+
+using namespace Aws::IoTFleetWise::OffboardConnectivityAwsIot;
+using namespace Aws::IoTFleetWise::Platform::Linux;
+
+namespace
+{
+constexpr char ALLOCATION_TAG[] = "AWS-SDK";
+constexpr size_t NUM_THREADS = 1;
+constexpr size_t MAX_HOSTS = 1;
+constexpr size_t MAX_TTL = 5;
+} // namespace
+
+namespace Aws
+{
+namespace IoTFleetWise
+{
+namespace OffboardConnectivityAwsIot
+{
+
+struct AwsBootstrap::Impl
+{
+    Impl()
+    {
+        // Enable for logging
+        // mOptions.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Info;
+
+        // We are using a memory manager that is not suitable for over-aligned types.
+        // Since we do not use alignas in our codebase, we are OK.
+        auto &memMgr = AwsSDKMemoryManager::getInstance();
+        mOptions.memoryManagementOptions.memoryManager = &memMgr;
+
+        auto clientBootstrapFn = [this]() {
+            // You need an event loop group to process IO events.
+            // If you only have a few connections, 1 thread is ideal
+            Aws::Crt::Io::EventLoopGroup eventLoopGroup( NUM_THREADS );
+            if ( !eventLoopGroup )
+            {
+                mLogger.error( "AwsBootstrap::Impl::Impl",
+                               "Event Loop Group Creation failed with error " +
+                                   std::string( Crt::ErrorDebugString( eventLoopGroup.LastError() ) ) );
+            }
+            else
+            {
+                Aws::Crt::Io::DefaultHostResolver defaultHostResolver( eventLoopGroup, MAX_HOSTS, MAX_TTL );
+                auto bootstrap = Aws::MakeShared<Aws::Crt::Io::ClientBootstrap>(
+                    ALLOCATION_TAG, eventLoopGroup, defaultHostResolver );
+                mBootstrap = bootstrap.get();
+                return bootstrap;
+            }
+            return std::shared_ptr<Aws::Crt::Io::ClientBootstrap>{ nullptr };
+        };
+        mOptions.ioOptions.clientBootstrap_create_fn = clientBootstrapFn;
+        Aws::InitAPI( mOptions );
+    }
+
+    ~Impl()
+    {
+        Aws::ShutdownAPI( mOptions );
+        mLogger.trace( "AwsBootstrap::Impl::~Impl", "AWS API ShutDown Completed" );
+    }
+
+    Impl( const Impl & ) = delete;
+    Impl &operator=( const Impl & ) = delete;
+    Impl( Impl && ) = delete;
+    Impl &operator=( Impl && ) = delete;
+
+    Aws::Crt::Io::ClientBootstrap *
+    getClientBootStrap() const
+    {
+        return mBootstrap;
+    }
+
+    Platform::Linux::LoggingModule mLogger;
+    Aws::SDKOptions mOptions;
+
+    /**
+     * @brief Pointer to client bootstrap.
+     * @note The lifecycle is managed by the SDK itself
+     *
+     */
+    Aws::Crt::Io::ClientBootstrap *mBootstrap{ nullptr };
+};
+
+AwsBootstrap::AwsBootstrap()
+{
+    mImpl = std::make_unique<Impl>();
+}
+
+AwsBootstrap::~AwsBootstrap() = default;
+
+AwsBootstrap &
+AwsBootstrap::getInstance()
+{
+    static AwsBootstrap boot;
+    return boot;
+}
+
+Aws::Crt::Io::ClientBootstrap *
+AwsBootstrap::getClientBootStrap()
+{
+    return mImpl->getClientBootStrap();
+}
+
+} // namespace OffboardConnectivityAwsIot
+} // namespace IoTFleetWise
+} // namespace Aws

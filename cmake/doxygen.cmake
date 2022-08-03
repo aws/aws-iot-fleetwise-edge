@@ -1,24 +1,48 @@
 # check if Doxygen is installed
-find_package(Doxygen)
+find_package(Doxygen OPTIONAL_COMPONENTS dot)
 
 if(DOXYGEN_FOUND)
-  # set input and output files
-  set(doxyfileIn  ${CMAKE_SOURCE_DIR}/docs/Doxyfile.in)
-  set(doxyfile ${CMAKE_BINARY_DIR}/Doxyfile)
 
-  # request to configure the file
-  configure_file(${doxyfileIn} ${doxyfile} @ONLY)
-  message("Building documentation")
+  message(STATUS "Building documentation")
 
-  # note the option ALL which allows to build the docs together with the application
-  add_custom_target( 
-    doc_doxygen ALL
-    COMMAND ${DOXYGEN_EXECUTABLE} ${doxyfile}
+  set(DOXYGEN_DOT_IMAGE_FORMAT svg)
+  set(DOXYGEN_EXCLUDE_PATTERNS "*/test/*")
+  set(DOXYGEN_EXPAND_ONLY_PREDEF YES)
+  set(DOXYGEN_EXTRACT_ALL YES)
+  set(DOXYGEN_EXTRACT_PRIVATE YES)
+  set(DOXYGEN_EXTRACT_STATIC YES)
+  set(DOXYGEN_GENERATE_TREEVIEW YES)
+
+  if (TARGET Doxygen::dot)
+    set(DOXYGEN_HAVE_DOT YES)
+  endif()
+
+  set(DOXYGEN_HIDE_UNDOC_RELATIONS NO)
+  set(DOXYGEN_HTML_DYNAMIC_SECTIONS YES)
+  set(DOXYGEN_INCLUDE_PATH "/usr/local/include")
+  set(DOXYGEN_INTERACTIVE_SVG YES)
+  set(DOXYGEN_JAVADOC_AUTOBRIEF YES)
+  set(DOXYGEN_MACRO_EXPANSION YES)
+  set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/docs")
+  set(DOXYGEN_PREDEFINED IOTFLEETWISE_LINUX)
+  set(DOXYGEN_PROJECT_NAME "AWS IoT FleetWise Edge")
+  set(DOXYGEN_QUIET YES)
+  set(DOXYGEN_SOURCE_BROWSER YES)
+  set(DOXYGEN_TEMPLATE_RELATIONS YES)
+  set(DOXYGEN_TOC_INCLUDE_HEADINGS 5)
+  set(DOXYGEN_UML_LOOK YES)
+
+  doxygen_add_docs(
+    doc_doxygen
+    ${PROJECT_SOURCE_DIR}/src 
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Generating API documentation with Doxygen"
-    VERBATIM 
   )
 
+  # Note: From CMake 3.12 onwards, the ALL option is supported as part of
+  # doxygen_add_docs
+  # Until then, we have to set it manually
+  set_target_properties(doc_doxygen PROPERTIES EXCLUDE_FROM_ALL FALSE)
 else (DOXYGEN_FOUND)
   message("Doxygen needs to be installed to generate the doxygen documentation")
 endif (DOXYGEN_FOUND)

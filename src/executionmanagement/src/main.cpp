@@ -17,6 +17,7 @@
 #include "IoTFleetWiseVersion.h"
 #include "LogLevel.h"
 #include <csignal>
+#include <cstdlib>
 #include <iostream>
 
 using namespace Aws::IoTFleetWise::ExecutionManagement;
@@ -42,7 +43,7 @@ printVersion()
 static void
 setSystemWideLogLevel( const Json::Value &config )
 {
-    Aws::IoTFleetWise::Platform::LogLevel logLevel = Aws::IoTFleetWise::Platform::LogLevel::Trace;
+    Aws::IoTFleetWise::Platform::Linux::LogLevel logLevel = Aws::IoTFleetWise::Platform::Linux::LogLevel::Trace;
     stringToLogLevel( config["staticConfig"]["internalParameters"]["systemWideLogLevel"].asString(), logLevel );
     gSystemWideLogLevel = logLevel;
 }
@@ -54,7 +55,7 @@ main( int argc, char *argv[] )
     if ( argc != 2 )
     {
         std::cout << "error: invalid argument - only a config file is required" << std::endl;
-        exit( -1 );
+        return EXIT_FAILURE;
     }
 
     IoTFleetWiseEngine engine;
@@ -64,7 +65,7 @@ main( int argc, char *argv[] )
     if ( !IoTFleetWiseConfig::read( configFilename, config ) )
     {
         std::cout << " AWS IoT FleetWise Edge Service failed to read config file: " + configFilename << std::endl;
-        exit( -1 );
+        return EXIT_FAILURE;
     }
     // Set system wide log level
     setSystemWideLogLevel( config );
@@ -76,7 +77,7 @@ main( int argc, char *argv[] )
     }
     else
     {
-        exit( -1 );
+        return EXIT_FAILURE;
     }
 
     while ( !mSignal )
@@ -86,11 +87,9 @@ main( int argc, char *argv[] )
     if ( engine.stop() && engine.disconnect() )
     {
         std::cout << " AWS IoT FleetWise Edge Service Stopped successfully " << std::endl;
-        exit( 0 );
+        return EXIT_SUCCESS;
     }
-    else
-    {
-        std::cout << " AWS IoT FleetWise Edge Service Stopped with errors " << std::endl;
-        exit( -1 );
-    }
+
+    std::cout << " AWS IoT FleetWise Edge Service Stopped with errors " << std::endl;
+    return EXIT_FAILURE;
 }

@@ -16,7 +16,7 @@
 
 #include "MemoryUsageInfo.h"
 #include <atomic>
-#include <stdio.h>
+#include <cstdio>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -26,6 +26,8 @@ namespace Aws
 namespace IoTFleetWise
 {
 namespace Platform
+{
+namespace Linux
 {
 
 bool
@@ -74,7 +76,7 @@ MemoryUsageInfo::reportMemoryUsageInfo()
         return true;
     }
 }
-
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

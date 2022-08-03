@@ -14,7 +14,7 @@
 #pragma once
 
 // Includes
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 
 namespace Aws
@@ -39,12 +39,12 @@ const uint32_t P2_TIMEOUT_INFINITE = 0;
  */
 struct ISOTPOverCANSenderOptions
 {
-    ISOTPOverCANSenderOptions( const std::string &socketCanIFName,
-                               const uint32_t &sourceCANId,
-                               const uint32_t &destinationCANId,
-                               const bool &isExtendedId = false,
+    ISOTPOverCANSenderOptions( std::string socketCanIFName,
+                               const uint32_t sourceCANId,
+                               const uint32_t destinationCANId,
+                               const bool isExtendedId = false,
                                const uint32_t p2TimeoutMs = P2_TIMEOUT_DEFAULT_MS )
-        : mSocketCanIFName( socketCanIFName )
+        : mSocketCanIFName( std::move( socketCanIFName ) )
         , mSourceCANId( sourceCANId )
         , mDestinationCANId( destinationCANId )
         , mIsExtendedId( isExtendedId )
@@ -52,19 +52,13 @@ struct ISOTPOverCANSenderOptions
     {
     }
 
-    ISOTPOverCANSenderOptions()
-        : mSourceCANId( 0x0 )
-        , mDestinationCANId( 0x0 )
-        , mIsExtendedId( false )
-        , mP2TimeoutMs( P2_TIMEOUT_DEFAULT_MS )
-    {
-    }
+    ISOTPOverCANSenderOptions() = default;
 
     std::string mSocketCanIFName;
-    uint32_t mSourceCANId;
-    uint32_t mDestinationCANId;
-    bool mIsExtendedId;
-    uint32_t mP2TimeoutMs;
+    uint32_t mSourceCANId{ 0x0 };
+    uint32_t mDestinationCANId{ 0x0 };
+    bool mIsExtendedId{ false };
+    uint32_t mP2TimeoutMs{ P2_TIMEOUT_DEFAULT_MS };
 };
 
 /**
@@ -84,14 +78,14 @@ struct ISOTPOverCANSenderOptions
  */
 struct ISOTPOverCANReceiverOptions
 {
-    ISOTPOverCANReceiverOptions( const std::string &socketCanIFName,
-                                 const uint32_t &sourceCANId,
-                                 const uint32_t &destinationCANId,
-                                 const bool &isExtendedId = false,
-                                 const uint8_t &blockSize = 0,
-                                 const uint32_t &frameSeparationTimeMs = 0,
-                                 const uint32_t p2TimeoutMs = P2_TIMEOUT_DEFAULT_MS )
-        : mSocketCanIFName( socketCanIFName )
+    ISOTPOverCANReceiverOptions( std::string socketCanIFName,
+                                 uint32_t sourceCANId,
+                                 uint32_t destinationCANId,
+                                 bool isExtendedId = false,
+                                 uint8_t blockSize = 0,
+                                 uint32_t frameSeparationTimeMs = 0,
+                                 uint32_t p2TimeoutMs = P2_TIMEOUT_DEFAULT_MS )
+        : mSocketCanIFName( std::move( socketCanIFName ) )
         , mSourceCANId( sourceCANId )
         , mDestinationCANId( destinationCANId )
         , mIsExtendedId( isExtendedId )
@@ -101,23 +95,15 @@ struct ISOTPOverCANReceiverOptions
     {
     }
 
-    ISOTPOverCANReceiverOptions()
-        : mSourceCANId( 0x0 )
-        , mDestinationCANId( 0x0 )
-        , mIsExtendedId( false )
-        , mBlockSize( 0x0 )
-        , mFrameSeparationTimeMs( 0x0 )
-        , mP2TimeoutMs( P2_TIMEOUT_DEFAULT_MS )
-    {
-    }
+    ISOTPOverCANReceiverOptions() = default;
 
     std::string mSocketCanIFName;
-    uint32_t mSourceCANId;
-    uint32_t mDestinationCANId;
-    bool mIsExtendedId;
-    uint8_t mBlockSize;
-    uint32_t mFrameSeparationTimeMs;
-    uint32_t mP2TimeoutMs;
+    uint32_t mSourceCANId{ 0x0 };
+    uint32_t mDestinationCANId{ 0x0 };
+    bool mIsExtendedId{ false };
+    uint8_t mBlockSize{ 0x0 };
+    uint32_t mFrameSeparationTimeMs{ 0x0 };
+    uint32_t mP2TimeoutMs{ P2_TIMEOUT_DEFAULT_MS };
 };
 
 /**
@@ -136,14 +122,16 @@ struct ISOTPOverCANReceiverOptions
  */
 struct ISOTPOverCANSenderReceiverOptions
 {
-    ISOTPOverCANSenderReceiverOptions( const std::string &socketCanIFName,
-                                       const uint32_t &sourceCANId,
-                                       const uint32_t &destinationCANId,
-                                       const bool &isExtendedId = false,
-                                       const uint8_t &blockSize = 0,
-                                       const uint32_t &frameSeparationTimeMs = 0,
-                                       const uint32_t p2TimeoutMs = P2_TIMEOUT_DEFAULT_MS )
-        : mSocketCanIFName( socketCanIFName )
+    ISOTPOverCANSenderReceiverOptions() = default;
+
+    ISOTPOverCANSenderReceiverOptions( std::string socketCanIFName,
+                                       uint32_t sourceCANId,
+                                       uint32_t destinationCANId,
+                                       bool isExtendedId = false,
+                                       uint8_t blockSize = 0,
+                                       uint32_t frameSeparationTimeMs = 0,
+                                       uint32_t p2TimeoutMs = P2_TIMEOUT_DEFAULT_MS )
+        : mSocketCanIFName( std::move( socketCanIFName ) )
         , mSourceCANId( sourceCANId )
         , mDestinationCANId( destinationCANId )
         , mIsExtendedId( isExtendedId )
@@ -153,23 +141,13 @@ struct ISOTPOverCANSenderReceiverOptions
     {
     }
 
-    ISOTPOverCANSenderReceiverOptions()
-        : mSourceCANId( 0x0 )
-        , mDestinationCANId( 0x0 )
-        , mIsExtendedId( false )
-        , mBlockSize( 0x0 )
-        , mFrameSeparationTimeMs( 0x0 )
-        , mP2TimeoutMs( P2_TIMEOUT_DEFAULT_MS )
-    {
-    }
-
     std::string mSocketCanIFName;
-    uint32_t mSourceCANId;
-    uint32_t mDestinationCANId;
-    bool mIsExtendedId;
-    uint8_t mBlockSize;
-    uint32_t mFrameSeparationTimeMs;
-    uint32_t mP2TimeoutMs;
+    uint32_t mSourceCANId{ 0x0 };
+    uint32_t mDestinationCANId{ 0x0 };
+    bool mIsExtendedId{ false };
+    uint8_t mBlockSize{ 0x0 };
+    uint32_t mFrameSeparationTimeMs{ 0x0 };
+    uint32_t mP2TimeoutMs{ P2_TIMEOUT_DEFAULT_MS };
 };
 } // namespace VehicleNetwork
 } // namespace IoTFleetWise

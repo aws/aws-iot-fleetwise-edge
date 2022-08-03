@@ -18,7 +18,7 @@
 #include <gtest/gtest.h>
 #include <iostream>
 
-using namespace Aws::IoTFleetWise::Platform;
+using namespace Aws::IoTFleetWise::Platform::Linux;
 
 TEST( CPUUsageInfoTest, testCPUUsageInfo )
 {

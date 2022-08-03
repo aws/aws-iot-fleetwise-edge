@@ -22,7 +22,7 @@ namespace IoTFleetWise
 {
 namespace OffboardConnectivity
 {
-using Aws::IoTFleetWise::Platform::ThreadListeners;
+using Aws::IoTFleetWise::Platform::Linux::ThreadListeners;
 
 /**
  * @brief Receiver must inherit from IReceiverCallback
@@ -30,7 +30,7 @@ using Aws::IoTFleetWise::Platform::ThreadListeners;
  */
 struct IReceiverCallback
 {
-    virtual ~IReceiverCallback() = 0;
+    virtual ~IReceiverCallback() = default;
 
     /**
      * @brief called after new data received
@@ -65,11 +65,11 @@ struct IReceiverCallback
  *  \endcode
  * @see IReceiverCallback
  */
-class IReceiver : public Aws::IoTFleetWise::Platform::ThreadListeners<IReceiverCallback>
+class IReceiver : public Aws::IoTFleetWise::Platform::Linux::ThreadListeners<IReceiverCallback>
 {
 
 public:
-    virtual ~IReceiver() = default;
+    ~IReceiver() override = default;
     /**
      * @brief indicates if the connection is established and authenticated
      *

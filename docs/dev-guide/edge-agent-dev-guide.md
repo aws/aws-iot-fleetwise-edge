@@ -95,18 +95,18 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
 1. Run the demo script:
 
    ```bash
-   ./demo.sh --vehicle-id fwdemo
+   ./demo.sh --vehicle-name fwdemo
    ```
 
    1. (Optional) If you selected a `FleetSize` of greater than one above, append the option `--fleet-size <SIZE>`, where `<SIZE>` is the number selected.
    1. (Optional) If you changed `IoTCoreRegion` above, append the option `--region <REGION>`, where `<REGION>` is the selected region.
    1. (Optional) If you changed `Stack name` when creating the stack above, pass the
-      new stack name to the `--vehicle-id` option.
+      new stack name to the `--vehicle-name` option.
 
    For example, if you chose to create two AWS IoT things in Europe (Frankfurt) with a stack named `myfwdemo`, you must pass those values when calling `demo.sh`:
 
    ```bash
-   ./demo.sh --vehicle-id myfwdemo --fleet-size 2 --region eu-central-1
+   ./demo.sh --vehicle-name myfwdemo --fleet-size 2 --region eu-central-1
    ```
 
 1. When the script completes, a path to an HTML file is given in the format `/home/cloudshell-user/aws-iot-fleetwise-cloud/fwdemo-<TIMESTAMP>.html`. Copy the path, then click on the Actions drop down menu in the top-right corner of the CloudShell window and choose **Download file**. Paste the path to the file, choose **Download**, and open the downloaded file in your browser.
@@ -183,7 +183,7 @@ An Ubuntu 18.04 development machine with 200GB free disk space will be required.
 1. Install the AWS IoT FleetWise Edge Agent dependencies
 
    1. `install-deps-native.sh` — installs the following Ubuntu packages:
-      `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libsnappy-dev default-jre libasio-dev`. Additionally it installs the following: `jsoncpp protobuf aws-iot-device-sdk-cpp-v2`
+      `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`. Additionally it installs the following: `jsoncpp protobuf aws-sdk-cpp`
    1. `install-socketcan.sh` — installs the following Ubuntu packages: `build-essential dkms can-utils git linux-modules-extra-aws`. Additionally it installs the following: `can-isotp`. It also installs a systemd service called `setup-socketcan` that brings up the virtual SocketCAN interface `vcan0` at startup.
    1. `install-cansim.sh` — installs the following Ubuntu packages: `python3.7 python3-setuptools curl`. It then installs Python PIP for Python 3.7 and the following PIP packages: `wrapt cantools prompt_toolkit python-can can-isotp matplotlib`. It also installs a systemd service called `cansim` that periodically transmits data on the virtual SocketCAN bus `vcan0` to simulate vehicle data.
 
@@ -208,15 +208,15 @@ An Ubuntu 18.04 development machine with 200GB free disk space will be required.
    ```bash
    sudo mkdir -p /etc/aws-iot-fleetwise \
        && sudo ./tools/provision.sh \
-           --vehicle-id fwdemo-ec2 \
+           --vehicle-name fwdemo-ec2 \
            --certificate-pem-outfile /etc/aws-iot-fleetwise/certificate.pem \
            --private-key-outfile /etc/aws-iot-fleetwise/private-key.key \
            --endpoint-url-outfile /etc/aws-iot-fleetwise/endpoint.txt \
-           --vehicle-id-outfile /etc/aws-iot-fleetwise/vehicle-id.txt \
+           --vehicle-name-outfile /etc/aws-iot-fleetwise/vehicle-name.txt \
        && sudo ./tools/configure-fwe.sh \
            --input-config-file configuration/static-config.json \
            --output-config-file /etc/aws-iot-fleetwise/config-0.json \
-           --vehicle-id `cat /etc/aws-iot-fleetwise/vehicle-id.txt` \
+           --vehicle-name `cat /etc/aws-iot-fleetwise/vehicle-name.txt` \
            --endpoint-url `cat /etc/aws-iot-fleetwise/endpoint.txt` \
            --can-bus0 vcan0 \
        && sudo ./tools/install-fwe.sh
@@ -255,14 +255,14 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
 1. Run the demo script:
 
    ```bash
-   ./demo.sh --vehicle-id fwdemo-ec2
+   ./demo.sh --vehicle-name fwdemo-ec2
    ```
 
    1. (Optional) If you changed the `--region` option to `provision.sh` above, append the option `--region <REGION>`, where `<REGION>` is the selected region.
       For example, if you chose to create the AWS IoT thing in Europe (Frankfurt), you must configure `--region` to `eu-central-1` in the demo.sh file.
 
       ```bash
-      ./demo.sh --vehicle-id fwdemo-ec2 --region eu-central-1
+      ./demo.sh --vehicle-name fwdemo-ec2 --region eu-central-1
       ```
 
    1. The demo script:
@@ -297,13 +297,13 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
 1. Run the following _on the development machine_ to deploy a ‘heartbeat’ campaign that collects OBD data from the vehicle. Repeat the process above to view the collected data.
 
    ```bash
-   ./demo.sh --vehicle-id fwdemo-ec2 --campaign-file campaign-obd-heartbeat.json
+   ./demo.sh --vehicle-name fwdemo-ec2 --campaign-file campaign-obd-heartbeat.json
    ```
 
    Similarly, if you chose to deploy the ‘heartbeat’ campaign that collects OBD data from an AWS IoT thing created in in Europe (Frankfurt), you must configure `--region`:
 
    ```bash
-   ./demo.sh --vehicle-id fwdemo-ec2 --campaign-file campaign-obd-heartbeat.json --region eu-central-1
+   ./demo.sh --vehicle-name fwdemo-ec2 --campaign-file campaign-obd-heartbeat.json --region eu-central-1
    ```
 
 ## Getting started with AWS IoT FleetWise Edge Agent on NXP S32G
@@ -393,15 +393,15 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
   build/src/executionmanagement/ \
 && mkdir -p config && cd config \
 && ../tools/provision.sh \
-  --vehicle-id fwdemo-s32g \
+  --vehicle-name fwdemo-s32g \
   --certificate-pem-outfile certificate.pem \
   --private-key-outfile private-key.key \
   --endpoint-url-outfile endpoint.txt \
-  --vehicle-id-outfile vehicle-id.txt \
+  --vehicle-name-outfile vehicle-name.txt \
 && ../tools/configure-fwe.sh \
   --input-config-file ~/aws-iot-fleetwise-edge/configuration/static-config.json \
   --output-config-file config-0.json \
-  --vehicle-id `cat vehicle-id.txt` \
+  --vehicle-name `cat vehicle-name.txt` \
   --endpoint-url `cat endpoint.txt` \
   --can-bus0 can0 \
 && cd .. && zip -r aws-iot-fleetwise-deploy.zip .
@@ -443,7 +443,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
-       && ./demo.sh --vehicle-id fwdemo-s32g --campaign-file campaign-obd-heartbeat.json
+       && ./demo.sh --vehicle-name fwdemo-s32g --campaign-file campaign-obd-heartbeat.json
    ```
 
 **Note:**
@@ -1478,10 +1478,10 @@ Customers can set the System level logging severity externally via the software 
 |                          | hasTransmissionEcu                          | specifies whether the vehicle has a Transmission ECU                                                                      | boolean  |
 |                          | interfaceId                                 | Every OBD signal decoder is associated with a OBD network interface using a unique Id                                     | string   |
 |                          | type                                        | Specifies if the interface carries CAN or OBD signals over this channel, this will be OBD for a OBD network interface     | string   |
-| bufferSizes              | dtcBufferSize                               | Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer. This is a single producer single consumer buffer.                                                                                                                                                                                                                      | integer  |
+| bufferSizes              | dtcBufferSize                               | Max size of the buffer shared between data collection module (Collection Engine) and Vehicle Data Consumer. This is a single producer single consumer buffer.                                                                                                                                                                                                                      | integer  |
 |                          | socketCANBufferSize                         | Max size of the circular buffer associated with a network channel (CAN Bus) for data consumption from that channel. This is a single producer-single consumer buffer.                                                                                                                                                                                                                 | integer  |
-|                          | decodedSignalsBufferSize                    | Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer for OBD and CAN signals. This buffer receives the raw packets from the Network Channel e.g. CAN bus and stores the decoded/filtered data according to the signal decoding information provided in decoder manifest. This is a multiple producer single consumer buffer. | integer  |
-|                          | rawCANFrameBufferSize                       | Max size of the buffer shared between Network Channel Consumer and data collection module (Collection Engine). This buffer stores raw CAN frames coming in from the CAN Bus. This is a lock-free multi-producer single consumer buffer.                                                                                                                                               | integer  |
+|                          | decodedSignalsBufferSize                    | Max size of the buffer shared between data collection module (Collection Engine) and Vehicle Data Consumer for OBD and CAN signals. This buffer receives the raw packets from the Vehicle Data e.g. CAN bus and stores the decoded/filtered data according to the signal decoding information provided in decoder manifest. This is a multiple producer single consumer buffer. | integer  |
+|                          | rawCANFrameBufferSize                       | Max size of the buffer shared between Vehicle Data Consumer and data collection module (Collection Engine). This buffer stores raw CAN frames coming in from the CAN Bus. This is a lock-free multi-producer single consumer buffer.                                                                                                                                               | integer  |
 | threadIdleTimes          | inspectionThreadIdleTimeMs                  | Sleep time for inspection engine thread if no new data is available (in milliseconds)                                     | integer  |
 |                          | socketCANThreadIdleTimeMs                   | Sleep time for CAN interface if no new data is available (in milliseconds)                                                | integer  |
 |                          | canDecoderThreadIdleTimeMs                  | Sleep time for CAN decoder thread if no new data is available (in milliseconds)                                           | integer  |
@@ -1517,12 +1517,14 @@ The device software has been designed to be deployed in a non safety relevant in
 
 ### Best Practices and recommendation
 
-You can use the cmake build option, `FWE_SECURITY_COMPILE_FLAGS`, to enable security-related compile options when building the binary. Consult the compiler manual for the effect of each option in `./cmake/compiler_gcc.cmake`.
+You can use the cmake build option, `FWE_SECURITY_COMPILE_FLAGS`, to enable security-related compile options when building the binary. Consult the compiler manual for the effect of each option in `./cmake/compiler_gcc.cmake`. This flag is already enabled in the default [native compilation script](./tools/build-fwe-native.sh) and [cross compilation script](./tools/build-fwe-cross.sh)
 
-Modify `./tools/build-fwe-cross.sh` to enable the security build option:
+Customers are encouraged to store key materials on hardware modules, such as hardware security module (HSM), Trusted Platform Modules (TPM), or other cryptographic elements. 
+A HSM is a removable or external device that can generate, store, and manage RSA keys used in asymmetric encryption. A TPM is a cryptographic processor present on most commercial PCs and servers.
 
-1. Add the following line: `-DFWE_SECURITY_COMPILE_FLAGS=On`
-2. Check that the `FWE_STRIP_SYMBOLS` on is turned `On`
+Please refer to [AWS IoT Security Best Practices](https://docs.aws.amazon.com/iot/latest/developerguide/security-best-practices.html) for recommended security best practices.
+
+Please refer to [Device Manufacturing and Provisioning with X.509 Certificates in AWS IoT Core](https://d1.awsstatic.com/whitepapers/device-manufacturing-provisioning.pdf) for security recommendations on device manufacturing and provisioning.
 
 Note: This is **only** a recommendation. Your system must be protected with proper security measures.
 
@@ -1559,7 +1561,7 @@ The following documents or websites provide more information about AWS IoT Fleet
       "interfaceId": "0",
       "type": "OBD_INTERFACE",
       "obdInterface": {
-        "obdInterfaceName": "can0",
+        "name": "can0",
         "requestMessageId": 2015,
         "obdStandard": "J1979",
         "pidRequestIntervalSeconds": 5,
@@ -1570,7 +1572,7 @@ The following documents or websites provide more information about AWS IoT Fleet
       "interfaceId": "1",
       "type": "CAN_INTERFACE",
       "canInterface": {
-        "canInterfaceName": "can0",
+        "name": "can0",
         "protocolName": "CAN",
         "protocolVersion": "2.0B"
       }
@@ -1582,7 +1584,7 @@ The following documents or websites provide more information about AWS IoT Fleet
       "interfaceId": "1",
       "type": "CAN_SIGNAL",
       "canSignal": {
-        "canSignalName": "myCanSignal",
+        "name": "myCanSignal",
         "factor": 1.0,
         "isBigEndian": true,
         "isSigned": true,
@@ -1616,7 +1618,7 @@ The following documents or websites provide more information about AWS IoT Fleet
 
 ```json
 {
-  "campaignName": "my-campaign",
+  "name": "my-campaign",
   "signalCatalogArn": "arn:aws:iotfleetwise:us-east-1:111111111111:signal-catalog/my-signal-catalog",
   "targetArn": "arn:aws:iotfleetwise:us-east-1:111111111111:fleet/my-fleet",
   "compression": "SNAPPY",
@@ -1633,10 +1635,10 @@ The following documents or websites provide more information about AWS IoT Fleet
   "postTriggerCollectionDuration": 1000,
   "signalsToCollect": [
     {
-      "signalName": "Vehicle.DemoEngineTorque"
+      "name": "Vehicle.DemoEngineTorque"
     },
     {
-      "signalName": "Vehicle.DemoBrakePedalPressure"
+      "name": "Vehicle.DemoBrakePedalPressure"
     }
   ]
 }

@@ -28,16 +28,9 @@ namespace OffboardConnectivity
  */
 struct CollectionSchemeParams
 {
-    CollectionSchemeParams()
-        : persist( false )
-        , compression( false )
-        , priority( 0 )
-    {
-    }
-
-    bool persist;      // specifies if data needs to be persisted in case of connection loss
-    bool compression;  // specifies if data needs to be compressed for cloud
-    uint32_t priority; // collectionScheme priority specified by the cloud
+    bool persist{ false };     // specifies if data needs to be persisted in case of connection loss
+    bool compression{ false }; // specifies if data needs to be compressed for cloud
+    uint32_t priority{ 0 };    // collectionScheme priority specified by the cloud
 };
 
 /**

@@ -16,8 +16,8 @@ ENDPOINT_URL=""
 ENDPOINT_URL_OPTION=""
 REGION="us-east-1"
 TIMESTAMP=`date +%s`
-DEFAULT_VEHICLE_ID="fwdemo"
-VEHICLE_ID=""
+DEFAULT_VEHICLE_NAME="fwdemo"
+VEHICLE_NAME=""
 TIMESTREAM_DB_NAME="IoTFleetWiseDB-${TIMESTAMP}"
 TIMESTREAM_TABLE_NAME="VehicleDataTable"
 SERVICE_ROLE="IoTFleetWiseServiceRole"
@@ -32,8 +32,8 @@ FORCE_REGISTRATION=false
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case $1 in
-        --vehicle-id)
-            VEHICLE_ID=$2
+        --vehicle-name)
+            VEHICLE_NAME=$2
             ;;
         --fleet-size)
             FLEET_SIZE=$2
@@ -55,10 +55,10 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --vehicle-id <ID>       Vehicle ID"
+            echo "  --vehicle-name <ID>     Vehicle name"
             echo "  --fleet-size <SIZE>     Size of fleet, default: ${FLEET_SIZE}. When greater than 1,"
             echo "                          the instance number will be appended to each"
-            echo "                          vehicle ID after a '-', e.g. ${DEFAULT_VEHICLE_ID}-42"
+            echo "                          Vehicle name after a '-', e.g. ${DEFAULT_VEHICLE_NAME}-42"
             echo "  --campaign-file <FILE>  Campaign JSON file, default: ${CAMPAIGN_FILE}"
             echo "  --clean-up              Delete created resources"
             echo "  --endpoint-url <URL>    The endpoint URL used for AWS CLI calls"
@@ -85,21 +85,21 @@ echo "==================================="
 
 parse_args "$@"
 
-if [ "${VEHICLE_ID}" == "" ]; then
-    echo -n "Enter vehicle ID [${DEFAULT_VEHICLE_ID}]: "
-    read VEHICLE_ID
-    if [ "${VEHICLE_ID}" == "" ]; then
-        VEHICLE_ID=${DEFAULT_VEHICLE_ID}
+if [ "${VEHICLE_NAME}" == "" ]; then
+    echo -n "Enter Vehicle name [${DEFAULT_VEHICLE_NAME}]: "
+    read VEHICLE_NAME
+    if [ "${VEHICLE_NAME}" == "" ]; then
+        VEHICLE_NAME=${DEFAULT_VEHICLE_NAME}
     fi
 fi
 
-NAME="${VEHICLE_ID}-${TIMESTAMP}"
+NAME="${VEHICLE_NAME}-${TIMESTAMP}"
 SERVICE_ROLE="${SERVICE_ROLE}-${REGION}-${TIMESTAMP}"
 
 echo -n "Date: "
 date --rfc-3339=seconds
 echo "Timestamp: ${TIMESTAMP}"
-echo "Vehicle ID: ${VEHICLE_ID}"
+echo "Vehicle name: ${VEHICLE_NAME}"
 echo "Fleet Size: ${FLEET_SIZE}"
 
 # AWS CLI v1.x has a double base64 encoding issue
@@ -114,7 +114,7 @@ fi
 error_handler() {
     if [ ${CLEAN_UP} == true ]; then
         ./clean-up.sh \
-            --vehicle-id ${VEHICLE_ID} \
+            --vehicle-name ${VEHICLE_NAME} \
             --fleet-size ${FLEET_SIZE} \
             --timestamp ${TIMESTAMP} \
             ${ENDPOINT_URL_OPTION} \
@@ -294,12 +294,12 @@ TIMESTREAM_DB_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistr
 TIMESTREAM_TABLE_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamTableName` 
 
 if ((FLEET_SIZE==1)); then
-    echo "Deleting vehicle ${VEHICLE_ID} if it already exists..."
+    echo "Deleting vehicle ${VEHICLE_NAME} if it already exists..."
     aws iotfleetwise delete-vehicle \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --vehicle-id "${VEHICLE_ID}"
+        --vehicle-name "${VEHICLE_NAME}"
 else
-    echo "Deleting vehicle ${VEHICLE_ID}-0..$((FLEET_SIZE-1)) if it already exists..."
+    echo "Deleting vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1)) if it already exists..."
     for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
         for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
             # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
@@ -307,7 +307,7 @@ else
             { \
                 aws iotfleetwise delete-vehicle \
                     ${ENDPOINT_URL_OPTION} --region ${REGION} \
-                    --vehicle-id "${VEHICLE_ID}-$((i+j))" \
+                    --vehicle-name "${VEHICLE_NAME}-$((i+j))" \
             2>&3 &} 3>&2 2>/dev/null
         done
         # Wait for all background processes to finish
@@ -347,8 +347,8 @@ if [ ${SIGNAL_CATALOG_COUNT} == 0 ]; then
         --description "DBC signals" \
         --nodes-to-add "${DBC_NODES}" | jq -r .arn
 else
-    SIGNAL_CATALOG_NAME=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].signalCatalogName`
-    SIGNAL_CATALOG_ARN=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].signalCatalogArn`
+    SIGNAL_CATALOG_NAME=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].name`
+    SIGNAL_CATALOG_ARN=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].arn`
     echo ${SIGNAL_CATALOG_ARN}
 
     echo "Updating Vehicle node in signal catalog..."
@@ -429,8 +429,7 @@ NODE_TO_DBC_MAP=`echo ${DBC_NODES} | jq '.[].sensor.fullyQualifiedName//""|match
 NETWORK_FILE_DEFINITIONS=`echo [] \
     | jq .[0].canDbc.signalsMap="${NODE_TO_DBC_MAP}" \
     | jq .[0].canDbc.networkInterface="\"1\"" \
-    | jq .[0].canDbc.canDbcFiles[0]="\"${DBC}\"" \
-    | jq .[0].networkFileType="\"CAN_DBC\""`
+    | jq .[0].canDbc.canDbcFiles[0]="\"${DBC}\""`
 aws iotfleetwise import-decoder-manifest \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
     --name ${NAME}-decoder-manifest \
@@ -443,15 +442,15 @@ aws iotfleetwise update-decoder-manifest \
     --status ACTIVE | jq -r .arn
 
 if ((FLEET_SIZE==1)); then
-    echo "Creating vehicle ${VEHICLE_ID}..."
+    echo "Creating vehicle ${VEHICLE_NAME}..."
     aws iotfleetwise create-vehicle \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
         --decoder-manifest-arn ${DECODER_MANIFEST_ARN} \
         --association-behavior ValidateIotThingExists \
         --model-manifest-arn ${MODEL_MANIFEST_ARN} \
-        --vehicle-id "${VEHICLE_ID}" | jq -r .arn
+        --vehicle-name "${VEHICLE_NAME}" | jq -r .arn
 else
-    echo "Creating vehicle ${VEHICLE_ID}-0..$((FLEET_SIZE-1))..."
+    echo "Creating vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1))..."
     for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
         for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
             # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
@@ -462,7 +461,7 @@ else
                     --decoder-manifest-arn ${DECODER_MANIFEST_ARN} \
                     --association-behavior ValidateIotThingExists \
                     --model-manifest-arn ${MODEL_MANIFEST_ARN} \
-                    --vehicle-id "${VEHICLE_ID}-$((i+j))" >/dev/null \
+                    --vehicle-name "${VEHICLE_NAME}-$((i+j))" >/dev/null \
             2>&3 &} 3>&2 2>/dev/null
         done
         # Wait for all background processes to finish
@@ -479,22 +478,22 @@ FLEET_ARN=`aws iotfleetwise create-fleet \
 echo ${FLEET_ARN}
 
 if ((FLEET_SIZE==1)); then
-    echo "Associating vehicle ${VEHICLE_ID}..."
-    aws iotfleetwise associate-vehicle \
+    echo "Associating vehicle ${VEHICLE_NAME}..."
+    aws iotfleetwise associate-vehicle-fleet \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
         --fleet-id ${NAME}-fleet \
-        --vehicle-id "${VEHICLE_ID}"
+        --vehicle-name "${VEHICLE_NAME}"
 else
-    echo "Associating vehicle ${VEHICLE_ID}-0..$((FLEET_SIZE-1))..."
+    echo "Associating vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1))..."
     for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
         for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
             # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
             # to print stderr from the output group, but not info about the background process.
             { \
-                aws iotfleetwise associate-vehicle \
+                aws iotfleetwise associate-vehicle-fleet \
                     ${ENDPOINT_URL_OPTION} --region ${REGION} \
                     --fleet-id ${NAME}-fleet \
-                    --vehicle-id "${VEHICLE_ID}-$((i+j))" \
+                    --vehicle-name "${VEHICLE_NAME}-$((i+j))" \
             2>&3 &} 3>&2 2>/dev/null
         done
         # Wait for all background processes to finish
@@ -504,7 +503,7 @@ fi
 
 echo "Creating campaign from ${CAMPAIGN_FILE}..."
 CAMPAIGN=`cat ${CAMPAIGN_FILE} \
-    | jq .campaignName=\"${NAME}-campaign\" \
+    | jq .name=\"${NAME}-campaign\" \
     | jq .signalCatalogArn=\"${SIGNAL_CATALOG_ARN}\" \
     | jq .targetArn=\"${FLEET_ARN}\"`
 aws iotfleetwise create-campaign \
@@ -516,7 +515,7 @@ while true; do
     sleep 5
     CAMPAIGN_STATUS=`aws iotfleetwise get-campaign \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --campaign-name ${NAME}-campaign | jq -r .status`
+        --name ${NAME}-campaign | jq -r .status`
     if [ "${CAMPAIGN_STATUS}" == "WAITING_FOR_APPROVAL" ]; then
         break
     fi
@@ -525,14 +524,14 @@ done
 echo "Approving campaign..."
 aws iotfleetwise update-campaign \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
-    --campaign-name ${NAME}-campaign \
+    --name ${NAME}-campaign \
     --action APPROVE | jq -r .arn
 
 check_vehicle_healthy() {
     for ((k=0; k<${HEALTH_CHECK_RETRIES}; k++)); do
         VEHICLE_STATUS=`aws iotfleetwise get-vehicle-status \
             ${ENDPOINT_URL_OPTION} --region ${REGION} \
-            --vehicle-id "$1"`
+            --vehicle-name "$1"`
         for ((l=0; ; l++)); do
             CAMPAIGN_NAME=`echo ${VEHICLE_STATUS} | jq -r .campaigns[${l}].campaignName`
             CAMPAIGN_STATUS=`echo ${VEHICLE_STATUS} | jq -r .campaigns[${l}].status`
@@ -557,16 +556,16 @@ check_vehicle_healthy() {
 }
 
 if ((FLEET_SIZE==1)); then
-    echo "Waiting until status of vehicle ${VEHICLE_ID} is healthy..."
-    check_vehicle_healthy "${VEHICLE_ID}"
+    echo "Waiting until status of vehicle ${VEHICLE_NAME} is healthy..."
+    check_vehicle_healthy "${VEHICLE_NAME}"
 else
-    echo "Waiting until status of vehicle ${VEHICLE_ID}-0..$((FLEET_SIZE-1)) is healthy..."
+    echo "Waiting until status of vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1)) is healthy..."
     for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
         for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
             # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
             # to print stderr from the output group, but not info about the background process.
             { \
-                check_vehicle_healthy "${VEHICLE_ID}-$((i+j))" \
+                check_vehicle_healthy "${VEHICLE_NAME}-$((i+j))" \
             2>&3 &} 3>&2 2>/dev/null
         done
         # Wait for all background processes to finish
@@ -582,7 +581,7 @@ echo "Querying Timestream..."
 aws timestream-query query \
     --region ${REGION} \
     --query-string "SELECT * FROM \"${TIMESTREAM_DB_NAME}\".\"${TIMESTREAM_TABLE_NAME}\" \
-        WHERE vehicleId = '${VEHICLE_ID}`if ((FLEET_SIZE>1)); then echo "-0"; fi`' \
+        WHERE vehicleName = '${VEHICLE_NAME}`if ((FLEET_SIZE>1)); then echo "-0"; fi`' \
         AND time between ago(1m) and now() ORDER BY time ASC" \
     > ${NAME}-timestream-result.json
 
@@ -598,7 +597,7 @@ echo `pwd`/${OUTPUT_FILE_HTML}
 
 if [ ${CLEAN_UP} == true ]; then
     ./clean-up.sh \
-        --vehicle-id ${VEHICLE_ID} \
+        --vehicle-name ${VEHICLE_NAME} \
         --fleet-size ${FLEET_SIZE} \
         --timestamp ${TIMESTAMP} \
         ${ENDPOINT_URL_OPTION} \

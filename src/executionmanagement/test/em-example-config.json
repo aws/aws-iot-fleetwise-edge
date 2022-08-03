@@ -39,7 +39,7 @@
         "persistency": {
             "persistencyPath": "./",
             "persistencyPartitionMaxSize": 524288,
-            "persistencyUploadRetryInterval" : 10000
+            "persistencyUploadRetryInterval": 10000
         },
         "internalParameters": {
             "readyToPublishDataBufferSize": 10000,

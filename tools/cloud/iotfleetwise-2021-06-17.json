@@ -13,14 +13,14 @@
     "uid":"iotfleetwise-2021-06-17"
   },
   "operations":{
-    "AssociateVehicle":{
-      "name":"AssociateVehicle",
+    "AssociateVehicleFleet":{
+      "name":"AssociateVehicleFleet",
       "http":{
         "method":"POST",
         "requestUri":"/"
       },
-      "input":{"shape":"AssociateVehicleRequest"},
-      "output":{"shape":"AssociateVehicleResponse"},
+      "input":{"shape":"AssociateVehicleFleetRequest"},
+      "output":{"shape":"AssociateVehicleFleetResponse"},
       "errors":[
         {"shape":"InternalServerException"},
         {"shape":"ResourceNotFoundException"},
@@ -40,7 +40,7 @@
       "output":{"shape":"BatchCreateVehicleResponse"},
       "errors":[
         {"shape":"InternalServerException"},
-        {"shape":"ServiceQuotaExceededException"},
+        {"shape":"LimitExceededException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
@@ -74,12 +74,12 @@
       "errors":[
         {"shape":"ResourceNotFoundException"},
         {"shape":"ConflictException"},
-        {"shape":"ServiceQuotaExceededException"},
+        {"shape":"LimitExceededException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
       ],
-      "documentation":"<p>Creates an orchestration of data collection rules. The Amazon Web Services IoT FleetWise Edge Agent software running in vehicles uses campaigns to decide how to collect and transfer data to the cloud. You create campaigns in the cloud. After campaigns are approved by you or your team, Amazon Web Services IoT FleetWise automatically deploys them to vehicles. </p> <p> For more information, see <a href=\"https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/\">Campaigns</a> in the <i>Amazon Web Services IoT FleetWise Developer Guide</i>.</p>",
+      "documentation":"<p>Creates an orchestration of data collection rules. The Amazon Web Services IoT FleetWise Edge Agent software running in vehicles uses campaigns to decide how to collect and transfer data to the cloud. You create campaigns in the cloud. After you or your team approve campaigns, Amazon Web Services IoT FleetWise automatically deploys them to vehicles. </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/campaigns.html\">Collect and transfer data with campaigns</a> in the <i>Amazon Web Services IoT FleetWise Developer Guide</i>.</p>",
       "idempotent":true
     },
     "CreateDecoderManifest":{
@@ -93,13 +93,13 @@
       "errors":[
         {"shape":"ResourceNotFoundException"},
         {"shape":"ConflictException"},
+        {"shape":"LimitExceededException"},
         {"shape":"DecoderManifestValidationException"},
-        {"shape":"ServiceQuotaExceededException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
       ],
-      "documentation":"<p>Creates the decoder manifest associated with a model manifest. To create a decoder manifest:</p> <ul> <li> <p>Every signal decoder must have a unique name.</p> </li> <li> <p>Each signal decoder must be associated with a network interface.</p> </li> <li> <p>Network interfaces must have a unique ID.</p> </li> <li> <p>The signal decoders must be specified in the model manifest.</p> </li> </ul>",
+      "documentation":"<p>Creates the decoder manifest associated with a model manifest. To create a decoder manifest, the following must be true:</p> <ul> <li> <p>Every signal decoder has a unique name.</p> </li> <li> <p>Each signal decoder is associated with a network interface.</p> </li> <li> <p>Each network interface has a unique ID.</p> </li> <li> <p>The signal decoders are specified in the model manifest.</p> </li> </ul>",
       "idempotent":true
     },
     "CreateFleet":{
@@ -114,7 +114,7 @@
         {"shape":"InternalServerException"},
         {"shape":"ResourceNotFoundException"},
         {"shape":"ConflictException"},
-        {"shape":"ServiceQuotaExceededException"},
+        {"shape":"LimitExceededException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
@@ -133,13 +133,13 @@
       "errors":[
         {"shape":"ResourceNotFoundException"},
         {"shape":"ConflictException"},
-        {"shape":"ServiceQuotaExceededException"},
+        {"shape":"LimitExceededException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"InvalidSignalsException"},
         {"shape":"AccessDeniedException"}
       ],
-      "documentation":"<p> Creates a vehicle model (model manifest) that specifies signals (attributes, branches, sensors, and actuators). </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/\">Vehicle models</a> in the <i>Amazon Web Services IoT FleetWise Developer Guide.</i>.</p>",
+      "documentation":"<p> Creates a vehicle model (model manifest) that specifies signals (attributes, branches, sensors, and actuators). </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/vehicle-models.html\">Vehicle models</a> in the <i>Amazon Web Services IoT FleetWise Developer Guide</i>.</p>",
       "idempotent":true
     },
     "CreateSignalCatalog":{
@@ -152,7 +152,8 @@
       "output":{"shape":"CreateSignalCatalogResponse"},
       "errors":[
         {"shape":"ConflictException"},
-        {"shape":"ServiceQuotaExceededException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"InvalidNodeException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"InvalidSignalsException"},
@@ -173,7 +174,7 @@
         {"shape":"InternalServerException"},
         {"shape":"ResourceNotFoundException"},
         {"shape":"ConflictException"},
-        {"shape":"ServiceQuotaExceededException"},
+        {"shape":"LimitExceededException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
@@ -208,6 +209,7 @@
       "output":{"shape":"DeleteDecoderManifestResponse"},
       "errors":[
         {"shape":"InternalServerException"},
+        {"shape":"ConflictException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
@@ -242,6 +244,7 @@
       "output":{"shape":"DeleteModelManifestResponse"},
       "errors":[
         {"shape":"InternalServerException"},
+        {"shape":"ConflictException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
@@ -259,6 +262,7 @@
       "output":{"shape":"DeleteSignalCatalogResponse"},
       "errors":[
         {"shape":"InternalServerException"},
+        {"shape":"ConflictException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
@@ -283,14 +287,14 @@
       "documentation":"<p> Deletes a vehicle and removes it from any campaigns.</p> <note> <p>If the vehicle is successfully deleted, Amazon Web Services IoT FleetWise sends back an HTTP 200 response with an empty body.</p> </note>",
       "idempotent":true
     },
-    "DisassociateVehicle":{
-      "name":"DisassociateVehicle",
+    "DisassociateVehicleFleet":{
+      "name":"DisassociateVehicleFleet",
       "http":{
         "method":"POST",
         "requestUri":"/"
       },
-      "input":{"shape":"DisassociateVehicleRequest"},
-      "output":{"shape":"DisassociateVehicleResponse"},
+      "input":{"shape":"DisassociateVehicleFleetRequest"},
+      "output":{"shape":"DisassociateVehicleFleetResponse"},
       "errors":[
         {"shape":"InternalServerException"},
         {"shape":"ResourceNotFoundException"},
@@ -298,7 +302,7 @@
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
       ],
-      "documentation":"<p>Removes, or disassociates, a vehicle from a fleet. Disassociating a vehicle from a fleet won't delete the vehicle.</p> <note> <p>If the vehicle is successfully dissociated from a fleet, Amazon Web Services IoT FleetWise sends back an HTTP 200 response with an empty body.</p> </note>"
+      "documentation":"<p>Removes, or disassociates, a vehicle from a fleet. Disassociating a vehicle from a fleet doesn't delete the vehicle.</p> <note> <p>If the vehicle is successfully dissociated from a fleet, Amazon Web Services IoT FleetWise sends back an HTTP 200 response with an empty body.</p> </note>"
     },
     "GetCampaign":{
       "name":"GetCampaign",
@@ -379,7 +383,7 @@
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
       ],
-      "documentation":"<p> Retrieves information about the status of registering your Amazon Web Services account, IAM, and Amazon Timestream resources so that Amazon Web Services IoT FleetWise can transfer your vehicle data to the Amazon Web Services Cloud. </p> <p>For more information, including step-by-step procedures, see <a href=\"https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/\">Setting up Amazon Web Services IoT FleetWise</a>. </p> <note> <p>This API operation doesn't require input parameters.</p> </note>"
+      "documentation":"<p> Retrieves information about the status of registering your Amazon Web Services account, IAM, and Amazon Timestream resources so that Amazon Web Services IoT FleetWise can transfer your vehicle data to the Amazon Web Services Cloud. </p> <p>For more information, including step-by-step procedures, see <a href=\"https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/setting-up.html\">Setting up Amazon Web Services IoT FleetWise</a>. </p> <note> <p>This API operation doesn't require input parameters.</p> </note>"
     },
     "GetSignalCatalog":{
       "name":"GetSignalCatalog",
@@ -440,6 +444,7 @@
       "output":{"shape":"ImportDecoderManifestResponse"},
       "errors":[
         {"shape":"ResourceNotFoundException"},
+        {"shape":"ConflictException"},
         {"shape":"DecoderManifestValidationException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
@@ -460,12 +465,13 @@
         {"shape":"ResourceNotFoundException"},
         {"shape":"InternalServerException"},
         {"shape":"ConflictException"},
+        {"shape":"LimitExceededException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"InvalidSignalsException"},
         {"shape":"AccessDeniedException"}
       ],
-      "documentation":"<p> Creates a signal catalog using your existing VSS file from your local device. </p>",
+      "documentation":"<p> Creates a signal catalog using your existing VSS formatted content from your local device. </p>",
       "idempotent":true
     },
     "ListCampaigns":{
@@ -578,7 +584,7 @@
       "errors":[
         {"shape":"InternalServerException"},
         {"shape":"ResourceNotFoundException"},
-        {"shape":"ServiceQuotaExceededException"},
+        {"shape":"LimitExceededException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
@@ -612,7 +618,7 @@
       "errors":[
         {"shape":"InternalServerException"},
         {"shape":"ResourceNotFoundException"},
-        {"shape":"ServiceQuotaExceededException"},
+        {"shape":"LimitExceededException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
@@ -634,6 +640,23 @@
         {"shape":"AccessDeniedException"}
       ],
       "documentation":"<p> Lists all the created signal catalogs in an Amazon Web Services account. </p> <p>You can use to list information about each signal (node) specified in a signal catalog.</p> <note> <p>This API operation uses pagination. Specify the <code>nextToken</code> parameter in the request to return more results.</p> </note>"
+    },
+    "ListTagsForResource":{
+      "name":"ListTagsForResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"ListTagsForResourceRequest"},
+      "output":{"shape":"ListTagsForResourceResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"ValidationException"},
+        {"shape":"AccessDeniedException"}
+      ],
+      "documentation":"<p>Lists the tags (metadata) you have assigned to the resource.</p>"
     },
     "ListVehicles":{
       "name":"ListVehicles",
@@ -684,7 +707,43 @@
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
       ],
-      "documentation":"<p>Registers your Amazon Web Services account, IAM, and Amazon Timestream resources so Amazon Web Services IoT FleetWise can transfer your vehicle data to the Amazon Web Services Cloud. For more information, including step-by-step procedures, see <a href=\"https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/\">Setting up Amazon Web Services IoT FleetWise</a>. </p> <note> <p>An Amazon Web Services account is <b>not</b> the same thing as a \"user account\". An <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction_identity-management.html#intro-identity-users\">Amazon Web Services user</a> is an identity that you create using Identity and Access Management (IAM) and takes the form of either an <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users.html\">IAM user</a> or an <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html\">IAM role, both with credentials</a>. A single Amazon Web Services account can, and typically does contain many users and roles.</p> </note>"
+      "documentation":"<p>Registers your Amazon Web Services account, IAM, and Amazon Timestream resources so Amazon Web Services IoT FleetWise can transfer your vehicle data to the Amazon Web Services Cloud. For more information, including step-by-step procedures, see <a href=\"https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/setting-up.html\">Setting up Amazon Web Services IoT FleetWise</a>. </p> <note> <p>An Amazon Web Services account is <b>not</b> the same thing as a \"user account\". An <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction_identity-management.html#intro-identity-users\">Amazon Web Services user</a> is an identity that you create using Identity and Access Management (IAM) and takes the form of either an <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users.html\">IAM user</a> or an <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html\">IAM role, both with credentials</a>. A single Amazon Web Services account can, and typically does, contain many users and roles.</p> </note>"
+    },
+    "TagResource":{
+      "name":"TagResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"TagResourceRequest"},
+      "output":{"shape":"TagResourceResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"ValidationException"},
+        {"shape":"AccessDeniedException"}
+      ],
+      "documentation":"<p>Adds to or modifies the tags of the given resource. Tags are metadata which can be used to manage a resource.</p>",
+      "idempotent":true
+    },
+    "UntagResource":{
+      "name":"UntagResource",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"UntagResourceRequest"},
+      "output":{"shape":"UntagResourceResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"ValidationException"},
+        {"shape":"AccessDeniedException"}
+      ],
+      "documentation":"<p>Removes the given tags (metadata) from the resource.</p>",
+      "idempotent":true
     },
     "UpdateCampaign":{
       "name":"UpdateCampaign",
@@ -714,8 +773,8 @@
       "errors":[
         {"shape":"ResourceNotFoundException"},
         {"shape":"ConflictException"},
+        {"shape":"LimitExceededException"},
         {"shape":"DecoderManifestValidationException"},
-        {"shape":"ServiceQuotaExceededException"},
         {"shape":"ThrottlingException"},
         {"shape":"ValidationException"},
         {"shape":"AccessDeniedException"}
@@ -773,6 +832,7 @@
         {"shape":"ResourceNotFoundException"},
         {"shape":"InternalServerException"},
         {"shape":"ConflictException"},
+        {"shape":"InvalidNodeException"},
         {"shape":"ThrottlingException"},
         {"shape":"InvalidSignalsException"},
         {"shape":"AccessDeniedException"}
@@ -806,24 +866,23 @@
       "members":{
         "message":{"shape":"string"}
       },
-      "documentation":"<p> You don't have sufficient permission to perform this action. </p>",
+      "documentation":"<p>You don't have sufficient permission to perform this action.</p>",
       "exception":true
     },
     "Actuator":{
       "type":"structure",
       "required":[
         "dataType",
-        "fullyQualifiedName",
-        "name"
+        "fullyQualifiedName"
       ],
       "members":{
         "allowedValues":{
           "shape":"listOfStrings",
-          "documentation":"<p> A list of possible values an actuator can take. </p>"
+          "documentation":"<p>A list of possible values an actuator can take.</p>"
         },
         "assignedValue":{
           "shape":"string",
-          "documentation":"<p> A specified value for the actuator. </p>"
+          "documentation":"<p>A specified value for the actuator.</p>"
         },
         "dataType":{
           "shape":"NodeDataType",
@@ -831,49 +890,50 @@
         },
         "description":{
           "shape":"description",
-          "documentation":"<p> A brief description of the actuator. </p>"
+          "documentation":"<p>A brief description of the actuator.</p>"
         },
         "fullyQualifiedName":{
           "shape":"string",
-          "documentation":"<p> The fully qualified name of the actuator. For example, the fully qualified name of an actuator might be <code>Vehicle.Front.Left.Door.Lock</code>.</p>"
+          "documentation":"<p>The fully qualified name of the actuator. For example, the fully qualified name of an actuator might be <code>Vehicle.Front.Left.Door.Lock</code>.</p>"
         },
         "max":{
           "shape":"double",
-          "documentation":"<p> The specified possible maximum value of an actuator. </p>"
+          "documentation":"<p>The specified possible maximum value of an actuator.</p>"
         },
         "min":{
           "shape":"double",
-          "documentation":"<p> The specified possible minimum value of an actuator. </p>"
-        },
-        "name":{
-          "shape":"string",
-          "documentation":"<p> The unique name of the actuator. </p>"
+          "documentation":"<p>The specified possible minimum value of an actuator.</p>"
         },
         "unit":{
           "shape":"string",
-          "documentation":"<p> The scientific unit for the actuator. </p>"
+          "documentation":"<p>The scientific unit for the actuator.</p>"
         }
       },
-      "documentation":"<p>A signal that represents a vehicle device such as the engine, heater, and door locks. Data from an actuator reports the state of a certain vehicle device.</p> <note> <p> Updating actuator data can change the state of a device. For example, you can turn on or off the heater by updating its actuator data. </p> </note>"
+      "documentation":"<p>A signal that represents a vehicle device such as the engine, heater, and door locks. Data from an actuator reports the state of a certain vehicle device.</p> <note> <p> Updating actuator data can change the state of a device. For example, you can turn on or off the heater by updating its actuator data.</p> </note>"
     },
-    "AssociateVehicleRequest":{
+    "AmazonResourceName":{
+      "type":"string",
+      "max":1011,
+      "min":1
+    },
+    "AssociateVehicleFleetRequest":{
       "type":"structure",
       "required":[
         "fleetId",
-        "vehicleId"
+        "vehicleName"
       ],
       "members":{
         "fleetId":{
           "shape":"fleetId",
           "documentation":"<p> The ID of a fleet. </p>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
-          "documentation":"<p> The ID of the vehicle to associate with the fleet. </p>"
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p> The unique ID of the vehicle to associate with the fleet. </p>"
         }
       }
     },
-    "AssociateVehicleResponse":{
+    "AssociateVehicleFleetResponse":{
       "type":"structure",
       "members":{
       }
@@ -882,17 +942,16 @@
       "type":"structure",
       "required":[
         "dataType",
-        "fullyQualifiedName",
-        "name"
+        "fullyQualifiedName"
       ],
       "members":{
         "allowedValues":{
           "shape":"listOfStrings",
-          "documentation":"<p> A list of possible values an attribute can be assigned. </p>"
+          "documentation":"<p>A list of possible values an attribute can be assigned.</p>"
         },
         "assignedValue":{
           "shape":"string",
-          "documentation":"<p> A specified value for the attribute. </p>"
+          "documentation":"<p>A specified value for the attribute.</p>"
         },
         "dataType":{
           "shape":"NodeDataType",
@@ -900,34 +959,30 @@
         },
         "defaultValue":{
           "shape":"string",
-          "documentation":"<p> The default value of the attribute. </p>"
+          "documentation":"<p>The default value of the attribute.</p>"
         },
         "description":{
           "shape":"description",
-          "documentation":"<p> A brief description of the attribute. </p>"
+          "documentation":"<p>A brief description of the attribute.</p>"
         },
         "fullyQualifiedName":{
           "shape":"string",
-          "documentation":"<p>The fully qualified name of the attribute. For example, the fully qualified name of an attribute might be <code>Vehicle.Body.Engine.Type</code>. </p>"
+          "documentation":"<p>The fully qualified name of the attribute. For example, the fully qualified name of an attribute might be <code>Vehicle.Body.Engine.Type</code>.</p>"
         },
         "max":{
           "shape":"double",
-          "documentation":"<p> The specified possible maximum value of the attribute. </p>"
+          "documentation":"<p>The specified possible maximum value of the attribute.</p>"
         },
         "min":{
           "shape":"double",
-          "documentation":"<p> The specified possible minimum value of the attribute. </p>"
-        },
-        "name":{
-          "shape":"string",
-          "documentation":"<p> The name of the attribute. </p>"
+          "documentation":"<p>The specified possible minimum value of the attribute.</p>"
         },
         "unit":{
           "shape":"string",
-          "documentation":"<p> The scientific unit for the attribute. </p>"
+          "documentation":"<p>The scientific unit for the attribute.</p>"
         }
       },
-      "documentation":"<p>A signal that represents static information about the vehicle, such as engine type or manufacturing date. </p>"
+      "documentation":"<p>A signal that represents static information about the vehicle, such as engine type or manufacturing date.</p>"
     },
     "BatchCreateVehicleRequest":{
       "type":"structure",
@@ -971,31 +1026,24 @@
         },
         "vehicles":{
           "shape":"updateVehicleResponseItems",
-          "documentation":"<p> A list of information about the batch of updated vehicles. </p> <note> <p>This only returns a list of unique IDs for the vehicles that were updated.</p> </note>"
+          "documentation":"<p> A list of information about the batch of updated vehicles. </p> <note> <p>This list contains only unique IDs for the vehicles that were updated.</p> </note>"
         }
       }
     },
     "Branch":{
       "type":"structure",
-      "required":[
-        "fullyQualifiedName",
-        "name"
-      ],
+      "required":["fullyQualifiedName"],
       "members":{
         "description":{
           "shape":"description",
-          "documentation":"<p> A brief description of the branch. </p>"
+          "documentation":"<p>A brief description of the branch.</p>"
         },
         "fullyQualifiedName":{
           "shape":"string",
-          "documentation":"<p> The fully qualified name of the branch. For example, the fully qualified name of a branch might be <code>Vehicle.Body.Engine</code>. </p>"
-        },
-        "name":{
-          "shape":"string",
-          "documentation":"<p> The name of the branch. </p>"
+          "documentation":"<p>The fully qualified name of the branch. For example, the fully qualified name of a branch might be <code>Vehicle.Body.Engine</code>.</p>"
         }
       },
-      "documentation":"<p> A group of signals that are defined in a hierarchical structure.</p>"
+      "documentation":"<p>A group of signals that are defined in a hierarchical structure.</p>"
     },
     "CampaignStatus":{
       "type":"string",
@@ -1008,29 +1056,45 @@
     },
     "CampaignSummary":{
       "type":"structure",
+      "required":[
+        "creationTime",
+        "lastModificationTime"
+      ],
       "members":{
         "arn":{
           "shape":"arn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of a campaign. </p>"
+          "documentation":"<p>The Amazon Resource Name (ARN) of a campaign.</p>"
         },
-        "campaignName":{
+        "creationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the campaign was created.</p>"
+        },
+        "description":{
+          "shape":"description",
+          "documentation":"<p>The description of the campaign.</p>"
+        },
+        "lastModificationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The last time the campaign was modified.</p>"
+        },
+        "name":{
           "shape":"campaignName",
-          "documentation":"<p> The name of a campaign. </p>"
+          "documentation":"<p>The name of a campaign.</p>"
         },
         "signalCatalogArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of the signal catalog associated with the campaign. </p>"
+          "documentation":"<p>The ARN of the signal catalog associated with the campaign.</p>"
         },
         "status":{
           "shape":"CampaignStatus",
-          "documentation":"<p>The state of a campaign. The status can be one of:</p> <ul> <li> <p> <code>CREATING</code> - Amazon Web Services IoT FleetWise is processing your request to create the campaign. </p> </li> <li> <p> <code>WAITING_FOR_APPROVAL</code> - After a campaign is created, it enters the <code>WAITING_FOR_APPROVAL</code> state. To allow Amazon Web Services IoT FleetWise to deploy the campaign to the target vehicle or fleet, use the API operation to approve the campaign. </p> </li> <li> <p> <code>RUNNING</code> - The campaign is active. </p> </li> <li> <p> <code>SUSPENDED</code> - The campaign is suspended. To resume the campaign, use the API operation. </p> </li> </ul>"
+          "documentation":"<p>The state of a campaign. The status can be one of the following:</p> <ul> <li> <p> <code>CREATING</code> - Amazon Web Services IoT FleetWise is processing your request to create the campaign.</p> </li> <li> <p> <code>WAITING_FOR_APPROVAL</code> - After a campaign is created, it enters the <code>WAITING_FOR_APPROVAL</code> state. To allow Amazon Web Services IoT FleetWise to deploy the campaign to the target vehicle or fleet, use the API operation to approve the campaign. </p> </li> <li> <p> <code>RUNNING</code> - The campaign is active. </p> </li> <li> <p> <code>SUSPENDED</code> - The campaign is suspended. To resume the campaign, use the API operation. </p> </li> </ul>"
         },
         "targetArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of a vehicle or fleet to which the campaign is deployed. </p>"
+          "documentation":"<p>The ARN of a vehicle or fleet to which the campaign is deployed.</p>"
         }
       },
-      "documentation":"<p> Information about a campaign. </p> <p>You can use the API operation to return this information about multiple created campaigns. </p>"
+      "documentation":"<p>Information about a campaign. </p> <p>You can use the API operation to return this information about multiple created campaigns.</p>"
     },
     "CanDbcDefinition":{
       "type":"structure",
@@ -1041,37 +1105,37 @@
       "members":{
         "canDbcFiles":{
           "shape":"NetworkFilesList",
-          "documentation":"<p> A list of DBC files. You can upload only one DBC file for each network interface and only specify up to five (inclusive) files in the list.</p>"
+          "documentation":"<p>A list of DBC files. You can upload only one DBC file for each network interface and specify up to five (inclusive) files in the list.</p>"
         },
         "networkInterface":{
           "shape":"InterfaceId",
-          "documentation":"<p> Contains information about a network interface. </p>"
+          "documentation":"<p>Contains information about a network interface.</p>"
         },
         "signalsMap":{
           "shape":"ModelSignalsMap",
-          "documentation":"<p> Pairs every signal specified in your vehicle model with a signal decoder. </p>"
+          "documentation":"<p>Pairs every signal specified in your vehicle model with a signal decoder.</p>"
         }
       },
-      "documentation":"<p> Configurations used to create a decoder manifest.</p>"
+      "documentation":"<p>Configurations used to create a decoder manifest.</p>"
     },
     "CanInterface":{
       "type":"structure",
-      "required":["canInterfaceName"],
+      "required":["name"],
       "members":{
-        "canInterfaceName":{
+        "name":{
           "shape":"CanInterfaceName",
-          "documentation":"<p> The unique name of the interface. </p>"
+          "documentation":"<p>The unique name of the interface.</p>"
         },
         "protocolName":{
           "shape":"ProtocolName",
-          "documentation":"<p> The name of the communication protocol for the interface. </p>"
+          "documentation":"<p>The name of the communication protocol for the interface.</p>"
         },
         "protocolVersion":{
           "shape":"ProtocolVersion",
-          "documentation":"<p> The version of the communication protocol for the interface. </p>"
+          "documentation":"<p>The version of the communication protocol for the interface.</p>"
         }
       },
-      "documentation":"<p> A single controller area network (CAN) device interface. </p>"
+      "documentation":"<p>A single controller area network (CAN) device interface.</p>"
     },
     "CanInterfaceName":{
       "type":"string",
@@ -1090,37 +1154,37 @@
         "startBit"
       ],
       "members":{
-        "canSignalName":{
-          "shape":"CanSignalName",
-          "documentation":"<p> The name of the signal. </p>"
-        },
         "factor":{
           "shape":"double",
-          "documentation":"<p> A multiplier used to decode the CAN message. </p>"
+          "documentation":"<p>A multiplier used to decode the CAN message.</p>"
         },
         "isBigEndian":{
           "shape":"boolean",
-          "documentation":"<p> Whether the byte ordering of a CAN message is big-endian. </p>"
+          "documentation":"<p>Whether the byte ordering of a CAN message is big-endian.</p>"
         },
         "isSigned":{
           "shape":"boolean",
-          "documentation":"<p> Whether the message data is specified as a signed value. </p>"
+          "documentation":"<p>Whether the message data is specified as a signed value.</p>"
         },
         "length":{
           "shape":"nonNegativeInteger",
-          "documentation":"<p> How many bytes of data are in the message. </p>"
+          "documentation":"<p>How many bytes of data are in the message.</p>"
         },
         "messageId":{
           "shape":"nonNegativeInteger",
-          "documentation":"<p> The ID of the message. </p>"
+          "documentation":"<p>The ID of the message.</p>"
+        },
+        "name":{
+          "shape":"CanSignalName",
+          "documentation":"<p>The name of the signal.</p>"
         },
         "offset":{
           "shape":"double",
-          "documentation":"<p> Indicates where data appears in the CAN message. </p>"
+          "documentation":"<p>Indicates where data appears in the CAN message.</p>"
         },
         "startBit":{
           "shape":"nonNegativeInteger",
-          "documentation":"<p> Indicates the beginning of the CAN message.</p>"
+          "documentation":"<p>Indicates the beginning of the CAN message.</p>"
         }
       },
       "documentation":"<p>Information about a single controller area network (CAN) signal and the messages it receives and transmits.</p>"
@@ -1135,14 +1199,14 @@
       "members":{
         "conditionBasedCollectionScheme":{
           "shape":"ConditionBasedCollectionScheme",
-          "documentation":"<p> Information about a collection scheme that uses a simple logical expression to recognize what data to collect. </p>"
+          "documentation":"<p>Information about a collection scheme that uses a simple logical expression to recognize what data to collect.</p>"
         },
         "timeBasedCollectionScheme":{
           "shape":"TimeBasedCollectionScheme",
-          "documentation":"<p> Information about a collection scheme that uses a time period to decide how often to collect data. </p>"
+          "documentation":"<p>Information about a collection scheme that uses a time period to decide how often to collect data.</p>"
         }
       },
-      "documentation":"<p> Specifies what data to collect and how often or when to collect it. </p>",
+      "documentation":"<p>Specifies what data to collect and how often or when to collect it.</p>",
       "union":true
     },
     "Compression":{
@@ -1158,22 +1222,22 @@
       "members":{
         "conditionLanguageVersion":{
           "shape":"languageVersion",
-          "documentation":"<p> Specifies the version of the conditional expression language. </p>"
+          "documentation":"<p>Specifies the version of the conditional expression language.</p>"
         },
         "expression":{
           "shape":"eventExpression",
-          "documentation":"<p> The logical expression used to recognize what data to collect. For example, <code>$variable.Vehicle.OutsideAirTemperature &gt;= 105.0</code>. </p>"
+          "documentation":"<p>The logical expression used to recognize what data to collect. For example, <code>$variable.Vehicle.OutsideAirTemperature &gt;= 105.0</code>.</p>"
         },
         "minimumTriggerIntervalMs":{
           "shape":"uint32",
-          "documentation":"<p> The minimum duration of time between two triggering events to collect data, in milliseconds. </p> <note> <p>If a signal changes often, you might want to collect data at a slower rate.</p> </note>"
+          "documentation":"<p>The minimum duration of time between two triggering events to collect data, in milliseconds.</p> <note> <p>If a signal changes often, you might want to collect data at a slower rate.</p> </note>"
         },
         "triggerMode":{
           "shape":"TriggerMode",
-          "documentation":"<p> Whether to collect data for all triggering events (<code>ALWAYS</code>). Specify (<code>RISING_EDGE</code>) or only when the condition first evaluates to false. For example, triggering on \"AirbagDeployed\"; users aren't interested on triggering when the airbag is already exploded, they only care about the change from not deployed =&gt; deployed. </p>"
+          "documentation":"<p>Whether to collect data for all triggering events (<code>ALWAYS</code>). Specify (<code>RISING_EDGE</code>), or specify only when the condition first evaluates to false. For example, triggering on \"AirbagDeployed\"; Users aren't interested on triggering when the airbag is already exploded; they only care about the change from not deployed =&gt; deployed.</p>"
         }
       },
-      "documentation":"<p> Information about a collection scheme that uses a simple logical expression to recognize what data to collect. </p>"
+      "documentation":"<p>Information about a collection scheme that uses a simple logical expression to recognize what data to collect.</p>"
     },
     "ConflictException":{
       "type":"structure",
@@ -1184,36 +1248,42 @@
       ],
       "members":{
         "message":{"shape":"string"},
-        "resource":{"shape":"string"},
-        "resourceType":{"shape":"string"}
+        "resource":{
+          "shape":"string",
+          "documentation":"<p>The resource on which there are conflicting operations.</p>"
+        },
+        "resourceType":{
+          "shape":"string",
+          "documentation":"<p>The type of resource on which there are conflicting operations..</p>"
+        }
       },
-      "documentation":"<p> Your request has conflicting operations. This can occur if you're trying to perform more than one operation on the same resource at the same time. </p>",
+      "documentation":"<p>The request has conflicting operations. This can occur if you're trying to perform more than one operation on the same resource at the same time.</p>",
       "exception":true
     },
     "CreateCampaignRequest":{
       "type":"structure",
       "required":[
-        "campaignName",
         "collectionScheme",
+        "name",
         "signalCatalogArn",
         "targetArn"
       ],
       "members":{
-        "campaignName":{
-          "shape":"campaignName",
-          "documentation":"<p> The name of the campaign to create. </p>"
-        },
         "collectionScheme":{
           "shape":"CollectionScheme",
-          "documentation":"<p> The data collection scheme associated with the campaign. You can specify a scheme that collects data based on time or a triggering event. For more information, see <a href=\"https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/\">Collection schemes</a> in the <i>Amazon Web Services IoT FleetWise Developer Guide</i>.</p>"
+          "documentation":"<p> The data collection scheme associated with the campaign. You can specify a scheme that collects data based on time or an event.</p>"
         },
         "compression":{
           "shape":"Compression",
-          "documentation":"<p> (Optional) Whether to compress signals before transmitting data to Amazon Web Services IoT FleetWise. Use <code>OFF</code> if you don't want to compress the signals. If it's not specified, <code>SNAPPY</code> is used. </p> <p>Default: <code>SNAPPY</code> </p>"
+          "documentation":"<p> (Optional) Whether to compress signals before transmitting data to Amazon Web Services IoT FleetWise. If you don't want to compress the signals, use <code>OFF</code>. If it's not specified, <code>SNAPPY</code> is used. </p> <p>Default: <code>SNAPPY</code> </p>"
         },
         "dataExtraDimensions":{
           "shape":"DataExtraDimensionNodePathList",
           "documentation":"<p> (Optional) A list of vehicle attributes to associate with a campaign. </p> <p>Default: An empty array</p>"
+        },
+        "description":{
+          "shape":"description",
+          "documentation":"<p>An optional description of the campaign to help identify its purpose.</p>"
         },
         "diagnosticsMode":{
           "shape":"DiagnosticsMode",
@@ -1223,13 +1293,17 @@
           "shape":"timestamp",
           "documentation":"<p> (Optional) The time the campaign expires, in seconds since epoch (January 1, 1970 at midnight UTC time). Vehicle data won't be collected after the campaign expires. </p> <p>Default: 253402243200 (December 31, 9999, 00:00:00 UTC)</p>"
         },
+        "name":{
+          "shape":"campaignName",
+          "documentation":"<p> The name of the campaign to create. </p>"
+        },
         "postTriggerCollectionDuration":{
           "shape":"uint32",
           "documentation":"<p> (Optional) How long (in milliseconds) to collect raw data after a triggering event initiates the collection. If it's not specified, <code>0</code> is used.</p> <p>Default: <code>0</code> </p>"
         },
         "priority":{
           "shape":"priority",
-          "documentation":"<p>(Optional) A number indicating the priority of one campaign over another campaign for a certain vehicle or fleet. A campaign with the lowest value is deployed to vehicles before any other campaigns. If it's not specified, <code>0</code> is used.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/\">Campaigns</a> in the <i>Amazon Web Services IoT FleetWise Developer Guide</i>.</p> <p>Default: <code>0</code> </p>"
+          "documentation":"<p>(Optional) A number indicating the priority of one campaign over another campaign for a certain vehicle or fleet. A campaign with the lowest value is deployed to vehicles before any other campaigns. If it's not specified, <code>0</code> is used. </p> <p>Default: <code>0</code> </p>"
         },
         "signalCatalogArn":{
           "shape":"arn",
@@ -1241,11 +1315,15 @@
         },
         "spoolingMode":{
           "shape":"SpoolingMode",
-          "documentation":"<p>(Optional) Whether to store collected data after a vehicle lost a connection with the cloud. After a connection is re-established, the data is automatically forwarded to Amazon Web Services IoT FleetWise. If you want to store collected data when a vehicle looses connection with the cloud, use <code>TO_DISK</code>. If it's not specified, <code>OFF</code> is used.</p> <p>Default: <code>OFF</code> </p>"
+          "documentation":"<p>(Optional) Whether to store collected data after a vehicle lost a connection with the cloud. After a connection is re-established, the data is automatically forwarded to Amazon Web Services IoT FleetWise. If you want to store collected data when a vehicle loses connection with the cloud, use <code>TO_DISK</code>. If it's not specified, <code>OFF</code> is used.</p> <p>Default: <code>OFF</code> </p>"
         },
         "startTime":{
           "shape":"timestamp",
           "documentation":"<p>(Optional) The time, in milliseconds, to deliver a campaign after it was approved. If it's not specified, <code>0</code> is used.</p> <p>Default: <code>0</code> </p>"
+        },
+        "tags":{
+          "shape":"TagList",
+          "documentation":"<p>Metadata that can be used to manage the campaign.</p>"
         },
         "targetArn":{
           "shape":"arn",
@@ -1259,6 +1337,10 @@
         "arn":{
           "shape":"arn",
           "documentation":"<p> The ARN of the created campaign. </p>"
+        },
+        "name":{
+          "shape":"campaignName",
+          "documentation":"<p>The name of the created campaign.</p>"
         }
       }
     },
@@ -1288,6 +1370,10 @@
         "signalDecoders":{
           "shape":"SignalDecoders",
           "documentation":"<p> A list of information about signal decoders. </p>"
+        },
+        "tags":{
+          "shape":"TagList",
+          "documentation":"<p>Metadata that can be used to manage the decoder manifest.</p>"
         }
       }
     },
@@ -1326,6 +1412,10 @@
         "signalCatalogArn":{
           "shape":"arn",
           "documentation":"<p> The Amazon Resource Name (ARN) of a signal catalog. </p>"
+        },
+        "tags":{
+          "shape":"TagList",
+          "documentation":"<p>Metadata that can be used to manage the fleet.</p>"
         }
       }
     },
@@ -1369,6 +1459,10 @@
         "signalCatalogArn":{
           "shape":"arn",
           "documentation":"<p> The Amazon Resource Name (ARN) of a signal catalog. </p>"
+        },
+        "tags":{
+          "shape":"TagList",
+          "documentation":"<p>Metadata that can be used to manage the vehicle model.</p>"
         }
       }
     },
@@ -1404,6 +1498,10 @@
         "nodes":{
           "shape":"Nodes",
           "documentation":"<p> A list of information about nodes, which are a general abstraction of signals. For more information, see the API data type.</p>"
+        },
+        "tags":{
+          "shape":"TagList",
+          "documentation":"<p>Metadata that can be used to manage the signal catalog.</p>"
         }
       }
     },
@@ -1428,26 +1526,26 @@
       "type":"structure",
       "members":{
         "code":{
-          "shape":"number",
-          "documentation":"<p> An HTTP error code. </p>"
+          "shape":"string",
+          "documentation":"<p>An HTTP error code.</p>"
         },
         "message":{
           "shape":"string",
-          "documentation":"<p> A description of the HTTP error. </p>"
+          "documentation":"<p>A description of the HTTP error.</p>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
-          "documentation":"<p> The unique ID of the vehicle with the error.</p>"
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The ID of the vehicle with the error.</p>"
         }
       },
-      "documentation":"<p> An HTTP error resulting from creating a vehicle. </p>"
+      "documentation":"<p>An HTTP error resulting from creating a vehicle.</p>"
     },
     "CreateVehicleRequest":{
       "type":"structure",
       "required":[
         "decoderManifestArn",
         "modelManifestArn",
-        "vehicleId"
+        "vehicleName"
       ],
       "members":{
         "associationBehavior":{
@@ -1460,14 +1558,18 @@
         },
         "decoderManifestArn":{
           "shape":"arn",
-          "documentation":"<p> The (ARN) of a decoder manifest. </p>"
+          "documentation":"<p> The ARN of a decoder manifest. </p>"
         },
         "modelManifestArn":{
           "shape":"arn",
           "documentation":"<p> The Amazon Resource Name ARN of a vehicle model. </p>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
+        "tags":{
+          "shape":"TagList",
+          "documentation":"<p>Metadata that can be used to manage the vehicle.</p>"
+        },
+        "vehicleName":{
+          "shape":"vehicleName",
           "documentation":"<p> The unique ID of the vehicle to create. </p>"
         }
       }
@@ -1477,12 +1579,12 @@
       "required":[
         "decoderManifestArn",
         "modelManifestArn",
-        "vehicleId"
+        "vehicleName"
       ],
       "members":{
         "associationBehavior":{
           "shape":"VehicleAssociationBehavior",
-          "documentation":"<p> An option to create a new Amazon Web Services IoT thing when creating a vehicle, or to validate an existing thing as a vehicle. </p>"
+          "documentation":"<p>An option to create a new Amazon Web Services IoT thing when creating a vehicle, or to validate an existing thing as a vehicle.</p>"
         },
         "attributes":{
           "shape":"attributesMap",
@@ -1490,18 +1592,22 @@
         },
         "decoderManifestArn":{
           "shape":"arn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of a decoder manifest associated with the vehicle to create. </p>"
+          "documentation":"<p>The Amazon Resource Name (ARN) of a decoder manifest associated with the vehicle to create. </p>"
         },
         "modelManifestArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of the vehicle model (model manifest) to create the vehicle from. </p>"
+          "documentation":"<p>The ARN of the vehicle model (model manifest) to create the vehicle from.</p>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
-          "documentation":"<p> The unique ID of the vehicle to create.</p>"
+        "tags":{
+          "shape":"TagList",
+          "documentation":"<p>Metadata which can be used to manage the vehicle.</p>"
+        },
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The unique ID of the vehicle to create.</p>"
         }
       },
-      "documentation":"<p> Information about the vehicle to create. </p>"
+      "documentation":"<p>Information about the vehicle to create.</p>"
     },
     "CreateVehicleResponse":{
       "type":"structure",
@@ -1510,13 +1616,13 @@
           "shape":"arn",
           "documentation":"<p> The ARN of the created vehicle. </p>"
         },
-        "id":{
-          "shape":"vehicleId",
-          "documentation":"<p> The ID of the created vehicle. </p>"
-        },
         "thingArn":{
           "shape":"arn",
           "documentation":"<p> The ARN of a created or validated Amazon Web Services IoT thing. </p>"
+        },
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The unique ID of the created vehicle.</p>"
         }
       }
     },
@@ -1525,18 +1631,18 @@
       "members":{
         "arn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of the created vehicle. </p>"
-        },
-        "id":{
-          "shape":"vehicleId",
-          "documentation":"<p> The ID of the created vehicle. </p>"
+          "documentation":"<p>The ARN of the created vehicle.</p>"
         },
         "thingArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of a created or validated Amazon Web Services IoT thing. </p>"
+          "documentation":"<p>The ARN of a created or validated Amazon Web Services IoT thing.</p>"
+        },
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The unique ID of the vehicle to create.</p>"
         }
       },
-      "documentation":"<p> Information about a created vehicle. </p>"
+      "documentation":"<p>Information about a created vehicle.</p>"
     },
     "DataExtraDimensionNodePathList":{
       "type":"list",
@@ -1546,52 +1652,62 @@
     },
     "DecoderManifestSummary":{
       "type":"structure",
+      "required":[
+        "creationTime",
+        "lastModificationTime"
+      ],
       "members":{
-        "creationDate":{
-          "shape":"unixDateTime",
-          "documentation":"<p> The time the decoder manifest was created in seconds since epoch (January 1, 1970 at midnight UTC time).</p>"
-        },
-        "decoderManifestArn":{
+        "arn":{
           "shape":"arn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of the decoder manifest. </p>"
+          "documentation":"<p>The ARN of a vehicle model (model manifest) associated with the decoder manifest. </p>"
         },
-        "decoderManifestName":{
-          "shape":"string",
-          "documentation":"<p> The name of the decoder manifest. </p>"
+        "creationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the decoder manifest was created in seconds since epoch (January 1, 1970 at midnight UTC time).</p>"
         },
         "description":{
           "shape":"description",
-          "documentation":"<p> A brief description of the decoder manifest. </p>"
+          "documentation":"<p>A brief description of the decoder manifest.</p>"
         },
-        "lastModificationDate":{
-          "shape":"unixDateTime",
-          "documentation":"<p> The time the decoder manifest was last updated in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
+        "lastModificationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the decoder manifest was last updated in seconds since epoch (January 1, 1970 at midnight UTC time).</p>"
         },
         "modelManifestArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of a vehicle model (model manifest) associated with the decoder manifest. </p>"
+          "documentation":"<p>The ARN of a vehicle model (model manifest) associated with the decoder manifest.</p>"
+        },
+        "name":{
+          "shape":"string",
+          "documentation":"<p>The name of the decoder manifest.</p>"
         },
         "status":{
           "shape":"ManifestStatus",
-          "documentation":"<p> The state of the decoder manifest. If the status is <code>ACTIVE</code>, the decoder manifest can't be edited. You can only edit the decoder manifest if the status is marked <code>DRAFT</code>.</p>"
+          "documentation":"<p>The state of the decoder manifest. If the status is <code>ACTIVE</code>, the decoder manifest can't be edited. If the status is marked <code>DRAFT</code>, you can edit the decoder manifest.</p>"
         }
       },
-      "documentation":"<p> Information about a created decoder manifest. You can use the API operation to return this information about multiple decoder manifests.</p>"
+      "documentation":"<p>Information about a created decoder manifest. You can use the API operation to return this information about multiple decoder manifests.</p>"
     },
     "DecoderManifestValidationException":{
       "type":"structure",
       "members":{
-        "invalidNetworkInterfaces":{"shape":"InvalidNetworkInterfaces"},
-        "invalidSignals":{"shape":"InvalidSignalDecoders"}
+        "invalidNetworkInterfaces":{
+          "shape":"InvalidNetworkInterfaces",
+          "documentation":"<p>The request couldn't be completed because of invalid network interfaces in the request.</p>"
+        },
+        "invalidSignals":{
+          "shape":"InvalidSignalDecoders",
+          "documentation":"<p>The request couldn't be completed because of invalid signals in the request.</p>"
+        }
       },
       "documentation":"<p>The request couldn't be completed because it contains signal decoders with one or more validation errors.</p>",
       "exception":true
     },
     "DeleteCampaignRequest":{
       "type":"structure",
-      "required":["campaignName"],
+      "required":["name"],
       "members":{
-        "campaignName":{
+        "name":{
           "shape":"campaignName",
           "documentation":"<p> The name of the campaign to delete. </p>"
         }
@@ -1603,6 +1719,10 @@
         "arn":{
           "shape":"arn",
           "documentation":"<p> The Amazon Resource Name (ARN) of the deleted campaign.</p> <note> <p>The ARN isn’t returned if a campaign doesn’t exist.</p> </note>"
+        },
+        "name":{
+          "shape":"campaignName",
+          "documentation":"<p>The name of the deleted campaign.</p>"
         }
       }
     },
@@ -1618,7 +1738,19 @@
     },
     "DeleteDecoderManifestResponse":{
       "type":"structure",
+      "required":[
+        "arn",
+        "name"
+      ],
       "members":{
+        "arn":{
+          "shape":"arn",
+          "documentation":"<p/>"
+        },
+        "name":{
+          "shape":"resourceName",
+          "documentation":"<p/>"
+        }
       }
     },
     "DeleteFleetRequest":{
@@ -1634,6 +1766,14 @@
     "DeleteFleetResponse":{
       "type":"structure",
       "members":{
+        "arn":{
+          "shape":"arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the deleted fleet.</p>"
+        },
+        "id":{
+          "shape":"fleetId",
+          "documentation":"<p>The ID of the deleted fleet.</p>"
+        }
       }
     },
     "DeleteModelManifestRequest":{
@@ -1648,7 +1788,19 @@
     },
     "DeleteModelManifestResponse":{
       "type":"structure",
+      "required":[
+        "arn",
+        "name"
+      ],
       "members":{
+        "arn":{
+          "shape":"arn",
+          "documentation":"<p/>"
+        },
+        "name":{
+          "shape":"resourceName",
+          "documentation":"<p/>"
+        }
       }
     },
     "DeleteSignalCatalogRequest":{
@@ -1663,22 +1815,46 @@
     },
     "DeleteSignalCatalogResponse":{
       "type":"structure",
+      "required":[
+        "arn",
+        "name"
+      ],
       "members":{
+        "arn":{
+          "shape":"arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the deleted signal catalog.</p>"
+        },
+        "name":{
+          "shape":"resourceName",
+          "documentation":"<p>The name of the deleted signal catalog.</p>"
+        }
       }
     },
     "DeleteVehicleRequest":{
       "type":"structure",
-      "required":["vehicleId"],
+      "required":["vehicleName"],
       "members":{
-        "vehicleId":{
-          "shape":"vehicleId",
-          "documentation":"<p> ID of the vehicle to delete. </p>"
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The ID of the vehicle to delete. </p>"
         }
       }
     },
     "DeleteVehicleResponse":{
       "type":"structure",
+      "required":[
+        "arn",
+        "vehicleName"
+      ],
       "members":{
+        "arn":{
+          "shape":"arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the deleted vehicle.</p>"
+        },
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The ID of the deleted vehicle.</p>"
+        }
       }
     },
     "DiagnosticsMode":{
@@ -1688,24 +1864,24 @@
         "SEND_ACTIVE_DTCS"
       ]
     },
-    "DisassociateVehicleRequest":{
+    "DisassociateVehicleFleetRequest":{
       "type":"structure",
       "required":[
         "fleetId",
-        "vehicleId"
+        "vehicleName"
       ],
       "members":{
         "fleetId":{
           "shape":"fleetId",
           "documentation":"<p> The unique ID of a fleet. </p>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
+        "vehicleName":{
+          "shape":"vehicleName",
           "documentation":"<p> The unique ID of the vehicle to disassociate from the fleet.</p>"
         }
       }
     },
-    "DisassociateVehicleResponse":{
+    "DisassociateVehicleFleetResponse":{
       "type":"structure",
       "members":{
       }
@@ -1714,37 +1890,48 @@
       "type":"structure",
       "required":[
         "arn",
-        "creationDate",
+        "creationTime",
         "id",
         "signalCatalogArn"
       ],
       "members":{
         "arn":{
           "shape":"arn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of the fleet. </p>"
+          "documentation":"<p>The Amazon Resource Name (ARN) of the fleet.</p>"
         },
-        "creationDate":{
-          "shape":"unixDateTime",
-          "documentation":"<p> The time the fleet was created, in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
+        "creationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the fleet was created, in seconds since epoch (January 1, 1970 at midnight UTC time).</p>"
         },
         "description":{
           "shape":"description",
-          "documentation":"<p> A brief description of the fleet. </p>"
+          "documentation":"<p>A brief description of the fleet.</p>"
         },
         "id":{
           "shape":"fleetId",
-          "documentation":"<p> The unique ID of the fleet. </p>"
+          "documentation":"<p>The unique ID of the fleet.</p>"
         },
-        "lastModificationDate":{
-          "shape":"unixDateTime",
-          "documentation":"<p> The time the fleet was last updated in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
+        "lastModificationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the fleet was last updated in seconds since epoch (January 1, 1970 at midnight UTC time).</p>"
         },
         "signalCatalogArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of the signal catalog associated with the fleet. </p>"
+          "documentation":"<p>The ARN of the signal catalog associated with the fleet.</p>"
         }
       },
-      "documentation":"<p> Information about a fleet. </p> <p>You can use the API operation to return this information about multiple fleets.</p>"
+      "documentation":"<p>Information about a fleet.</p> <p>You can use the API operation to return this information about multiple fleets.</p>"
+    },
+    "FormattedVss":{
+      "type":"structure",
+      "members":{
+        "vssJson":{
+          "shape":"String",
+          "documentation":"<p>Provides the VSS in JSON format.</p>"
+        }
+      },
+      "documentation":"<p>Vehicle Signal Specification (VSS) is a precise language used to describe and model signals in vehicle networks. The JSON file collects signal specificiations in a VSS format.</p>",
+      "union":true
     },
     "Fqns":{
       "type":"list",
@@ -1759,9 +1946,9 @@
     },
     "GetCampaignRequest":{
       "type":"structure",
-      "required":["campaignName"],
+      "required":["name"],
       "members":{
-        "campaignName":{
+        "name":{
           "shape":"campaignName",
           "documentation":"<p> The name of the campaign to retrieve information about. </p>"
         }
@@ -1780,11 +1967,19 @@
         },
         "compression":{
           "shape":"Compression",
-          "documentation":"<p> Whether to compress signals before transmitting data to Amazon Web Services IoT FleetWise. If <code>OFF</code> is specified, the signals aren't compressed. If not specified, <code>SNAPPY</code> is used. </p>"
+          "documentation":"<p> Whether to compress signals before transmitting data to Amazon Web Services IoT FleetWise. If <code>OFF</code> is specified, the signals aren't compressed. If it's not specified, <code>SNAPPY</code> is used. </p>"
+        },
+        "creationTime":{
+          "shape":"timestamp",
+          "documentation":"<p> The time the campaign was created in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "dataExtraDimensions":{
           "shape":"DataExtraDimensionNodePathList",
           "documentation":"<p> A list of vehicle attributes associated with the campaign. </p>"
+        },
+        "description":{
+          "shape":"description",
+          "documentation":"<p>The description of the campaign.</p>"
         },
         "diagnosticsMode":{
           "shape":"DiagnosticsMode",
@@ -1793,6 +1988,14 @@
         "expiryTime":{
           "shape":"timestamp",
           "documentation":"<p> The time the campaign expires, in seconds since epoch (January 1, 1970 at midnight UTC time). Vehicle data won't be collected after the campaign expires.</p>"
+        },
+        "lastModificationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The last time the campaign was modified.</p>"
+        },
+        "name":{
+          "shape":"campaignName",
+          "documentation":"<p>The name of the campaign.</p>"
         },
         "postTriggerCollectionDuration":{
           "shape":"uint32",
@@ -1842,6 +2045,8 @@
       "type":"structure",
       "required":[
         "arn",
+        "creationTime",
+        "lastModificationTime",
         "name"
       ],
       "members":{
@@ -1849,16 +2054,16 @@
           "shape":"arn",
           "documentation":"<p> The Amazon Resource Name (ARN) of the decoder manifest. </p>"
         },
-        "creationDate":{
-          "shape":"unixDateTime",
+        "creationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time the decoder manifest was created in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "description":{
           "shape":"description",
           "documentation":"<p> A brief description of the decoder manifest.</p>"
         },
-        "lastModificationDate":{
-          "shape":"unixDateTime",
+        "lastModificationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time the decoder manifest was last updated in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "modelManifestArn":{
@@ -1870,8 +2075,8 @@
           "documentation":"<p> The name of the decoder manifest. </p>"
         },
         "status":{
-          "shape":"string",
-          "documentation":"<p> The state of the decoder manifest. If the status is <code>ACTIVE</code>, the decoder manifest can't be edited. You can edit the decoder manifest if the status is marked <code>DRAFT</code>.</p>"
+          "shape":"ManifestStatus",
+          "documentation":"<p> The state of the decoder manifest. If the status is <code>ACTIVE</code>, the decoder manifest can't be edited. If the status is marked <code>DRAFT</code>, you can edit the decoder manifest.</p>"
         }
       }
     },
@@ -1889,8 +2094,9 @@
       "type":"structure",
       "required":[
         "arn",
-        "creationDate",
+        "creationTime",
         "id",
+        "lastModificationTime",
         "signalCatalogArn"
       ],
       "members":{
@@ -1898,8 +2104,8 @@
           "shape":"arn",
           "documentation":"<p> The Amazon Resource Name (ARN) of the fleet. </p>"
         },
-        "creationDate":{
-          "shape":"unixDateTime",
+        "creationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time the fleet was created in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "description":{
@@ -1910,8 +2116,8 @@
           "shape":"fleetId",
           "documentation":"<p> The ID of the fleet.</p>"
         },
-        "lastModificationDate":{
-          "shape":"unixDateTime",
+        "lastModificationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time the fleet was last updated, in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "signalCatalogArn":{
@@ -1934,6 +2140,8 @@
       "type":"structure",
       "required":[
         "arn",
+        "creationTime",
+        "lastModificationTime",
         "name"
       ],
       "members":{
@@ -1941,13 +2149,17 @@
           "shape":"arn",
           "documentation":"<p> The Amazon Resource Name (ARN) of the vehicle model. </p>"
         },
-        "creationDate":{
-          "shape":"unixDateTime",
+        "creationTime":{
+          "shape":"timestamp",
           "documentation":"<p>The time the vehicle model was created, in seconds since epoch (January 1, 1970 at midnight UTC time).</p>"
         },
         "description":{
           "shape":"description",
           "documentation":"<p> A brief description of the vehicle model. </p>"
+        },
+        "lastModificationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The last time the vehicle model was modified.</p>"
         },
         "name":{
           "shape":"resourceName",
@@ -1972,10 +2184,10 @@
       "type":"structure",
       "required":[
         "accountStatus",
-        "creationDate",
+        "creationTime",
         "customerAccountId",
         "iamRegistrationResponse",
-        "lastModificationDate",
+        "lastModificationTime",
         "timestreamRegistrationResponse"
       ],
       "members":{
@@ -1983,8 +2195,8 @@
           "shape":"RegistrationStatus",
           "documentation":"<p> The status of registering your account and resources. The status can be one of:</p> <ul> <li> <p> <code>REGISTRATION_SUCCESS</code> - The Amazon Web Services resource is successfully registered.</p> </li> <li> <p> <code>REGISTRATION_PENDING</code> - Amazon Web Services IoT FleetWise is processing the registration request. This process takes approximately five minutes to complete.</p> </li> <li> <p> <code>REGISTRATION_FAILURE</code> - Amazon Web Services IoT FleetWise can't register the AWS resource. Try again later.</p> </li> </ul>"
         },
-        "creationDate":{
-          "shape":"unixDateTime",
+        "creationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time the account was registered, in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "customerAccountId":{
@@ -1995,8 +2207,8 @@
           "shape":"IamRegistrationResponse",
           "documentation":"<p> Information about the registered IAM resources or errors, if any. </p>"
         },
-        "lastModificationDate":{
-          "shape":"unixDateTime",
+        "lastModificationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time this registration was last updated, in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "timestreamRegistrationResponse":{
@@ -2019,6 +2231,8 @@
       "type":"structure",
       "required":[
         "arn",
+        "creationTime",
+        "lastModificationTime",
         "name"
       ],
       "members":{
@@ -2026,13 +2240,17 @@
           "shape":"arn",
           "documentation":"<p> The Amazon Resource Name (ARN) of the signal catalog. </p>"
         },
-        "creationDate":{
-          "shape":"unixDateTime",
+        "creationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time the signal catalog was created in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "description":{
           "shape":"description",
           "documentation":"<p> A brief description of the signal catalog. </p>"
+        },
+        "lastModificationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The last time the signal catalog was modified.</p>"
         },
         "name":{
           "shape":"resourceName",
@@ -2046,10 +2264,10 @@
     },
     "GetVehicleRequest":{
       "type":"structure",
-      "required":["vehicleId"],
+      "required":["vehicleName"],
       "members":{
-        "vehicleId":{
-          "shape":"vehicleId",
+        "vehicleName":{
+          "shape":"vehicleName",
           "documentation":"<p> The ID of the vehicle to retrieve information about. </p>"
         }
       }
@@ -2065,42 +2283,42 @@
           "shape":"attributesMap",
           "documentation":"<p>Static information about a vehicle in a key-value pair. For example:</p> <p> <code>\"engineType\"</code> : <code>\"1.3 L R2\"</code> </p>"
         },
-        "creationDate":{
-          "shape":"unixDateTime",
+        "creationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time the vehicle was created in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "decoderManifestArn":{
           "shape":"arn",
           "documentation":"<p> The ARN of a decoder manifest associated with the vehicle. </p>"
         },
-        "id":{
-          "shape":"vehicleId",
-          "documentation":"<p> The ID of the vehicle. </p>"
-        },
-        "lastModificationDate":{
-          "shape":"unixDateTime",
+        "lastModificationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time the vehicle was last updated in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "modelManifestArn":{
           "shape":"arn",
           "documentation":"<p> The ARN of a vehicle model (model manifest) associated with the vehicle. </p>"
+        },
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The ID of the vehicle.</p>"
         }
       }
     },
     "GetVehicleStatusRequest":{
       "type":"structure",
-      "required":["vehicleId"],
+      "required":["vehicleName"],
       "members":{
         "maxResults":{
           "shape":"maxResults",
           "documentation":"<p> The maximum number of items to return, between 1 and 100, inclusive. </p>"
         },
         "nextToken":{
-          "shape":"string",
+          "shape":"nextToken",
           "documentation":"<p>A pagination token for the next set of results.</p> <p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next set of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value. </p>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
+        "vehicleName":{
+          "shape":"vehicleName",
           "documentation":"<p> The ID of the vehicle to retrieve information about. </p>"
         }
       }
@@ -2113,7 +2331,7 @@
           "documentation":"<p> Lists information about the state of the vehicle with deployed campaigns. </p>"
         },
         "nextToken":{
-          "shape":"string",
+          "shape":"nextToken",
           "documentation":"<p> The token to retrieve the next set of results, or <code>null</code> if there are no more results. </p>"
         }
       }
@@ -2133,18 +2351,18 @@
       "members":{
         "errorMessage":{
           "shape":"errorMessage",
-          "documentation":"<p> A message associated with a registration error. </p>"
+          "documentation":"<p>A message associated with a registration error.</p>"
         },
         "registrationStatus":{
           "shape":"RegistrationStatus",
-          "documentation":"<p> The status of registering your IAM resource. The status can be one of <code>REGISTRATION_SUCCESS</code>, <code>REGISTRATION_PENDING</code>, <code>REGISTRATION_FAILURE</code>. </p>"
+          "documentation":"<p>The status of registering your IAM resource. The status can be one of <code>REGISTRATION_SUCCESS</code>, <code>REGISTRATION_PENDING</code>, <code>REGISTRATION_FAILURE</code>.</p>"
         },
         "roleArn":{
           "shape":"arn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of the IAM role to register. </p>"
+          "documentation":"<p>The Amazon Resource Name (ARN) of the IAM role to register.</p>"
         }
       },
-      "documentation":"<p> Information about registering an Identity and Access Management (IAM) resource so Amazon Web Services IoT FleetWise edge agent software can transfer your vehicle data to Amazon Timestream. </p>"
+      "documentation":"<p>Information about registering an Identity and Access Management (IAM) resource so Amazon Web Services IoT FleetWise edge agent software can transfer your vehicle data to Amazon Timestream.</p>"
     },
     "IamResources":{
       "type":"structure",
@@ -2152,10 +2370,10 @@
       "members":{
         "roleArn":{
           "shape":"IAMRoleArn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of the IAM resource that allows Amazon Web Services IoT FleetWise to send data to Amazon Timestream. For example, <code>arn:aws:iam::123456789012:role/SERVICE-ROLE-ARN</code>. </p>"
+          "documentation":"<p>The Amazon Resource Name (ARN) of the IAM resource that allows Amazon Web Services IoT FleetWise to send data to Amazon Timestream. For example, <code>arn:aws:iam::123456789012:role/SERVICE-ROLE-ARN</code>. </p>"
         }
       },
-      "documentation":"<p> The IAM resource that enables Amazon Web Services IoT FleetWise edge agent software to send data to Amazon Timestream. </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html\">IAM roles</a> in the <i>Identity and Access Management User Guide</i>.</p>"
+      "documentation":"<p>The IAM resource that enables Amazon Web Services IoT FleetWise edge agent software to send data to Amazon Timestream. </p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html\">IAM roles</a> in the <i>Identity and Access Management User Guide</i>.</p>"
     },
     "ImportDecoderManifestRequest":{
       "type":"structure",
@@ -2203,7 +2421,14 @@
           "shape":"resourceName",
           "documentation":"<p>The name of the signal catalog to import.</p>"
         },
-        "vss":{"shape":"VssFormats"}
+        "tags":{
+          "shape":"TagList",
+          "documentation":"<p>Metadata that can be used to manage the signal catalog.</p>"
+        },
+        "vss":{
+          "shape":"FormattedVss",
+          "documentation":"<p>The contents of the Vehicle Signal Specification (VSS) configuration. VSS is a precise language used to describe and model signals in vehicle networks.</p>"
+        }
       }
     },
     "ImportSignalCatalogResponse":{
@@ -2239,9 +2464,12 @@
       "required":["message"],
       "members":{
         "message":{"shape":"string"},
-        "retryAfterSeconds":{"shape":"RetryAfterSeconds"}
+        "retryAfterSeconds":{
+          "shape":"RetryAfterSeconds",
+          "documentation":"<p>The number of seconds to wait before retrying the command.</p>"
+        }
       },
-      "documentation":"<p> The request couldn't be completed because the server temporarily failed.</p>",
+      "documentation":"<p>The request couldn't be completed because the server temporarily failed.</p>",
       "exception":true,
       "fault":true
     },
@@ -2250,46 +2478,61 @@
       "members":{
         "interfaceId":{
           "shape":"InterfaceId",
-          "documentation":"<p> The ID of the interface that isn't valid. </p>"
+          "documentation":"<p>The ID of the interface that isn't valid.</p>"
         },
         "reason":{
           "shape":"NetworkInterfaceFailureReason",
-          "documentation":"<p> A message about why the interface isn't valid. </p>"
+          "documentation":"<p>A message about why the interface isn't valid. </p>"
         }
       },
-      "documentation":"<p> A reason a vehicle network interface isn't valid. </p>"
+      "documentation":"<p>A reason a vehicle network interface isn't valid.</p>"
     },
     "InvalidNetworkInterfaces":{
       "type":"list",
       "member":{"shape":"InvalidNetworkInterface"}
+    },
+    "InvalidNodeException":{
+      "type":"structure",
+      "members":{
+        "invalidNodes":{
+          "shape":"Nodes",
+          "documentation":"<p>The specified node type isn't valid.</p>"
+        },
+        "reason":{
+          "shape":"string",
+          "documentation":"<p>The reason the node validation failed.</p>"
+        }
+      },
+      "documentation":"<p>The specified node type doesn't match the expected node type for a node. You can specify the node type as branch, sensor, actuator, or attribute.</p>",
+      "exception":true
     },
     "InvalidSignal":{
       "type":"structure",
       "members":{
         "name":{
           "shape":"FullyQualifiedName",
-          "documentation":"<p> The name of the signal that isn't valid. </p>"
+          "documentation":"<p>The name of the signal that isn't valid.</p>"
         },
         "reason":{
           "shape":"string",
-          "documentation":"<p> A message about why the signal isn't valid. </p>"
+          "documentation":"<p>A message about why the signal isn't valid.</p>"
         }
       },
-      "documentation":"<p> A reason that a signal isn't valid. </p>"
+      "documentation":"<p>A reason that a signal isn't valid.</p>"
     },
     "InvalidSignalDecoder":{
       "type":"structure",
       "members":{
         "name":{
           "shape":"FullyQualifiedName",
-          "documentation":"<p> The name of a signal decoder that isn't valid. </p>"
+          "documentation":"<p>The name of a signal decoder that isn't valid.</p>"
         },
         "reason":{
           "shape":"SignalDecoderFailureReason",
-          "documentation":"<p> A message about why the signal decoder isn't valid. </p>"
+          "documentation":"<p>A message about why the signal decoder isn't valid.</p>"
         }
       },
-      "documentation":"<p> A reason that a signal decoder isn't valid. </p>"
+      "documentation":"<p>A reason that a signal decoder isn't valid.</p>"
     },
     "InvalidSignalDecoders":{
       "type":"list",
@@ -2302,9 +2545,34 @@
     "InvalidSignalsException":{
       "type":"structure",
       "members":{
-        "invalidSignals":{"shape":"InvalidSignals"}
+        "invalidSignals":{
+          "shape":"InvalidSignals",
+          "documentation":"<p>The signals which caused the exception.</p>"
+        },
+        "message":{"shape":"string"}
       },
-      "documentation":"<p> The request couldn't be completed because it contains signals that aren't valid. </p>",
+      "documentation":"<p>The request couldn't be completed because it contains signals that aren't valid.</p>",
+      "exception":true
+    },
+    "LimitExceededException":{
+      "type":"structure",
+      "required":[
+        "message",
+        "resourceId",
+        "resourceType"
+      ],
+      "members":{
+        "message":{"shape":"string"},
+        "resourceId":{
+          "shape":"string",
+          "documentation":"<p>The identifier of the resource that was exceeded.</p>"
+        },
+        "resourceType":{
+          "shape":"string",
+          "documentation":"<p>The type of resource that was exceeded.</p>"
+        }
+      },
+      "documentation":"<p>A service quota was exceeded. </p>",
       "exception":true
     },
     "ListCampaignsRequest":{
@@ -2431,7 +2699,7 @@
     },
     "ListFleetsForVehicleRequest":{
       "type":"structure",
-      "required":["vehicleId"],
+      "required":["vehicleName"],
       "members":{
         "maxResults":{
           "shape":"maxResults",
@@ -2441,8 +2709,8 @@
           "shape":"nextToken",
           "documentation":"<p>A pagination token for the next set of results.</p> <p>If the results of a search are large, only a portion of the results are returned, and a <code>nextToken</code> pagination token is returned in the response. To retrieve the next set of results, reissue the search request and include the returned token. When all results have been returned, the response does not contain a pagination token value. </p>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
+        "vehicleName":{
+          "shape":"vehicleName",
           "documentation":"<p> The ID of the vehicle to retrieve information about. </p>"
         }
       }
@@ -2604,6 +2872,25 @@
         }
       }
     },
+    "ListTagsForResourceRequest":{
+      "type":"structure",
+      "required":["ResourceARN"],
+      "members":{
+        "ResourceARN":{
+          "shape":"AmazonResourceName",
+          "documentation":"<p>The ARN of the resource.</p>"
+        }
+      }
+    },
+    "ListTagsForResourceResponse":{
+      "type":"structure",
+      "members":{
+        "Tags":{
+          "shape":"TagList",
+          "documentation":"<p>The list of tags assigned to the resource.</p>"
+        }
+      }
+    },
     "ListVehiclesInFleetRequest":{
       "type":"structure",
       "required":["fleetId"],
@@ -2674,37 +2961,41 @@
     },
     "ModelManifestSummary":{
       "type":"structure",
+      "required":[
+        "creationTime",
+        "lastModificationTime"
+      ],
       "members":{
-        "creationDate":{
-          "shape":"unixDateTime",
-          "documentation":"<p> The time the vehicle model was created, in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
+        "arn":{
+          "shape":"arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the vehicle model.</p>"
+        },
+        "creationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the vehicle model was created, in seconds since epoch (January 1, 1970 at midnight UTC time).</p>"
         },
         "description":{
           "shape":"description",
-          "documentation":"<p> A brief description of the vehicle model. </p>"
+          "documentation":"<p>A brief description of the vehicle model.</p>"
         },
-        "lastModificationDate":{
-          "shape":"unixDateTime",
-          "documentation":"<p> The time the vehicle model was last updated, in seconds since epoch (January 1, 1970 at midnight UTC time).</p>"
+        "lastModificationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the vehicle model was last updated, in seconds since epoch (January 1, 1970 at midnight UTC time).</p>"
         },
-        "modelManifestArn":{
-          "shape":"arn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of the vehicle model. </p>"
-        },
-        "modelName":{
+        "name":{
           "shape":"string",
-          "documentation":"<p> The name of the vehicle model. </p>"
+          "documentation":"<p>The name of the vehicle model.</p>"
         },
         "signalCatalogArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of the signal catalog associated with the vehicle model. </p>"
+          "documentation":"<p>The ARN of the signal catalog associated with the vehicle model.</p>"
         },
         "status":{
           "shape":"ManifestStatus",
-          "documentation":"<p> The state of the vehicle model. If the status is <code>ACTIVE</code>, the vehicle model can't be edited. You can only edit the vehicle model if the status is <code>DRAFT</code>.</p>"
+          "documentation":"<p>The state of the vehicle model. If the status is <code>ACTIVE</code>, the vehicle model can't be edited. If the status is <code>DRAFT</code>, you can edit the vehicle model.</p>"
         }
       },
-      "documentation":"<p> Information about a vehicle model (model manifest). You can use the API operation to return this information about multiple vehicle models.</p>"
+      "documentation":"<p>Information about a vehicle model (model manifest). You can use the API operation to return this information about multiple vehicle models.</p>"
     },
     "ModelSignalsMap":{
       "type":"map",
@@ -2714,26 +3005,18 @@
     "NetworkFileBlob":{"type":"blob"},
     "NetworkFileDefinition":{
       "type":"structure",
-      "required":["networkFileType"],
       "members":{
         "canDbc":{
           "shape":"CanDbcDefinition",
-          "documentation":"<p> Information, including CAN DBC files, about the configurations used to create a decoder manifest. </p>"
-        },
-        "networkFileType":{
-          "shape":"NetworkFileType",
-          "documentation":"<p> The type of file. </p>"
+          "documentation":"<p>Information, including CAN DBC files, about the configurations used to create a decoder manifest.</p>"
         }
       },
-      "documentation":"<p> Specifications for defining a vehicle network. </p>"
+      "documentation":"<p>Specifications for defining a vehicle network.</p>",
+      "union":true
     },
     "NetworkFileDefinitions":{
       "type":"list",
       "member":{"shape":"NetworkFileDefinition"}
-    },
-    "NetworkFileType":{
-      "type":"string",
-      "enum":["CAN_DBC"]
     },
     "NetworkFilesList":{
       "type":"list",
@@ -2750,22 +3033,22 @@
       "members":{
         "canInterface":{
           "shape":"CanInterface",
-          "documentation":"<p> Information about a network interface specified by the Controller Area Network (CAN) protocol. </p>"
+          "documentation":"<p>Information about a network interface specified by the Controller Area Network (CAN) protocol.</p>"
         },
         "interfaceId":{
           "shape":"InterfaceId",
-          "documentation":"<p> The ID of the network interface. </p>"
+          "documentation":"<p>The ID of the network interface.</p>"
         },
         "obdInterface":{
           "shape":"ObdInterface",
-          "documentation":"<p> Information about a network interface specified by the On-board diagnostic (OBD) II protocol. </p>"
+          "documentation":"<p>Information about a network interface specified by the On-board diagnostic (OBD) II protocol.</p>"
         },
         "type":{
           "shape":"NetworkInterfaceType",
-          "documentation":"<p> The network protocol for the vehicle. For example, <code>CAN_SIGNAL</code> specifies a protocol that defines how data is communicated between electronic control units (ECUs). <code>OBD_SIGNAL</code> specifies a protocol that defines how self-diagnostic data is communicated between ECUs. </p>"
+          "documentation":"<p>The network protocol for the vehicle. For example, <code>CAN_SIGNAL</code> specifies a protocol that defines how data is communicated between electronic control units (ECUs). <code>OBD_SIGNAL</code> specifies a protocol that defines how self-diagnostic data is communicated between ECUs.</p>"
         }
       },
-      "documentation":"<p> Represents a node and its specifications in an in-vehicle communication network. All signal decoders must be associated with a network node. </p> <p>You can use the API operation to return this information about all the network interfaces specified in a decoder manifest. </p>"
+      "documentation":"<p>Represents a node and its specifications in an in-vehicle communication network. All signal decoders must be associated with a network node. </p> <p> To return this information about all the network interfaces specified in a decoder manifest, use the API operation.</p>"
     },
     "NetworkInterfaceFailureReason":{
       "type":"string",
@@ -2773,6 +3056,8 @@
         "DUPLICATE_NETWORK_INTERFACE",
         "CONFLICTING_NETWORK_INTERFACE",
         "NETWORK_INTERFACE_TO_ADD_ALREADY_EXISTS",
+        "CAN_NETWORK_INTERFACE_INFO_IS_NULL",
+        "OBD_NETWORK_INTERFACE_INFO_IS_NULL",
         "NETWORK_INTERFACE_TO_REMOVE_ASSOCIATED_WITH_SIGNALS"
       ]
     },
@@ -2791,53 +3076,49 @@
     },
     "Node":{
       "type":"structure",
-      "required":["type"],
       "members":{
         "actuator":{
           "shape":"Actuator",
-          "documentation":"<p> Information about a node specified as an actuator. </p> <note> <p>An actuator is a digital representation of a vehicle device.</p> </note>"
+          "documentation":"<p>Information about a node specified as an actuator.</p> <note> <p>An actuator is a digital representation of a vehicle device.</p> </note>"
         },
         "attribute":{
           "shape":"Attribute",
-          "documentation":"<p> Information about a node specified as an attribute. </p> <note> <p>An attribute represents static information about a vehicle.</p> </note>"
+          "documentation":"<p>Information about a node specified as an attribute.</p> <note> <p>An attribute represents static information about a vehicle.</p> </note>"
         },
         "branch":{
           "shape":"Branch",
-          "documentation":"<p> Information about a node specified as a branch. </p> <note> <p>A group of signals that are defined in a hierarchical structure.</p> </note>"
+          "documentation":"<p>Information about a node specified as a branch.</p> <note> <p>A group of signals that are defined in a hierarchical structure.</p> </note>"
         },
-        "sensor":{"shape":"Sensor"},
-        "type":{
-          "shape":"NodeType",
-          "documentation":"<p> The type of the node. Possible values are: <code>Actuator</code>, <code>Attribute</code>, <code>Branch</code>, and <code>Sensor</code>.</p>"
-        }
+        "sensor":{"shape":"Sensor"}
       },
-      "documentation":"<p> A general abstraction of a signal. A node can be specified as an actuator, attribute, branch, or sensor. </p>"
+      "documentation":"<p>A general abstraction of a signal. A node can be specified as an actuator, attribute, branch, or sensor.</p>",
+      "union":true
     },
     "NodeCounts":{
       "type":"structure",
       "members":{
         "totalActuators":{
           "shape":"number",
-          "documentation":"<p> The total number of nodes in a vehicle network that represent actuators. </p>"
+          "documentation":"<p>The total number of nodes in a vehicle network that represent actuators.</p>"
         },
         "totalAttributes":{
           "shape":"number",
-          "documentation":"<p> The total number of nodes in a vehicle network that represent attributes. </p>"
+          "documentation":"<p>The total number of nodes in a vehicle network that represent attributes.</p>"
         },
         "totalBranches":{
           "shape":"number",
-          "documentation":"<p> The total number of nodes in a vehicle network that represent branches. </p>"
+          "documentation":"<p>The total number of nodes in a vehicle network that represent branches.</p>"
         },
         "totalNodes":{
           "shape":"number",
-          "documentation":"<p> The total number of nodes in a vehicle network. </p>"
+          "documentation":"<p>The total number of nodes in a vehicle network.</p>"
         },
         "totalSensors":{
           "shape":"number",
-          "documentation":"<p> The total number of nodes in a vehicle network that represent sensors. </p>"
+          "documentation":"<p>The total number of nodes in a vehicle network that represent sensors.</p>"
         }
       },
-      "documentation":"<p> Information about the number of nodes and node types in a vehicle network. </p>"
+      "documentation":"<p>Information about the number of nodes and node types in a vehicle network.</p>"
     },
     "NodeDataType":{
       "type":"string",
@@ -2883,15 +3164,6 @@
       "max":500,
       "min":1
     },
-    "NodeType":{
-      "type":"string",
-      "enum":[
-        "Sensor",
-        "Actuator",
-        "Attribute",
-        "Branch"
-      ]
-    },
     "Nodes":{
       "type":"list",
       "member":{"shape":"Node"},
@@ -2913,40 +3185,40 @@
     "ObdInterface":{
       "type":"structure",
       "required":[
-        "obdInterfaceName",
+        "name",
         "requestMessageId"
       ],
       "members":{
         "dtcRequestIntervalSeconds":{
           "shape":"nonNegativeInteger",
-          "documentation":"<p> The maximum number message requests per diagnostic trouble code per second. </p>"
+          "documentation":"<p>The maximum number message requests per diagnostic trouble code per second.</p>"
         },
         "hasTransmissionEcu":{
           "shape":"boolean",
-          "documentation":"<p> Whether the vehicle has a transmission control module (TCM). </p>"
+          "documentation":"<p>Whether the vehicle has a transmission control module (TCM).</p>"
         },
-        "obdInterfaceName":{
+        "name":{
           "shape":"ObdInterfaceName",
-          "documentation":"<p> The name of the interface. </p>"
+          "documentation":"<p>The name of the interface.</p>"
         },
         "obdStandard":{
           "shape":"ObdStandard",
-          "documentation":"<p> The standard OBD II PID. </p>"
+          "documentation":"<p>The standard OBD II PID.</p>"
         },
         "pidRequestIntervalSeconds":{
           "shape":"nonNegativeInteger",
-          "documentation":"<p> The maximum number message requests per second. </p>"
+          "documentation":"<p>The maximum number message requests per second.</p>"
         },
         "requestMessageId":{
           "shape":"nonNegativeInteger",
-          "documentation":"<p> The ID of the message requesting vehicle data. </p>"
+          "documentation":"<p>The ID of the message requesting vehicle data.</p>"
         },
         "useExtendedIds":{
           "shape":"boolean",
-          "documentation":"<p> Whether to use extended IDs in the message. </p>"
+          "documentation":"<p>Whether to use extended IDs in the message.</p>"
         }
       },
-      "documentation":"<p> A network interface that specifies the On-board diagnostic (OBD) II network protocol. </p>"
+      "documentation":"<p>A network interface that specifies the On-board diagnostic (OBD) II network protocol.</p>"
     },
     "ObdInterfaceName":{
       "type":"string",
@@ -2967,42 +3239,42 @@
       "members":{
         "bitMaskLength":{
           "shape":"ObdBitmaskLength",
-          "documentation":"<p> The number of bits to mask in a message. </p>"
+          "documentation":"<p>The number of bits to mask in a message.</p>"
         },
         "bitRightShift":{
           "shape":"nonNegativeInteger",
-          "documentation":"<p> The number of positions to shift bits in the message. </p>"
+          "documentation":"<p>The number of positions to shift bits in the message.</p>"
         },
         "byteLength":{
           "shape":"ObdByteLength",
-          "documentation":"<p> The length of a message. </p>"
+          "documentation":"<p>The length of a message.</p>"
         },
         "offset":{
           "shape":"double",
-          "documentation":"<p> Indicates where data appears in the message. </p>"
+          "documentation":"<p>Indicates where data appears in the message.</p>"
         },
         "pid":{
           "shape":"nonNegativeInteger",
-          "documentation":"<p> The diagnostic code used to request data from a vehicle for this signal. </p>"
+          "documentation":"<p>The diagnostic code used to request data from a vehicle for this signal.</p>"
         },
         "pidResponseLength":{
           "shape":"positiveInteger",
-          "documentation":"<p> The length of the requested data. </p>"
+          "documentation":"<p>The length of the requested data.</p>"
         },
         "scaling":{
           "shape":"double",
-          "documentation":"<p> A multiplier used to decode the message. </p>"
+          "documentation":"<p>A multiplier used to decode the message.</p>"
         },
         "serviceMode":{
           "shape":"nonNegativeInteger",
-          "documentation":"<p> The mode of operation (diagnostic service) in a message. </p>"
+          "documentation":"<p>The mode of operation (diagnostic service) in a message.</p>"
         },
         "startByte":{
           "shape":"nonNegativeInteger",
-          "documentation":"<p> Indicates the beginning of the message. </p>"
+          "documentation":"<p>Indicates the beginning of the message.</p>"
         }
       },
-      "documentation":"<p> Information about signal messages using the on-board diagnostics (OBD) II protocol in a vehicle. </p>"
+      "documentation":"<p>Information about signal messages using the on-board diagnostics (OBD) II protocol in a vehicle.</p>"
     },
     "ObdStandard":{
       "type":"string",
@@ -3036,23 +3308,23 @@
     "RegisterAccountResponse":{
       "type":"structure",
       "required":[
-        "creationDate",
+        "creationTime",
         "iamResources",
-        "lastModificationDate",
+        "lastModificationTime",
         "registerAccountStatus",
         "timestreamResources"
       ],
       "members":{
-        "creationDate":{
-          "shape":"unixDateTime",
+        "creationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time the account was registered, in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "iamResources":{
           "shape":"IamResources",
           "documentation":"<p> The registered IAM resource that allows Amazon Web Services IoT FleetWise to send data to Amazon Timestream. </p>"
         },
-        "lastModificationDate":{
-          "shape":"unixDateTime",
+        "lastModificationTime":{
+          "shape":"timestamp",
           "documentation":"<p> The time this registration was last updated, in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "registerAccountStatus":{
@@ -3079,10 +3351,16 @@
       ],
       "members":{
         "message":{"shape":"string"},
-        "resourceId":{"shape":"string"},
-        "resourceType":{"shape":"string"}
+        "resourceId":{
+          "shape":"string",
+          "documentation":"<p>The identifier of the resource that wasn't found.</p>"
+        },
+        "resourceType":{
+          "shape":"string",
+          "documentation":"<p>The type of resource that wasn't found.</p>"
+        }
       },
-      "documentation":"<p> The resource wasn't found. </p>",
+      "documentation":"<p>The resource wasn't found.</p>",
       "exception":true
     },
     "RetryAfterSeconds":{"type":"integer"},
@@ -3090,13 +3368,12 @@
       "type":"structure",
       "required":[
         "dataType",
-        "fullyQualifiedName",
-        "name"
+        "fullyQualifiedName"
       ],
       "members":{
         "allowedValues":{
           "shape":"listOfStrings",
-          "documentation":"<p> A list of possible values a sensor can take. </p>"
+          "documentation":"<p>A list of possible values a sensor can take.</p>"
         },
         "dataType":{
           "shape":"NodeDataType",
@@ -3104,69 +3381,48 @@
         },
         "description":{
           "shape":"description",
-          "documentation":"<p> A brief description of a sensor. </p>"
+          "documentation":"<p>A brief description of a sensor.</p>"
         },
         "fullyQualifiedName":{
           "shape":"string",
-          "documentation":"<p> The fully qualified name of the sensor. For example, the fully qualified name of a sensor might be <code>Vehicle.Body.Engine.Battery</code>. </p>"
+          "documentation":"<p>The fully qualified name of the sensor. For example, the fully qualified name of a sensor might be <code>Vehicle.Body.Engine.Battery</code>.</p>"
         },
         "max":{
           "shape":"double",
-          "documentation":"<p> The specified possible maximum value of the sensor. </p>"
+          "documentation":"<p>The specified possible maximum value of the sensor.</p>"
         },
         "min":{
           "shape":"double",
-          "documentation":"<p> The specified possible minimum value of the sensor. </p>"
-        },
-        "name":{
-          "shape":"string",
-          "documentation":"<p> The name of the sensor. </p>"
+          "documentation":"<p>The specified possible minimum value of the sensor.</p>"
         },
         "unit":{
           "shape":"string",
-          "documentation":"<p> The scientific unit of measurement for data collected by the sensor. </p>"
+          "documentation":"<p>The scientific unit of measurement for data collected by the sensor.</p>"
         }
       },
-      "documentation":"<p> An input component that reports the environmental condition of a vehicle. </p> <note> <p> You can collect data about fluid levels, temperatures, vibrations, or battery voltage from sensors. </p> </note>"
-    },
-    "ServiceQuotaExceededException":{
-      "type":"structure",
-      "required":[
-        "message",
-        "quotaCode",
-        "serviceCode"
-      ],
-      "members":{
-        "message":{"shape":"string"},
-        "quotaCode":{"shape":"string"},
-        "resourceId":{"shape":"string"},
-        "resourceType":{"shape":"string"},
-        "serviceCode":{"shape":"string"}
-      },
-      "documentation":"<p> A service quota was exceeded. </p>",
-      "exception":true
+      "documentation":"<p>An input component that reports the environmental condition of a vehicle.</p> <note> <p>You can collect data about fluid levels, temperatures, vibrations, or battery voltage from sensors.</p> </note>"
     },
     "SignalCatalogSummary":{
       "type":"structure",
       "members":{
-        "creationDate":{
-          "shape":"unixDateTime",
-          "documentation":"<p> The time the signal catalog was created in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
-        },
-        "lastModificationDate":{
-          "shape":"unixDateTime",
-          "documentation":"<p> The time the signal catalog was last updated in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
-        },
-        "signalCatalogArn":{
+        "arn":{
           "shape":"arn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of the signal catalog. </p>"
+          "documentation":"<p>The Amazon Resource Name (ARN) of the signal catalog.</p>"
         },
-        "signalCatalogName":{
+        "creationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the signal catalog was created in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
+        },
+        "lastModificationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the signal catalog was last updated in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
+        },
+        "name":{
           "shape":"string",
-          "documentation":"<p> The name of the signal catalog. </p>"
+          "documentation":"<p>The name of the signal catalog.</p>"
         }
       },
-      "documentation":"<p> Information about a collection of standardized signals, which can be attributes, branches, sensors, or actuators.</p>"
+      "documentation":"<p>Information about a collection of standardized signals, which can be attributes, branches, sensors, or actuators.</p>"
     },
     "SignalDecoder":{
       "type":"structure",
@@ -3178,26 +3434,26 @@
       "members":{
         "canSignal":{
           "shape":"CanSignal",
-          "documentation":"<p> Information about signal decoder using the Controller Area Network (CAN) protocol. </p>"
+          "documentation":"<p>Information about signal decoder using the Controller Area Network (CAN) protocol.</p>"
         },
         "fullyQualifiedName":{
           "shape":"FullyQualifiedName",
-          "documentation":"<p> The fully qualified name of a signal decoder as defined in a vehicle model. </p>"
+          "documentation":"<p>The fully qualified name of a signal decoder as defined in a vehicle model.</p>"
         },
         "interfaceId":{
           "shape":"InterfaceId",
-          "documentation":"<p> The ID of a network interface that specifies what network protocol a vehicle follows. </p>"
+          "documentation":"<p>The ID of a network interface that specifies what network protocol a vehicle follows.</p>"
         },
         "obdSignal":{
           "shape":"ObdSignal",
-          "documentation":"<p> Information about signal decoder using the On-board diagnostic (OBD) II protocol. </p>"
+          "documentation":"<p>Information about signal decoder using the On-board diagnostic (OBD) II protocol.</p>"
         },
         "type":{
           "shape":"SignalDecoderType",
-          "documentation":"<p> The network protocol for the vehicle. For example, <code>CAN_SIGNAL</code> specifies a protocol that defines how data is communicated between electronic control units (ECUs). <code>OBD_SIGNAL</code> specifies a protocol that defines how self-diagnostic data is communicated between ECUs. </p>"
+          "documentation":"<p>The network protocol for the vehicle. For example, <code>CAN_SIGNAL</code> specifies a protocol that defines how data is communicated between electronic control units (ECUs). <code>OBD_SIGNAL</code> specifies a protocol that defines how self-diagnostic data is communicated between ECUs.</p>"
         }
       },
-      "documentation":"<p> Information about a signal decoder. </p>"
+      "documentation":"<p>Information about a signal decoder.</p>"
     },
     "SignalDecoderFailureReason":{
       "type":"string",
@@ -3208,6 +3464,8 @@
         "SIGNAL_NOT_ASSOCIATED_WITH_NETWORK_INTERFACE",
         "NETWORK_INTERFACE_TYPE_INCOMPATIBLE_WITH_SIGNAL_DECODER_TYPE",
         "SIGNAL_NOT_IN_MODEL",
+        "CAN_SIGNAL_INFO_IS_NULL",
+        "OBD_SIGNAL_INFO_IS_NULL",
         "NO_DECODER_INFO_FOR_SIGNAL_IN_MODEL"
       ]
     },
@@ -3226,28 +3484,28 @@
     },
     "SignalInformation":{
       "type":"structure",
-      "required":["signalName"],
+      "required":["name"],
       "members":{
         "maxSampleCount":{
           "shape":"maxSampleCount",
-          "documentation":"<p> The maximum number of samples to collect. </p>"
+          "documentation":"<p>The maximum number of samples to collect.</p>"
         },
         "minimumSamplingIntervalMs":{
           "shape":"uint32",
-          "documentation":"<p> The minimum duration of time (in milliseconds) between two triggering events to collect data. </p> <note> <p>If a signal changes often, you might want to collect data at a slower rate.</p> </note>"
+          "documentation":"<p>The minimum duration of time (in milliseconds) between two triggering events to collect data.</p> <note> <p>If a signal changes often, you might want to collect data at a slower rate.</p> </note>"
         },
-        "signalName":{
+        "name":{
           "shape":"wildcardSignalName",
-          "documentation":"<p> The name of the signal. </p>"
+          "documentation":"<p>The name of the signal.</p>"
         }
       },
-      "documentation":"<p> Information about a signal. </p>"
+      "documentation":"<p>Information about a signal.</p>"
     },
     "SignalInformationList":{
       "type":"list",
       "member":{"shape":"SignalInformation"},
       "max":1000,
-      "min":1
+      "min":0
     },
     "SpoolingMode":{
       "type":"string",
@@ -3257,16 +3515,87 @@
       ]
     },
     "String":{"type":"string"},
+    "Tag":{
+      "type":"structure",
+      "required":[
+        "Key",
+        "Value"
+      ],
+      "members":{
+        "Key":{
+          "shape":"TagKey",
+          "documentation":"<p>The tag's key.</p>"
+        },
+        "Value":{
+          "shape":"TagValue",
+          "documentation":"<p>The tag's value.</p>"
+        }
+      },
+      "documentation":"<p>A set of key/value pairs that are used to manage the resource.</p>"
+    },
+    "TagKey":{
+      "type":"string",
+      "max":128,
+      "min":1
+    },
+    "TagKeyList":{
+      "type":"list",
+      "member":{"shape":"TagKey"},
+      "max":200,
+      "min":0
+    },
+    "TagList":{
+      "type":"list",
+      "member":{"shape":"Tag"},
+      "max":50,
+      "min":0
+    },
+    "TagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceARN",
+        "Tags"
+      ],
+      "members":{
+        "ResourceARN":{
+          "shape":"AmazonResourceName",
+          "documentation":"<p>The ARN of the resource.</p>"
+        },
+        "Tags":{
+          "shape":"TagList",
+          "documentation":"<p>The new or modified tags for the resource.</p>"
+        }
+      }
+    },
+    "TagResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "TagValue":{
+      "type":"string",
+      "max":256,
+      "min":0
+    },
     "ThrottlingException":{
       "type":"structure",
       "required":["message"],
       "members":{
         "message":{"shape":"string"},
-        "quotaCode":{"shape":"string"},
-        "retryAfterSeconds":{"shape":"RetryAfterSeconds"},
-        "serviceCode":{"shape":"string"}
+        "quotaCode":{
+          "shape":"string",
+          "documentation":"<p>The quota identifier of the applied throttling rules for this request.</p>"
+        },
+        "retryAfterSeconds":{
+          "shape":"RetryAfterSeconds",
+          "documentation":"<p>The number of seconds to wait before retrying the command.</p>"
+        },
+        "serviceCode":{
+          "shape":"string",
+          "documentation":"<p>The code for the service that couldn't be completed due to throttling.</p>"
+        }
       },
-      "documentation":"<p> The request couldn't be completed due to throttling. </p>",
+      "documentation":"<p>The request couldn't be completed due to throttling.</p>",
       "exception":true
     },
     "TimeBasedCollectionScheme":{
@@ -3275,10 +3604,10 @@
       "members":{
         "periodMs":{
           "shape":"collectionPeriodMs",
-          "documentation":"<p> The time period (in milliseconds) to decide how often to collect data. For example, if the time period is <code>60000</code> the Edge Agent software collects data once every minute. </p>"
+          "documentation":"<p>The time period (in milliseconds) to decide how often to collect data. For example, if the time period is <code>60000</code>, the Edge Agent software collects data once every minute.</p>"
         }
       },
-      "documentation":"<p> Information about a collection scheme that uses a time period to decide how often to collect data. </p>"
+      "documentation":"<p>Information about a collection scheme that uses a time period to decide how often to collect data.</p>"
     },
     "TimestreamDatabaseName":{
       "type":"string",
@@ -3296,30 +3625,30 @@
       "members":{
         "errorMessage":{
           "shape":"errorMessage",
-          "documentation":"<p> A message associated with a registration error. </p>"
+          "documentation":"<p>A message associated with a registration error.</p>"
         },
         "registrationStatus":{
           "shape":"RegistrationStatus",
-          "documentation":"<p> The status of registering your Amazon Timestream resources. The status can be one of <code>REGISTRATION_SUCCESS</code>, <code>REGISTRATION_PENDING</code>, <code>REGISTRATION_FAILURE</code>. </p>"
+          "documentation":"<p>The status of registering your Amazon Timestream resources. The status can be one of <code>REGISTRATION_SUCCESS</code>, <code>REGISTRATION_PENDING</code>, <code>REGISTRATION_FAILURE</code>.</p>"
         },
         "timestreamDatabaseArn":{
           "shape":"arn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of the Timestream database. </p>"
+          "documentation":"<p>The Amazon Resource Name (ARN) of the Timestream database.</p>"
         },
         "timestreamDatabaseName":{
           "shape":"TimestreamDatabaseName",
-          "documentation":"<p> The name of the Timestream database. </p>"
+          "documentation":"<p>The name of the Timestream database.</p>"
         },
         "timestreamTableArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of the Timestream database table. </p>"
+          "documentation":"<p>The ARN of the Timestream database table.</p>"
         },
         "timestreamTableName":{
           "shape":"TimestreamTableName",
-          "documentation":"<p> The name of the Timestream database table. </p>"
+          "documentation":"<p>The name of the Timestream database table.</p>"
         }
       },
-      "documentation":"<p> Information about the registered Amazon Timestream resources or errors, if any. </p>"
+      "documentation":"<p>Information about the registered Amazon Timestream resources or errors, if any.</p>"
     },
     "TimestreamResources":{
       "type":"structure",
@@ -3330,14 +3659,14 @@
       "members":{
         "timestreamDatabaseName":{
           "shape":"TimestreamDatabaseName",
-          "documentation":"<p> The name of the registered Amazon Timestream database. </p>"
+          "documentation":"<p>The name of the registered Amazon Timestream database.</p>"
         },
         "timestreamTableName":{
           "shape":"TimestreamTableName",
-          "documentation":"<p> The name of the registered Amazon Timestream database table. </p>"
+          "documentation":"<p>The name of the registered Amazon Timestream database table.</p>"
         }
       },
-      "documentation":"<p> The registered Amazon Timestream resources that Amazon Web Services IoT FleetWise edge agent software can transfer your vehicle data to. </p>"
+      "documentation":"<p>The registered Amazon Timestream resources that Amazon Web Services IoT FleetWise edge agent software can transfer your vehicle data to.</p>"
     },
     "TimestreamTableName":{
       "type":"string",
@@ -3352,6 +3681,28 @@
         "RISING_EDGE"
       ]
     },
+    "UntagResourceRequest":{
+      "type":"structure",
+      "required":[
+        "ResourceARN",
+        "TagKeys"
+      ],
+      "members":{
+        "ResourceARN":{
+          "shape":"AmazonResourceName",
+          "documentation":"<p>The ARN of the resource.</p>"
+        },
+        "TagKeys":{
+          "shape":"TagKeyList",
+          "documentation":"<p>A list of the keys of the tags to be removed from the resource.</p>"
+        }
+      }
+    },
+    "UntagResourceResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
     "UpdateCampaignAction":{
       "type":"string",
       "enum":[
@@ -3365,20 +3716,24 @@
       "type":"structure",
       "required":[
         "action",
-        "campaignName"
+        "name"
       ],
       "members":{
         "action":{
           "shape":"UpdateCampaignAction",
-          "documentation":"<p> Specifies how to update a campaign. The action can be one of:</p> <ul> <li> <p> <code>APPROVE</code> - To approve delivering a data collection scheme to vehicles. </p> </li> <li> <p> <code>SUSPEND</code> - To suspend collecting signal data. </p> </li> <li> <p> <code>RESUME</code> - To resume collecting signal data. </p> </li> <li> <p> <code>UPDATE</code> - To update a campaign. </p> </li> </ul>"
-        },
-        "campaignName":{
-          "shape":"campaignName",
-          "documentation":"<p> The name of the campaign to update. </p>"
+          "documentation":"<p> Specifies how to update a campaign. The action can be one of the following:</p> <ul> <li> <p> <code>APPROVE</code> - To approve delivering a data collection scheme to vehicles. </p> </li> <li> <p> <code>SUSPEND</code> - To suspend collecting signal data. </p> </li> <li> <p> <code>RESUME</code> - To resume collecting signal data. </p> </li> <li> <p> <code>UPDATE</code> - To update a campaign. </p> </li> </ul>"
         },
         "dataExtraDimensions":{
           "shape":"DataExtraDimensionNodePathList",
           "documentation":"<p> A list of vehicle attributes to associate with a signal. </p> <p>Default: An empty array</p>"
+        },
+        "description":{
+          "shape":"description",
+          "documentation":"<p>The description of the campaign.</p>"
+        },
+        "name":{
+          "shape":"campaignName",
+          "documentation":"<p> The name of the campaign to update. </p>"
         }
       }
     },
@@ -3388,6 +3743,10 @@
         "arn":{
           "shape":"arn",
           "documentation":"<p> The Amazon Resource Name (ARN) of the campaign. </p>"
+        },
+        "name":{
+          "shape":"campaignName",
+          "documentation":"<p>The name of the updated campaign.</p>"
         },
         "status":{
           "shape":"CampaignStatus",
@@ -3421,7 +3780,7 @@
         },
         "signalDecodersToAdd":{
           "shape":"SignalDecoders",
-          "documentation":"<p> A list of information about decoding additional signals, to add to the decoder manifest. </p>"
+          "documentation":"<p> A list of information about decoding additional signals to add to the decoder manifest. </p>"
         },
         "signalDecodersToRemove":{
           "shape":"Fqns",
@@ -3429,11 +3788,11 @@
         },
         "signalDecodersToUpdate":{
           "shape":"SignalDecoders",
-          "documentation":"<p> A list of updated information about decoding signals, to update in the decoder manifest. </p>"
+          "documentation":"<p> A list of updated information about decoding signals to update in the decoder manifest. </p>"
         },
         "status":{
           "shape":"ManifestStatus",
-          "documentation":"<p> The state of the decoder manifest. If the status is <code>ACTIVE</code>, the decoder manifest can't be edited. You can edit the decoder manifest if the status is <code>DRAFT</code>. </p>"
+          "documentation":"<p> The state of the decoder manifest. If the status is <code>ACTIVE</code>, the decoder manifest can't be edited. If the status is <code>DRAFT</code>, you can edit the decoder manifest. </p>"
         }
       }
     },
@@ -3471,7 +3830,22 @@
     "UpdateFleetResponse":{
       "type":"structure",
       "members":{
+        "arn":{
+          "shape":"arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the updated fleet.</p>"
+        },
+        "id":{
+          "shape":"fleetId",
+          "documentation":"<p>The ID of the updated fleet.</p>"
+        }
       }
+    },
+    "UpdateMode":{
+      "type":"string",
+      "enum":[
+        "Overwrite",
+        "Merge"
+      ]
     },
     "UpdateModelManifestRequest":{
       "type":"structure",
@@ -3495,7 +3869,7 @@
         },
         "status":{
           "shape":"ManifestStatus",
-          "documentation":"<p> The state of the vehicle model. If the status is <code>ACTIVE</code>, the vehicle model can't be edited. You can only edit the vehicle model if the status is <code>DRAFT</code>. </p>"
+          "documentation":"<p> The state of the vehicle model. If the status is <code>ACTIVE</code>, the vehicle model can't be edited. If the status is <code>DRAFT</code>, you can edit the vehicle model. </p>"
         }
       }
     },
@@ -3564,96 +3938,114 @@
       "members":{
         "code":{
           "shape":"number",
-          "documentation":"<p> The relevant HTTP error code (400+).</p>"
+          "documentation":"<p>The relevant HTTP error code (400+).</p>"
         },
         "message":{
           "shape":"string",
-          "documentation":"<p> A message associated with the error. </p>"
+          "documentation":"<p>A message associated with the error.</p>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
-          "documentation":"<p> The ID of the vehicle with the error. </p>"
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The ID of the vehicle with the error.</p>"
         }
       },
-      "documentation":"<p> An HTTP error resulting from updating the description for a vehicle. </p>"
+      "documentation":"<p>An HTTP error resulting from updating the description for a vehicle.</p>"
     },
     "UpdateVehicleRequest":{
       "type":"structure",
-      "required":["vehicleId"],
+      "required":["vehicleName"],
       "members":{
+        "attributeUpdateMode":{
+          "shape":"UpdateMode",
+          "documentation":"<p>The method the specified attributes will update the existing attributes on the vehicle. Use<code>Overwite</code> to replace the vehicle attributes with the specified attributes. Or use <code>Merge</code> to combine all attributes.</p> <p>This is required if attributes are present in the input.</p>"
+        },
         "attributes":{
           "shape":"attributesMap",
           "documentation":"<p>Static information about a vehicle in a key-value pair. For example:</p> <p> <code>\"engineType\"</code> : <code>\"1.3 L R2\"</code> </p>"
         },
         "decoderManifestArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of the decoder manifest associated with this vehicle. </p>"
-        },
-        "mergeAttributes":{
-          "shape":"flag",
-          "documentation":"<p> Specifies whether a list of vehicle attributes is merged with existing vehicle attributes instead of overwriting them. </p>"
+          "documentation":"<p>The ARN of the decoder manifest associated with this vehicle.</p>"
         },
         "modelManifestArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of a vehicle model (model manifest) associated with the vehicle. </p>"
+          "documentation":"<p>The ARN of a vehicle model (model manifest) associated with the vehicle.</p>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
-          "documentation":"<p> The unique ID of the vehicle to update. </p>"
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The unique ID of the vehicle to update.</p>"
         }
       }
     },
     "UpdateVehicleRequestItem":{
       "type":"structure",
-      "required":["vehicleId"],
+      "required":["vehicleName"],
       "members":{
+        "attributeUpdateMode":{
+          "shape":"UpdateMode",
+          "documentation":"<p>The method the specified attributes will update the existing attributes on the vehicle. Use<code>Overwite</code> to replace the vehicle attributes with the specified attributes. Or use <code>Merge</code> to combine all attributes.</p> <p>This is required if attributes are present in the input.</p>"
+        },
         "attributes":{
           "shape":"attributesMap",
           "documentation":"<p>Static information about a vehicle in a key-value pair. For example:</p> <p> <code>\"engineType\"</code> : <code>\"1.3 L R2\"</code> </p>"
         },
         "decoderManifestArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of the signal decoder manifest associated with the vehicle to update. </p>"
-        },
-        "mergeAttributes":{
-          "shape":"flag",
-          "documentation":"<p> Specifies whether a list of vehicle attributes is merged with existing vehicle attributes instead of overwriting them. </p>"
+          "documentation":"<p>The ARN of the signal decoder manifest associated with the vehicle to update.</p>"
         },
         "modelManifestArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of the vehicle model (model manifest) associated with the vehicle to update. </p>"
+          "documentation":"<p>The ARN of the vehicle model (model manifest) associated with the vehicle to update.</p>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
-          "documentation":"<p> The unique ID of the vehicle to update. </p>"
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The unique ID of the vehicle to update.</p>"
         }
       },
-      "documentation":"<p> Information about the vehicle to update. </p>"
+      "documentation":"<p>Information about the vehicle to update.</p>"
     },
     "UpdateVehicleResponse":{
       "type":"structure",
       "members":{
+        "arn":{
+          "shape":"arn",
+          "documentation":"<p>The ARN of the updated vehicle.</p>"
+        },
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The ID of the updated vehicle.</p>"
+        }
       }
     },
     "UpdateVehicleResponseItem":{
       "type":"structure",
       "members":{
-        "vehicleId":{
-          "shape":"vehicleId",
-          "documentation":"<p> The ID of the updated vehicle. </p>"
+        "arn":{
+          "shape":"arn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the updated vehicle.</p>"
+        },
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The unique ID of the updated vehicle.</p>"
         }
       },
-      "documentation":"<p> Information about the updated vehicle. </p>"
+      "documentation":"<p>Information about the updated vehicle.</p>"
     },
     "ValidationException":{
       "type":"structure",
       "required":["message"],
       "members":{
-        "fieldList":{"shape":"ValidationExceptionFieldList"},
+        "fieldList":{
+          "shape":"ValidationExceptionFieldList",
+          "documentation":"<p>The list of fields that fail to satisfy the constraints specified by an Amazon Web Services service.</p>"
+        },
         "message":{"shape":"string"},
-        "reason":{"shape":"ValidationExceptionReason"}
+        "reason":{
+          "shape":"ValidationExceptionReason",
+          "documentation":"<p>The reason the input failed to satisfy the constraints specified by an Amazon Web Services service.</p>"
+        }
       },
-      "documentation":"<p> The input fails to satisfy the constraints specified by an Amazon Web Services service. </p>",
+      "documentation":"<p>The input fails to satisfy the constraints specified by an Amazon Web Services service.</p>",
       "exception":true
     },
     "ValidationExceptionField":{
@@ -3665,14 +4057,14 @@
       "members":{
         "message":{
           "shape":"String",
-          "documentation":"<p> A message about the validation error. </p>"
+          "documentation":"<p>A message about the validation error.</p>"
         },
         "name":{
           "shape":"String",
-          "documentation":"<p> The name of the parameter field with the validation error. </p>"
+          "documentation":"<p>The name of the parameter field with the validation error.</p>"
         }
       },
-      "documentation":"<p> A validation error due to mismatch between the expected data type, length, or pattern of the parameter and the input. </p>"
+      "documentation":"<p>A validation error due to mismatch between the expected data type, length, or pattern of the parameter and the input.</p>"
     },
     "ValidationExceptionFieldList":{
       "type":"list",
@@ -3694,23 +4086,33 @@
         "ValidateIotThingExists"
       ]
     },
+    "VehicleState":{
+      "type":"string",
+      "enum":[
+        "CREATED",
+        "READY",
+        "HEALTHY",
+        "SUSPENDED",
+        "DELETING"
+      ]
+    },
     "VehicleStatus":{
       "type":"structure",
       "members":{
         "campaignName":{
           "shape":"string",
-          "documentation":"<p> The name of a campaign. </p>"
+          "documentation":"<p>The name of a campaign.</p>"
         },
         "status":{
-          "shape":"status",
-          "documentation":"<p>The state of a vehicle, which can be one of the following:</p> <ul> <li> <p> <code>CREATING</code> - Amazon Web Services IoT FleetWise is processing your request to create the vehicle. </p> </li> <li> <p> <code>READY</code> - The vehicle is ready to receive a campaign deployment. </p> </li> <li> <p> <code>HEALTHY</code> - A campaign deployment was delivered to the vehicle. </p> </li> <li> <p> <code>SUSPENDED</code> - The campaign is suspended. </p> </li> <li> <p> <code>DELETING</code> - Amazon Web Services IoT FleetWise is removing a campaign from the vehicle. </p> </li> </ul>"
+          "shape":"VehicleState",
+          "documentation":"<p>The state of a vehicle, which can be one of the following:</p> <ul> <li> <p> <code>CREATED</code> - Amazon Web Services IoT FleetWise sucessfully created the vehicle. </p> </li> <li> <p> <code>READY</code> - The vehicle is ready to receive a campaign deployment. </p> </li> <li> <p> <code>HEALTHY</code> - A campaign deployment was delivered to the vehicle. </p> </li> <li> <p> <code>SUSPENDED</code> - A campaign associated with the vehicle was suspended and data collection was paused. </p> </li> <li> <p> <code>DELETING</code> - Amazon Web Services IoT FleetWise is removing a campaign from the vehicle. </p> </li> </ul>"
         },
-        "vehicleId":{
-          "shape":"vehicleId",
-          "documentation":"<p> The ID of the vehicle. </p>"
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The unique ID of the vehicle.</p>"
         }
       },
-      "documentation":"<p> Information about the state of a vehicle and how it relates to the status of a campaign. </p>"
+      "documentation":"<p>Information about the state of a vehicle and how it relates to the status of a campaign.</p>"
     },
     "VehicleStatusList":{
       "type":"list",
@@ -3720,49 +4122,39 @@
       "type":"structure",
       "required":[
         "arn",
-        "creationDate",
+        "creationTime",
         "decoderManifestArn",
-        "id",
-        "modelManifestArn"
+        "lastModificationTime",
+        "modelManifestArn",
+        "vehicleName"
       ],
       "members":{
         "arn":{
           "shape":"arn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of the vehicle. </p>"
+          "documentation":"<p>The Amazon Resource Name (ARN) of the vehicle.</p>"
         },
-        "creationDate":{
-          "shape":"unixDateTime",
-          "documentation":"<p>The time the vehicle was created in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
+        "creationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the vehicle was created in seconds since epoch (January 1, 1970 at midnight UTC time).</p>"
         },
         "decoderManifestArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of a decoder manifest associated with the vehicle.</p>"
+          "documentation":"<p>The ARN of a decoder manifest associated with the vehicle.</p>"
         },
-        "id":{
-          "shape":"vehicleId",
-          "documentation":"<p> The ID of the vehicle. </p>"
-        },
-        "lastModificationDate":{
-          "shape":"unixDateTime",
-          "documentation":"<p> The time the vehicle was last updated in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
+        "lastModificationTime":{
+          "shape":"timestamp",
+          "documentation":"<p>The time the vehicle was last updated in seconds since epoch (January 1, 1970 at midnight UTC time). </p>"
         },
         "modelManifestArn":{
           "shape":"arn",
-          "documentation":"<p> The ARN of a vehicle model (model manifest) associated with the vehicle. </p>"
+          "documentation":"<p>The ARN of a vehicle model (model manifest) associated with the vehicle.</p>"
+        },
+        "vehicleName":{
+          "shape":"vehicleName",
+          "documentation":"<p>The unique ID of the vehicle.</p>"
         }
       },
-      "documentation":"<p> Information about a vehicle. </p> <p>You can use the API operation to return this information about vehicles in your account.</p>"
-    },
-    "VssFormats":{
-      "type":"structure",
-      "members":{
-        "vssJson":{
-          "shape":"string",
-          "documentation":"<p> Specifies the VSS file format configuration as JSON.</p>"
-        }
-      },
-      "documentation":"<p> The file format of the Vehicle Signal Specification (VSS) configuration. </p> <note> <p>Vehicle Signal Specification is a precise language used to describe and model signals in vehicle networks.</p> </note>",
-      "union":true
+      "documentation":"<p>Information about a vehicle.</p> <p>To return this information about vehicles in your account, you can use the API operation.</p>"
     },
     "arn":{"type":"string"},
     "attributeName":{
@@ -3827,7 +4219,6 @@
       "max":2048,
       "min":1
     },
-    "flag":{"type":"boolean"},
     "fleetId":{
       "type":"string",
       "max":100,
@@ -3911,10 +4302,6 @@
       "max":4294967295,
       "min":0
     },
-    "unixDateTime":{
-      "type":"long",
-      "box":true
-    },
     "updateVehicleErrors":{
       "type":"list",
       "member":{"shape":"UpdateVehicleError"}
@@ -3927,7 +4314,7 @@
       "type":"list",
       "member":{"shape":"UpdateVehicleResponseItem"}
     },
-    "vehicleId":{
+    "vehicleName":{
       "type":"string",
       "max":100,
       "min":1,
@@ -3939,7 +4326,7 @@
     },
     "vehicles":{
       "type":"list",
-      "member":{"shape":"vehicleId"}
+      "member":{"shape":"vehicleName"}
     },
     "wildcardSignalName":{
       "type":"string",

@@ -2,10 +2,11 @@
 
 cmake_minimum_required(VERSION 3.10.2)
 
-project(iotfleetwise VERSION 0.1.2)
+project(iotfleetwise VERSION 0.1.3)
 
-# Due to autosar rules, AWS IoT FleetWise Edge will use C++11
-set(CMAKE_CXX_STANDARD 11)
+# AWS IoT FleetWise Edge uses C++14 for compatibility reasons with 
+# Automotive middlewares ( Adaptive AUTOSAR, ROS2)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 message(STATUS "Hello from the AWS IoT FleetWise build system!")
@@ -31,6 +32,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+include(CMakeGraphVizOptions.cmake)
 include(cmake/compiler_gcc.cmake)
 include(cmake/protobufs.cmake)
 if(FWE_FEATURE_CAMERA)
@@ -39,6 +41,7 @@ if(FWE_FEATURE_CAMERA)
 endif()
 include(cmake/snappy.cmake)
 include(CTest)
+include(cmake/unit_test.cmake)
 include(cmake/valgrind.cmake)
 include(cmake/clang_tools.cmake)
 include(cmake/clang_tidy.cmake)
@@ -47,3 +50,6 @@ if(FWE_BUILD_DOC)
 endif()
 
 add_subdirectory(src)
+
+# Disallow cycles
+set_property( GLOBAL PROPERTY GLOBAL_DEPENDS_NO_CYCLES ON )

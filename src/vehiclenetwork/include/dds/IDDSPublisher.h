@@ -15,7 +15,7 @@
 
 // Includes
 #include "DDSDataTypes.h"
-#include "datatypes/NetworkChannelDataTypes.h"
+#include "datatypes/VehicleDataSourceTypes.h"
 // DDS lib related headers
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
@@ -32,7 +32,7 @@ namespace IoTFleetWise
 namespace VehicleNetwork
 {
 using namespace eprosima::fastdds::dds;
-using namespace Aws::IoTFleetWise::Platform;
+using namespace Aws::IoTFleetWise::Platform::Linux;
 /**
  * Metadata representing an DDS Data Request.
  * Refer to DataInspection::EventMetadata for more details
@@ -51,7 +51,7 @@ struct DDSDataRequest
 class IDDSPublisher : public DataWriterListener
 {
 public:
-    virtual ~IDDSPublisher() = default;
+    ~IDDSPublisher() override = default;
 
     /**
      * @brief Inits a DDS Node publisher using the source properties.
@@ -92,8 +92,8 @@ public:
     /**
      * @return the unique ID of the channel.
      */
-    inline NetworkChannelID
-    getChannelID()
+    inline VehicleDataSourceID
+    getChannelID() const
     {
         return mID;
     }
@@ -101,8 +101,8 @@ public:
     /**
      * @return the Network Protocol Type
      */
-    inline NetworkChannelProtocol
-    getChannelProtocol()
+    inline VehicleDataSourceProtocol
+    getChannelProtocol() const
     {
         return mNetworkProtocol;
     }
@@ -111,7 +111,7 @@ public:
      * @return the DDS Domain ID
      */
     inline DDSDomainID
-    getDDSDomainID()
+    getDDSDomainID() const
     {
         return mDDSDomainID;
     }
@@ -120,7 +120,7 @@ public:
      * @return the DDS Topic
      */
     inline DDSTopicName
-    getDDSTopic()
+    getDDSTopic() const
     {
         return mDDSTopic;
     }
@@ -129,7 +129,7 @@ public:
      * @return the Publisher name
      */
     inline DDSWriterName
-    getDDSPublisherName()
+    getDDSPublisherName() const
     {
         return mDDSwriterName;
     }
@@ -138,7 +138,7 @@ public:
      * @return the Source Type
      */
     inline SensorSourceType
-    getSensorSourceType()
+    getSensorSourceType() const
     {
         return mType;
     }
@@ -148,21 +148,21 @@ protected:
      * @brief Thread safe Channel ID generator
      * @return returns a unique identifier of a channel.
      */
-    uint32_t
+    static uint32_t
     generateChannelID()
     {
-        static std::atomic<uint32_t> channelID( INVALID_CHANNEL_ID );
+        static std::atomic<uint32_t> channelID( INVALID_DATA_SOURCE_ID );
         return ++channelID;
     }
 
     SensorSourceType mType;
-    NetworkChannelID mID;
+    VehicleDataSourceID mID;
     DDSDomainID mDDSDomainID;
     DDSTopicName mDDSTopic;
     DDSWriterName mDDSwriterName;
-    NetworkChannelProtocol mNetworkProtocol;
+    VehicleDataSourceProtocol mNetworkProtocol;
 };
-typedef std::unique_ptr<IDDSPublisher> DDSPublisherPtr;
+using DDSPublisherPtr = std::unique_ptr<IDDSPublisher>;
 } // namespace VehicleNetwork
 } // namespace IoTFleetWise
 } // namespace Aws

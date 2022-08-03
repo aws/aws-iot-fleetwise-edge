@@ -9,7 +9,7 @@ message(STATUS "Linux platform configuration started.")
 # The name used for this library target
 set(libraryTargetName iotfleetwise.platform.linux)
 # The alias name is what other targets will use as a dependency
-set(libraryAliasName IoTFleetWise::Platform)
+set(libraryAliasName IoTFleetWise::Platform::Linux)
 
 add_library(
   ${libraryTargetName}
@@ -35,6 +35,12 @@ target_include_directories(
   persistencymanagement/include
   # Linux Kernel less than 5.10 require this header.
   can
+)
+
+target_link_libraries(
+  ${libraryTargetName}
+  # From the Platform, this is what is used: logmanagement timemanagement
+  IoTFleetWise::Platform::Utility
 )
 
 # This allows the preprocessor to enable the code in the libraries
@@ -89,11 +95,17 @@ set(
   persistencymanagement/test/CacheAndPersistTest.cpp
 )
 
+set(
+  benchmarkSources
+  timemanagement/test/ClockHandlerBenchmarkTest.cpp
+)
+
 
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
 
   find_package(GTest REQUIRED)
+  find_package(benchmark REQUIRED)
 
   # Add the executable targets
   foreach(testSource ${testSources})
@@ -110,8 +122,28 @@ if(${BUILD_TESTING})
       GTest::Main
     )
 
-    add_test(NAME ${testName} COMMAND ${testName} --gtest_output=xml:report-${testName}.xml)
+    add_unit_test(${testName})
     add_valgrind_test(${testName})
+    install(TARGETS ${testName} RUNTIME DESTINATION bin/tests)
+
+  endforeach()
+
+  # Add the executable benchmark targets
+  foreach(testSource ${benchmarkSources})
+    # Need a name for each exec so use filename w/o extension
+    get_filename_component(testName ${testSource} NAME_WE)
+
+    add_executable(${testName} ${testSource})
+
+    # Link to the project library and GTest main
+    target_link_libraries(
+      ${testName}
+      PRIVATE
+      ${libraryTargetName}
+      benchmark::benchmark
+    )
+
+    add_test(NAME ${testName} COMMAND ${testName} --benchmark_out=benchmark-report-${testName}.txt --benchmark_out_format=console)
     install(TARGETS ${testName} RUNTIME DESTINATION bin/tests)
 
   endforeach()

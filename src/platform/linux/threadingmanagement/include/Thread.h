@@ -16,7 +16,7 @@
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
 #include "Signal.h"
-#include <assert.h>
+#include <cassert>
 #include <functional>
 #include <memory>
 
@@ -25,6 +25,8 @@ namespace Aws
 namespace IoTFleetWise
 {
 namespace Platform
+{
+namespace Linux
 {
 /**
  * @brief POSIX Thread Wrapper Implementation.
@@ -39,10 +41,6 @@ class Thread
 {
 public:
     using WorkerFunction = std::function<void( void * )>;
-
-    Thread();
-
-    ~Thread();
 
     /**
      * @brief Creates a POSIX Thread.
@@ -73,6 +71,7 @@ public:
     /**
      * @brief Sets Thread name
      */
+    // NOLINTNEXTLINE(readability-make-member-function-const)
     void setThreadName( const std::string &name );
 
     /**
@@ -83,22 +82,15 @@ public:
 private:
     struct ThreadSettings
     {
-        ThreadSettings()
-            : mSelf( nullptr )
-            , mWorkerFunction( nullptr )
-            , mParams( nullptr )
-        {
-        }
-
-        Thread *mSelf;
-        WorkerFunction mWorkerFunction;
-        void *mParams;
+        Thread *mSelf{ nullptr };
+        WorkerFunction mWorkerFunction{ nullptr };
+        void *mParams{ nullptr };
     };
     static void *workerFunctionWrapper( void *params );
 
-    unsigned long getThreadID();
+    unsigned long getThreadID() const;
 
-    pthread_t mThread;
+    pthread_t mThread{ 0 };
     ThreadSettings mExecParams;
 
     unsigned long mThreadId{};
@@ -108,6 +100,7 @@ private:
     std::unique_ptr<Signal> mTerminateSignal;
 };
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

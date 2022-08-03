@@ -43,7 +43,7 @@ jobs:
       run: |
         cd build
         # Exclude tests that require SocketCAN
-        CTEST_OUTPUT_ON_FAILURE=1 ctest -E "IoTFleetWiseEngineTest|NetworkChannelBinderTest|OBDOverCANModuleTest|ISOTPOverCANProtocolTest|SocketCANBusChannelTest"
+        CTEST_OUTPUT_ON_FAILURE=1 ctest
 
     - name: upload-artifacts
       uses: actions/upload-artifact@v2

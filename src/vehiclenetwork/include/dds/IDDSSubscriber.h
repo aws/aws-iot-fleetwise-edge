@@ -17,7 +17,7 @@
 #include "DDSDataTypes.h"
 #include "Listener.h"
 
-#include "datatypes/NetworkChannelDataTypes.h"
+#include "datatypes/VehicleDataSourceTypes.h"
 // DDS lib related headers
 #include "SensorDataListener.h"
 #include <fastdds/dds/domain/DomainParticipant.hpp>
@@ -37,7 +37,7 @@ namespace IoTFleetWise
 namespace VehicleNetwork
 {
 using namespace eprosima::fastdds::dds;
-using namespace Aws::IoTFleetWise::Platform;
+using namespace Aws::IoTFleetWise::Platform::Linux;
 
 /**
  * @brief Abstract DDS Subscriber Interface. Every DDS Node that wants to subscribe to data on a
@@ -47,7 +47,7 @@ using namespace Aws::IoTFleetWise::Platform;
 class IDDSSubscriber : public ThreadListeners<SensorDataListener>, public DataReaderListener
 {
 public:
-    virtual ~IDDSSubscriber() = default;
+    ~IDDSSubscriber() override = default;
 
     /**
      * @brief Inits a DDS Node subscriber using the source properties.
@@ -79,8 +79,8 @@ public:
     /**
      * @return the unique ID of the channel.
      */
-    inline NetworkChannelID
-    getChannelID()
+    inline VehicleDataSourceID
+    getChannelID() const
     {
         return mID;
     }
@@ -88,8 +88,8 @@ public:
     /**
      * @return the Network Protocol Type
      */
-    inline NetworkChannelProtocol
-    getChannelProtocol()
+    inline VehicleDataSourceProtocol
+    getChannelProtocol() const
     {
         return mNetworkProtocol;
     }
@@ -98,7 +98,7 @@ public:
      * @return the DDS Domain ID
      */
     inline DDSDomainID
-    getDDSDomainID()
+    getDDSDomainID() const
     {
         return mDDSDomainID;
     }
@@ -107,7 +107,7 @@ public:
      * @return the DDS Topic
      */
     inline DDSTopicName
-    getDDSTopic()
+    getDDSTopic() const
     {
         return mDDSTopic;
     }
@@ -116,7 +116,7 @@ public:
      * @return the Subscriber name
      */
     inline DDSWriterName
-    getDDSSubscriberName()
+    getDDSSubscriberName() const
     {
         return mDDSReaderName;
     }
@@ -125,7 +125,7 @@ public:
      * @return the Source Type
      */
     inline SensorSourceType
-    getSensorSourceType()
+    getSensorSourceType() const
     {
         return mType;
     }
@@ -134,7 +134,7 @@ public:
      * @return the DDS Topic QoS
      */
     inline DDSTopicQoS
-    getDDSTopicQoS()
+    getDDSTopicQoS() const
     {
         return mTopicQoS;
     }
@@ -144,23 +144,23 @@ protected:
      * @brief Thread safe Channel ID generator
      * @return returns a unique identifier of a channel.
      */
-    uint32_t
+    static uint32_t
     generateChannelID()
     {
-        static std::atomic<uint32_t> channelID( INVALID_CHANNEL_ID );
+        static std::atomic<uint32_t> channelID( INVALID_DATA_SOURCE_ID );
         return ++channelID;
     }
 
     SensorSourceType mType;
-    NetworkChannelID mID;
+    VehicleDataSourceID mID;
     DDSDomainID mDDSDomainID;
     DDSTopicName mDDSTopic;
     DDSWriterName mDDSReaderName;
-    NetworkChannelProtocol mNetworkProtocol;
+    VehicleDataSourceProtocol mNetworkProtocol;
     std::string mTemporaryCacheLocation;
     DDSTopicQoS mTopicQoS;
 };
-typedef std::unique_ptr<IDDSSubscriber> DDSSubscriberPtr;
+using DDSSubscriberPtr = std::unique_ptr<IDDSSubscriber>;
 } // namespace VehicleNetwork
 } // namespace IoTFleetWise
 } // namespace Aws

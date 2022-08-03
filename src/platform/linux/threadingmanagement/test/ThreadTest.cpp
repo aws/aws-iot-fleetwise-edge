@@ -16,7 +16,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace Aws::IoTFleetWise::Platform;
+using namespace Aws::IoTFleetWise::Platform::Linux;
 void
 workerFunction( void *data )
 {

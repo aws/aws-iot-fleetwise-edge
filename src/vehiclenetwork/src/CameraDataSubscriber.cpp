@@ -14,11 +14,11 @@
 // Includes
 #include "dds/CameraDataSubscriber.h"
 #include "ClockHandler.h"
+#include <cstdio>
 #include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
 #include <fstream>
 #include <iostream>
-#include <stdio.h>
 namespace Aws
 {
 namespace IoTFleetWise
@@ -26,14 +26,8 @@ namespace IoTFleetWise
 namespace VehicleNetwork
 {
 CameraDataSubscriber::CameraDataSubscriber()
-    : mDDSParticipant( nullptr )
-    , mDDSSubscriber( nullptr )
-    , mDDSTopic( nullptr )
-    , mDDSReader( nullptr )
-    , mDDStype( new CameraDataItemPubSubType() )
-    , mSourceID( 0 )
 {
-    mNetworkProtocol = DDS;
+    mNetworkProtocol = VehicleDataSourceProtocol::DDS;
     mID = generateChannelID();
 }
 
@@ -134,7 +128,7 @@ bool
 CameraDataSubscriber::start()
 {
     // Prevent concurrent stop/init
-    std::lock_guard<std::recursive_mutex> lock( mThreadMutex );
+    std::lock_guard<std::mutex> lock( mThreadMutex );
     // On multi core systems the shared variable mShouldStop must be updated for
     // all cores before starting the thread otherwise thread will directly end
     mShouldStop.store( false );
@@ -153,7 +147,7 @@ CameraDataSubscriber::start()
 bool
 CameraDataSubscriber::stop()
 {
-    std::lock_guard<std::recursive_mutex> lock( mThreadMutex );
+    std::lock_guard<std::mutex> lock( mThreadMutex );
     mShouldStop.store( true, std::memory_order_relaxed );
     mWait.notify();
     mThread.release();
@@ -177,7 +171,7 @@ CameraDataSubscriber::doWork( void *data )
     while ( !subscriber->shouldStop() )
     {
         // Wait for data to arrive from the DDS Network.
-        subscriber->mWait.wait( Platform::Signal::WaitWithPredicate );
+        subscriber->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
         // Ok we have received data and it should have been loaded into our CameraDataItem.
         // We should log it into local storage location and then notify the DDS Handler that
         // the data is ready.
@@ -188,7 +182,8 @@ CameraDataSubscriber::doWork( void *data )
             SensorArtifactMetadata cameraArtifact;
             cameraArtifact.path = subscriber->mCachePath + subscriber->mDataItem.dataItemId();
             cameraArtifact.sourceID = subscriber->mSourceID;
-            if ( subscriber->persistToStorage( subscriber->mDataItem.frameBuffer(), cameraArtifact.path ) )
+            if ( Aws::IoTFleetWise::VehicleNetwork::CameraDataSubscriber::persistToStorage(
+                     subscriber->mDataItem.frameBuffer(), cameraArtifact.path ) )
             {
                 subscriber->notifyListeners<const SensorArtifactMetadata &>(
                     &SensorDataListener::onSensorArtifactAvailable, cameraArtifact );

@@ -1,5 +1,32 @@
 # Change Log
 
+## v0.1.3 (Aug 3, 2022)
+https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.3/aws-iot-fleetwise-edge.zip
+
+Customer Demo:
+* Updated demo scripts to match with latest AWS IoT FleetWise Cloud [API changes](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/update-sdk-cli.html)
+* Fix a bug in demo script that might render scatter plot incorrectly. 
+
+Docs:
+* Updated the Edge Agent Developer Guide to match with latest AWS IoT FleetWise Cloud [API changes](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/update-sdk-cli.html)
+* Updated Security Best Practices in Edge Agent Developer Guide
+
+Bugfixes:
+* Fixed a bug which previously prevented OBD from functioning at 29-bit mode.
+* Fixed a bug that potentially caused a crash when two collection schemes were using the same
+  Signal Ids in the condition with different minimum sampling intervals
+
+Improvements:
+* Signal Ids sent over Protobuf from the cloud can now be spread across the whole 32 bit range,
+  not only 0-50.000
+* Security improvement to pass certificate and private key by content rather than by file path
+* Improvement to Google test CMake configuration
+* Clang tidy coverage improvements
+* Improvement to AWS SDK memory allocation with change to custom thread-safe allocator
+* Re-organized code to remove cycles among CMake library targets
+* Refactored Vehicle Network module to improve extensibility for other network types
+* Improvement to cansim to better handle ISO-TP error. 
+
 ## v0.1.2 (February 24, 2022)
 https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.2/aws-iot-fleetwise-edge.zip
 

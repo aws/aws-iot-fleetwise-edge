@@ -17,8 +17,8 @@
                 "obdStandard": "J1979",
                 "useExtendedIds": false,
                 "hasTransmissionEcu": true,
-                "pidRequestIntervalSeconds" : 0,
-                "dtcRequestIntervalSeconds" : 0
+                "pidRequestIntervalSeconds": 0,
+                "dtcRequestIntervalSeconds": 0
             },
             "interfaceId": "2",
             "type": "obdInterface"
@@ -39,12 +39,13 @@
         "persistency": {
             "persistencyPath": "/path/to/collection-scheme-and-data-persistency",
             "persistencyPartitionMaxSize": 524288,
-            "persistencyUploadRetryInterval" : 10000
+            "persistencyUploadRetryInterval": 10000
         },
         "internalParameters": {
             "readyToPublishDataBufferSize": 10000,
             "systemWideLogLevel": "Trace",
-            "dataReductionProbabilityDisabled" : false
+            "dataReductionProbabilityDisabled": false,
+            "useJsonBasedCollection": false
         },
         "publishToCloudParameters": {
             "maxPublishMessageCount": 1000,

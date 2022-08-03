@@ -23,6 +23,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 /**
  * @brief Template utility implementing a thread safe Subject/Observer design pattern.
  */
@@ -32,24 +34,19 @@ class ThreadListeners
 
 private:
     template <typename... Args>
-    struct CallBackFunction
-    {
-        typedef void ( ThreadListener::*type )( Args... );
-    };
+    using CallBackFunction = void ( ThreadListener::* )( Args... );
 
 public:
-    ThreadListeners()
-        : mActive( false )
-        , mCopied( false )
-        , mModified( false )
-    {
-    }
-
-    ~ThreadListeners()
+    ThreadListeners() = default;
+    virtual ~ThreadListeners()
     {
         MutexLock lock( mMutex );
         mContainer.clear();
     }
+    ThreadListeners( const ThreadListeners & ) = delete;
+    ThreadListeners &operator=( const ThreadListeners & ) = delete;
+    ThreadListeners( ThreadListeners && ) = delete;
+    ThreadListeners &operator=( ThreadListeners && ) = delete;
 
     /**
      * @brief Subscribe the listener instance to notifications from this thread.
@@ -106,7 +103,7 @@ public:
      */
     template <typename... Args>
     void
-    notifyListeners( typename CallBackFunction<Args...>::type callBackFunction, Args... args ) const
+    notifyListeners( CallBackFunction<Args...> callBackFunction, Args... args ) const
     {
         MutexLock lock( mMutex );
 
@@ -131,18 +128,22 @@ public:
 
 private:
     // Container to store the list of listeners to this thread
-    typedef std::vector<ThreadListener *> ListenerContainer;
+    using ListenerContainer = std::vector<ThreadListener *>;
     // Mutex to protect the storage from concurrent reads and writes
-    typedef typename std::lock_guard<std::recursive_mutex> MutexLock;
+    using MutexLock = std::lock_guard<std::mutex>;
     // Container for all listeners registered.
     mutable ListenerContainer mContainer;
     // Temporary container used during modification via subscribe/unsubscribe
     mutable ListenerContainer mTemporaryContainer;
     // Container state coordinating local swaps of the listener container
-    mutable bool mActive;
-    mutable bool mCopied;
-    mutable bool mModified;
-    mutable typename std::recursive_mutex mMutex;
+    // Active flag is set when Listener callbacks are being executed
+    mutable bool mActive{ false };
+    // Copied flag is set when the Listener Container is being backed up successfully after an invocation
+    mutable bool mCopied{ false };
+    // Modified flag is set when the Listener Container is being modified ( when a listener callback
+    // is either added or removed.
+    mutable bool mModified{ false };
+    mutable typename std::mutex mMutex;
 
     // Manages the container storing the listeners in a way that
     // callback invocations is eventually consistent.
@@ -165,6 +166,11 @@ private:
             }
         }
 
+        ContainerInvocationState( const ContainerInvocationState & ) = delete;
+        ContainerInvocationState &operator=( const ContainerInvocationState & ) = delete;
+        ContainerInvocationState( ContainerInvocationState && ) = delete;
+        ContainerInvocationState &operator=( ContainerInvocationState && ) = delete;
+
     private:
         bool mPreviousState;
         ThreadListeners const *mOriginalContainer;
@@ -180,11 +186,11 @@ private:
         if ( mActive )
         {
             mModified = true;
+            mCopied = true;
             mTemporaryContainer = mContainer;
 
             return mTemporaryContainer;
         }
-
         return mContainer;
     }
 
@@ -206,6 +212,7 @@ private:
     }
 };
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

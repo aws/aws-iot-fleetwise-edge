@@ -30,7 +30,7 @@ namespace IoTFleetWise
 namespace VehicleNetwork
 {
 
-using namespace Aws::IoTFleetWise::Platform;
+using namespace Aws::IoTFleetWise::Platform::Linux;
 
 /**
  * @brief IDDSPublisher implementation for the Camera Sensor.
@@ -42,7 +42,12 @@ class CameraDataPublisher : public IDDSPublisher
 {
 public:
     CameraDataPublisher();
-    ~CameraDataPublisher();
+    ~CameraDataPublisher() override;
+
+    CameraDataPublisher( const CameraDataPublisher & ) = delete;
+    CameraDataPublisher &operator=( const CameraDataPublisher & ) = delete;
+    CameraDataPublisher( CameraDataPublisher && ) = delete;
+    CameraDataPublisher &operator=( CameraDataPublisher && ) = delete;
 
     bool init( const DDSDataSourceConfig &dataSourceConfig ) override;
 
@@ -84,16 +89,16 @@ private:
     std::atomic<bool> mShouldStop{ false };
     std::atomic<bool> mIsAlive{ false };
     std::atomic<bool> mRequestCompleted{ true };
-    mutable std::recursive_mutex mThreadMutex;
+    mutable std::mutex mThreadMutex;
     Timer mTimer;
     LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
-    Platform::Signal mWait;
-    DomainParticipant *mDDSParticipant;
-    Publisher *mDDSPublisher;
-    Topic *mDDSTopic;
-    DataWriter *mDDSWriter;
-    TypeSupport mDDStype;
+    Platform::Linux::Signal mWait;
+    DomainParticipant *mDDSParticipant{ nullptr };
+    Publisher *mDDSPublisher{ nullptr };
+    Topic *mDDSTopic{ nullptr };
+    DataWriter *mDDSWriter{ nullptr };
+    TypeSupport mDDStype{ new CameraDataRequestPubSubType() };
     mutable std::mutex mRequesMutex;
     CameraDataRequest mRequest;
 };

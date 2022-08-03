@@ -57,6 +57,7 @@ apt install -y \
     wget \
     curl \
     zlib1g-dev:arm64 \
+    libcurl4-openssl-dev:arm64 \
     libsnappy-dev:arm64
 
 mkdir -p deps-cross && cd deps-cross
@@ -101,21 +102,21 @@ if [ ! -d can-isotp ]; then
 fi
 cp can-isotp/include/uapi/linux/can/isotp.h /usr/include/linux/can
 
-if [ ! -d aws-iot-device-sdk-cpp-v2 ]; then
-    git clone -b v1.14.1 --recursive https://github.com/aws/aws-iot-device-sdk-cpp-v2.git
-    cd aws-iot-device-sdk-cpp-v2
+if [ ! -d aws-sdk-cpp ]; then
+    git clone -b 1.9.253 --recursive https://github.com/aws/aws-sdk-cpp.git
+    cd aws-sdk-cpp
     mkdir build && cd build
     cmake \
         -DBUILD_SHARED_LIBS=OFF \
-        -DBUILD_DEPS=ON \
-        -DBUILD_TESTING=OFF \
-        -DUSE_OPENSSL=ON \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_ONLY='s3-crt;iot' \
+        -DAWS_CUSTOM_MEMORY_MANAGEMENT=ON \
         -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
         -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
         ..
-    cd ../.. 
+    cd ../..
 fi
-make install -j`nproc` -C aws-iot-device-sdk-cpp-v2/build
+make install -j`nproc` -C aws-sdk-cpp/build
 
 if [ ! -d googletest ]; then
     git clone -b release-1.10.0 https://github.com/google/googletest.git
@@ -128,6 +129,21 @@ if [ ! -d googletest ]; then
     cd ../.. 
 fi
 make install -j`nproc` -C googletest/build
+
+if [ ! -d benchmark ]; then
+    git clone -b v1.6.1 https://github.com/google/benchmark.git
+    cd benchmark
+    mkdir build && cd build
+    cmake \
+        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
+        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
+        -DBENCHMARK_DOWNLOAD_DEPENDENCIES=on \
+        -DCMAKE_BUILD_TYPE=Release \
+        ..
+    cd ../.. 
+fi
+make install -j`nproc` -C benchmark/build
+
 sudo ldconfig
 
 # AWS IoT FleetWise Edge camera support requires Fast-DDS and its dependencies:

@@ -15,11 +15,11 @@
 // Includes
 #include "businterfaces/ISOTPOverCANSender.h"
 #include "ClockHandler.h"
+#include <cstring>
 #include <iostream>
 #include <linux/can.h>
 #include <linux/can/isotp.h>
 #include <net/if.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -31,14 +31,6 @@ namespace IoTFleetWise
 {
 namespace VehicleNetwork
 {
-
-ISOTPOverCANSender::ISOTPOverCANSender()
-{
-}
-
-ISOTPOverCANSender::~ISOTPOverCANSender()
-{
-}
 
 bool
 ISOTPOverCANSender::init( const ISOTPOverCANSenderOptions &senderOptions )
@@ -61,7 +53,8 @@ ISOTPOverCANSender::connect()
     // Both source and destination are extended CANIDs
     if ( mSenderOptions.mIsExtendedId )
     {
-        optionalFlags.flags |= ( CAN_ISOTP_EXTEND_ADDR | CAN_ISOTP_RX_EXT_ADDR );
+        interfaceAddress.can_addr.tp.tx_id |= CAN_EFF_FLAG;
+        interfaceAddress.can_addr.tp.rx_id |= CAN_EFF_FLAG;
     }
 
     // Open a Socket in default blocking mode

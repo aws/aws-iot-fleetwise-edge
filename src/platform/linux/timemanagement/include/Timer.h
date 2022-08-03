@@ -23,7 +23,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
-
+namespace Linux
+{
 /**
  * Generic Timer utility that helps tracking execution of tasks.
  */
@@ -147,6 +148,7 @@ Timer::getElapsedSeconds() const
     return std::chrono::duration<double>( getElapsed() ).count();
 }
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

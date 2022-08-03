@@ -14,17 +14,17 @@
 #pragma once
 
 // Includes
-
-#include <cstdint>
+#include "TimeTypes.h"
 #include <string>
+
 namespace Aws
 {
 namespace IoTFleetWise
 {
 namespace Platform
 {
-// Timestamp unit in milliseconds
-using timestampT = std::uint64_t;
+namespace Linux
+{
 
 /**
  * @brief Clock API. Offers the system time since EPOCH.
@@ -36,7 +36,7 @@ public:
      * @brief Computes the timestamp since epoch from the system clock
      * @return timestamp in milliseconds
      */
-    virtual timestampT timeSinceEpochMs() const = 0;
+    virtual Timestamp timeSinceEpochMs() const = 0;
 
     /**
      * @brief  Convert the current time to "%Y-%m-%d %I:%M:%S %p" format.
@@ -47,10 +47,9 @@ public:
     /**
      * @brief virtual destructor
      */
-    virtual ~Clock()
-    {
-    }
+    virtual ~Clock() = default;
 };
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

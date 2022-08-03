@@ -59,11 +59,7 @@ class canigen:
         if not obd_config_filename is None:
             for ecu in self.__obd_config['ecus']:
                 for rx_id in ecu['rx_ids']:
-                    isotp_socket = isotp.socket(timeout=0.5)
-                    if ecu['zero_padding']:
-                        isotp_socket.set_opts(txpad=0, rxpad=0)
-                    isotp_socket.bind(self.__interface, isotp.Address(rxid=int(rx_id, 0), txid=int(ecu['tx_id'], 0)))
-                    thread = Thread(target=self.__obd_thread, args=(isotp_socket, ecu))
+                    thread = Thread(target=self.__obd_thread, args=(rx_id, ecu))
                     thread.start()
                     self.__threads.append(thread)
 
@@ -137,9 +133,25 @@ class canigen:
                 return out
         return None
 
-    def __obd_thread(self, isotp_socket, ecu):
+    def __obd_thread(self, rx_id, ecu):
+        create_socket = True
         while not self.__stop:
-            rx = isotp_socket.recv()
+            if create_socket:
+                create_socket = False
+                isotp_socket = isotp.socket(timeout=0.5)
+                if ecu['zero_padding']:
+                    isotp_socket.set_opts(txpad=0, rxpad=0)
+                rxid=int(rx_id, 0)
+                txid=int(ecu['tx_id'], 0)
+                addressing_mode = isotp.AddressingMode.Normal_11bits if txid <= 0x7FF else isotp.AddressingMode.Normal_29bits
+                isotp_socket.bind(self.__interface, isotp.Address(addressing_mode=addressing_mode, rxid=rxid, txid=txid))
+            try:
+                rx = isotp_socket.recv()
+            except OSError:
+                create_socket = True
+                time.sleep(1) # Wait one sec, to avoid high CPU usage in the case of persistent bus errors
+                continue
+
             if not rx is None:
                 rx = list(rx)
                 #print(ecu['name']+' rx: '+str(rx))
