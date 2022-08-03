@@ -16,18 +16,18 @@ ENDPOINT_URL=""
 ENDPOINT_URL_OPTION=""
 REGION="us-east-1"
 TIMESTAMP=`date +%s`
-DEFAULT_VEHICLE_ID="fwdemo"
-VEHICLE_ID=""
+DEFAULT_VEHICLE_NAME="fwdemo"
+VEHICLE_NAME=""
 CERT_OUT_FILE="certificate.pem"
 PRIVATE_KEY_OUT_FILE="private-key.key"
 ENDPOINT_URL_OUT_FILE=""
-VEHICLE_ID_OUT_FILE=""
+VEHICLE_NAME_OUT_FILE=""
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case $1 in
-        --vehicle-id)
-            VEHICLE_ID=$2
+        --vehicle-name)
+            VEHICLE_NAME=$2
             ;;
         --certificate-pem-outfile)
             CERT_OUT_FILE=$2
@@ -38,8 +38,8 @@ parse_args() {
         --endpoint-url-outfile)
             ENDPOINT_URL_OUT_FILE=$2
             ;;
-        --vehicle-id-outfile)
-            VEHICLE_ID_OUT_FILE=$2
+        --vehicle-name-outfile)
+            VEHICLE_NAME_OUT_FILE=$2
             ;;
         --endpoint-url)
             ENDPOINT_URL=$2
@@ -49,11 +49,11 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --vehicle-id <ID>                     Vehicle ID"
+            echo "  --vehicle-name <ID>                   Vehicle name"
             echo "  --certificate-pem-outfile <FILENAME>  Certificate output file, default: ${CERT_OUT_FILE}"
             echo "  --private-key-outfile <FILENAME>      Private key output file, default: ${PRIVATE_KEY_OUT_FILE}"
             echo "  --endpoint-url-outfile <FILENAME>     Endpoint URL for MQTT connections output file"
-            echo "  --vehicle-id-outfile <FILENAME>       Vehicle ID output file"
+            echo "  --vehicle-name-outfile <FILENAME>     Vehicle name output file"
             echo "  --endpoint-url <URL>                  The endpoint URL used for AWS CLI calls"
             echo "  --region                              The region used for AWS CLI calls, default: ${REGION}"
             exit 0
@@ -73,20 +73,20 @@ echo "=============================="
 
 parse_args "$@"
 
-if [ "${VEHICLE_ID}" == "" ]; then
-    echo -n "Enter vehicle ID [${DEFAULT_VEHICLE_ID}]: "
-    read VEHICLE_ID
-    if [ "${VEHICLE_ID}" == "" ]; then
-        VEHICLE_ID=${DEFAULT_VEHICLE_ID}
+if [ "${VEHICLE_NAME}" == "" ]; then
+    echo -n "Enter Vehicle name [${DEFAULT_VEHICLE_NAME}]: "
+    read VEHICLE_NAME
+    if [ "${VEHICLE_NAME}" == "" ]; then
+        VEHICLE_NAME=${DEFAULT_VEHICLE_NAME}
     fi
 fi
 
-NAME="${VEHICLE_ID}-${TIMESTAMP}"
+NAME="${VEHICLE_NAME}-${TIMESTAMP}"
 
 echo -n "Date: "
 date --rfc-3339=seconds
 
-echo "Vehicle ID: ${VEHICLE_ID}"
+echo "Vehicle name: ${VEHICLE_NAME}"
 
 echo "Getting AWS account ID..."
 ACCOUNT_ID=`aws sts get-caller-identity | jq -r .Account`
@@ -96,7 +96,7 @@ echo "Creating IoT thing..."
 aws iot create-thing \
     ${ENDPOINT_URL_OPTION} \
     --region ${REGION} \
-    --thing-name ${VEHICLE_ID} \
+    --thing-name ${VEHICLE_NAME} \
     | jq -r .thingArn
 
 IOT_POLICY=`cat <<EOF
@@ -119,7 +119,7 @@ IOT_POLICY=`cat <<EOF
 EOF
 `
 IOT_POLICY=`echo "${IOT_POLICY}" \
-    | jq ".Statement[0].Resource[0]=\"arn:aws:iot:${REGION}:${ACCOUNT_ID}:client/${VEHICLE_ID}\"" \
+    | jq ".Statement[0].Resource[0]=\"arn:aws:iot:${REGION}:${ACCOUNT_ID}:client/${VEHICLE_NAME}\"" \
     | jq ".Statement[0].Resource[1]=\"arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/*\"" \
     | jq ".Statement[0].Resource[2]=\"arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/*\""`
 
@@ -152,7 +152,7 @@ echo "Attaching thing principal..."
 aws iot attach-thing-principal \
     ${ENDPOINT_URL_OPTION} \
     --region ${REGION} \
-    --thing-name ${VEHICLE_ID} \
+    --thing-name ${VEHICLE_NAME} \
     --principal ${CERT_ARN}
 
 echo "Getting endpoint..."
@@ -167,6 +167,6 @@ if [ "${ENDPOINT_URL_OUT_FILE}" != "" ]; then
     echo ${ENDPOINT} > ${ENDPOINT_URL_OUT_FILE}
 fi
 
-if [ "${VEHICLE_ID_OUT_FILE}" != "" ]; then
-    echo -n $VEHICLE_ID > ${VEHICLE_ID_OUT_FILE}
+if [ "${VEHICLE_NAME_OUT_FILE}" != "" ]; then
+    echo -n $VEHICLE_NAME > ${VEHICLE_NAME_OUT_FILE}
 fi

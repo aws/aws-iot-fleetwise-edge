@@ -30,12 +30,12 @@ namespace VehicleNetwork
 // These type defs can be turned to the concrete ones based
 // on the DDS implementation we use e.g. fast dds.
 // For now, keeping them as basic C++ types.
-typedef uint32_t DDSDomainID;
-typedef std::string DDSDomainParticipantQoS;
-typedef std::string DDSTopicQoS;
-typedef std::string DDSTopicName;
-typedef std::string DDSReaderName;
-typedef std::string DDSWriterName;
+using DDSDomainID = uint32_t;
+using DDSDomainParticipantQoS = std::string;
+using DDSTopicQoS = std::string;
+using DDSTopicName = std::string;
+using DDSReaderName = std::string;
+using DDSWriterName = std::string;
 
 /**
  * The category of the source e.g. Camera/Lidar etc. This is useful to help
@@ -91,7 +91,7 @@ struct DDSDataSourceConfig
     DDSTransportType transportType;
 };
 
-typedef std::vector<DDSDataSourceConfig> DDSDataSourcesConfig;
+using DDSDataSourcesConfig = std::vector<DDSDataSourceConfig>;
 
 } // namespace VehicleNetwork
 } // namespace IoTFleetWise

@@ -22,7 +22,7 @@
 #include <iostream>
 #include <vector>
 
-using namespace Aws::IoTFleetWise::Platform;
+using namespace Aws::IoTFleetWise::Platform::Linux;
 
 namespace Aws
 {
@@ -41,11 +41,7 @@ namespace VehicleNetwork
 class ISOTPOverCANReceiver
 {
 public:
-    /**
-     * @brief Default Constructor/Destructor.
-     */
-    ISOTPOverCANReceiver();
-    virtual ~ISOTPOverCANReceiver();
+    virtual ~ISOTPOverCANReceiver() = default;
 
     /**
      * @brief Initialize the Receiver state.

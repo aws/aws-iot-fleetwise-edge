@@ -14,6 +14,7 @@
 #pragma once
 
 // Includes
+#include "EnumUtility.h"
 #include "LoggingModule.h"
 #include <algorithm>
 #include <atomic>
@@ -26,11 +27,14 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
+using namespace Aws::IoTFleetWise::Platform::Utility;
 /**
  * Different Variables defined at compile time used by all other modules
  * For verbose print to work it needs to be also added to getVariableName()
  * */
-enum TraceVariable
+enum class TraceVariable
 {
     READ_SOCKET_FRAMES_0 = 0,
     READ_SOCKET_FRAMES_1,
@@ -93,7 +97,7 @@ enum TraceVariable
     TRACE_VARIABLE_SIZE
 };
 
-enum TraceAtomicVariable
+enum class TraceAtomicVariable
 {
     QUEUE_CONSUMER_TO_INSPECTION_SIGNALS = 0,
     QUEUE_CONSUMER_TO_INSPECTION_CAN,
@@ -111,7 +115,7 @@ enum TraceAtomicVariable
  * Different Sections defined at compile time used by all other modules
  * For verbose print to work it needs to be also added to getSectionName()
  * */
-enum TraceSection
+enum class TraceSection
 {
     BUILD_MQTT = 0,
     FWE_STARTUP,
@@ -127,7 +131,7 @@ enum TraceSection
 class IMetricsReceiver
 {
 public:
-    virtual ~IMetricsReceiver() = 0;
+    virtual ~IMetricsReceiver() = default;
 
     /**
      * @brief set a value that will than be processed by the implementing class
@@ -172,10 +176,11 @@ public:
     void
     setVariable( TraceVariable variable, uint64_t value )
     {
-        if ( variable < TRACE_VARIABLE_SIZE )
+        if ( variable < TraceVariable::TRACE_VARIABLE_SIZE )
         {
-            mVariableData[variable].mCurrentValue = value;
-            mVariableData[variable].mMaxValue = std::max( value, mVariableData[variable].mMaxValue );
+            mVariableData[toUType( variable )].mCurrentValue = value;
+            mVariableData[toUType( variable )].mMaxValue =
+                std::max( value, mVariableData[toUType( variable )].mMaxValue );
         }
     }
 
@@ -192,9 +197,9 @@ public:
     void
     addToVariable( TraceVariable variable, uint64_t value )
     {
-        if ( variable < TRACE_VARIABLE_SIZE )
+        if ( variable < TraceVariable::TRACE_VARIABLE_SIZE )
         {
-            setVariable( variable, mVariableData[variable].mCurrentValue + value );
+            setVariable( variable, mVariableData[toUType( variable )].mCurrentValue + value );
         }
     }
 
@@ -229,12 +234,12 @@ public:
     void
     addToAtomicVariable( TraceAtomicVariable variable, uint64_t add )
     {
-        if ( variable < TRACE_ATOMIC_VARIABLE_SIZE )
+        if ( variable < TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE )
         {
-            uint64_t currentValue = mAtomicVariableData[variable].mCurrentValue.fetch_add( add );
+            uint64_t currentValue = mAtomicVariableData[toUType( variable )].mCurrentValue.fetch_add( add );
             // If two threads add or increment in parallel the max value might be wrong
-            mAtomicVariableData[variable].mMaxValue =
-                std::max( currentValue + add, mAtomicVariableData[variable].mMaxValue );
+            mAtomicVariableData[toUType( variable )].mMaxValue =
+                std::max( currentValue + add, mAtomicVariableData[toUType( variable )].mMaxValue );
         }
     }
 
@@ -272,9 +277,9 @@ public:
     void
     subtractFromAtomicVariable( TraceAtomicVariable variable, uint64_t sub )
     {
-        if ( variable < TRACE_ATOMIC_VARIABLE_SIZE )
+        if ( variable < TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE )
         {
-            mAtomicVariableData[variable].mCurrentValue.fetch_sub( sub );
+            mAtomicVariableData[toUType( variable )].mCurrentValue.fetch_sub( sub );
         }
     }
 
@@ -306,9 +311,9 @@ public:
     uint64_t
     getVariableMax( TraceVariable variable )
     {
-        if ( variable < TRACE_VARIABLE_SIZE )
+        if ( variable < TraceVariable::TRACE_VARIABLE_SIZE )
         {
-            return mVariableData[variable].mMaxValue;
+            return mVariableData[toUType( variable )].mMaxValue;
         }
         return 0;
     }
@@ -370,11 +375,11 @@ public:
     void forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler );
 
 private:
-    const char *getVariableName( TraceVariable variable );
+    static const char *getVariableName( TraceVariable variable );
 
-    const char *getAtomicVariableName( TraceAtomicVariable variable );
+    static const char *getAtomicVariableName( TraceAtomicVariable variable );
 
-    const char *getSectionName( TraceSection section );
+    static const char *getSectionName( TraceSection section );
 
     void updateAllTimeData();
 
@@ -406,17 +411,15 @@ private:
         bool mCurrentlyActive;
     };
 
-    struct VariableData mVariableData[TRACE_VARIABLE_SIZE];
+    struct VariableData mVariableData[toUType( TraceVariable::TRACE_VARIABLE_SIZE )];
 
-    struct AtomicVariableData mAtomicVariableData[TRACE_ATOMIC_VARIABLE_SIZE];
+    struct AtomicVariableData mAtomicVariableData[toUType( TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE )];
 
-    struct SectionData mSectionData[TRACE_SECTION_SIZE];
+    struct SectionData mSectionData[toUType( TraceSection::TRACE_SECTION_SIZE )];
 
     LoggingModule mLogger;
-
-    TraceModule();
-    ~TraceModule();
 };
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

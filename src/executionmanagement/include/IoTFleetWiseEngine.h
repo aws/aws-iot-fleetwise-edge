@@ -27,16 +27,15 @@
 #include "DataOverDDSModule.h"
 #endif // FWE_FEATURE_CAMERA
 #include "IDataReadyToPublishListener.h"
-#include "INetworkChannelConsumer.h"
 #include "LoggingModule.h"
-#include "NetworkChannelBinder.h"
 #include "OBDOverCANModule.h"
 #include "RemoteProfiler.h"
 #include "Schema.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "Timer.h"
-#include "businterfaces/INetworkChannelBridge.h"
+#include "VehicleDataSourceBinder.h"
+#include "businterfaces/AbstractVehicleDataSource.h"
 #include <atomic>
 #include <json/json.h>
 #include <map>
@@ -50,8 +49,8 @@ namespace ExecutionManagement
 {
 using namespace Aws::IoTFleetWise::DataManagement;
 using namespace Aws::IoTFleetWise::DataInspection;
-using namespace Aws::IoTFleetWise::Platform;
-using namespace Aws::IoTFleetWise::Platform::PersistencyManagement;
+using namespace Aws::IoTFleetWise::Platform::Linux;
+using namespace Aws::IoTFleetWise::Platform::Linux::PersistencyManagement;
 using namespace Aws::IoTFleetWise::VehicleNetwork;
 using namespace Aws::IoTFleetWise::OffboardConnectivityAwsIot;
 
@@ -73,7 +72,13 @@ public:
     static const uint64_t DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS; // retry every 10 second
 
     IoTFleetWiseEngine();
-    virtual ~IoTFleetWiseEngine();
+    ~IoTFleetWiseEngine() override;
+
+    IoTFleetWiseEngine( const IoTFleetWiseEngine & ) = delete;
+    IoTFleetWiseEngine &operator=( const IoTFleetWiseEngine & ) = delete;
+    IoTFleetWiseEngine( IoTFleetWiseEngine && ) = delete;
+    IoTFleetWiseEngine &operator=( IoTFleetWiseEngine && ) = delete;
+
     bool connect( const Json::Value &config );
     bool start();
     bool stop();
@@ -93,6 +98,24 @@ public:
      */
     bool checkAndSendRetrievedData();
 
+    /**
+     * @brief Attach a vehicle data source to IoTFleetWise. All functions in the data source must be
+     * thread safe. The source instance is needed so that FleetWise can access its output data
+     * buffer ( holding the vehicle data messages ) and to register to the connect and disconnect
+     * events. A vehicle data consumer will be attached to the source.
+     * This function can be called either on startup or runtime.
+     * The life cycle of the source is managed by the caller ( e.g. init, connect, disconnect).
+     */
+    void attachVehicleDataSource( VehicleDataSourcePtr vehicleDataSource );
+
+    /**
+     * @brief Detach a vehicle data source to IoTFleetWise. No further data produced by this source
+     * will be visible to IoTFleetWise.
+     * This function can be called either on shutdown or runtime.
+     * The life cycle of the source is managed by the caller ( e.g. init, connect, disconnect).
+     */
+    static void detachVehicleDataSource( VehicleDataSourcePtr vehicleDataSource );
+
 private:
     // atomic state of the bus. If true, we should stop
     bool shouldStop() const;
@@ -105,18 +128,19 @@ public:
     std::shared_ptr<CacheAndPersist> mPersistDecoderManifestCollectionSchemesAndData;
 
 private:
+    static constexpr uint64_t DEFAULT_PERSISTENCY_UPLOAD_RETRY_INTERVAL_MS = 0;
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };
-    mutable std::recursive_mutex mThreadMutex;
+    mutable std::mutex mThreadMutex;
 
-    Platform::Signal mWait;
+    Platform::Linux::Signal mWait;
     Timer mTimer;
     Timer mRetrySendingPersistedDataTimer;
-    uint64_t mPersistencyUploadRetryIntervalMs;
+    uint64_t mPersistencyUploadRetryIntervalMs{ DEFAULT_PERSISTENCY_UPLOAD_RETRY_INTERVAL_MS };
 
     LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
-    std::unique_ptr<NetworkChannelBinder> mBinder;
+    std::unique_ptr<VehicleDataSourceBinder> mVehicleDataSourceBinder;
     CollectionSchemePtr mCollectionScheme;
 
     std::shared_ptr<OBDOverCANModule> mOBDOverCANModule;
@@ -137,6 +161,7 @@ private:
     std::unique_ptr<RemoteProfiler> mRemoteProfiler;
     std::shared_ptr<AwsIotChannel> mAwsIotChannelMetricsUpload;
     std::shared_ptr<AwsIotChannel> mAwsIotChannelLogsUpload;
+    VehicleDataSourcePtr mVehicleDataSource;
 #ifdef FWE_FEATURE_CAMERA
     // DDS Module
     std::shared_ptr<DataOverDDSModule> mDataOverDDSModule;

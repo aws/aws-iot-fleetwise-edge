@@ -10,11 +10,11 @@
 # express or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-# arg1: ${CMAKE_SOURCE_DIR}
+# arg1: ${CMAKE_CURRENT_SOURCE_DIR}
 # arg2: ${CMAKE_BINARY_DIR}
 
 # Generate compile_commands.json for clang-tidy test
-python $1/tools/code_check/compile_db_remove_test.py $2
+python3 $1/tools/code_check/compile_db_remove_test.py $2
 
 # Run clang-tidy test
-run-clang-tidy-10 -header-filter=src/.* -p $2/Testing/Temporary $1/src
+run-clang-tidy-10 -header-filter=$1/src/.* -p $2/Testing/Temporary $1/src

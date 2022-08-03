@@ -30,7 +30,7 @@ namespace IoTFleetWise
 namespace VehicleNetwork
 {
 
-using namespace Aws::IoTFleetWise::Platform;
+using namespace Aws::IoTFleetWise::Platform::Linux;
 
 /**
  * @brief IDDSSusbcriber implementation for the Camera Sensor.
@@ -42,7 +42,12 @@ class CameraDataSubscriber : public IDDSSubscriber
 {
 public:
     CameraDataSubscriber();
-    ~CameraDataSubscriber();
+    ~CameraDataSubscriber() override;
+
+    CameraDataSubscriber( const CameraDataSubscriber & ) = delete;
+    CameraDataSubscriber &operator=( const CameraDataSubscriber & ) = delete;
+    CameraDataSubscriber( CameraDataSubscriber && ) = delete;
+    CameraDataSubscriber &operator=( CameraDataSubscriber && ) = delete;
 
     bool init( const DDSDataSourceConfig &dataSourceConfig ) override;
 
@@ -91,25 +96,25 @@ private:
     // frames again/Split the file into frames. We want to do this correctly in future versions
     // of this code, where we would store as a metadata the frame size and/or store the frames
     // in separate artifacts.
-    bool persistToStorage( const std::vector<CameraFrame> &buffer, const std::string &fileName );
+    static bool persistToStorage( const std::vector<CameraFrame> &buffer, const std::string &fileName );
 
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };
     std::atomic<bool> mIsAlive{ false };
     std::atomic<bool> mNewResponseReceived{ false };
-    mutable std::recursive_mutex mThreadMutex;
+    mutable std::mutex mThreadMutex;
     Timer mTimer;
     LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
-    Platform::Signal mWait;
+    Platform::Linux::Signal mWait;
     CameraDataItem mDataItem;
-    DomainParticipant *mDDSParticipant;
-    Subscriber *mDDSSubscriber;
-    Topic *mDDSTopic;
-    DataReader *mDDSReader;
-    TypeSupport mDDStype;
+    DomainParticipant *mDDSParticipant{ nullptr };
+    Subscriber *mDDSSubscriber{ nullptr };
+    Topic *mDDSTopic{ nullptr };
+    DataReader *mDDSReader{ nullptr };
+    TypeSupport mDDStype{ new CameraDataItemPubSubType() };
     std::string mCachePath;
-    uint32_t mSourceID;
+    uint32_t mSourceID{ 0 };
 };
 } // namespace VehicleNetwork
 } // namespace IoTFleetWise

@@ -23,7 +23,7 @@ f.close()
 
 index = 0
 while index < len(lines):
-    x = re.search('"command": ".+awsiotcpp\/test\/include.+', lines[index] )
+    x = re.search('"command": ".+iotcpp\/test\/include.+', lines[index] )
     if x:
         del lines[index-2:index+3] # remove a json block
         index = index - 3

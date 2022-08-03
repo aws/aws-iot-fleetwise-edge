@@ -6,9 +6,7 @@ set(libraryAliasName IoTFleetWise::Vehiclenetwork)
 
 
 set(SRCS
-  src/SocketCANBusChannel.cpp
-  src/CANRawMessage.cpp
-  src/NetworkChannelBridgeListener.cpp
+  src/CANDataSource.cpp
   src/ISOTPOverCANReceiver.cpp
   src/ISOTPOverCANSender.cpp
   src/ISOTPOverCANSenderReceiver.cpp
@@ -26,7 +24,7 @@ add_library(
 
 # Adding the include directory which contains two subdirectories. Users of this
 # library will have to use the subdirectory name to include headers from this
-# library, for example: #include "businterfaces/NetworkChannelBridgeListener.h"
+# library, for example: #include "businterfaces/VehicleDataSource.h"
 target_include_directories(${libraryTargetName} PUBLIC include)
 
 find_package(Boost 1.65.1 REQUIRED COMPONENTS thread)
@@ -36,7 +34,8 @@ if(FWE_FEATURE_CAMERA)
 endif()
 
 set(LIBS
-  IoTFleetWise::Platform
+  IoTFleetWise::Platform::Linux
+  IoTFleetWise::Platform::Utility
   Boost::thread
   $<$<BOOL:${FWE_FEATURE_CAMERA}>:IoTFleetWise::Idls>
   $<$<BOOL:${FWE_FEATURE_CAMERA}>:fastrtps>
@@ -58,20 +57,21 @@ install(TARGETS ${libraryTargetName} DESTINATION lib)
 
 install(
   FILES
-  include/businterfaces/INetworkChannelBridge.h
-  include/businterfaces/NetworkChannelBridgeListener.h
-  include/businterfaces/SocketCANBusChannel.h
   include/businterfaces/ISOTPOverCANReceiver.h
   include/businterfaces/ISOTPOverCANSender.h
   include/businterfaces/ISOTPOverCANSenderReceiver.h
+  include/businterfaces/AbstractVehicleDataSource.h
+  include/businterfaces/VehicleDataSourceListener.h
+  include/businterfaces/CANDataSource.h
   DESTINATION
   include
 )
 
 install(
   FILES
-  include/datatypes/CANRawMessage.h
-  include/datatypes/NetworkChannelDataTypes.h
+  include/datatypes/VehicleDataMessage.h
+  include/datatypes/VehicleDataSourceConfig.h
+  include/datatypes/VehicleDataSourceTypes.h
   include/datatypes/ISOTPOverCANOptions.h
   DESTINATION
   include/datatypes
@@ -96,9 +96,9 @@ endif()
 # If adding a test, simply add the source file here
 set(
   testSources
-  test/SocketCANBusChannelTest.cpp
   test/ISOTPOverCANProtocolTest.cpp
-  test/CANRawMessageTest.cpp
+  test/VehicleDataMessageTest.cpp
+  test/CANDataSourceTest.cpp
 )
 
 if(FWE_FEATURE_CAMERA)
@@ -129,7 +129,7 @@ if(${BUILD_TESTING})
       ${libraryTargetName}
       GTest::Main
     )
-    add_test(NAME ${testName} COMMAND ${testName} --gtest_output=xml:report-${testName}.xml)
+    add_unit_test(${testName})
     add_valgrind_test(${testName})
     install(TARGETS ${testName} RUNTIME DESTINATION bin/tests)
 

@@ -23,10 +23,12 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 namespace PersistencyManagement
 {
 
-enum ErrorCode
+enum class ErrorCode
 {
     SUCCESS = 0,
     MEMORY_FULL,
@@ -36,7 +38,7 @@ enum ErrorCode
     INVALID_DATA
 };
 
-enum DataType
+enum class DataType
 {
     EDGE_TO_CLOUD_PAYLOAD = 0,
     COLLECTION_SCHEME_LIST,
@@ -54,7 +56,7 @@ public:
     /**
      * @brief destructor
      */
-    virtual ~ICacheAndPersist() = 0;
+    virtual ~ICacheAndPersist() = default;
 
     /**
      * @brief Writes to the non volatile memory(NVM).
@@ -109,6 +111,7 @@ public:
     static const char *getErrorString( ErrorCode err );
 };
 } // namespace PersistencyManagement
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

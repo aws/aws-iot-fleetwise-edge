@@ -24,6 +24,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 
 /**
  * @brief This module allows users to inject an external clock into the system.
@@ -47,6 +49,7 @@ public:
     static void setClock( std::shared_ptr<const Clock> clock );
 };
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

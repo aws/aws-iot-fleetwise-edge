@@ -18,9 +18,11 @@ target_include_directories(${libraryTargetName} PUBLIC include)
 target_link_libraries(
   ${libraryTargetName}
   IoTFleetWise::Vehiclenetwork
-  IoTFleetWise::Datamanagement
-  IoTFleetWise::Datainspection
-  IoTFleetWise::Platform
+  IoTFleetWise::DataManager
+  IoTFleetWise::DataCollection
+  IoTFleetWise::DataInspection
+  IoTFleetWise::DataDecoding
+  IoTFleetWise::Platform::Linux
   IoTFleetWise::OffboardConnectivityAwsIot
 )
 
@@ -33,7 +35,7 @@ add_executable(aws-iot-fleetwise-edge src/main.cpp)
 target_link_libraries(
   aws-iot-fleetwise-edge
   ${libraryTargetName}
-  IoTFleetWise::Platform
+  IoTFleetWise::Platform::Linux
   pthread
   -Xlinker
   -Map=aws-iot-fleetwise-edge.map
@@ -103,7 +105,7 @@ if(${BUILD_TESTING})
       GTest::Main
     )
 
-    add_test(NAME ${testName} COMMAND ${testName} --gtest_output=xml:report-${testName}.xml)
+    add_unit_test(${testName})
     add_valgrind_test(${testName})
     install(TARGETS ${testName} RUNTIME DESTINATION bin/tests)
 

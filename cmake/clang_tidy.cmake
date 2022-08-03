@@ -6,7 +6,7 @@ if(FWE_TEST_CLANG_TIDY)
     message(WARNING "FWE_TEST_CLANG_TIDY is ON but clang-tidy is not found!")
   else()
     add_test(NAME ClangTidyTest
-      COMMAND ${CMAKE_SOURCE_DIR}/tools/code_check/clang-tidy-test.sh ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/code_check/clang-tidy-test.sh ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}
     )
   endif()
 endif()

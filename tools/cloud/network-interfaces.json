@@ -3,7 +3,7 @@
         "interfaceId": "0",
         "type": "OBD_INTERFACE",
         "obdInterface": {
-            "obdInterfaceName": "can0",
+            "name": "can0",
             "requestMessageId": 2015,
             "obdStandard": "J1979",
             "pidRequestIntervalSeconds": 5,
@@ -14,7 +14,7 @@
         "interfaceId": "1",
         "type": "CAN_INTERFACE",
         "canInterface": {
-            "canInterfaceName": "can0",
+            "name": "can0",
             "protocolName": "CAN",
             "protocolVersion": "2.0B"
         }

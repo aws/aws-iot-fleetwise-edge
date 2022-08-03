@@ -13,10 +13,10 @@
     "postTriggerCollectionDuration": 1000,
     "signalsToCollect": [
         {
-            "signalName": "Vehicle.DemoEngineTorque"
+            "name": "Vehicle.DemoEngineTorque"
         },
         {
-            "signalName": "Vehicle.DemoBrakePedalPressure"
+            "name": "Vehicle.DemoBrakePedalPressure"
         }
     ]
 }

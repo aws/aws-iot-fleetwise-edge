@@ -16,7 +16,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace Aws::IoTFleetWise::Platform;
+using namespace Aws::IoTFleetWise::Platform::Linux;
 
 TEST( TimerTest, timerState )
 {

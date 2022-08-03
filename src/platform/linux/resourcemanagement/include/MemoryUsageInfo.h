@@ -23,6 +23,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 
 /**
  * @brief Utility class to track and report Memory Consumption.
@@ -30,8 +32,6 @@ namespace Platform
 class MemoryUsageInfo
 {
 public:
-    MemoryUsageInfo();
-
     /**
      * @brief Updates the current CPU usage stats.
      * @return True if the report succeeded.
@@ -63,17 +63,10 @@ public:
     std::size_t getVirtualMemorySize() const;
 
 private:
-    std::size_t mMaxResidentMemorySize;
-    std::size_t mResidentMemorySize;
-    std::size_t mVirtualMemorySize;
+    std::size_t mMaxResidentMemorySize{ 0 };
+    std::size_t mResidentMemorySize{ 0 };
+    std::size_t mVirtualMemorySize{ 0 };
 };
-
-inline MemoryUsageInfo::MemoryUsageInfo()
-    : mMaxResidentMemorySize( 0 )
-    , mResidentMemorySize( 0 )
-    , mVirtualMemorySize( 0 )
-{
-}
 
 inline std::size_t
 MemoryUsageInfo::getMaxResidentMemorySize() const
@@ -93,6 +86,7 @@ MemoryUsageInfo::getVirtualMemorySize() const
     return mVirtualMemorySize;
 }
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

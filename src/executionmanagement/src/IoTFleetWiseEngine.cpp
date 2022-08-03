@@ -13,11 +13,13 @@
 
 // Includes
 #include "IoTFleetWiseEngine.h"
+#include "AwsBootstrap.h"
+#include "CANDataConsumer.h"
 #include "CollectionInspectionAPITypes.h"
 #include "CollectionSchemeJSONParser.h"
-#include "NetworkChannelConsumer.h"
 #include "TraceModule.h"
-#include "businterfaces/SocketCANBusChannel.h"
+#include "businterfaces/AbstractVehicleDataSource.h"
+#include "businterfaces/CANDataSource.h"
 #include <boost/lockfree/spsc_queue.hpp>
 
 namespace Aws
@@ -27,7 +29,7 @@ namespace IoTFleetWise
 namespace ExecutionManagement
 {
 using namespace Aws::IoTFleetWise::DataInspection;
-using namespace Aws::IoTFleetWise::Platform::PersistencyManagement;
+using namespace Aws::IoTFleetWise::Platform::Linux::PersistencyManagement;
 using Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams;
 using Aws::IoTFleetWise::OffboardConnectivity::ConnectivityError;
 
@@ -35,12 +37,40 @@ const uint32_t IoTFleetWiseEngine::MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG = 6;
 const uint64_t IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 1000;
 const uint64_t IoTFleetWiseEngine::DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 10000;
 
-IoTFleetWiseEngine::IoTFleetWiseEngine()
-    : mPersistencyUploadRetryIntervalMs( 0 )
-    , mAwsIotChannelMetricsUpload( nullptr )
-    , mAwsIotChannelLogsUpload( nullptr )
+static const std::string CAN_INTERFACE_TYPE = "canInterface";
+static const std::string OBD_INTERFACE_TYPE = "obdInterface";
+
+namespace
 {
-    TraceModule::get().sectionBegin( FWE_STARTUP );
+
+/**
+ * @brief Get the File Contents including whitespace characters
+ *
+ * @param p The file path
+ * @return std::string File contents
+ */
+std::string
+getFileContents( const std::string &p )
+{
+    constexpr auto NUM_CHARS = 1;
+    std::string ret;
+    std::ifstream fs{ p };
+    // False alarm: uninit_use_in_call: Using uninitialized value "fs._M_streambuf_state" when calling "good".
+    // coverity[uninit_use_in_call : SUPPRESS]
+    while ( fs.good() )
+    {
+        auto c = static_cast<char>( fs.get() );
+        ret.append( NUM_CHARS, c );
+    }
+
+    return ret;
+}
+
+} // namespace
+
+IoTFleetWiseEngine::IoTFleetWiseEngine()
+{
+    TraceModule::get().sectionBegin( TraceSection::FWE_STARTUP );
 }
 
 IoTFleetWiseEngine::~IoTFleetWiseEngine()
@@ -57,18 +87,31 @@ IoTFleetWiseEngine::~IoTFleetWiseEngine()
     setLogForwarding( nullptr );
 }
 
+void
+IoTFleetWiseEngine::attachVehicleDataSource( VehicleDataSourcePtr vehicleDataSource )
+{
+    mVehicleDataSource = std::move( vehicleDataSource );
+}
+
+void
+IoTFleetWiseEngine::detachVehicleDataSource( VehicleDataSourcePtr vehicleDataSource )
+{
+    // TODO
+    static_cast<void>( vehicleDataSource );
+}
+
 bool
 IoTFleetWiseEngine::connect( const Json::Value &config )
 {
     // Main bootstrap sequence.
     try
     {
+        const auto persistencyPath = config["staticConfig"]["persistency"]["persistencyPath"].asString();
         /*************************Payload Manager and Persistency library bootstrap begin*********/
 
         // Create an object for Persistency
         mPersistDecoderManifestCollectionSchemesAndData = std::make_shared<CacheAndPersist>(
-            config["staticConfig"]["persistency"]["persistencyPath"].asString(),
-            config["staticConfig"]["persistency"]["persistencyPartitionMaxSize"].asInt() );
+            persistencyPath, config["staticConfig"]["persistency"]["persistencyPartitionMaxSize"].asInt() );
         if ( !mPersistDecoderManifestCollectionSchemesAndData->init() )
         {
             mLogger.error( "IoTFleetWiseEngine::connect", " Failed to init persistency library " );
@@ -93,7 +136,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         // Initialize
         for ( const auto &interfaceName : config["networkInterfaces"] )
         {
-            if ( interfaceName["type"].asString() == "canInterface" )
+            if ( interfaceName["type"].asString() == CAN_INTERFACE_TYPE )
             {
                 canIDTranslator.add( interfaceName["interfaceId"].asString() );
             }
@@ -147,18 +190,26 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         // useJsonBasedCollectionScheme
         mDataCollectionSender = std::make_shared<DataCollectionSender>(
             mAwsIotChannelSendCanData,
-            config["staticConfig"]["internalParameters"]["useJsonBasedCollectionScheme"].asBool(),
+            config["staticConfig"]["internalParameters"]["useJsonBasedCollection"].asBool(),
             config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asUInt(),
-            canIDTranslator );
+            canIDTranslator,
+            persistencyPath );
 
+        // Pass on the AWS SDK Bootsrap handle to the IoTModule.
+        auto bootstrapPtr = AwsBootstrap::getInstance().getClientBootStrap();
+
+        const auto privateKey =
+            getFileContents( config["staticConfig"]["mqttConnection"]["privateKeyFilename"].asString() );
+        const auto certificate =
+            getFileContents( config["staticConfig"]["mqttConnection"]["certificateFilename"].asString() );
         // For asynchronous connect the call needs to be done after all channels created and setTopic calls
-        mAwsIotModule->connect( config["staticConfig"]["mqttConnection"]["privateKeyFilename"].asString(),
-                                config["staticConfig"]["mqttConnection"]["certificateFilename"].asString(),
+        mAwsIotModule->connect( privateKey,
+                                certificate,
                                 config["staticConfig"]["mqttConnection"]["endpointUrl"].asString(),
                                 config["staticConfig"]["mqttConnection"]["clientId"].asString(),
+                                bootstrapPtr,
                                 true );
-
-        /*************************Connectivity bootstrap end***************************************/
+        /*************************Connectivity `bootstrap end***************************************/
 
         /*************************Remote Profiling bootstrap begin**********************************/
         if ( config["staticConfig"].isMember( "remoteProfilerDefaultValues" ) )
@@ -189,13 +240,13 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             // metricsUploadIntervalMs
             // loggingUploadMaxWaitBeforeUploadMs
             // profilerPrefix
-            mRemoteProfiler = std::unique_ptr<RemoteProfiler>( new RemoteProfiler(
+            mRemoteProfiler = std::make_unique<RemoteProfiler>(
                 mAwsIotChannelMetricsUpload,
                 mAwsIotChannelLogsUpload,
                 config["staticConfig"]["remoteProfilerDefaultValues"]["metricsUploadIntervalMs"].asUInt(),
                 config["staticConfig"]["remoteProfilerDefaultValues"]["loggingUploadMaxWaitBeforeUploadMs"].asUInt(),
                 logThreshold,
-                config["staticConfig"]["remoteProfilerDefaultValues"]["profilerPrefix"].asString() ) );
+                config["staticConfig"]["remoteProfilerDefaultValues"]["profilerPrefix"].asString() );
             if ( !mRemoteProfiler->start() )
             {
                 mLogger.warn(
@@ -208,7 +259,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 
         /*************************Inspection Engine bootstrap begin*********************************/
 
-        // Below are three buffers to be shared between Network Channel Consumer and Collection Engine
+        // Below are three buffers to be shared between Vehicle Data Consumer and Collection Engine
         // Signal Buffer are a lock-free multi-producer single consumer buffer
         auto signalBufferPtr =
             std::make_shared<SignalBuffer>( config["staticConfig"]["bufferSizes"]["decodedSignalsBufferSize"].asInt() );
@@ -247,7 +298,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 
         /*************************Inspection Engine bootstrap end***********************************/
 
-        /*************************CollectionScheme Insgestion bootstrap begin*********************************/
+        /*************************CollectionScheme Ingestion bootstrap begin*********************************/
 
         // These parameters need to be added to the Config file to enable the feature :
         // jsonBasedCollectionSchemeFilename
@@ -314,30 +365,37 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         // Allow CollectionSchemeManagement to send checkins through the Schema Object Callback
         mCollectionSchemeManagerPtr->setSchemaListenerPtr( mSchemaPtr );
 
-        /********************************Network Binder bootstrap start*******************************/
-
-        // Initialize the Network Management layer.
-        // Start with the Binder, then the Network Channels and Consumers.
-        mBinder.reset( new NetworkChannelBinder() );
-        if ( mBinder.get() == nullptr || !mBinder->connect() )
-        {
-            mLogger.error( "IoTFleetWiseEngine::connect", " Failed to initialize the network binder " );
-            return false;
-        }
+        /********************************Vehicle Data Source Binder bootstrap start*******************************/
 
         auto obdOverCANModuleInit = false;
+        // Start the vehicle data source binder
+        mVehicleDataSourceBinder = std::make_unique<VehicleDataSourceBinder>();
+        if ( mVehicleDataSourceBinder == nullptr || !mVehicleDataSourceBinder->connect() )
+        {
+            mLogger.error( "IoTFleetWiseEngine::connect", " Failed to initialize the Vehicle DataSource binder " );
+            return false;
+        }
 
         // Initialize
         for ( const auto &interfaceName : config["networkInterfaces"] )
         {
-            if ( interfaceName["type"].asString() == "canInterface" )
+            const auto &interfaceType = interfaceName["type"].asString();
+
+            if ( interfaceType == CAN_INTERFACE_TYPE )
             {
-                std::shared_ptr<INetworkChannelBridge> channelPtr;
-                channelPtr.reset(
-                    new SocketCANBusChannel( interfaceName["canInterface"]["interfaceName"].asString() ) );
-                std::shared_ptr<INetworkChannelConsumer> consumerPtr;
-                consumerPtr.reset( new NetworkChannelConsumer() );
-                if ( channelPtr.get() == nullptr || consumerPtr.get() == nullptr )
+                std::vector<VehicleDataSourceConfig> canSourceConfigs( 1 );
+                auto &canSourceConfig = canSourceConfigs.back();
+                canSourceConfig.transportProperties.emplace(
+                    "interfaceName", interfaceName[CAN_INTERFACE_TYPE]["interfaceName"].asString() );
+                canSourceConfig.transportProperties.emplace(
+                    "threadIdleTimeMs",
+                    config["staticConfig"]["threadIdleTimes"]["socketCANThreadIdleTimeMs"].asString() );
+                canSourceConfig.maxNumberOfVehicleDataMessages =
+                    config["staticConfig"]["bufferSizes"]["socketCANBufferSize"].asUInt();
+                auto canSourcePtr = std::make_shared<CANDataSource>();
+                auto canConsumerPtr = std::make_shared<CANDataConsumer>();
+
+                if ( canSourcePtr == nullptr || canConsumerPtr == nullptr )
                 {
                     mLogger.error( "IoTFleetWiseEngine::connect", " Failed to create consumer/producer " );
                     return false;
@@ -345,47 +403,53 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 // Initialize the consumer/producers
                 // Currently we limit 1 channel to a single consumer. We can always extend this
                 // if we want to process the data coming from 1 channel to multiple consumers.
-                if ( !channelPtr->init(
-                         config["staticConfig"]["bufferSizes"]["socketCANBufferSize"].asUInt(),
-                         config["staticConfig"]["threadIdleTimes"]["socketCANThreadIdleTimeMs"].asUInt() ) ||
-                     !consumerPtr->init(
-                         static_cast<uint8_t>(
+                if ( !canSourcePtr->init( canSourceConfigs ) ||
+                     !canConsumerPtr->init(
+                         static_cast<VehicleDataSourceID>(
                              canIDTranslator.getChannelNumericID( interfaceName["interfaceId"].asString() ) ),
                          signalBufferPtr,
-                         canRawBufferPtr,
                          config["staticConfig"]["threadIdleTimes"]["canDecoderThreadIdleTimeMs"].asUInt() ) )
                 {
                     mLogger.error( "IoTFleetWiseEngine::connect", " Failed to initialize the producers/consumers " );
                     return false;
                 }
+                else
+                {
+                    // CAN Consumers require a RAW Buffer after init
+                    // TODO: This is temporary change . Will need to think how this can be abstracted for all data
+                    // sources.
+                    canConsumerPtr->setCANBufferPtr( canRawBufferPtr );
+                }
 
                 // Handshake the binder and the channel
-                if ( !mBinder->addNetworkChannel( channelPtr ) )
+                if ( !mVehicleDataSourceBinder->addVehicleDataSource( canSourcePtr ) )
                 {
                     mLogger.error( "IoTFleetWiseEngine::connect", " Failed to add a network channel " );
                     return false;
                 }
 
-                if ( !mBinder->bindConsumerToNetworkChannel( consumerPtr, channelPtr->getChannelID() ) )
+                if ( !mVehicleDataSourceBinder->bindConsumerToVehicleDataSource(
+                         canConsumerPtr, canSourcePtr->getVehicleDataSourceID() ) )
                 {
                     mLogger.error( "IoTFleetWiseEngine::connect", " Failed to Bind Consumers to Producers " );
                     return false;
                 }
             }
-            else if ( interfaceName["type"].asString() == "obdInterface" )
+            else if ( interfaceType == OBD_INTERFACE_TYPE )
             {
                 if ( !obdOverCANModuleInit )
                 {
                     auto obdOverCANModule = std::make_shared<OBDOverCANModule>();
                     obdOverCANModuleInit = true;
                     // Init returns false if no collection is configured:
-                    if ( obdOverCANModule->init( signalBufferPtr,
-                                                 activeDTCBufferPtr,
-                                                 interfaceName["obdInterface"]["interfaceName"].asString(),
-                                                 interfaceName["obdInterface"]["pidRequestIntervalSeconds"].asUInt(),
-                                                 interfaceName["obdInterface"]["dtcRequestIntervalSeconds"].asUInt(),
-                                                 interfaceName["obdInterface"]["useExtendedIds"].asBool(),
-                                                 interfaceName["obdInterface"]["hasTransmissionEcu"].asBool() ) )
+                    if ( obdOverCANModule->init(
+                             signalBufferPtr,
+                             activeDTCBufferPtr,
+                             interfaceName[OBD_INTERFACE_TYPE]["interfaceName"].asString(),
+                             interfaceName[OBD_INTERFACE_TYPE]["pidRequestIntervalSeconds"].asUInt(),
+                             interfaceName[OBD_INTERFACE_TYPE]["dtcRequestIntervalSeconds"].asUInt(),
+                             interfaceName[OBD_INTERFACE_TYPE]["useExtendedIds"].asBool(),
+                             interfaceName[OBD_INTERFACE_TYPE]["hasTransmissionEcu"].asBool() ) )
                     {
                         // Connect the OBD Module
                         mOBDOverCANModule = obdOverCANModule;
@@ -421,10 +485,16 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 mLogger.error( "IoTFleetWiseEngine::connect", interfaceName["type"].asString() + " is not supported" );
             }
         }
-        // Register Network Channel Binder as listener for CollectionScheme Manager
-        mCollectionSchemeManagerPtr->subscribeListener(
-            static_cast<IActiveDecoderDictionaryListener *>( mBinder.get() ) );
-        /********************************Network Binder bootstrap end*******************************/
+        // Register Vehicle Data Source Binder as listener for CollectionScheme Manager
+        if ( !mCollectionSchemeManagerPtr->subscribeListener( mVehicleDataSourceBinder.get() ) )
+        {
+            mLogger.error(
+                "IoTFleetWiseEngine::connect",
+                "Could not register the vehicle data source binder as a listener to the collection campaign manager" );
+            return false;
+        }
+
+        /********************************Vehicle Data Source Binder bootstrap end*******************************/
 
         // Only start the CollectionSchemeManager after all listeners have subscribed, otherwise
         // they will not be notified of the initial decoder manifest and collection schemes that are
@@ -497,7 +567,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         {
             mDataOverDDSModule.reset( new DataOverDDSModule() );
             // Init the Module
-            if ( mDataOverDDSModule.get() == nullptr || !mDataOverDDSModule->init( ddsNodes ) )
+            if ( mDataOverDDSModule == nullptr || !mDataOverDDSModule->init( ddsNodes ) )
             {
                 mLogger.error( "IoTFleetWiseEngine::connect", " Failed to initialize the DDS Module " );
                 return false;
@@ -578,15 +648,14 @@ IoTFleetWiseEngine::disconnect()
     }
 
     // Stop the Binder
-    if ( !mBinder->disconnect() )
+    if ( mVehicleDataSourceBinder && !mVehicleDataSourceBinder->disconnect() )
     {
         mLogger.error( "IoTFleetWiseEngine::disconnect", "Could not disconnect the Binder" );
         return false;
     }
     mLogger.info( "IoTFleetWiseEngine::disconnect", "Engine Disconnected" );
-    TraceModule::get().sectionEnd( FWE_SHUTDOWN );
+    TraceModule::get().sectionEnd( TraceSection::FWE_SHUTDOWN );
     TraceModule::get().print();
-
     return true;
 }
 
@@ -594,7 +663,7 @@ bool
 IoTFleetWiseEngine::start()
 {
     // Prevent concurrent stop/init
-    std::lock_guard<std::recursive_mutex> lock( mThreadMutex );
+    std::lock_guard<std::mutex> lock( mThreadMutex );
     // On multi core systems the shared variable mShouldStop must be updated for
     // all cores before starting the thread otherwise thread will directly end
     mShouldStop.store( false );
@@ -614,8 +683,8 @@ IoTFleetWiseEngine::start()
 bool
 IoTFleetWiseEngine::stop()
 {
-    TraceModule::get().sectionBegin( FWE_SHUTDOWN );
-    std::lock_guard<std::recursive_mutex> lock( mThreadMutex );
+    TraceModule::get().sectionBegin( TraceSection::FWE_SHUTDOWN );
+    std::lock_guard<std::mutex> lock( mThreadMutex );
     mShouldStop.store( true, std::memory_order_relaxed );
     mWait.notify();
     mThread.release();
@@ -643,7 +712,7 @@ IoTFleetWiseEngine::doWork( void *data )
     // Time in seconds
     double timeTrigger = 0;
     bool uploadedPersistedDataOnce = false;
-    TraceModule::get().sectionEnd( FWE_STARTUP );
+    TraceModule::get().sectionEnd( TraceSection::FWE_STARTUP );
 
     engine->mRetrySendingPersistedDataTimer.reset();
 
@@ -654,8 +723,8 @@ IoTFleetWiseEngine::doWork( void *data )
         // should be read and flushed.
         // 2- A consumer has been either reconnected or disconnected on runtime.
         // we should then either register or unregister for callbacks from this consumer.
-        // 3- A new collectionScheme is available - First old data is sent out then the new collectionScheme is applied
-        // to all consumers of the channel data
+        // 3- A new collectionScheme is available - First old data is sent out then the new collectionScheme is
+        // applied to all consumers of the channel data
 
         engine->mTimer.reset();
         uint32_t elapsedTimeUs = 0;
@@ -684,14 +753,14 @@ IoTFleetWiseEngine::doWork( void *data )
         {
             engine->mLogger.trace(
                 "IoTFleetWiseEngine::doWork",
-                "Waiting for :" + std::to_string( timeTrigger ) + "seconds " +
+                "Waiting for :" + std::to_string( timeTrigger ) + " seconds " +
                     std::to_string( engine->mPersistencyUploadRetryIntervalMs ) + " config" +
                     std::to_string( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) + " timer" );
             engine->mWait.wait( static_cast<uint32_t>( timeTrigger * 1000 ) );
         }
         else
         {
-            engine->mWait.wait( Platform::Signal::WaitWithPredicate );
+            engine->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
             elapsedTimeUs += static_cast<uint32_t>( engine->mTimer.getElapsedMs().count() );
             engine->mLogger.trace( "IoTFleetWiseEngine::doWork", "Event Arrived" );
             engine->mLogger.trace( "IoTFleetWiseEngine::doWork",
@@ -717,15 +786,16 @@ IoTFleetWiseEngine::doWork( void *data )
                 firstSignalValues += "]";
                 engine->mLogger.info(
                     "IoTFleetWiseEngine::doWork",
-                    "FWE data ready to send: Signals:" +
+                    "FWE data ready to send with eventID " +
+                        std::to_string( triggeredCollectionSchemeDataPtr->eventID ) + " from " +
+                        triggeredCollectionSchemeDataPtr->metaData.collectionSchemeID + " Signals:" +
                         std::to_string( triggeredCollectionSchemeDataPtr->signals.size() ) + " " + firstSignalValues +
                         " raw CAN frames:" + std::to_string( triggeredCollectionSchemeDataPtr->canFrames.size() ) +
                         " DTCs:" + std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() ) +
                         " Geohash:" + triggeredCollectionSchemeDataPtr->mGeohashInfo.mGeohashString );
-
                 engine->mDataCollectionSender->send( triggeredCollectionSchemeDataPtr );
             } );
-        TraceModule::get().setVariable( QUEUE_INSPECTION_TO_SENDER, consumedElements );
+        TraceModule::get().setVariable( TraceVariable::QUEUE_INSPECTION_TO_SENDER, consumedElements );
 
         if ( ( engine->mPersistencyUploadRetryIntervalMs > 0 &&
                ( static_cast<uint64_t>( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) >=
@@ -758,7 +828,7 @@ IoTFleetWiseEngine::checkAndSendRetrievedData()
     // Retrieve the data from persistency library
     ErrorCode status = mPayloadManager->retrieveData( payloads );
 
-    if ( status == SUCCESS )
+    if ( status == ErrorCode::SUCCESS )
     {
         ConnectivityError res = ConnectivityError::Success;
         mLogger.trace( "IoTFleetWiseEngine::checkAndSendRetrievedData",
@@ -784,14 +854,14 @@ IoTFleetWiseEngine::checkAndSendRetrievedData()
         if ( res == ConnectivityError::Success )
         {
             // All the stored data has been transmitted, erase the file contents
-            mPersistDecoderManifestCollectionSchemesAndData->erase( EDGE_TO_CLOUD_PAYLOAD );
+            mPersistDecoderManifestCollectionSchemesAndData->erase( DataType::EDGE_TO_CLOUD_PAYLOAD );
             mLogger.info( "IoTFleetWiseEngine::checkAndSendRetrievedData",
                           "All " + std::to_string( payloads.size() ) + " Payloads successfully sent to the backend" );
             return true;
         }
         return false;
     }
-    else if ( status == EMPTY )
+    else if ( status == ErrorCode::EMPTY )
     {
         mLogger.trace( "IoTFleetWiseEngine::checkAndSendRetrievedData", "No Payloads to Retrieve" );
         return true;

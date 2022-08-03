@@ -1,0 +1,7 @@
+deb [arch=armhf] http://ports.ubuntu.com/ bionic main restricted
+deb [arch=armhf] http://ports.ubuntu.com/ bionic-updates main restricted
+deb [arch=armhf] http://ports.ubuntu.com/ bionic universe
+deb [arch=armhf] http://ports.ubuntu.com/ bionic-updates universe
+deb [arch=armhf] http://ports.ubuntu.com/ bionic multiverse
+deb [arch=armhf] http://ports.ubuntu.com/ bionic-updates multiverse
+deb [arch=armhf] http://ports.ubuntu.com/ bionic-backports main restricted universe multiverse

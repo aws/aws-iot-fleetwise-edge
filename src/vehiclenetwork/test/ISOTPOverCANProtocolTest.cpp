@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <thread>
 
+#include <linux/can.h>
+#include <linux/can/isotp.h>
+#include <sys/socket.h>
+
 /**
  * @brief This is an integration test of the ISO-TP Kernel Module
  * and FWE Send and Receive APIs. If you want to run this test,
@@ -31,6 +35,20 @@
  */
 
 using namespace Aws::IoTFleetWise::VehicleNetwork;
+namespace
+{
+
+bool
+socketAvailable()
+{
+    auto sock = socket( PF_CAN, SOCK_DGRAM, CAN_ISOTP );
+    if ( sock < 0 )
+    {
+        return false;
+    }
+    close( sock );
+    return true;
+}
 
 void
 sendPDU( ISOTPOverCANSender &sender, const std::vector<uint8_t> &pdu )
@@ -56,7 +74,22 @@ receivePDU( ISOTPOverCANReceiver &receiver, std::vector<uint8_t> &pdu )
     ASSERT_TRUE( receiver.receivePDU( pdu ) );
 }
 
-TEST( ISOTPOverCANProtocolTest, isotpSenderTestLifeCycle_LinuxCANDep )
+} // namespace
+
+class ISOTPOverCANProtocolTest : public ::testing::Test
+{
+protected:
+    void
+    SetUp() override
+    {
+        if ( !socketAvailable() )
+        {
+            GTEST_SKIP() << "Skipping test fixture due to unavailability of socket";
+        }
+    }
+};
+
+TEST_F( ISOTPOverCANProtocolTest, isotpSenderTestLifeCycle )
 {
     ISOTPOverCANSender sender;
     ISOTPOverCANSenderOptions options;
@@ -68,7 +101,7 @@ TEST( ISOTPOverCANProtocolTest, isotpSenderTestLifeCycle_LinuxCANDep )
     ASSERT_TRUE( sender.disconnect() );
 }
 
-TEST( ISOTPOverCANProtocolTest, isotpSenderTestSendSingleFramePDU_LinuxCANDep )
+TEST_F( ISOTPOverCANProtocolTest, isotpSenderTestSendSingleFramePDU )
 {
     ISOTPOverCANSender sender;
     ISOTPOverCANSenderOptions options;
@@ -83,7 +116,7 @@ TEST( ISOTPOverCANProtocolTest, isotpSenderTestSendSingleFramePDU_LinuxCANDep )
     ASSERT_TRUE( sender.disconnect() );
 }
 
-TEST( ISOTPOverCANProtocolTest, isotpReceiverTestLifeCycle_LinuxCANDep )
+TEST_F( ISOTPOverCANProtocolTest, isotpReceiverTestLifeCycle )
 {
     ISOTPOverCANReceiver receiver;
     ISOTPOverCANReceiverOptions options;
@@ -95,7 +128,7 @@ TEST( ISOTPOverCANProtocolTest, isotpReceiverTestLifeCycle_LinuxCANDep )
     ASSERT_TRUE( receiver.disconnect() );
 }
 
-TEST( ISOTPOverCANProtocolTest, isotpSendAndReceiveSingleFrame_LinuxCANDep )
+TEST_F( ISOTPOverCANProtocolTest, isotpSendAndReceiveSingleFrame )
 {
     // Setup the sender
     ISOTPOverCANSender sender;
@@ -130,7 +163,7 @@ TEST( ISOTPOverCANProtocolTest, isotpSendAndReceiveSingleFrame_LinuxCANDep )
     ASSERT_TRUE( sender.disconnect() );
 }
 
-TEST( ISOTPOverCANProtocolTest, isotpSendAndReceiveMultiFrame_LinuxCANDep )
+TEST_F( ISOTPOverCANProtocolTest, isotpSendAndReceiveMultiFrame )
 {
     // Setup the sender
     ISOTPOverCANSender sender;
@@ -165,7 +198,7 @@ TEST( ISOTPOverCANProtocolTest, isotpSendAndReceiveMultiFrame_LinuxCANDep )
     ASSERT_TRUE( sender.disconnect() );
 }
 
-TEST( ISOTPOverCANProtocolTest, isotpSendAndReceiveSameSocket_LinuxCANDep )
+TEST_F( ISOTPOverCANProtocolTest, isotpSendAndReceiveSameSocket )
 {
     // Setup the sender receiver
     ISOTPOverCANSenderReceiver senderReceiver;

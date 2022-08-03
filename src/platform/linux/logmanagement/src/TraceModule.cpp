@@ -23,29 +23,24 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
-TraceModule::TraceModule()
-    : mVariableData{}
-    , mAtomicVariableData{}
-    , mSectionData{}
+namespace Linux
 {
-}
-TraceModule::~TraceModule()
-{
-}
 
 void
 TraceModule::sectionBegin( TraceSection section )
 {
-    if ( section < TRACE_SECTION_SIZE )
+    if ( section < TraceSection::TRACE_SECTION_SIZE )
     {
         auto time = std::chrono::high_resolution_clock::now();
-        mSectionData[section].mLastStartTime = time;
-        mSectionData[section].mCurrentlyActive = true;
-        if ( mSectionData[section].mHitCounter > 0 )
+        mSectionData[toUType( section )].mLastStartTime = time;
+        mSectionData[toUType( section )].mCurrentlyActive = true;
+        if ( mSectionData[toUType( section )].mHitCounter > 0 )
         {
-            double interval = std::chrono::duration<double>( ( time - mSectionData[section].mLastEndTime ) ).count();
-            mSectionData[section].mIntervalSum += interval;
-            mSectionData[section].mMaxInterval = std::max( mSectionData[section].mMaxInterval, interval );
+            double interval =
+                std::chrono::duration<double>( ( time - mSectionData[toUType( section )].mLastEndTime ) ).count();
+            mSectionData[toUType( section )].mIntervalSum += interval;
+            mSectionData[toUType( section )].mMaxInterval =
+                std::max( mSectionData[toUType( section )].mMaxInterval, interval );
         }
     }
 }
@@ -53,15 +48,16 @@ TraceModule::sectionBegin( TraceSection section )
 void
 TraceModule::sectionEnd( TraceSection section )
 {
-    if ( section < TRACE_SECTION_SIZE && mSectionData[section].mCurrentlyActive )
+    if ( section < TraceSection::TRACE_SECTION_SIZE && mSectionData[toUType( section )].mCurrentlyActive )
     {
         auto time = std::chrono::high_resolution_clock::now();
-        mSectionData[section].mLastEndTime = time;
-        double spent = std::chrono::duration<double>( ( time - mSectionData[section].mLastStartTime ) ).count();
-        mSectionData[section].mHitCounter++;
-        mSectionData[section].mCurrentlyActive = false;
-        mSectionData[section].mTimeSpentSum += spent;
-        mSectionData[section].mMaxSpent = std::max( mSectionData[section].mMaxSpent, spent );
+        mSectionData[toUType( section )].mLastEndTime = time;
+        double spent =
+            std::chrono::duration<double>( ( time - mSectionData[toUType( section )].mLastStartTime ) ).count();
+        mSectionData[toUType( section )].mHitCounter++;
+        mSectionData[toUType( section )].mCurrentlyActive = false;
+        mSectionData[toUType( section )].mTimeSpentSum += spent;
+        mSectionData[toUType( section )].mMaxSpent = std::max( mSectionData[toUType( section )].mMaxSpent, spent );
     }
 }
 
@@ -243,17 +239,17 @@ TraceModule::getSectionName( TraceSection section )
 void
 TraceModule::updateAllTimeData()
 {
-    for ( int i = 0; i < TRACE_VARIABLE_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceVariable::TRACE_VARIABLE_SIZE ); i++ )
     {
         auto &v = mVariableData[i];
         v.mMaxValueAllTime = std::max( v.mMaxValueAllTime, v.mMaxValue );
     }
-    for ( int i = 0; i < TRACE_ATOMIC_VARIABLE_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE ); i++ )
     {
         auto &v = mAtomicVariableData[i];
         v.mMaxValueAllTime = std::max( v.mMaxValueAllTime, v.mMaxValue );
     }
-    for ( int i = 0; i < TRACE_SECTION_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceSection::TRACE_SECTION_SIZE ); i++ )
     {
         auto &v = mSectionData[i];
         v.mMaxSpentAllTime = std::max( v.mMaxSpentAllTime, v.mMaxSpent );
@@ -265,17 +261,17 @@ void
 TraceModule::startNewObservationWindow()
 {
     updateAllTimeData();
-    for ( int i = 0; i < TRACE_VARIABLE_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceVariable::TRACE_VARIABLE_SIZE ); i++ )
     {
         auto &v = mVariableData[i];
         v.mMaxValue = 0;
     }
-    for ( int i = 0; i < TRACE_ATOMIC_VARIABLE_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE ); i++ )
     {
         auto &v = mAtomicVariableData[i];
         v.mMaxValue = 0;
     }
-    for ( int i = 0; i < TRACE_SECTION_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceSection::TRACE_SECTION_SIZE ); i++ )
     {
         auto &v = mSectionData[i];
         v.mMaxSpent = 0;
@@ -292,7 +288,7 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
     }
 
     updateAllTimeData();
-    for ( int i = 0; i < TRACE_VARIABLE_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceVariable::TRACE_VARIABLE_SIZE ); i++ )
     {
         auto &v = mVariableData[i];
         profiler->setMetric( std::string( "variableMaxSinceStartup_" ) +
@@ -306,7 +302,7 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
                              static_cast<double>( v.mMaxValueAllTime ),
                              "Count" );
     }
-    for ( int i = 0; i < TRACE_ATOMIC_VARIABLE_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE ); i++ )
     {
         auto &v = mAtomicVariableData[i];
         profiler->setMetric( ( std::string( "variableMaxSinceStartup_atomic_" ) +
@@ -320,7 +316,7 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
                              static_cast<double>( v.mMaxValue ),
                              "Count" );
     }
-    for ( int i = 0; i < TRACE_SECTION_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceSection::TRACE_SECTION_SIZE ); i++ )
     {
         auto &v = mSectionData[i];
         profiler->setMetric( std::string( "sectionAvgSinceStartup_" ) +
@@ -349,7 +345,7 @@ void
 TraceModule::print()
 {
     updateAllTimeData();
-    for ( int i = 0; i < TRACE_VARIABLE_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceVariable::TRACE_VARIABLE_SIZE ); i++ )
     {
         auto &v = mVariableData[i];
         mLogger.trace( "TraceModule::print",
@@ -361,7 +357,7 @@ TraceModule::print()
                            std::to_string( v.mMaxValue ) + "] overall max value: [" +
                            std::to_string( v.mMaxValueAllTime ) + "]" );
     }
-    for ( int i = 0; i < TRACE_ATOMIC_VARIABLE_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE ); i++ )
     {
         auto &v = mAtomicVariableData[i];
         mLogger.trace( "TraceModule::print",
@@ -373,7 +369,7 @@ TraceModule::print()
                            std::to_string( v.mMaxValue ) + "] overall max value: [" +
                            std::to_string( v.mMaxValueAllTime ) + "]" );
     }
-    for ( int i = 0; i < TRACE_SECTION_SIZE; i++ )
+    for ( auto i = 0; i < toUType( TraceSection::TRACE_SECTION_SIZE ); i++ )
     {
         auto &v = mSectionData[i];
         mLogger.trace(
@@ -394,6 +390,7 @@ TraceModule::print()
     std::fflush( stdout );
 }
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

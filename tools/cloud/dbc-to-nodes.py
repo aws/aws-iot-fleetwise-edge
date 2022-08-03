@@ -44,11 +44,9 @@ for message in db.messages:
         else:
             datatype = "INT64" if signal.is_signed else "UINT64"
         node = {
-            "type": "Sensor",
             "sensor": {
                 "dataType": datatype,
                 "fullyQualifiedName": "Vehicle."+signal.name,
-                "name": signal.name
             }
         }
         if signal.comment:

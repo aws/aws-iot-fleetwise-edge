@@ -25,15 +25,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
-
-Thread::Thread()
-    : mThread( 0 )
+namespace Linux
 {
-}
-
-Thread::~Thread()
-{
-}
 
 bool
 Thread::create( WorkerFunction workerFunction, void *execParam )
@@ -43,7 +36,7 @@ Thread::create( WorkerFunction workerFunction, void *execParam )
     mExecParams.mParams = execParam;
 
     mDone.store( false );
-    mTerminateSignal.reset( new Signal() );
+    mTerminateSignal = std::make_unique<Signal>();
 
     if ( pthread_create( &mThread, nullptr, Thread::workerFunctionWrapper, &mExecParams ) != 0 )
     {
@@ -115,7 +108,7 @@ Thread::workerFunctionWrapper( void *params )
 }
 
 void
-Thread::setThreadName( const std::string &name )
+Thread::setThreadName( const std::string &name ) // NOLINT(readability-make-member-function-const)
 {
 
     pthread_setname_np( mThread, name.c_str() );
@@ -128,11 +121,12 @@ Thread::SetCurrentThreadName( const std::string &name )
 }
 
 unsigned long
-Thread::getThreadID()
+Thread::getThreadID() const
 {
     return static_cast<unsigned long>( mThread );
 }
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

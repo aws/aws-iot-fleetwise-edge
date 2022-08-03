@@ -24,6 +24,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 /**
  * @brief Logging API. Used by all modules of the software to forward log entries
  * to a console logger instance.
@@ -64,7 +66,7 @@ public:
 private:
     ConsoleLogger mLogger;
 };
-
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

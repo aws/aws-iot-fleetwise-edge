@@ -25,13 +25,8 @@ namespace IoTFleetWise
 namespace VehicleNetwork
 {
 CameraDataPublisher::CameraDataPublisher()
-    : mDDSParticipant( nullptr )
-    , mDDSPublisher( nullptr )
-    , mDDSTopic( nullptr )
-    , mDDSWriter( nullptr )
-    , mDDStype( new CameraDataRequestPubSubType() )
 {
-    mNetworkProtocol = DDS;
+    mNetworkProtocol = VehicleDataSourceProtocol::DDS;
     mID = generateChannelID();
 }
 
@@ -130,7 +125,7 @@ bool
 CameraDataPublisher::start()
 {
     // Prevent concurrent stop/init
-    std::lock_guard<std::recursive_mutex> lock( mThreadMutex );
+    std::lock_guard<std::mutex> lock( mThreadMutex );
     // On multi core systems the shared variable mShouldStop must be updated for
     // all cores before starting the thread otherwise thread will directly end
     mShouldStop.store( false );
@@ -149,7 +144,7 @@ CameraDataPublisher::start()
 bool
 CameraDataPublisher::stop()
 {
-    std::lock_guard<std::recursive_mutex> lock( mThreadMutex );
+    std::lock_guard<std::mutex> lock( mThreadMutex );
     mShouldStop.store( true, std::memory_order_relaxed );
     mWait.notify();
     mThread.release();
@@ -173,7 +168,7 @@ CameraDataPublisher::doWork( void *data )
     while ( !publisher->shouldStop() )
     {
         // Wait for data to arrive from the DDS Network.
-        publisher->mWait.wait( Platform::Signal::WaitWithPredicate );
+        publisher->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
         // We need now to send the request.
         // Reset the request to avoid sending it during shutdown
         std::lock_guard<std::mutex> lock( publisher->mRequesMutex );

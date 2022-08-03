@@ -17,6 +17,7 @@
 #include "ConsoleLogger.h"
 #include "ClockHandler.h"
 #include <chrono>
+#include <cinttypes>
 #include <iomanip>
 #include <mutex>
 #include <sstream>
@@ -29,7 +30,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
-
+namespace Linux
+{
 LogLevel gSystemWideLogLevel;
 
 static std::mutex gLogForwardingMutex;
@@ -60,20 +62,12 @@ forwardLog( LogLevel level, const std::string &function, const std::string &logE
     }
 }
 
-ConsoleLogger::ConsoleLogger()
-{
-}
-
-ILogger::~ILogger()
-{
-}
-
 void
 ConsoleLogger::logMessage( LogLevel level, const std::string &function, const std::string &logEntry )
 {
     if ( level >= gSystemWideLogLevel )
     {
-        std::printf( "[Thread : %lu] [%s] [%s] [%s]: [%s] ",
+        std::printf( "[Thread : %" PRIu64 "] [%s] [%s] [%s]: [%s] ",
                      currentThreadId(),
                      timeAsString().c_str(),
                      levelToString( level ).c_str(),
@@ -126,6 +120,7 @@ ConsoleLogger::currentThreadId()
     return static_cast<uint64_t>( syscall( SYS_gettid ) );
 }
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

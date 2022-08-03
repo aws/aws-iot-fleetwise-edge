@@ -22,10 +22,9 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
-
-LoggingModule::LoggingModule()
+namespace Linux
 {
-}
+LoggingModule::LoggingModule() = default;
 
 void
 LoggingModule::error( const std::string &function, const std::string &logEntry )
@@ -50,7 +49,7 @@ LoggingModule::trace( const std::string &function, const std::string &logEntry )
 {
     mLogger.logMessage( LogLevel::Trace, function, logEntry );
 }
-
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

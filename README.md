@@ -1,7 +1,8 @@
 AWS IoT FleetWise Edge
 ======================
 
-> :information_source: To quickly get started, jump to the [Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md).
+> :information_source: To quickly get started, jump to the [Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md)
+  or the [Raspberry Pi Tutorial](./docs/rpi-tutorial/raspberry-pi-tutorial.md)
 
 AWS IoT FleetWise is a service that makes it easy for Automotive OEMs to collect, store, organize, and monitor data from vehicles at scale. AWS IoT FleetWise Edge provides C++ libraries that allow you to run the application on your vehicle. You can then use AWS IoT FleetWise's pre-configured analytic capabilities to process the collected data, gain insights about the vehicle's health and use the service’s visual interface to help diagnose and troubleshoot potential issues with your vehicles. Furthermore, AWS IoT FleetWise's capability to collect ECU data and store them on cloud databases enables you to utilize different AWS services (Analytics Services, ML, etc.) to develop novel use-cases that augment your existing vehicle functionality. 
 
@@ -61,7 +62,7 @@ AWS IoT FleetWise Edge was also tested on an EC2 Instance with the following det
 
 ## AWS IoT FleetWise Client-Server Communication
 
-AWS IoT FleetWise Edge relies on [AWS IoT C++ Device SDK](https://github.com/aws/aws-iot-device-sdk-cpp-v2) to send and receive data from and to AWS IoT FleetWise Server. All data sent to AWS IoT is sent over an encrypted [TLS connection](https://docs.aws.amazon.com/iot/latest/developerguide/data-encryption.html) using MQTT, HTTPS, and WebSocket protocols, making it secure by default while in transit. AWS IoT FleetWise uses MQTT quality of service zero (QoS = 0).
+AWS IoT FleetWise Edge relies on [AWS SDK for C++](https://github.com/aws/aws-sdk-cpp) to send and receive data from and to AWS IoT FleetWise Server. All data sent to AWS IoT is sent over an encrypted [TLS connection](https://docs.aws.amazon.com/iot/latest/developerguide/data-encryption.html) using MQTT, HTTPS, and WebSocket protocols, making it secure by default while in transit. AWS IoT FleetWise uses MQTT quality of service zero (QoS = 0).
 
 
 
@@ -74,12 +75,17 @@ See [SECURITY](./SECURITY.md) for more information
 ## License Summary and Build Dependencies
 AWS IoT FleetWise Edge depends on the following open source libraries. Refer to the corresponding links for more information.
 
-* [AWS IoT Device SDK for C++ v2 version: v1.14.1](https://github.com/aws/aws-iot-device-sdk-cpp-v2)
+* [AWS SDK for C++: v1.9.253](https://github.com/aws/aws-sdk-cpp)
+* [cURL: v7.58.0](https://github.com/curl/curl)
 * [GoogleTest version: release-1.10.0](https://github.com/google/googletest)
+* [Benchmark version: 1.6.1](https://github.com/google/benchmark)
 * [Protobuf version: 3.9.2](https://github.com/protocolbuffers/protobuf)
 * [Boost version 1.65.1](https://github.com/boostorg/boost)
 * [jsoncpp version 1.7.4](https://github.com/open-source-parsers/jsoncpp)
 * [Snappy version: 1.1.7](https://github.com/google/snappy)
+
+Optional: The following dependencies are only required when the experimental option `FWE_FEATURE_CAMERA` is enabled.
+
 * [Fast-DDS version: 2.3.3](https://github.com/eProsima/Fast-DDS.git)
   * [Fast-CDR version: v1.0.21](https://github.com/eProsima/Fast-CDR.git)
   * [Foonathan memory vendor version: v1.1.0](https://github.com/eProsima/foonathan_memory_vendor.git)
@@ -98,7 +104,7 @@ See [LICENSE](./LICENSE) for more information.
 
 ## Resources
 
-The following documents  provide more information about AWS IoT FleetWise Edge.
+The following documents provide more information about AWS IoT FleetWise Edge.
 
 1. [Change Log](./CHANGELOG.md) provides a summary of feature enhancements, updates, and resolved and known issues.
 2. [AWS IoT FleetWise Edge Offboarding](./docs/AWS-IoTFleetWiseOffboarding.md) provides a summary of the steps needed on the Client side to off board from the service.

@@ -20,6 +20,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 /**
  * @brief Log levels.
  */
@@ -37,23 +39,23 @@ stringToLogLevel( const std::string level, LogLevel &outLogLevel )
 {
     if ( level == "Info" )
     {
-        outLogLevel = Aws::IoTFleetWise::Platform::LogLevel::Info;
+        outLogLevel = Aws::IoTFleetWise::Platform::Linux::LogLevel::Info;
     }
     else if ( level == "Error" )
     {
-        outLogLevel = Aws::IoTFleetWise::Platform::LogLevel::Error;
+        outLogLevel = Aws::IoTFleetWise::Platform::Linux::LogLevel::Error;
     }
     else if ( level == "Warning" )
     {
-        outLogLevel = Aws::IoTFleetWise::Platform::LogLevel::Warning;
+        outLogLevel = Aws::IoTFleetWise::Platform::Linux::LogLevel::Warning;
     }
     else if ( level == "Trace" )
     {
-        outLogLevel = Aws::IoTFleetWise::Platform::LogLevel::Trace;
+        outLogLevel = Aws::IoTFleetWise::Platform::Linux::LogLevel::Trace;
     }
     else if ( level == "Off" )
     {
-        outLogLevel = Aws::IoTFleetWise::Platform::LogLevel::Off;
+        outLogLevel = Aws::IoTFleetWise::Platform::Linux::LogLevel::Off;
     }
     else
     {
@@ -63,6 +65,7 @@ stringToLogLevel( const std::string level, LogLevel &outLogLevel )
 }
 
 extern LogLevel gSystemWideLogLevel;
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

@@ -9,22 +9,22 @@
     },
     "signalsToCollect": [
         {
-            "signalName": "Vehicle.OBD.EngineSpeed"
+            "name": "Vehicle.OBD.EngineSpeed"
         },
         {
-            "signalName": "Vehicle.OBD.Speed"
+            "name": "Vehicle.OBD.Speed"
         },
         {
-            "signalName": "Vehicle.OBD.AmbientAirTemperature"
+            "name": "Vehicle.OBD.AmbientAirTemperature"
         },
         {
-            "signalName": "Vehicle.OBD.EngineCoolantTemperature"
+            "name": "Vehicle.OBD.EngineCoolantTemperature"
         },
         {
-            "signalName": "Vehicle.OBD.ThrottlePosition"
+            "name": "Vehicle.OBD.ThrottlePosition"
         },
         {
-            "signalName": "Vehicle.OBD.FuelLevel"
+            "name": "Vehicle.OBD.FuelLevel"
         }
     ]
 }

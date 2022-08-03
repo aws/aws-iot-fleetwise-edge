@@ -26,6 +26,8 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 /**
  * @brief Wrapper on top of a condition variable. Helps Thread state transitions.
  */
@@ -36,9 +38,7 @@ public:
     {
         mNotify = false;
     }
-    ~Signal()
-    {
-    }
+    ~Signal() = default;
 
     /**
      * @brief wait constant passed to the condition variable. Releases when the
@@ -93,6 +93,7 @@ private:
     std::mutex mMutex;
 };
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

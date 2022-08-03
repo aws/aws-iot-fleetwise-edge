@@ -196,7 +196,7 @@ Resources:
             ./tools/configure-fwe.sh \
               --input-config-file "configuration/static-config.json" \
               --output-config-file "/etc/aws-iot-fleetwise/config-0.json" \
-              --vehicle-id "${AWS::StackName}" \
+              --vehicle-name "${AWS::StackName}" \
               --endpoint-url "${IoTThing.iotEndpoint}" \
               --topic-prefix '${IoTMqttTopicPrefix}' \
               --can-bus0 "vcan0"
@@ -212,7 +212,7 @@ Resources:
                   ./tools/configure-fwe.sh \
                     --input-config-file "configuration/static-config.json" \
                     --output-config-file "/etc/aws-iot-fleetwise/config-$((i+j)).json" \
-                    --vehicle-id "${AWS::StackName}-$((i+j))" \
+                    --vehicle-name "${AWS::StackName}-$((i+j))" \
                     --endpoint-url "${IoTThing.iotEndpoint}" \
                     --topic-prefix '${IoTMqttTopicPrefix}' \
                     --can-bus0 "vcan$((i+j))" \
@@ -248,7 +248,7 @@ Resources:
     Properties:
       Description: Create thing, certificate, and policy, return cert and private key
       Handler: index.handler
-      Runtime: python3.6
+      Runtime: python3.9
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 300
       Code:

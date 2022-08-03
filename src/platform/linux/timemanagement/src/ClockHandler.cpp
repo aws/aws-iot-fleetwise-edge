@@ -24,16 +24,18 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
+namespace Linux
+{
 static std::shared_ptr<const Clock> gClock;
 static std::mutex gClockMutex;
 
 class ChronoClock : public Clock
 {
 public:
-    timestampT
+    Timestamp
     timeSinceEpochMs() const override
     {
-        return static_cast<timestampT>(
+        return static_cast<Timestamp>(
             std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::system_clock::now().time_since_epoch() )
                 .count() );
     }
@@ -68,6 +70,7 @@ ClockHandler::setClock( std::shared_ptr<const Clock> clock )
     gClock = std::move( clock );
 }
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws

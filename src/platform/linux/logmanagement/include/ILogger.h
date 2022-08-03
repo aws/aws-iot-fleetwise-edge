@@ -24,11 +24,13 @@ namespace IoTFleetWise
 {
 namespace Platform
 {
-
+namespace Linux
+{
 class ILogger
 {
 public:
-    virtual ~ILogger() = 0;
+    virtual ~ILogger() = default;
+
     /**
      * @brief Logs a log message in different way depending on the implementation class
      *
@@ -54,6 +56,7 @@ public:
  */
 extern void setLogForwarding( ILogger *logForwarder );
 
+} // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise
 } // namespace Aws
