@@ -1302,7 +1302,7 @@
         "obdSignal": {
             "byteLength": 1,
             "offset": 0,
-            "pid": 103,
+            "pid": 5,
             "pidResponseLength": 3,
             "scaling": 1,
             "serviceMode": 1,
