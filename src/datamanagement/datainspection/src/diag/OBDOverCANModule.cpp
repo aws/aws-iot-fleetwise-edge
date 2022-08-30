@@ -17,10 +17,13 @@
 #include "OBDDataTypes.h"
 #include "TraceModule.h"
 
+#include <algorithm>
 #include <bitset>
 #include <cstring>
 #include <iostream>
 #include <iterator>
+#include <sstream>
+
 #define MAX_PID_RANGE ( 6U )
 namespace Aws
 {
@@ -274,10 +277,25 @@ OBDOverCANModule::doWork( void *data )
                     if ( OBDModule->requestReceiveSupportedPIDs(
                              SID::CURRENT_STATS, OBDModule->mEngineECUSenderReceiver, enginePIDs ) )
                     {
+                        std::sort( enginePIDs.begin(), enginePIDs.end() );
                         OBDModule->mSupportedPIDsEngine.emplace( SID::CURRENT_STATS, enginePIDs );
+                        std::ostringstream oss;
+                        oss << ": ";
+                        if ( !enginePIDs.empty() )
+                        {
+                            std::copy(
+                                enginePIDs.begin(), enginePIDs.end() - 1, std::ostream_iterator<int>( oss, "," ) );
+                            oss << std::to_string( enginePIDs.back() );
+                        }
                         OBDModule->mLogger.trace( "OBDOverCANModule::doWork",
-                                                  "Received Engine ECU PIDs for SID: " +
-                                                      std::to_string( toUType( SID::CURRENT_STATS ) ) );
+                                                  "Engine ECU supports PIDs for SID " +
+                                                      std::to_string( toUType( SID::CURRENT_STATS ) ) + oss.str() );
+                        // Take the common PIDs between the ECU supported PIDs and the PIDs that are requested by
+                        // Decoder Dictionary
+                        OBDModule->updatePIDRequestList( SID::CURRENT_STATS,
+                                                         ECUType::ENGINE,
+                                                         OBDModule->mSupportedPIDsEngine,
+                                                         OBDModule->mPIDsToRequestEngine );
                     }
                     else
                     {
@@ -297,10 +315,26 @@ OBDOverCANModule::doWork( void *data )
                     if ( OBDModule->requestReceiveSupportedPIDs(
                              SID::CURRENT_STATS, OBDModule->mTransmissionECUSenderReceiver, transmissionPIDs ) )
                     {
+                        std::sort( transmissionPIDs.begin(), transmissionPIDs.end() );
                         OBDModule->mSupportedPIDsTransmission.emplace( SID::CURRENT_STATS, transmissionPIDs );
+                        std::ostringstream oss;
+                        oss << ": ";
+                        if ( !transmissionPIDs.empty() )
+                        {
+                            std::copy( transmissionPIDs.begin(),
+                                       transmissionPIDs.end() - 1,
+                                       std::ostream_iterator<int>( oss, "," ) );
+                            oss << std::to_string( transmissionPIDs.back() );
+                        }
                         OBDModule->mLogger.trace( "OBDOverCANModule::doWork",
-                                                  "Received Transmission ECU PIDs for SID: " +
-                                                      std::to_string( toUType( SID::CURRENT_STATS ) ) );
+                                                  "Transmission ECU supports PIDs for SID " +
+                                                      std::to_string( toUType( SID::CURRENT_STATS ) ) + oss.str() );
+                        // Take the common PIDs between the ECU supported PIDs and the PIDs that are requested by
+                        // Decoder Dictionary
+                        OBDModule->updatePIDRequestList( SID::CURRENT_STATS,
+                                                         ECUType::TRANSMISSION,
+                                                         OBDModule->mSupportedPIDsTransmission,
+                                                         OBDModule->mPIDsToRequestTransmission );
                     }
                     else
                     {
@@ -315,7 +349,7 @@ OBDOverCANModule::doWork( void *data )
                 // To not overwhelm the bus, we split the PIDs into group of 6
                 // and wait for the response.
                 // Start with the ECM
-                if ( OBDModule->getSupportedPIDs( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) &&
+                if ( OBDModule->getPIDsToRequest( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) &&
                      !enginePIDs.empty() )
                 {
                     OBDModule->mLogger.trace( "OBDOverCANModule::doWork", "Requesting Emission PIDs from the ECM" );
@@ -351,7 +385,7 @@ OBDOverCANModule::doWork( void *data )
                 }
                 // TCM
                 if ( OBDModule->mHasTransmission &&
-                     OBDModule->getSupportedPIDs( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) &&
+                     OBDModule->getPIDsToRequest( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) &&
                      !transmissionPIDs.empty() )
                 {
                     OBDModule->mLogger.trace( "OBDOverCANModule::doWork", "Requesting Emission PIDs from the TCM" );
@@ -462,13 +496,12 @@ OBDOverCANModule::requestReceiveEmissionPIDs( const SID &sid,
 
     while ( rangeCount > 0 )
     {
+        auto pidList = std::vector<PID>( pids.begin() + static_cast<uint32_t>( rangeCount - 1U ) * MAX_PID_RANGE,
+                                         pids.begin() + static_cast<uint32_t>( rangeCount ) * MAX_PID_RANGE );
         // start from the tail and walk backwards.
-        if ( requestPIDs( sid,
-                          std::vector<PID>( pids.begin() + static_cast<uint32_t>( rangeCount - 1U ) * MAX_PID_RANGE,
-                                            pids.begin() + static_cast<uint32_t>( rangeCount ) * MAX_PID_RANGE ),
-                          isoTPSendReceive ) )
+        if ( requestPIDs( sid, pidList, isoTPSendReceive ) )
         {
-            if ( receivePIDs( sid, isoTPSendReceive, info ) )
+            if ( receivePIDs( sid, pidList, isoTPSendReceive, info ) )
             {
                 mLogger.trace( "OBDOverCANModule::doWork",
                                "Received Emission PID data for SID: " + std::to_string( toUType( sid ) ) );
@@ -484,11 +517,10 @@ OBDOverCANModule::requestReceiveEmissionPIDs( const SID &sid,
     // request the remaining PIDs if any.
     if ( rangeLeft > 0 )
     {
-        if ( requestPIDs( sid,
-                          std::vector<PID>( pids.end() - static_cast<uint32_t>( rangeLeft ), pids.end() ),
-                          isoTPSendReceive ) )
+        auto pidList = std::vector<PID>( pids.end() - static_cast<uint32_t>( rangeLeft ), pids.end() );
+        if ( requestPIDs( sid, pidList, isoTPSendReceive ) )
         {
-            if ( receivePIDs( sid, isoTPSendReceive, info ) )
+            if ( receivePIDs( sid, pidList, isoTPSendReceive, info ) )
             {
                 mLogger.trace( "OBDOverCANModule::doWork",
                                "Received Emission PID data for SID: " + std::to_string( toUType( sid ) ) );
@@ -592,17 +624,57 @@ OBDOverCANModule::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &di
             // Here we up cast the decoder dictionary to CAN Decoder Dictionary to extract can decoder method
             auto canDecoderDictionaryPtr = std::dynamic_pointer_cast<const CANDecoderDictionary>( dictionary );
             // As OBD only has one port, we expect the decoder dictionary only has one channel
-            if ( mOBDDataDecoder != nullptr && canDecoderDictionaryPtr != nullptr &&
-                 canDecoderDictionaryPtr->canMessageDecoderMethod.size() == 1 )
+            if ( mOBDDataDecoder != nullptr && canDecoderDictionaryPtr != nullptr )
             {
                 // Iterate through the received generic decoder dictionary to construct the OBD specific dictionary
-                for ( const auto &canMessageDecoderMethod :
-                      canDecoderDictionaryPtr->canMessageDecoderMethod.cbegin()->second )
+                std::vector<PID> pidsRequestedByDecoderDict{};
+                if ( canDecoderDictionaryPtr->canMessageDecoderMethod.size() == 1 )
                 {
-                    // The key is PID; The Value is decoder format
-                    mDecoderDictionaryPtr->emplace( canMessageDecoderMethod.first,
-                                                    canMessageDecoderMethod.second.format );
+                    for ( const auto &canMessageDecoderMethod :
+                          canDecoderDictionaryPtr->canMessageDecoderMethod.cbegin()->second )
+                    {
+                        // The key is PID; The Value is decoder format
+                        mDecoderDictionaryPtr->emplace( canMessageDecoderMethod.first,
+                                                        canMessageDecoderMethod.second.format );
+                        // Check if this PID's decoder method contains signals to be collected by
+                        // Decoder Dictionary. If so, add the PID to pidsRequestedByDecoderDict
+                        // Note in worst case scenario when no OBD signals are to be collected, this will
+                        // iterate through the entire OBD signal lists which only contains a few hundreds signals.
+                        for ( const auto &signal : canMessageDecoderMethod.second.format.mSignals )
+                        {
+                            // if the signal is to be collected according to decoder dictionary, push
+                            // the corresponding PID to the pidsRequestedByDecoderDict
+                            if ( canDecoderDictionaryPtr->signalIDsToCollect.find( signal.mSignalID ) !=
+                                 canDecoderDictionaryPtr->signalIDsToCollect.end() )
+                            {
+                                pidsRequestedByDecoderDict.emplace_back(
+                                    static_cast<PID>( canMessageDecoderMethod.first ) );
+                                // We know this PID needs to be requested, break to move on next PID
+                                break;
+                            }
+                        }
+                    }
                 }
+                // Need to sort the vector to make it easier to search for common PIDs between this vector
+                // and the PIDs supported by ECU.
+                std::sort( pidsRequestedByDecoderDict.begin(), pidsRequestedByDecoderDict.end() );
+                std::ostringstream oss;
+                if ( !pidsRequestedByDecoderDict.empty() )
+                {
+                    std::copy( pidsRequestedByDecoderDict.begin(),
+                               pidsRequestedByDecoderDict.end() - 1,
+                               std::ostream_iterator<int>( oss, "," ) );
+                    oss << std::to_string( pidsRequestedByDecoderDict.back() );
+                }
+                mLogger.trace( "OBDOverCANModule::onChangeOfActiveDictionary",
+                               "Decoder Dictionary requests PIDs: " + oss.str() );
+                // For now we only support OBD Service Mode 1 PID
+                mPIDsRequestedByDecoderDict[SID::CURRENT_STATS] = pidsRequestedByDecoderDict;
+                // If the program already know the supported PIDs from ECU, below two update will update
+                // the PIDs list to request from ECU. Otherwise, the two function below will not perform anything.
+                updatePIDRequestList( SID::CURRENT_STATS, ECUType::ENGINE, mSupportedPIDsEngine, mPIDsToRequestEngine );
+                updatePIDRequestList(
+                    SID::CURRENT_STATS, ECUType::TRANSMISSION, mSupportedPIDsTransmission, mPIDsToRequestTransmission );
                 // Pass on the decoder manifest to the OBD Decoder and wake up the thread.
                 // Before that we should interrupt the thread so that no further decoding
                 // is done using the previous decoder, then assign the new decoder manifest,
@@ -624,6 +696,46 @@ OBDOverCANModule::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &di
     }
 }
 
+void
+OBDOverCANModule::updatePIDRequestList( const SID &sid,
+                                        const ECUType &type,
+                                        std::map<SID, SupportedPIDs> &supportedPIDs,
+                                        std::map<SID, std::vector<PID>> &pidsToRequestPerService )
+{
+    // Update the PID Request List with PIDs that are common between decoder dictionary and the PIDs supported by ECU
+    if ( supportedPIDs.find( sid ) != supportedPIDs.end() &&
+         mPIDsRequestedByDecoderDict.find( sid ) != mPIDsRequestedByDecoderDict.end() )
+    {
+        std::vector<PID> pidsToRequest{};
+        // Note that the two vector has to be sorted previously to use the function below properly
+        std::set_intersection( supportedPIDs[sid].begin(),
+                               supportedPIDs[sid].end(),
+                               mPIDsRequestedByDecoderDict[sid].begin(),
+                               mPIDsRequestedByDecoderDict[sid].end(),
+                               std::back_inserter( pidsToRequest ) );
+        std::ostringstream oss;
+        oss << "The PIDs to Request from ";
+        switch ( type )
+        {
+        case ECUType::ENGINE:
+            oss << "Engine ECU are: ";
+            break;
+        case ECUType::TRANSMISSION:
+            oss << "Transmission ECU are: ";
+            break;
+        default:
+            oss << "ECU are: ";
+        }
+        if ( !pidsToRequest.empty() )
+        {
+            std::copy( pidsToRequest.begin(), pidsToRequest.end() - 1, std::ostream_iterator<int>( oss, "," ) );
+            oss << std::to_string( pidsToRequest.back() );
+        }
+        mLogger.trace( "OBDOverCANModule::updatePIDRequestList", oss.str() );
+        pidsToRequestPerService[sid] = pidsToRequest;
+    }
+}
+
 bool
 OBDOverCANModule::requestSupportedPIDs( const SID &sid, ISOTPOverCANSenderReceiver &isoTPSendReceive )
 {
@@ -634,7 +746,12 @@ OBDOverCANModule::requestSupportedPIDs( const SID &sid, ISOTPOverCANSenderReceiv
     mTxPDU.emplace_back( static_cast<uint8_t>( sid ) );
     // Then insert the PID ranges
     mTxPDU.insert( mTxPDU.end(), std::begin( supportedPIDRange ), std::end( supportedPIDRange ) );
+    mLogger.trace( "OBDOverCANModule::requestSupportedPIDs", "send supported PID requests" );
 
+    std::ostringstream oss;
+    std::copy( mTxPDU.begin(), mTxPDU.end() - 1, std::ostream_iterator<int>( oss, "," ) );
+    oss << std::to_string( mTxPDU.back() );
+    mLogger.trace( "OBDOverCANModule::requestSupportedPIDs", "TxPDU: " + oss.str() );
     return isoTPSendReceive.sendPDU( mTxPDU );
 }
 
@@ -651,9 +768,13 @@ OBDOverCANModule::receiveSupportedPIDs( const SID &sid,
     {
         return false;
     }
-    if ( !ecuResponse.empty() && mOBDDataDecoder->decodeSupportedPIDs( sid, ecuResponse, supportedPIDs ) )
+    if ( !ecuResponse.empty() )
     {
-        return true;
+        std::ostringstream oss;
+        std::copy( ecuResponse.begin(), ecuResponse.end() - 1, std::ostream_iterator<int>( oss, "," ) );
+        oss << std::to_string( ecuResponse.back() );
+        mLogger.trace( "OBDOverCANModule::receiveSupportedPIDs", "ECU Response: " + oss.str() );
+        return mOBDDataDecoder->decodeSupportedPIDs( sid, ecuResponse, supportedPIDs );
     }
     return false;
 }
@@ -675,12 +796,19 @@ OBDOverCANModule::requestPIDs( const SID &sid,
     mTxPDU.emplace_back( static_cast<uint8_t>( sid ) );
     // Then insert the items of the PIDs
     mTxPDU.insert( std::end( mTxPDU ), std::begin( pids ), std::end( pids ) );
+    std::ostringstream oss;
+    std::copy( mTxPDU.begin(), mTxPDU.end() - 1, std::ostream_iterator<int>( oss, "," ) );
+    oss << std::to_string( mTxPDU.back() );
+    mLogger.trace( "OBDOverCANModule::requestPIDs", "Transmit PDU: " + oss.str() );
     // Send
     return isoTPSendReceive.sendPDU( mTxPDU );
 }
 
 bool
-OBDOverCANModule::receivePIDs( const SID &sid, ISOTPOverCANSenderReceiver &isoTPSendReceive, EmissionInfo &info )
+OBDOverCANModule::receivePIDs( const SID &sid,
+                               const std::vector<PID> &pids,
+                               ISOTPOverCANSenderReceiver &isoTPSendReceive,
+                               EmissionInfo &info )
 {
     std::vector<uint8_t> ecuResponse;
     // Receive the PDU that has the Supported PIDs for this SID
@@ -690,9 +818,13 @@ OBDOverCANModule::receivePIDs( const SID &sid, ISOTPOverCANSenderReceiver &isoTP
         return false;
     }
     // The info structure will be appended with the new decoded PIDs
-    if ( !ecuResponse.empty() && mOBDDataDecoder->decodeEmissionPIDs( sid, ecuResponse, info ) )
+    if ( !ecuResponse.empty() )
     {
-        return true;
+        std::ostringstream oss;
+        std::copy( ecuResponse.begin(), ecuResponse.end() - 1, std::ostream_iterator<int>( oss, "," ) );
+        oss << std::to_string( ecuResponse.back() );
+        mLogger.trace( "OBDOverCANModule::receivePIDs", "ECU Response: " + oss.str() );
+        return mOBDDataDecoder->decodeEmissionPIDs( sid, pids, ecuResponse, info );
     }
 
     return false;
@@ -761,12 +893,12 @@ OBDOverCANModule::requestReceiveDTCs( const SID &sid, ISOTPOverCANSenderReceiver
 }
 
 bool
-OBDOverCANModule::getSupportedPIDs( const SID &sid, const ECUType &type, SupportedPIDs &supportedPIDs ) const
+OBDOverCANModule::getPIDsToRequest( const SID &sid, const ECUType &type, SupportedPIDs &supportedPIDs ) const
 {
     if ( type == ECUType::ENGINE )
     {
-        auto pidIterator = mSupportedPIDsEngine.find( sid );
-        if ( pidIterator == mSupportedPIDsEngine.end() )
+        auto pidIterator = mPIDsToRequestEngine.find( sid );
+        if ( pidIterator == mPIDsToRequestEngine.end() )
         {
             return false;
         }
@@ -775,8 +907,8 @@ OBDOverCANModule::getSupportedPIDs( const SID &sid, const ECUType &type, Support
     }
     else if ( type == ECUType::TRANSMISSION )
     {
-        auto pidIterator = mSupportedPIDsTransmission.find( sid );
-        if ( pidIterator == mSupportedPIDsTransmission.end() )
+        auto pidIterator = mPIDsToRequestTransmission.find( sid );
+        if ( pidIterator == mPIDsToRequestTransmission.end() )
         {
             return false;
         }

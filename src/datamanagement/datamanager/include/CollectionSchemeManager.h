@@ -305,6 +305,9 @@ private:
     static constexpr int RETRY_CHECKIN_INTERVAL_IN_MILLISECOND = 5000;
     // checkIn ID in parallel to collectionScheme IDs
     static const std::string CHECKIN;
+    // Supported Network Protocol. This list will expand when new protocol added
+    static constexpr std::array<VehicleDataSourceProtocol, 2> SUPPORTED_NETWORK_PROTOCOL = {
+        VehicleDataSourceProtocol::RAW_SOCKET, VehicleDataSourceProtocol::OBD };
 
     Thread mThread;
     // Atomic flag to signal the state of main thread. If true, we should stop

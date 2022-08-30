@@ -110,14 +110,13 @@ public:
     void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &activeConditions ) override;
 
     /**
-     * @brief Returns the Supported PIDs the Engine ECU has reported
-     * for the given SID
+     * @brief Returns the PIDs that are to be requested from ECU
      * @param sid the SID e.g. Mode 1
      * @param supportedPIDs container where the result will be copied
      * @param type the ECU Type e.g. Engine , Transmission
      * @return True if successful. False if the SID was not processed.
      */
-    bool getSupportedPIDs( const SID &sid, const ECUType &type, SupportedPIDs &supportedPIDs ) const;
+    bool getPIDsToRequest( const SID &sid, const ECUType &type, SupportedPIDs &supportedPIDs ) const;
 
     /**
      * @brief Returns the VIN received in this OBD Session
@@ -177,9 +176,17 @@ private:
     bool receiveSupportedPIDs( const SID &sid,
                                ISOTPOverCANSenderReceiver &isoTPSendReceive,
                                SupportedPIDs &supportedPIDs );
+    // Update the PID Request List with PIDs that are common between decoder dictionary and the PIDs supported by ECU
+    void updatePIDRequestList( const SID &sid,
+                               const ECUType &type,
+                               std::map<SID, SupportedPIDs> &supportedPIDs,
+                               std::map<SID, std::vector<PID>> &pidsToRequestPerService );
     // Request a set of PIDs from one ECU ( up to 6 PIDs at a time )
     bool requestPIDs( const SID &sid, const std::vector<PID> &pids, ISOTPOverCANSenderReceiver &isoTPSendReceive );
-    bool receivePIDs( const SID &sid, ISOTPOverCANSenderReceiver &isoTPSendReceive, EmissionInfo &info );
+    bool receivePIDs( const SID &sid,
+                      const std::vector<PID> &pids,
+                      ISOTPOverCANSenderReceiver &isoTPSendReceive,
+                      EmissionInfo &info );
 
     bool requestReceiveSupportedPIDs( const SID &sid,
                                       ISOTPOverCANSenderReceiver &isoTPSendReceive,
@@ -227,6 +234,13 @@ private:
     // Supported PIDs for both ECUs
     std::map<SID, SupportedPIDs> mSupportedPIDsEngine;
     std::map<SID, SupportedPIDs> mSupportedPIDsTransmission;
+    // PIDs that are required by decoder dictionary
+    std::unordered_map<SID, std::vector<PID>> mPIDsRequestedByDecoderDict;
+    // The PIDs to request from ECUs. It will be the common PIDs that are required by
+    // decoder dictionary as well as supported by ECU
+    std::map<SID, std::vector<PID>> mPIDsToRequestEngine;
+    std::map<SID, std::vector<PID>> mPIDsToRequestTransmission;
+
     // OBD Session Manager
     // Will not be used. This is for Future use for ECU discovery.
     // OBDOverCANSessionManager mSessionManager;

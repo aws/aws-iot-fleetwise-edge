@@ -1,5 +1,17 @@
 # Change Log
 
+## v0.1.4 (Aug 29, 2022)
+https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.4/aws-iot-fleetwise-edge.zip
+
+Bugfixes:
+* Fixed a bug in which software will continue requesting OBD-II PIDs or decoding CAN messages after all collection schemes removed.
+
+Improvements:
+* OBDOverCANModule will only request PIDs that are to be collected by Decoder Dictionary and supported by ECUs.
+* OBDDataDecoder will validate the OBD PID response Length before decoding. If software detect response length mismatch with OBD Decoder Manifest, program will do 1) Log warning; 2) Discard the entire response.
+* OBDDataDecoder will only decode the payload with the PIDs that previously requested.
+* Improve OBD logging to log CAN ISOTP raw bytes for better debugging
+
 ## v0.1.3 (Aug 3, 2022)
 https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.3/aws-iot-fleetwise-edge.zip
 
