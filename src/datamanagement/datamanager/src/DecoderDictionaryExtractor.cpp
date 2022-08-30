@@ -23,6 +23,7 @@ namespace IoTFleetWise
 {
 namespace DataManagement
 {
+constexpr std::array<VehicleDataSourceProtocol, 2> CollectionSchemeManager::SUPPORTED_NETWORK_PROTOCOL;
 void
 CollectionSchemeManager::decoderDictionaryExtractor(
     std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> &decoderDictionaryMap )
@@ -193,6 +194,16 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                     }
                 }
             }
+        }
+    }
+    for ( VehicleDataSourceProtocol networkType : SUPPORTED_NETWORK_PROTOCOL )
+    {
+        // check if the decoder dictionary has been created for this network type. If not, we need to explicity create
+        // an empty one to shutdown the decoding if it's on-going
+        if ( decoderDictionaryMap.find( networkType ) == decoderDictionaryMap.end() )
+        {
+            // Currently we don't have decoder dictionary for this type of network protocol, create one
+            decoderDictionaryMap.emplace( networkType, std::make_shared<CANDecoderDictionary>() );
         }
     }
 }

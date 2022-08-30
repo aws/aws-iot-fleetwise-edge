@@ -380,8 +380,13 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     test.decoderDictionaryExtractor( decoderDictionaryMapNew );
     ASSERT_TRUE( decoderDictionaryMapNew.find( VehicleDataSourceProtocol::RAW_SOCKET ) !=
                  decoderDictionaryMapNew.end() );
-    // OBD is only included in CollectionScheme 2 and it's already expired
-    ASSERT_TRUE( decoderDictionaryMapNew.find( VehicleDataSourceProtocol::OBD ) == decoderDictionaryMapNew.end() );
+    // OBD is only included in CollectionScheme 2 and it's already expired. Hence it will be an empty decoder dictionary
+    // for OBD
+    ASSERT_TRUE( decoderDictionaryMapNew.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMapNew.end() );
+    decoderDictionary = decoderDictionaryMapNew[VehicleDataSourceProtocol::OBD];
+    ASSERT_EQ( decoderDictionary->signalIDsToCollect.size(), 0 );
+    ASSERT_EQ( decoderDictionary->canMessageDecoderMethod.size(), 0 );
+
     decoderDictionary = decoderDictionaryMapNew[VehicleDataSourceProtocol::RAW_SOCKET];
     // Now dictionary shall not contain anything for Node 10 as CollectionScheme1 is retired
     ASSERT_TRUE( decoderDictionary->canMessageDecoderMethod.find( firstChannelId ) ==

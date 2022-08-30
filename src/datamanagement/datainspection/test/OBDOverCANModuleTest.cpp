@@ -78,8 +78,8 @@ initInspectionMatrix( OBDOverCANModule &module )
 // Initialize the decoder dictionary for this test.
 // Note In actual product, decoder dictionary comes from decoder manifest. For this unit test,
 // The decoder dictionary is initialized based on a local table mode1PIDs in OBDDataDecoder Module.
-void
-initDecoderDictionary( OBDOverCANModule &module )
+std::shared_ptr<CANDecoderDictionary>
+initDecoderDictionary()
 {
     auto decoderDictPtr = std::make_shared<CANDecoderDictionary>();
     decoderDictPtr->canMessageDecoderMethod.emplace( 0, std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>() );
@@ -101,11 +101,12 @@ initDecoderDictionary( OBDOverCANModule &module )
                 ( mode1PIDs[pid].formulas[idx].numOfBytes - 1 ) * BYTE_SIZE + mode1PIDs[pid].formulas[idx].bitMaskLen );
             format.mSignals[idx].mFactor = mode1PIDs[pid].formulas[idx].scaling;
             format.mSignals[idx].mOffset = mode1PIDs[pid].formulas[idx].offset;
+            decoderDictPtr->signalIDsToCollect.insert( pid | ( idx << 8 ) );
         }
         decoderDictPtr->canMessageDecoderMethod[0].emplace( pid, CANMessageDecoderMethod() );
         decoderDictPtr->canMessageDecoderMethod[0][pid].format = format;
     }
-    module.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
+    return decoderDictPtr;
 }
 
 } // namespace
@@ -194,7 +195,10 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleAssert29BitMessageSent )
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, true, false ) );
     ASSERT_TRUE( obdModule.connect() );
-    initDecoderDictionary( obdModule );
+    // Create decoder dictionary
+    auto decoderDictPtr = initDecoderDictionary();
+    // publish decoder dictionary to OBD module
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     ASSERT_TRUE( engineECU.receivePDU( rxPDUData ) );
     ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
@@ -260,7 +264,10 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleAndDecoderManifestLifecycle )
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     ASSERT_FALSE( engineECU.receivePDU( ecmRxPDUData ) );
     // Now activate the decoder manifest and observe that the module has sent a request
-    initDecoderDictionary( obdModule );
+    // Create decoder dictionary
+    auto decoderDictPtr = initDecoderDictionary();
+    // publish decoder dictionary to OBD module
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
     ASSERT_TRUE( engineECU.disconnect() );
@@ -291,7 +298,10 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestVIN )
     ASSERT_TRUE(
         obdModule.init( signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval ) );
     ASSERT_TRUE( obdModule.connect() );
-    initDecoderDictionary( obdModule );
+    // Create decoder dictionary
+    auto decoderDictPtr = initDecoderDictionary();
+    // publish decoder dictionary to OBD module
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
     // Wait for OBD module to send out VIN request
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
@@ -339,7 +349,10 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionSupportedPIDsTest )
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false, true ) );
     ASSERT_TRUE( obdModule.connect() );
-    initDecoderDictionary( obdModule );
+    // Create decoder dictionary
+    auto decoderDictPtr = initDecoderDictionary();
+    // publish decoder dictionary to OBD module
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
     // Wait for OBD module to send out VIN request
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     // Respond to VIN request
@@ -381,15 +394,32 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionSupportedPIDsTest )
     // Make sure the OBDModule thread has processed the response.
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     SupportedPIDs enginePIDs, transmissionPIDs;
-    ASSERT_TRUE( obdModule.getSupportedPIDs( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) );
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) );
 
     // Expected Result
     // The list should not include the Supported PID Ids.
-    expectedECMPIDs = {
-        0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x15, 0x19, 0x21 };
+    expectedECMPIDs = { 0x03,
+                        0x04,
+                        0x05,
+                        0x06,
+                        0x07,
+                        0x08,
+                        0x09,
+                        0x0B,
+                        0x0C,
+                        0x0D,
+                        0x0E,
+                        0x0F,
+                        0x10,
+                        0x11,
+                        0x13,
+                        0x15,
+                        0x19,
+                        0x1C,
+                        0x21 };
     ASSERT_EQ( enginePIDs, expectedECMPIDs );
     expectedTCMPIDs = { 0x0D };
-    ASSERT_TRUE( obdModule.getSupportedPIDs( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) );
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) );
     ASSERT_EQ( transmissionPIDs, expectedTCMPIDs );
     // Cleanup
     ASSERT_TRUE( engineECU.disconnect() );
@@ -397,7 +427,7 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionSupportedPIDsTest )
     ASSERT_TRUE( obdModule.disconnect() );
 }
 
-TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionPIDDataTest )
+TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestAllEmissionPIDDataTest )
 {
     std::vector<uint8_t> ecmRxPDUData;
     std::vector<uint8_t> ecmTxPDUData;
@@ -428,7 +458,10 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionPIDDataTest )
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false, true ) );
     ASSERT_TRUE( obdModule.connect() );
-    initDecoderDictionary( obdModule );
+    // Create decoder dictionary
+    auto decoderDictPtr = initDecoderDictionary();
+    // publish decoder dictionary to OBD module
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
     // Wait for OBD module to send out VIN request
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     // Respond to VIN request
@@ -470,8 +503,8 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionPIDDataTest )
     // Make sure the OBDModule thread has processed the response.
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     SupportedPIDs enginePIDs, transmissionPIDs;
-    ASSERT_TRUE( obdModule.getSupportedPIDs( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) );
-    ASSERT_TRUE( obdModule.getSupportedPIDs( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) );
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) );
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) );
 
     ASSERT_EQ( enginePIDs[0], 0x04 );
     ASSERT_EQ( enginePIDs[1], 0x05 );
@@ -511,6 +544,305 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionPIDDataTest )
     ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
     ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
     ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
+
+    // Cleanup
+    ASSERT_TRUE( engineECU.disconnect() );
+    ASSERT_TRUE( transmissionECU.disconnect() );
+    ASSERT_TRUE( obdModule.disconnect() );
+}
+
+// This test is to validate that OBDOverCANModule will only request PID that are specified in Decoder Dictionary
+// In this test scenario, the decoder dictionary will request signals from PIDs 0x04, 0x14, 0x0D, 0x15, 0x16, 0x17
+// Engine ECU supports PIDs 0x04,0x05,0x09,0x11,0x12,0x13,0x14
+// Transmission ECU supports PIDs 0x0D
+// Hence Edge Agent will only request 0x04, 0x14 to Engine ECU and 0x0D to Transmission ECU
+TEST_F( OBDOverCANModuleTest, DecoderDictionaryOnlyRequstPartialEmissionPIDTest )
+{
+    std::vector<uint8_t> ecmRxPDUData;
+    std::vector<uint8_t> ecmTxPDUData;
+    std::vector<uint8_t> tmcRxPDUData;
+    std::vector<uint8_t> tcmTxPDUData;
+    std::vector<uint8_t> expectedECMData;
+    std::vector<uint8_t> expectedTCMData;
+    std::vector<uint8_t> expectedECMPIDs;
+    std::vector<uint8_t> expectedTCMPIDs;
+    const uint32_t obdPIDRequestInterval = 2; // 2 seconds
+    const uint32_t obdDTCRequestInterval = 0; // no DTC request
+
+    ISOTPOverCANSenderReceiver engineECU;
+    ISOTPOverCANSenderReceiverOptions engineECUOptions;
+    ISOTPOverCANSenderReceiver transmissionECU;
+    ISOTPOverCANSenderReceiverOptions transmissionECUOptions;
+    // Engine ECU
+    engineECUOptions.mSocketCanIFName = "vcan0";
+    engineECUOptions.mSourceCANId = toUType( ECUID::ENGINE_ECU_RX );
+    engineECUOptions.mDestinationCANId = toUType( ECUID::ENGINE_ECU_TX );
+    engineECUOptions.mP2TimeoutMs = P2_TIMEOUT_INFINITE;
+    ASSERT_TRUE( engineECU.init( engineECUOptions ) );
+    ASSERT_TRUE( engineECU.connect() );
+
+    auto signalBufferPtr = std::make_shared<SignalBuffer>( 256 );
+    auto activeDTCBufferPtr = std::make_shared<ActiveDTCBuffer>( 256 );
+    OBDOverCANModule obdModule;
+    ASSERT_TRUE( obdModule.init(
+        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false, true ) );
+    ASSERT_TRUE( obdModule.connect() );
+    // create decoder dictionary
+    auto decoderDictPtr = initDecoderDictionary();
+    decoderDictPtr->signalIDsToCollect.clear();
+    decoderDictPtr->signalIDsToCollect.insert( 0x04 );
+    // Oxygen Sensor 1 contains two signals, we want to collect the second signal
+    decoderDictPtr->signalIDsToCollect.insert( 0x14 | 1 << 8 );
+    decoderDictPtr->signalIDsToCollect.insert( 0x0D );
+    // The decoder dictionary request PID 0x15, 0x16, 0x17 but they will not be supported by ECU
+    decoderDictPtr->signalIDsToCollect.insert( 0x15 );
+    decoderDictPtr->signalIDsToCollect.insert( 0x16 );
+    decoderDictPtr->signalIDsToCollect.insert( 0x17 );
+    // publish the decoder dictionary
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
+
+    // Wait for OBD module to send out VIN request
+    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
+    // Respond to VIN request
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    // Received VIN request for SID 0x09 and PID 0x02 from FWE
+    ASSERT_TRUE( ecmRxPDUData[0] == toUType( vehicleIdentificationNumberRequest.mSID ) );
+    ASSERT_TRUE( ecmRxPDUData[1] == vehicleIdentificationNumberRequest.mPID );
+    // Transmission ECU
+    transmissionECUOptions.mSocketCanIFName = "vcan0";
+    transmissionECUOptions.mSourceCANId = toUType( ECUID::TRANSMISSION_ECU_RX );
+    transmissionECUOptions.mDestinationCANId = toUType( ECUID::TRANSMISSION_ECU_TX );
+    transmissionECUOptions.mP2TimeoutMs = P2_TIMEOUT_INFINITE;
+    ASSERT_TRUE( transmissionECU.init( transmissionECUOptions ) );
+    ASSERT_TRUE( transmissionECU.connect() );
+    // Respond
+    ecmTxPDUData = { 0x49, 0x02, 0x01, 0x31, 0x47, 0x31, 0x4A, 0x43, 0x35, 0x34,
+                     0x34, 0x34, 0x52, 0x37, 0x32, 0x35, 0x32, 0x33, 0x36, 0x37 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    // Make sure we wait for the request to arrive from the OBD Module thread
+    // Wait for it to come.
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    // Received Supported PID request for SID 0x01 from FWE
+    ASSERT_TRUE( ecmRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
+    ASSERT_TRUE( ecmRxPDUData[1] == 0x00 );
+    // Respond
+    // Support PID 0x04,0x05,0x09,0x11,0x12,0x13,0x14
+    ecmTxPDUData = { 0x41, 0x00, 0x18, 0x80, 0xF0, 0x00 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    // Transmission ECU Handling
+    // The Supported PID request has now be issued.
+    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    // Received Supported PID request for SID 0x01 from FWE
+    ASSERT_TRUE( tmcRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
+    ASSERT_TRUE( tmcRxPDUData[1] == 0x00 );
+    // Respond
+    // Support PID 0x0D
+    tcmTxPDUData = { 0x41, 0x00, 0x00, 0x08, 0x00, 0x00 };
+    ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    // Make sure the OBDModule thread has processed the response.
+    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
+    SupportedPIDs enginePIDs, transmissionPIDs;
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) );
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) );
+
+    // 0x05, 0x09, 0x11, 0x12, 0x13 should not be requested as it's not required by decoder dictionary
+    ASSERT_EQ( enginePIDs[0], 0x04 );
+    // 0x14 shall be requested as it contains signals in decoder dictionary
+    ASSERT_EQ( enginePIDs[1], 0x14 );
+    ASSERT_EQ( transmissionPIDs[0], 0x0D );
+    // Receive any PID Data request
+    ecmRxPDUData.clear();
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    // expect SID 1 and 2 PIDs
+    // 0x05 should not be requested as it's not required by decoder dictionary
+    expectedECMPIDs = { 0x01, 0x04, 0x14 };
+    ASSERT_EQ( expectedECMPIDs, ecmRxPDUData );
+    // Respond to FWE with the requested PIDs.
+    // ECM , Engine load, O2 Sensor 1
+    ecmTxPDUData = { 0x41, 0x04, 0x99, 0x14, 0x10, 0x20 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+
+    tmcRxPDUData.clear();
+    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    // expect SID 1 and 1 PID
+    expectedTCMPIDs = { 0x01, 0x0D };
+    ASSERT_EQ( expectedECMPIDs, ecmRxPDUData );
+    // TCM, Vehicle speed of 35 kph
+    tcmTxPDUData = { 0x41, 0x0D, 0x23 };
+    ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    // Wait till the OBD Module receives the data
+    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
+
+    // Expected value for PID signals
+    std::map<SignalID, SignalValue> expectedPIDSignalValue = {
+        { toUType( EmissionPIDs::ENGINE_LOAD ), 60 },
+        { toUType( EmissionPIDs::OXYGEN_SENSOR1_1 ) | 0 << 8, (double)0x10 / 200 },
+        { toUType( EmissionPIDs::OXYGEN_SENSOR1_1 ) | 1 << 8, (double)0x20 * 100 / 128 - 100 },
+        { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 } };
+    // Verify all PID Signals are correctly decoded
+    CollectedSignal signal;
+    for ( size_t idx = 0; idx < expectedPIDSignalValue.size(); ++idx )
+    {
+        ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+        ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
+    }
+    ASSERT_TRUE( obdModule.getSignalBufferPtr()->empty() );
+
+    // Cleanup
+    ASSERT_TRUE( engineECU.disconnect() );
+    ASSERT_TRUE( transmissionECU.disconnect() );
+    ASSERT_TRUE( obdModule.disconnect() );
+}
+
+// This test is to validate that OBDOverCANModule can udpate the PID request list when receiving new decoder manifest
+// In this test scenario, decoder dictionary will first request PID 0x04, 0x14 and 0x0D; then it will switch
+// to 0x05, 0x14 and 0x0C.
+TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
+{
+    std::vector<uint8_t> ecmRxPDUData;
+    std::vector<uint8_t> ecmTxPDUData;
+    std::vector<uint8_t> tmcRxPDUData;
+    std::vector<uint8_t> tcmTxPDUData;
+    std::vector<uint8_t> expectedECMData;
+    std::vector<uint8_t> expectedTCMData;
+    std::vector<uint8_t> expectedECMPIDs;
+    std::vector<uint8_t> expectedTCMPIDs;
+    const uint32_t obdPIDRequestInterval = 2; // 2 seconds
+    const uint32_t obdDTCRequestInterval = 0; // no DTC request
+
+    ISOTPOverCANSenderReceiver engineECU;
+    ISOTPOverCANSenderReceiverOptions engineECUOptions;
+    ISOTPOverCANSenderReceiver transmissionECU;
+    ISOTPOverCANSenderReceiverOptions transmissionECUOptions;
+    // Engine ECU
+    engineECUOptions.mSocketCanIFName = "vcan0";
+    engineECUOptions.mSourceCANId = toUType( ECUID::ENGINE_ECU_RX );
+    engineECUOptions.mDestinationCANId = toUType( ECUID::ENGINE_ECU_TX );
+    engineECUOptions.mP2TimeoutMs = P2_TIMEOUT_INFINITE;
+    ASSERT_TRUE( engineECU.init( engineECUOptions ) );
+    ASSERT_TRUE( engineECU.connect() );
+
+    auto signalBufferPtr = std::make_shared<SignalBuffer>( 256 );
+    auto activeDTCBufferPtr = std::make_shared<ActiveDTCBuffer>( 256 );
+    OBDOverCANModule obdModule;
+    ASSERT_TRUE( obdModule.init(
+        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false, true ) );
+    ASSERT_TRUE( obdModule.connect() );
+
+    // Create decoder dictionary
+    auto decoderDictPtr = initDecoderDictionary();
+    // Specify the signals to collect
+    decoderDictPtr->signalIDsToCollect.clear();
+    decoderDictPtr->signalIDsToCollect.insert( 0x04 );
+    // Oxygen Sensor 1 contains two signals, we want to collect the second signal
+    decoderDictPtr->signalIDsToCollect.insert( 0x14 | 1 << 8 );
+    decoderDictPtr->signalIDsToCollect.insert( 0x0D );
+    // The decoder dictionary request PID 0x15, 0x16, 0x17 but they will not be supported by ECU
+    decoderDictPtr->signalIDsToCollect.insert( 0x15 );
+    decoderDictPtr->signalIDsToCollect.insert( 0x16 );
+    decoderDictPtr->signalIDsToCollect.insert( 0x17 );
+    // publish decoder dictionary
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
+
+    // Wait for OBD module to send out VIN request
+    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
+    // Respond to VIN request
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    // Received VIN request for SID 0x09 and PID 0x02 from FWE
+    ASSERT_TRUE( ecmRxPDUData[0] == toUType( vehicleIdentificationNumberRequest.mSID ) );
+    ASSERT_TRUE( ecmRxPDUData[1] == vehicleIdentificationNumberRequest.mPID );
+    // Transmission ECU
+    transmissionECUOptions.mSocketCanIFName = "vcan0";
+    transmissionECUOptions.mSourceCANId = toUType( ECUID::TRANSMISSION_ECU_RX );
+    transmissionECUOptions.mDestinationCANId = toUType( ECUID::TRANSMISSION_ECU_TX );
+    transmissionECUOptions.mP2TimeoutMs = P2_TIMEOUT_INFINITE;
+    ASSERT_TRUE( transmissionECU.init( transmissionECUOptions ) );
+    ASSERT_TRUE( transmissionECU.connect() );
+    // Respond
+    ecmTxPDUData = { 0x49, 0x02, 0x01, 0x31, 0x47, 0x31, 0x4A, 0x43, 0x35, 0x34,
+                     0x34, 0x34, 0x52, 0x37, 0x32, 0x35, 0x32, 0x33, 0x36, 0x37 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    // Make sure we wait for the request to arrive from the OBD Module thread
+    // Wait for it to come.
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    // Received Supported PID request for SID 0x01 from FWE
+    ASSERT_TRUE( ecmRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
+    ASSERT_TRUE( ecmRxPDUData[1] == 0x00 );
+    // Respond
+    // Support PID 0x04,0x05,0x09,0x11,0x12,0x13,0x14
+    ecmTxPDUData = { 0x41, 0x00, 0x18, 0x80, 0xF0, 0x00 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    // Transmission ECU Handling
+    // The Supported PID request has now be issued.
+    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    // Received Supported PID request for SID 0x01 from FWE
+    ASSERT_TRUE( tmcRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
+    ASSERT_TRUE( tmcRxPDUData[1] == 0x00 );
+    // Respond
+    // Support PID 0x0C 0x0D
+    tcmTxPDUData = { 0x41, 0x00, 0x00, 0x18, 0x00, 0x00 };
+    ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    // Make sure the OBDModule thread has processed the response.
+    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
+    SupportedPIDs enginePIDs, transmissionPIDs;
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) );
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) );
+
+    // 0x05, 0x09, 0x11, 0x12, 0x13 should not be requested as it's not required by decoder dictionary
+    ASSERT_EQ( enginePIDs[0], 0x04 );
+    // 0x14 shall be requested as it contains signals in decoder dictionary
+    ASSERT_EQ( enginePIDs[1], 0x14 );
+    ASSERT_EQ( transmissionPIDs[0], 0x0D );
+    // Receive any PID Data request
+    ecmRxPDUData.clear();
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    // expect SID 1 and 2 PIDs
+    // 0x05 should not be requested as it's not required by decoder dictionary
+    expectedECMPIDs = { 0x01, 0x04, 0x14 };
+    ASSERT_EQ( expectedECMPIDs, ecmRxPDUData );
+    // Respond to FWE with the requested PIDs.
+    // ECM , Engine load, O2 Sensor 1
+    ecmTxPDUData = { 0x41, 0x04, 0x99, 0x14, 0x10, 0x20 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+
+    tmcRxPDUData.clear();
+    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    // expect SID 1 and 1 PID
+    expectedTCMPIDs = { 0x01, 0x0D };
+    ASSERT_EQ( expectedECMPIDs, ecmRxPDUData );
+    // TCM, Vehicle speed of 35 kph
+    tcmTxPDUData = { 0x41, 0x0D, 0x23 };
+    ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+
+    // Update Decoder Dictionary to collect PID 0x05
+    decoderDictPtr->signalIDsToCollect.erase( 0x04 );
+    decoderDictPtr->signalIDsToCollect.insert( 0x05 );
+    decoderDictPtr->signalIDsToCollect.insert( 0x0C );
+    decoderDictPtr->signalIDsToCollect.erase( 0x0D );
+    decoderDictPtr->signalIDsToCollect.insert( 0x0E );
+    // publish the new decoder dictionary to OBD module
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) );
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) );
+
+    // Due to new decoder dictionary, we on longer collect PID 0x04 and 0x0D. 0x05 and 0x0C are newly added
+    // 0x0E will not be requested as it's not supported by ECU
+    ASSERT_EQ( enginePIDs[0], 0x05 );
+    ASSERT_EQ( enginePIDs[1], 0x14 );
+    ASSERT_EQ( enginePIDs.size(), 2 );
+    ASSERT_EQ( transmissionPIDs[0], 0x0C );
+    ASSERT_EQ( transmissionPIDs.size(), 1 );
+
+    // Update Decoder Dictionary to not collect any PIDs
+    decoderDictPtr->signalIDsToCollect.clear();
+    // publish the new decoder dictionary to OBD module
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) );
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) );
+
+    // With new decoder dictionary, no PID will be requested
+    ASSERT_EQ( enginePIDs.size(), 0 );
+    ASSERT_EQ( transmissionPIDs.size(), 0 );
 
     // Cleanup
     ASSERT_TRUE( engineECU.disconnect() );
@@ -558,7 +890,10 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestPIDAndDTCsTest )
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false, true ) );
     ASSERT_TRUE( obdModule.connect() );
-    initDecoderDictionary( obdModule );
+    // Create decoder dictionary
+    auto decoderDictPtr = initDecoderDictionary();
+    // publish decoder dictionary to OBD module
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
     initInspectionMatrix( obdModule );
     // Wait for OBD module to send out VIN request
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
