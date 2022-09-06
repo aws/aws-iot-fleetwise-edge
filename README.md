@@ -109,3 +109,6 @@ The following documents provide more information about AWS IoT FleetWise Edge.
 1. [Change Log](./CHANGELOG.md) provides a summary of feature enhancements, updates, and resolved and known issues.
 2. [AWS IoT FleetWise Edge Offboarding](./docs/AWS-IoTFleetWiseOffboarding.md) provides a summary of the steps needed on the Client side to off board from the service.
 3. [AWS IoT FleetWise Edge Agent Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md) provides step-by-step instructions for building and running AWS IoT FleetWise Edge.
+
+The following documents provide more information about AWS IoT FleetWise Cloud.
+1. [AWS IoT FleetWise API Reference](https://docs.aws.amazon.com/iot-fleetwise/latest/APIReference/Welcome.html) describes all the API operations for FleetWise
