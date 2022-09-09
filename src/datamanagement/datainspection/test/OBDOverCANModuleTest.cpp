@@ -83,24 +83,25 @@ initDecoderDictionary()
 {
     auto decoderDictPtr = std::make_shared<CANDecoderDictionary>();
     decoderDictPtr->canMessageDecoderMethod.emplace( 0, std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>() );
-    for ( PID pid = toUType( EmissionPIDs::FUEL_SYSTEM_STATUS ); pid <= toUType( EmissionPIDs::ODOMETER ); ++pid )
+    for ( const auto &pidInfo : mode1PIDs )
     {
         CANMessageFormat format;
+        auto pid = pidInfo.pid;
         format.mMessageID = pid;
-        format.mSizeInBytes = static_cast<uint8_t>( mode1PIDs[pid].retLen );
-        format.mSignals = std::vector<CANSignalFormat>( mode1PIDs[pid].formulas.size() );
-        for ( uint32_t idx = 0; idx < mode1PIDs[pid].formulas.size(); ++idx )
+        format.mSizeInBytes = static_cast<uint8_t>( pidInfo.retLen );
+        format.mSignals = std::vector<CANSignalFormat>( pidInfo.formulas.size() );
+        for ( uint32_t idx = 0; idx < pidInfo.formulas.size(); ++idx )
         {
             // In final product, signal ID comes from Cloud, edge doesn't generate signal ID
             // Below signal ID initialization got implemented only for Edge testing.
             // In this test, signal ID are defined as PID | (signal order) << 8
             format.mSignals[idx].mSignalID = pid | ( idx << 8 );
-            format.mSignals[idx].mFirstBitPosition = static_cast<uint16_t>(
-                mode1PIDs[pid].formulas[idx].byteOffset * BYTE_SIZE + mode1PIDs[pid].formulas[idx].bitShift );
+            format.mSignals[idx].mFirstBitPosition =
+                static_cast<uint16_t>( pidInfo.formulas[idx].byteOffset * BYTE_SIZE + pidInfo.formulas[idx].bitShift );
             format.mSignals[idx].mSizeInBits = static_cast<uint16_t>(
-                ( mode1PIDs[pid].formulas[idx].numOfBytes - 1 ) * BYTE_SIZE + mode1PIDs[pid].formulas[idx].bitMaskLen );
-            format.mSignals[idx].mFactor = mode1PIDs[pid].formulas[idx].scaling;
-            format.mSignals[idx].mOffset = mode1PIDs[pid].formulas[idx].offset;
+                ( pidInfo.formulas[idx].numOfBytes - 1 ) * BYTE_SIZE + pidInfo.formulas[idx].bitMaskLen );
+            format.mSignals[idx].mFactor = pidInfo.formulas[idx].scaling;
+            format.mSignals[idx].mOffset = pidInfo.formulas[idx].offset;
             decoderDictPtr->signalIDsToCollect.insert( pid | ( idx << 8 ) );
         }
         decoderDictPtr->canMessageDecoderMethod[0].emplace( pid, CANMessageDecoderMethod() );
@@ -320,11 +321,101 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestVIN )
     ASSERT_TRUE( obdModule.disconnect() );
 }
 
+// This test aim to validate this module can handle invalid response from ECU when requesting supported PID range
+TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionInvalidSupportedPIDsTest )
+{
+    std::vector<uint8_t> ecmRxPDUData;
+    std::vector<uint8_t> ecmTxPDUData;
+    std::vector<uint8_t> expectedECMPIDs;
+    const uint32_t obdPIDRequestInterval = 2; // 2 seconds
+    const uint32_t obdDTCRequestInterval = 2; // 2 seconds
+
+    ISOTPOverCANSenderReceiver engineECU;
+    ISOTPOverCANSenderReceiverOptions engineECUOptions;
+    // Engine ECU
+    engineECUOptions.mSocketCanIFName = "vcan0";
+    engineECUOptions.mSourceCANId = toUType( ECUID::ENGINE_ECU_RX );
+    engineECUOptions.mDestinationCANId = toUType( ECUID::ENGINE_ECU_TX );
+    engineECUOptions.mP2TimeoutMs = P2_TIMEOUT_INFINITE;
+    ASSERT_TRUE( engineECU.init( engineECUOptions ) );
+    ASSERT_TRUE( engineECU.connect() );
+
+    OBDOverCANModule obdModule;
+    auto signalBufferPtr = std::make_shared<SignalBuffer>( 256 );
+    auto activeDTCBufferPtr = std::make_shared<ActiveDTCBuffer>( 256 );
+    ASSERT_TRUE( obdModule.init(
+        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false, true ) );
+    ASSERT_TRUE( obdModule.connect() );
+    // Create decoder dictionary
+    auto decoderDictPtr = initDecoderDictionary();
+    // publish decoder dictionary to OBD module
+    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
+    // Wait for OBD module to send out VIN request
+    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
+    // Respond to VIN request
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    // Received VIN request for SID 0x09 and PID 0x02 from FWE
+    ASSERT_TRUE( ecmRxPDUData[0] == toUType( vehicleIdentificationNumberRequest.mSID ) );
+    ASSERT_TRUE( ecmRxPDUData[1] == vehicleIdentificationNumberRequest.mPID );
+
+    // Respond
+    ecmTxPDUData = { 0x49, 0x02, 0x01, 0x31, 0x47, 0x31, 0x4A, 0x43, 0x35, 0x34,
+                     0x34, 0x34, 0x52, 0x37, 0x32, 0x35, 0x32, 0x33, 0x36, 0x37 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    // Make sure we wait for the request to arrive from the OBD Module thread
+    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
+    // Wait for the Supported PID request to come it to come.
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    // Received Supported PID request for SID 0x01 from FWE
+    ASSERT_TRUE( ecmRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
+    ASSERT_TRUE( ecmRxPDUData[1] == 0x00 );
+    // Respond
+    // In the ECU response below, the second PID is invalid.
+    ecmTxPDUData = { 0x41, 0x00, 0xBF, 0xBF, 0xA8, 0x91, 0x10, 0xFF, 0xFF, 0xFF, 0xFF };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    ecmTxPDUData = { 0x7F, 0x01, 0x12 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    // flush the socket buffer before going to next cycle
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    // Mock ECU ignore 0x01, 0xC0, 0xE0, need to wait until it times out
+    std::this_thread::sleep_for( std::chrono::milliseconds( obdPIDRequestInterval ) );
+    // wait until ECU receive another message so that we know the requestReceiveSupportedPIDs is complete
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    SupportedPIDs enginePIDs;
+    ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::ENGINE, enginePIDs ) );
+
+    // Expected Result
+    // The list should not include PID above 0x20
+    expectedECMPIDs = { 0x01,
+                        0x03,
+                        0x04,
+                        0x05,
+                        0x06,
+                        0x07,
+                        0x08,
+                        0x09,
+                        0x0B,
+                        0x0C,
+                        0x0D,
+                        0x0E,
+                        0x0F,
+                        0x10,
+                        0x11,
+                        0x13,
+                        0x15,
+                        0x19,
+                        0x1C };
+    ASSERT_EQ( enginePIDs, expectedECMPIDs );
+    // Cleanup
+    ASSERT_TRUE( engineECU.disconnect() );
+    ASSERT_TRUE( obdModule.disconnect() );
+}
+
 TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionSupportedPIDsTest )
 {
     std::vector<uint8_t> ecmRxPDUData;
     std::vector<uint8_t> ecmTxPDUData;
-    std::vector<uint8_t> tmcRxPDUData;
+    std::vector<uint8_t> tcmRxPDUData;
     std::vector<uint8_t> tcmTxPDUData;
     std::vector<uint8_t> expectedECMPIDs;
     std::vector<uint8_t> expectedTCMPIDs;
@@ -379,18 +470,24 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionSupportedPIDsTest )
     ASSERT_TRUE( ecmRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
     ASSERT_TRUE( ecmRxPDUData[1] == 0x00 );
     // Respond
-    // ecmTxPDUData = {0x41,0x00,0xBF,0xBF,0xA8,0x91};
     ecmTxPDUData = { 0x41, 0x00, 0xBF, 0xBF, 0xA8, 0x91, 0x20, 0x80, 0x00, 0x00, 0x00 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    ecmTxPDUData = { 0x41, 0xC0, 0x00, 0x00, 0x00, 0x00 };
     ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
     // Transmission ECU Handling
     // The Supported PID request has now be issued.
-    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // Received Supported PID request for SID 0x01 from FWE
-    ASSERT_TRUE( tmcRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
-    ASSERT_TRUE( tmcRxPDUData[1] == 0x00 );
+    ASSERT_TRUE( tcmRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
+    ASSERT_TRUE( tcmRxPDUData[1] == 0x00 );
     // Respond
     tcmTxPDUData = { 0x41, 0x00, 0x80, 0x08, 0x00, 0x00 };
     ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    tcmTxPDUData = { 0x41, 0xC0, 0x00, 0x00, 0x00, 0x00 };
+    ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    // flush the socket buffer before going to next cycle
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // Make sure the OBDModule thread has processed the response.
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     SupportedPIDs enginePIDs, transmissionPIDs;
@@ -398,27 +495,10 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestEmissionSupportedPIDsTest )
 
     // Expected Result
     // The list should not include the Supported PID Ids.
-    expectedECMPIDs = { 0x03,
-                        0x04,
-                        0x05,
-                        0x06,
-                        0x07,
-                        0x08,
-                        0x09,
-                        0x0B,
-                        0x0C,
-                        0x0D,
-                        0x0E,
-                        0x0F,
-                        0x10,
-                        0x11,
-                        0x13,
-                        0x15,
-                        0x19,
-                        0x1C,
-                        0x21 };
+    expectedECMPIDs = { 0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0B, 0x0C,
+                        0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x15, 0x19, 0x1C, 0x21 };
     ASSERT_EQ( enginePIDs, expectedECMPIDs );
-    expectedTCMPIDs = { 0x0D };
+    expectedTCMPIDs = { 0x01, 0x0D };
     ASSERT_TRUE( obdModule.getPIDsToRequest( SID::CURRENT_STATS, ECUType::TRANSMISSION, transmissionPIDs ) );
     ASSERT_EQ( transmissionPIDs, expectedTCMPIDs );
     // Cleanup
@@ -431,7 +511,7 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestAllEmissionPIDDataTest )
 {
     std::vector<uint8_t> ecmRxPDUData;
     std::vector<uint8_t> ecmTxPDUData;
-    std::vector<uint8_t> tmcRxPDUData;
+    std::vector<uint8_t> tcmRxPDUData;
     std::vector<uint8_t> tcmTxPDUData;
     std::vector<uint8_t> expectedECMData;
     std::vector<uint8_t> expectedTCMData;
@@ -490,16 +570,24 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestAllEmissionPIDDataTest )
     // Support PID 0x04,0x05
     ecmTxPDUData = { 0x41, 0x00, 0x18, 0x00, 0x00, 0x00 };
     ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    ecmTxPDUData = { 0x41, 0xC0, 0x00, 0x00, 0x00, 0x00 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+
     // Transmission ECU Handling
     // The Supported PID request has now be issued.
-    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // Received Supported PID request for SID 0x01 from FWE
-    ASSERT_TRUE( tmcRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
-    ASSERT_TRUE( tmcRxPDUData[1] == 0x00 );
+    ASSERT_TRUE( tcmRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
+    ASSERT_TRUE( tcmRxPDUData[1] == 0x00 );
     // Respond
     // Support PID 0x0D
-    tcmTxPDUData = { 0x41, 0x00, 0x00, 0x08, 0x00, 0x00 };
+    tcmTxPDUData = { 0x41, 0x00, 0x00, 0x08, 0x00, 0x00, 0x40, 0x04, 0x00, 0x00, 0x00 };
     ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    tcmTxPDUData = { 0x41, 0xC0, 0x00, 0x00, 0x00, 0x00 };
+    ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    // flush the socket buffer before going to next cycle
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // Make sure the OBDModule thread has processed the response.
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     SupportedPIDs enginePIDs, transmissionPIDs;
@@ -509,6 +597,7 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestAllEmissionPIDDataTest )
     ASSERT_EQ( enginePIDs[0], 0x04 );
     ASSERT_EQ( enginePIDs[1], 0x05 );
     ASSERT_EQ( transmissionPIDs[0], 0x0D );
+    ASSERT_EQ( transmissionPIDs[1], 0x46 ); // ECU respond 0x40, 0x04, 0x00, 0x00, 0x00
     // Receive any PID Data request
     ecmRxPDUData.clear();
     ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
@@ -520,13 +609,13 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestAllEmissionPIDDataTest )
     ecmTxPDUData = { 0x41, 0x04, 0x99, 0x05, 0x6E };
     ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
 
-    tmcRxPDUData.clear();
-    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    tcmRxPDUData.clear();
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // expect SID 1 and 1 PID
-    expectedTCMPIDs = { 0x01, 0x0D };
-    ASSERT_EQ( expectedECMPIDs, ecmRxPDUData );
+    expectedTCMPIDs = { 0x01, 0x0D, 0x46 };
+    ASSERT_EQ( expectedTCMPIDs, tcmRxPDUData );
     // TCM, Vehicle speed of 35 kph
-    tcmTxPDUData = { 0x41, 0x0D, 0x23 };
+    tcmTxPDUData = { 0x41, 0x0D, 0x23, 0x46, 0x40 };
     ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
     // Wait till the OBD Module receives the data
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
@@ -535,9 +624,12 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestAllEmissionPIDDataTest )
     std::map<SignalID, SignalValue> expectedPIDSignalValue = {
         { toUType( EmissionPIDs::ENGINE_LOAD ), 60 },
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
-        { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 } };
+        { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 },
+        { toUType( EmissionPIDs::AMBIENT_AIR_TEMPERATURE ), 24 } };
     // Verify all PID Signals are correctly decoded
     CollectedSignal signal;
+    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
     ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
     ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
     ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
@@ -560,7 +652,7 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryOnlyRequstPartialEmissionPIDTest 
 {
     std::vector<uint8_t> ecmRxPDUData;
     std::vector<uint8_t> ecmTxPDUData;
-    std::vector<uint8_t> tmcRxPDUData;
+    std::vector<uint8_t> tcmRxPDUData;
     std::vector<uint8_t> tcmTxPDUData;
     std::vector<uint8_t> expectedECMData;
     std::vector<uint8_t> expectedTCMData;
@@ -598,6 +690,7 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryOnlyRequstPartialEmissionPIDTest 
     decoderDictPtr->signalIDsToCollect.insert( 0x15 );
     decoderDictPtr->signalIDsToCollect.insert( 0x16 );
     decoderDictPtr->signalIDsToCollect.insert( 0x17 );
+    decoderDictPtr->signalIDsToCollect.insert( 0xC1 );
     // publish the decoder dictionary
     obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
 
@@ -629,16 +722,23 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryOnlyRequstPartialEmissionPIDTest 
     // Support PID 0x04,0x05,0x09,0x11,0x12,0x13,0x14
     ecmTxPDUData = { 0x41, 0x00, 0x18, 0x80, 0xF0, 0x00 };
     ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    ecmTxPDUData = { 0x41, 0xC0, 0x00, 0x00, 0x00, 0x00 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
     // Transmission ECU Handling
     // The Supported PID request has now be issued.
-    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // Received Supported PID request for SID 0x01 from FWE
-    ASSERT_TRUE( tmcRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
-    ASSERT_TRUE( tmcRxPDUData[1] == 0x00 );
+    ASSERT_TRUE( tcmRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
+    ASSERT_TRUE( tcmRxPDUData[1] == 0x00 );
     // Respond
     // Support PID 0x0D
     tcmTxPDUData = { 0x41, 0x00, 0x00, 0x08, 0x00, 0x00 };
     ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    tcmTxPDUData = { 0x41, 0xC0, 0x80, 0x10, 0x00, 0x00 };
+    ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    // flush the socket buffer before going to next cycle
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // Make sure the OBDModule thread has processed the response.
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     SupportedPIDs enginePIDs, transmissionPIDs;
@@ -650,6 +750,7 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryOnlyRequstPartialEmissionPIDTest 
     // 0x14 shall be requested as it contains signals in decoder dictionary
     ASSERT_EQ( enginePIDs[1], 0x14 );
     ASSERT_EQ( transmissionPIDs[0], 0x0D );
+    ASSERT_EQ( transmissionPIDs[1], 0xC1 );
     // Receive any PID Data request
     ecmRxPDUData.clear();
     ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
@@ -662,13 +763,13 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryOnlyRequstPartialEmissionPIDTest 
     ecmTxPDUData = { 0x41, 0x04, 0x99, 0x14, 0x10, 0x20 };
     ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
 
-    tmcRxPDUData.clear();
-    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    tcmRxPDUData.clear();
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // expect SID 1 and 1 PID
-    expectedTCMPIDs = { 0x01, 0x0D };
-    ASSERT_EQ( expectedECMPIDs, ecmRxPDUData );
+    expectedTCMPIDs = { 0x01, 0x0D, 0xC1 };
+    ASSERT_EQ( expectedTCMPIDs, tcmRxPDUData );
     // TCM, Vehicle speed of 35 kph
-    tcmTxPDUData = { 0x41, 0x0D, 0x23 };
+    tcmTxPDUData = { 0x41, 0x0D, 0x23, 0xC1, 0xAA };
     ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
     // Wait till the OBD Module receives the data
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
@@ -678,7 +779,8 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryOnlyRequstPartialEmissionPIDTest 
         { toUType( EmissionPIDs::ENGINE_LOAD ), 60 },
         { toUType( EmissionPIDs::OXYGEN_SENSOR1_1 ) | 0 << 8, (double)0x10 / 200 },
         { toUType( EmissionPIDs::OXYGEN_SENSOR1_1 ) | 1 << 8, (double)0x20 * 100 / 128 - 100 },
-        { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 } };
+        { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 },
+        { 0xC1, 0xAA } };
     // Verify all PID Signals are correctly decoded
     CollectedSignal signal;
     for ( size_t idx = 0; idx < expectedPIDSignalValue.size(); ++idx )
@@ -701,7 +803,7 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
 {
     std::vector<uint8_t> ecmRxPDUData;
     std::vector<uint8_t> ecmTxPDUData;
-    std::vector<uint8_t> tmcRxPDUData;
+    std::vector<uint8_t> tcmRxPDUData;
     std::vector<uint8_t> tcmTxPDUData;
     std::vector<uint8_t> expectedECMData;
     std::vector<uint8_t> expectedTCMData;
@@ -772,16 +874,23 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
     // Support PID 0x04,0x05,0x09,0x11,0x12,0x13,0x14
     ecmTxPDUData = { 0x41, 0x00, 0x18, 0x80, 0xF0, 0x00 };
     ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    ecmTxPDUData = { 0x41, 0xC0, 0x00, 0x00, 0x00, 0x00 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
     // Transmission ECU Handling
     // The Supported PID request has now be issued.
-    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // Received Supported PID request for SID 0x01 from FWE
-    ASSERT_TRUE( tmcRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
-    ASSERT_TRUE( tmcRxPDUData[1] == 0x00 );
+    ASSERT_TRUE( tcmRxPDUData[0] == toUType( SID::CURRENT_STATS ) );
+    ASSERT_TRUE( tcmRxPDUData[1] == 0x00 );
     // Respond
     // Support PID 0x0C 0x0D
     tcmTxPDUData = { 0x41, 0x00, 0x00, 0x18, 0x00, 0x00 };
     ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    tcmTxPDUData = { 0x41, 0xC0, 0x00, 0x00, 0x00, 0x00 };
+    ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    // flush the socket buffer before going to next cycle
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // Make sure the OBDModule thread has processed the response.
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     SupportedPIDs enginePIDs, transmissionPIDs;
@@ -805,11 +914,11 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
     ecmTxPDUData = { 0x41, 0x04, 0x99, 0x14, 0x10, 0x20 };
     ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
 
-    tmcRxPDUData.clear();
-    ASSERT_TRUE( transmissionECU.receivePDU( tmcRxPDUData ) );
+    tcmRxPDUData.clear();
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
     // expect SID 1 and 1 PID
     expectedTCMPIDs = { 0x01, 0x0D };
-    ASSERT_EQ( expectedECMPIDs, ecmRxPDUData );
+    ASSERT_EQ( expectedTCMPIDs, tcmRxPDUData );
     // TCM, Vehicle speed of 35 kph
     tcmTxPDUData = { 0x41, 0x0D, 0x23 };
     ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
@@ -917,6 +1026,8 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestPIDAndDTCsTest )
     // Support PID 0x04,0x05
     ecmTxPDUData = { 0x41, 0x00, 0x18, 0x00, 0x00, 0x00 };
     ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
+    ecmTxPDUData = { 0x41, 0xC0, 0x00, 0x00, 0x00, 0x00 };
+    ASSERT_TRUE( engineECU.sendPDU( ecmTxPDUData ) );
 
     // Transmission ECU Handling
     // The Supported PID request has now be issued.
@@ -928,6 +1039,13 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleRequestPIDAndDTCsTest )
     // Support PID 0x0D
     tcmTxPDUData = { 0x41, 0x00, 0x00, 0x08, 0x00, 0x00 };
     ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    tcmTxPDUData = { 0x41, 0xC0, 0x00, 0x00, 0x00, 0x00 };
+    ASSERT_TRUE( transmissionECU.sendPDU( tcmTxPDUData ) );
+    // flush the socket buffer before going to next cycle
+    ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );
+    ASSERT_TRUE( transmissionECU.receivePDU( tcmRxPDUData ) );
+    // Make sure the OBDModule thread has processed the response.
+    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     // Receive any PID Data request
     ecmRxPDUData.clear();
     ASSERT_TRUE( engineECU.receivePDU( ecmRxPDUData ) );

@@ -278,16 +278,17 @@ enum class EmissionPIDs
     TRANSMISSION_ACTUAL_GEAR                                                       = 0XA4,
     ODOMETER                                                                       = 0XA6,
     PIDS_SUPPORTED_C1_E0                                                           = 0XC0,
+    HVESS_RECOMMENDED_MAX_SOC                                                      = 0xC1
 };
 // clang-format on
 
 static constexpr uint8_t SUPPORTED_PID_STEP = 0x20;
 
-static constexpr std::array<PID, 7> supportedPIDRange = { { 0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0 } };
+static constexpr std::array<PID, 8> supportedPIDRange = { { 0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0, 0xE0 } };
 
-// This table contains a local copy of OBD-II PID decoding method from J1979. It's only used by unit test.
+// This table is only used by unit test.
 // The actual Edge Agent will only use decoding manifest received from AWS
-const std::array<struct PIDInfo, 171> mode1PIDs = { {
+const std::array<struct PIDInfo, 172> mode1PIDs = { {
     { 0x00, 4, { { 0, 1.0, 0, 4 } } }, // PIDs supported [01 - 20]
     { 0x01, 4, { {} } },               // Monitor status since DTCs cleared.(MIL) status and number of DTCs.
     { 0x02, 2, { {} } },               // Freeze DTC
@@ -647,7 +648,8 @@ const std::array<struct PIDInfo, 171> mode1PIDs = { {
     { 0xA4, 4, { { 0, 1.0, 0, 1 }, { 1, 4, 4 }, { 2, 0.001, 0, 2 } } }, // Transmission Actual Gear
     { 0xA5, 4, { {} } },                                                // Diesel Exhaust Fluid Dosing
     { 0xA6, 4, { { 0, 0.1, 0, 4 } } },                                  // Odometer
-    { 0xC0, 4, { { 0, 1.0, 0, 4 } } }                                   // PIDs supported [C1 - E0]
+    { 0xC0, 4, { { 0, 1.0, 0, 4 } } },                                  // PIDs supported [C1 - E0]
+    { 0xC1, 1, { {} } }                                                 // HVESS Recommended Maximum State Of Charge
 } };
 
 // Mode 2
@@ -718,7 +720,7 @@ getPID( SID sid, size_t index )
     switch ( sid )
     {
     case SID::CURRENT_STATS:
-        if ( static_cast<PID>( index ) < supportedPIDRange.back() + SUPPORTED_PID_STEP )
+        if ( index < supportedPIDRange.back() + SUPPORTED_PID_STEP )
         {
             returnPID = static_cast<PID>( index );
         }
