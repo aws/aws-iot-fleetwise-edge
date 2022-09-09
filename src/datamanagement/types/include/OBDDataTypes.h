@@ -283,7 +283,7 @@ enum class EmissionPIDs
 
 static constexpr uint8_t SUPPORTED_PID_STEP = 0x20;
 
-static constexpr std::array<PID, 7> supportedPIDRange = { { 0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0 } };
+static constexpr std::array<PID, 6> supportedPIDRange = { { 0x00, 0x20, 0x40, 0x60, 0x80, 0xA0 } };
 
 // This table contains a local copy of OBD-II PID decoding method from J1979. It's only used by unit test.
 // The actual Edge Agent will only use decoding manifest received from AWS
