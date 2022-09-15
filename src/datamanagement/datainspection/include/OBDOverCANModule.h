@@ -169,9 +169,6 @@ private:
     // output buffer
     static void doWork( void *data );
 
-    // Issues a supported PID request to the specific ECU and SID
-    bool requestSupportedPIDs( const SID &sid, ISOTPOverCANSenderReceiver &isoTPSendReceive );
-
     // Receives the supported PID request to the specific ECU and SID
     bool receiveSupportedPIDs( const SID &sid,
                                ISOTPOverCANSenderReceiver &isoTPSendReceive,
@@ -204,6 +201,7 @@ private:
     bool receiveDTCs( const SID &sid, ISOTPOverCANSenderReceiver &isoTPSendReceive, DTCInfo &info );
     bool requestReceiveDTCs( const SID &sid, ISOTPOverCANSenderReceiver &isoTPSendReceive, DTCInfo &info );
 
+    static constexpr size_t MAX_PID_RANGE = 6U;
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };
     std::atomic<bool> mDecoderManifestAvailable{ false };

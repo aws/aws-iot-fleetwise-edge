@@ -1,5 +1,9 @@
 # Change Log
 
+## future release (TBD)
+Bugfixes:
+* Fixed an OBD bug in which software requests more than six PID ranges in one message. The new revision request the extra range in a separate message.
+
 ## v0.1.4 (Aug 29, 2022)
 https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.4/aws-iot-fleetwise-edge.zip
 

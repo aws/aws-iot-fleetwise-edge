@@ -40,8 +40,10 @@ OBDDataDecoder::decodeSupportedPIDs( const SID &sid,
     // First look at whether we received a positive response
     // The positive response can be identified by 0x40 + SID.
     // If the input size is less than 6 ( Response byte + Requested PID + 4 data bytes )
+    // or if the input size minus SID is not a multiple of 5
     // this is also not a valid input
-    if ( inputData.size() < 6 || POSITIVE_ECU_RESPONSE_BASE + toUType( sid ) != inputData[0] )
+    if ( inputData.size() < 6 || POSITIVE_ECU_RESPONSE_BASE + toUType( sid ) != inputData[0] ||
+         ( inputData.size() - 1 ) % 5 != 0 )
     {
         mLogger.warn( "OBDDataDecoder::decodeSupportedPIDs", "Invalid Supported PID Input" );
         return false;
@@ -53,13 +55,25 @@ OBDDataDecoder::decodeSupportedPIDs( const SID &sid,
     // Section 8.1.2.2 Request Current Powertrain Diagnostic Data Response Message Definition (report supported PIDs)
     // from the J1979 spec
     // 0x41(Positive response), 0x00( requested PID range), 4 Bytes, 0x20( requested PID range), 4 Bytes. etc
-    uint8_t basePIDCount = 0;
+    // basePID is the requested PID range such as 0x00, 0x20
+    PID basePID = 0;
+    // baseIdx is the byte index for the base PID. e.g: 1 for 0x00, 6 for 0x20.
+    size_t baseIdx = 0;
     for ( size_t i = 1; i < inputData.size(); ++i )
     {
         // First extract the PID Range, its position is always ByteIndex mod 5
         if ( ( i % 5 ) == 1 )
         {
-            basePIDCount++;
+            // if the PID is 0x00, the basePID is 0x00 and baseIdx is 1
+            // if the PID is 0x20, the basePID is 0x00 and baseIdx is 6
+            basePID = inputData[i];
+            if ( basePID % SUPPORTED_PID_STEP != 0 )
+            {
+                mLogger.warn( " OBDDataDecoder::decodeSupportedPIDs ",
+                              " Invalid PID for support range: " + std::to_string( basePID ) );
+                break;
+            }
+            baseIdx = i;
             // Skip this byte
             continue;
         }
@@ -67,8 +81,9 @@ OBDDataDecoder::decodeSupportedPIDs( const SID &sid,
         {
             if ( IS_BIT_SET( inputData[i], j ) )
             {
-                // E.g. basePID = 0x20, and j = 2, put SID1_PID_34 in the result
-                size_t index = ( i - basePIDCount ) * BYTE_SIZE - j;
+                // E.g. if MSb in the first byte after 0x20 is set, then
+                // i = 7, baseIdx = 6, and j = 7, put SID1_PID_33 in the result
+                size_t index = ( i - baseIdx ) * BYTE_SIZE - j + basePID;
                 PID decodedID = getPID( sid, index );
                 // The response includes the PID range requested.
                 // To remain consistent with the spec, we don't want to mix Supported PID IDs with

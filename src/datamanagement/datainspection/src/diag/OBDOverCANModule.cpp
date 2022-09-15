@@ -24,13 +24,14 @@
 #include <iterator>
 #include <sstream>
 
-#define MAX_PID_RANGE ( 6U )
 namespace Aws
 {
 namespace IoTFleetWise
 {
 namespace DataInspection
 {
+
+constexpr size_t OBDOverCANModule::MAX_PID_RANGE;
 
 OBDOverCANModule::OBDOverCANModule()
 {
@@ -491,13 +492,14 @@ OBDOverCANModule::requestReceiveEmissionPIDs( const SID &sid,
                                               ISOTPOverCANSenderReceiver &isoTPSendReceive,
                                               EmissionInfo &info )
 {
-    size_t rangeCount = pids.size() / MAX_PID_RANGE;
-    size_t rangeLeft = pids.size() % MAX_PID_RANGE;
+    size_t rangeCount = pids.size() / OBDOverCANModule::MAX_PID_RANGE;
+    size_t rangeLeft = pids.size() % OBDOverCANModule::MAX_PID_RANGE;
 
     while ( rangeCount > 0 )
     {
-        auto pidList = std::vector<PID>( pids.begin() + static_cast<uint32_t>( rangeCount - 1U ) * MAX_PID_RANGE,
-                                         pids.begin() + static_cast<uint32_t>( rangeCount ) * MAX_PID_RANGE );
+        auto pidList =
+            std::vector<PID>( pids.begin() + static_cast<uint32_t>( rangeCount - 1U ) * OBDOverCANModule::MAX_PID_RANGE,
+                              pids.begin() + static_cast<uint32_t>( rangeCount ) * OBDOverCANModule::MAX_PID_RANGE );
         // start from the tail and walk backwards.
         if ( requestPIDs( sid, pidList, isoTPSendReceive ) )
         {
@@ -541,17 +543,47 @@ OBDOverCANModule::requestReceiveSupportedPIDs( const SID &sid,
                                                ISOTPOverCANSenderReceiver &isoTPSendReceive,
                                                SupportedPIDs &supportedPIDs )
 {
-
-    // Request and try to receive within the time interval
-    if ( requestSupportedPIDs( sid, isoTPSendReceive ) )
+    // Function will return true if it receive supported PIDs from the ECU
+    bool requestStatus = false;
+    static_assert( supportedPIDRange.size() <= 8,
+                   "Array length for supported PID range shall be less or equal than 8" );
+    mLogger.trace( "OBDOverCANModule::requestReceiveSupportedPIDs", "send supported PID requests" );
+    supportedPIDs.clear();
+    // Request supported PID range. Per ISO 15765, we can only send six PID at one time
+    auto pidList = std::vector<PID>( supportedPIDRange.begin(),
+                                     supportedPIDRange.begin() +
+                                         std::min( OBDOverCANModule::MAX_PID_RANGE, supportedPIDRange.size() ) );
+    if ( requestPIDs( sid, pidList, isoTPSendReceive ) )
     {
         // Wait and process the response
         if ( receiveSupportedPIDs( sid, isoTPSendReceive, supportedPIDs ) )
         {
-            return true;
+            // we have received a list of supported PIDs
+            requestStatus = true;
+        }
+        else
+        {
+            // log warning as all emissions-related OBD ECUs which support at least one of the
+            // services defined in J1979 shall support Service $01 and PID $00
+            mLogger.warn( "OBDOverCANModule::requestReceiveSupportedPIDs", "Fail to receive supported PID range" );
         }
     }
-    return false;
+    // check if we need to send out more PID range request
+    if ( OBDOverCANModule::MAX_PID_RANGE < supportedPIDRange.size() )
+    {
+        pidList =
+            std::vector<PID>( supportedPIDRange.begin() + OBDOverCANModule::MAX_PID_RANGE, supportedPIDRange.end() );
+        if ( requestPIDs( sid, pidList, isoTPSendReceive ) )
+        {
+            // Wait and process the response
+            if ( receiveSupportedPIDs( sid, isoTPSendReceive, supportedPIDs ) )
+            {
+                // we have received a list of supported PIDs
+                requestStatus = true;
+            }
+        }
+    }
+    return requestStatus;
 }
 
 bool
@@ -737,30 +769,10 @@ OBDOverCANModule::updatePIDRequestList( const SID &sid,
 }
 
 bool
-OBDOverCANModule::requestSupportedPIDs( const SID &sid, ISOTPOverCANSenderReceiver &isoTPSendReceive )
-{
-    mTxPDU.clear();
-    // Every ECU should support such kind of request.
-    // J1979 8.1
-    // First insert the SID
-    mTxPDU.emplace_back( static_cast<uint8_t>( sid ) );
-    // Then insert the PID ranges
-    mTxPDU.insert( mTxPDU.end(), std::begin( supportedPIDRange ), std::end( supportedPIDRange ) );
-    mLogger.trace( "OBDOverCANModule::requestSupportedPIDs", "send supported PID requests" );
-
-    std::ostringstream oss;
-    std::copy( mTxPDU.begin(), mTxPDU.end() - 1, std::ostream_iterator<int>( oss, "," ) );
-    oss << std::to_string( mTxPDU.back() );
-    mLogger.trace( "OBDOverCANModule::requestSupportedPIDs", "TxPDU: " + oss.str() );
-    return isoTPSendReceive.sendPDU( mTxPDU );
-}
-
-bool
 OBDOverCANModule::receiveSupportedPIDs( const SID &sid,
                                         ISOTPOverCANSenderReceiver &isoTPSendReceive,
                                         SupportedPIDs &supportedPIDs )
 {
-    supportedPIDs.clear();
     std::vector<uint8_t> ecuResponse;
     // Receive the PDU that has the Supported PIDs for this SID
     // decoded according to J1979 8.1.2.2
@@ -788,7 +800,7 @@ OBDOverCANModule::requestPIDs( const SID &sid,
     // Assume that the PIDs belong to the SID, and that they are
     // supported by the ECU
     // ECUs do not support more than 6 PIDs at a time.
-    if ( pids.size() > MAX_PID_RANGE )
+    if ( pids.size() > OBDOverCANModule::MAX_PID_RANGE )
     {
         return false;
     }
