@@ -51,7 +51,7 @@ This guide assumes you have already logged in to the AWS console in your desired
 
 An AWS CloudFormation template is used to build AWS IoT FleetWise Edge Agent using AWS CodeBuild and deploy it to a new AWS EC2 instance using AWS CodeDeploy.
 
-1. Click here to [**Launch CloudFormation Template**](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-iot-fleetwise.s3.us-west-2.amazonaws.com%2Flatest%2Fcfn-templates%2Ffwdemo.yml&stackName=fwdemo).
+1. Click here to [**Launch CloudFormation Template**](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-iot-fleetwise.s3.us-west-2.amazonaws.com%2Flatest%2Fcfn-templates%2Ffwdemo.yml&stackName=fwdemo-${your_account_id}).
 1. (Optional) You can increase the number of simulated vehicles by updating the `FleetSize` parameter. You can also specify the region IoT Things are created in by updating the `IoTCoreRegion` parameter.
 1. Select the checkbox next to _‘I acknowledge that AWS CloudFormation might create IAM resources with custom names.’_
 1. Choose **Create stack**.
@@ -1508,10 +1508,10 @@ The device software has been designed with security principles in mind. Security
 
 - Device Authentication: the device software uses Client Certificates (x.509) to communicate with AWS IoT services. All the communications from and to the device software are over a secure TLS Connection. Refer to the [AWS IoT Security documentation](https://docs.aws.amazon.com/iot/latest/developerguide/x509-client-certs.html) for further details.
 - Data in transit: All the data exchanged with the AWS IoT services is encrypted in transit.
-- Data at rest: the current version of the software does not encrypt the data at rest i.e. during persistency. It’s assumed that the software operates in a secure partition that the OEM puts in place and rely on the OEM secure storage infrastructure that is applied for all IO operations happening in the gateway e.g. via HSM, OEM crypto stack.
+- Data at rest: the current version of the software does not encrypt the data at rest i.e. during persistency. It’s assumed that the software operates in a secure partition that the OEM puts in place.
 - Access to vehicle CAN data: the device software assumes that the software operates in a secure execution partition, that guarantees that if needed, the CAN traffic is encrypted/decrypted by the OEM Crypto stack (either on chip/HSM or via separate core running the crypto stack).
 
-The device software can be extended to invoke cryptography APIs to encrypt and decrypt the data as per the need. 
+The device software can be extended to invoke cryptography APIs to encrypt and decrypt the data as per the need.
 
 The device software has been designed to be deployed in a non safety relevant in-vehicle domain/partition. Due to its use of dynamic memory allocation, this software is not suited for deployment on real time/lock step/safety cores.
 
