@@ -10,7 +10,8 @@ In particular, AWS IoT FleetWise can leverage fleet data (Big Data) and enable y
 
 You can use the included sample C++ application to learn more about AWS IoT FleetWise Edge interfaces and to test interactions before integration.
 
-
+> _**Important**_ 
+> As provided in the AWS IoT FleetWise [Service Terms](https://aws.amazon.com/service-terms/), you are solely responsible for ensuring the AWS IoT FleetWise in-vehicle software component and any updates and modifications to it are deployed and maintained safely and securely in any vehicles and do not otherwise impact vehicle safety.
 
 ## AWS IoT FleetWise Architecture
 
