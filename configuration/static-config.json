@@ -49,7 +49,7 @@
         },
         "publishToCloudParameters": {
             "maxPublishMessageCount": 1000,
-            "collectionSchemeManagementCheckinIntervalMs": 5000
+            "collectionSchemeManagementCheckinIntervalMs": 120000
         },
         "mqttConnection": {
             "endpointUrl": "my-endpoint.my-region.amazonaws.com",
