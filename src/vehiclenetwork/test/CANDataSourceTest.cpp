@@ -115,6 +115,21 @@ sendTestMessage( int socketFD )
     ASSERT_EQ( bytesWritten, sizeof( struct can_frame ) );
 }
 
+static void
+sendTestMessageExtendedID( int socketFD )
+{
+    struct can_frame frame = {};
+    frame.can_id = 0x123 | CAN_EFF_FLAG;
+
+    frame.can_dlc = 4;
+    for ( uint8_t i = 0; i < 3; ++i )
+    {
+        frame.data[i] = i;
+    }
+    ssize_t bytesWritten = write( socketFD, &frame, sizeof( struct can_frame ) );
+    ASSERT_EQ( bytesWritten, sizeof( struct can_frame ) );
+}
+
 class CANDataSourceTest : public ::testing::Test
 {
 public:
@@ -282,4 +297,38 @@ TEST_F( CANDataSourceTest, testSourceIdsAreUnique )
         sourceIDs.insert( source.getVehicleDataSourceID() );
     }
     ASSERT_EQ( NUM_SOURCES, sourceIDs.size() );
+}
+
+TEST_F( CANDataSourceTest, testExtractExtendedID )
+{
+    LocalDataSourceEventListener listener;
+    ASSERT_TRUE( socketFD != -1 );
+
+    static_cast<void>( socketFD >= 0 );
+    VehicleDataSourceConfig sourceConfig;
+    sourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
+    sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
+    sourceConfig.maxNumberOfVehicleDataMessages = 1000;
+    std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
+    CANDataSource dataSource;
+    ASSERT_TRUE( dataSource.init( sourceConfigs ) );
+    ASSERT_TRUE( dataSource.subscribeListener( &listener ) );
+
+    ASSERT_TRUE( dataSource.connect() );
+    ASSERT_TRUE( listener.gotConnectCallback );
+    ASSERT_TRUE( dataSource.isAlive() );
+    // Set the Channel in an active acquire state
+    dataSource.resumeDataAcquisition();
+    ASSERT_EQ( dataSource.getVehicleDataSourceIfName(), "vcan0" );
+    ASSERT_EQ( dataSource.getVehicleDataSourceProtocol(), VehicleDataSourceProtocol::RAW_SOCKET );
+    ASSERT_EQ( dataSource.getVehicleDataSourceType(), VehicleDataSourceType::CAN_SOURCE );
+    sendTestMessageExtendedID( socketFD );
+    // Sleep for sometime on this thread to allow the other thread to finish
+    std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
+    VehicleDataMessage msg;
+    ASSERT_TRUE( dataSource.getBuffer()->pop( msg ) );
+    ASSERT_EQ( msg.getMessageID(), 0x123 );
+    ASSERT_TRUE( dataSource.disconnect() );
+    ASSERT_TRUE( dataSource.unSubscribeListener( &listener ) );
+    ASSERT_TRUE( listener.gotDisConnectCallback );
 }

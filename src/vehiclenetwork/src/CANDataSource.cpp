@@ -36,6 +36,7 @@ namespace VehicleNetwork
 using namespace Aws::IoTFleetWise::Platform::Utility;
 static const std::string INTERFACE_NAME_KEY = "interfaceName";
 static const std::string THREAD_IDLE_TIME_KEY = "threadIdleTimeMs";
+static constexpr uint32_t MSB_MASK = 0X7FFFFFFFU;
 CANDataSource::CANDataSource( bool useKernelTimestamp )
     : mUseKernelTimestamp{ useKernelTimestamp }
 {
@@ -284,7 +285,8 @@ CANDataSource::doWork( void *data )
                 {
                     rawData.emplace_back( frame[i].data[j] );
                 }
-                message.setup( frame[i].can_id, rawData, syntheticData, timestamp );
+                // Compose the correct CAN Frame ID by clearing the MSB
+                message.setup( frame[i].can_id & MSB_MASK, rawData, syntheticData, timestamp );
                 if ( message.isValid() )
                 {
                     if ( !dataSource->mCircularBuffPtr->push( message ) )

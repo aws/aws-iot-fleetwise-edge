@@ -10,9 +10,6 @@ Amazon.
 
 **Note**
 
-* AWS IoT FleetWise is in preview release and is subject to change. We recommend that you use the
-  service, including the AWS IoT FleetWise Edge Agent software, only with test data, and not in
-  production environments.
 * AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
 * The AWS IoT FleetWise in-vehicle software component is licensed to you under the Amazon Software
   License. You are solely responsible for ensuring such software and any updates and modifications

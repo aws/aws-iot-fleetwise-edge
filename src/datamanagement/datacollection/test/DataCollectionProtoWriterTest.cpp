@@ -22,27 +22,6 @@ using namespace Aws::IoTFleetWise::Platform::Linux;
 class DataCollectionProtoWriterTest : public ::testing::Test
 {
 public:
-    void
-    check( double input, double diff, bool print = true )
-    {
-        uint32_t quotient;
-        uint32_t divisor;
-        DataCollectionProtoWriter::convertToPeculiarFloat( input, quotient, divisor );
-        double output = (double)quotient / (double)divisor;
-        if ( print )
-        {
-            printf( "input=%g, output=%u/%u=%g\n", input, quotient, divisor, output );
-        }
-        if ( isnan( input ) || isinf( input ) )
-        {
-            EXPECT_EQ( UINT32_MAX, output );
-        }
-        else
-        {
-            EXPECT_NEAR( abs( input ), output, abs( input ) * diff );
-        }
-    }
-
     std::string
     convertProtoToHex( const std::string &proto )
     {
@@ -56,92 +35,6 @@ public:
         return hex;
     }
 };
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatZero )
-{
-    check( 0.0, 0.0 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloat1 )
-{
-    check( 1.0, 0.0 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatMinus1 )
-{
-    check( -1.0, 0.0 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloat1000 )
-{
-    check( 1000.0, 0.0 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatU32Max )
-{
-    check( UINT32_MAX, 0.0 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloat0_5 )
-{
-    check( 0.5, 0.0 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloat0_333 )
-{
-    check( 1.0 / 3.0, 0.000000001 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloat0_111 )
-{
-    check( 1.0 / 9.0, 0.000000001 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatMin )
-{
-    check( 1.0 / (double)( 1U << 31 ), 0.0 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatEpsilon )
-{
-    check( DBL_EPSILON, 1.0 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatMoreThan9SigFig )
-{
-    // This test broke decimalToFraction
-    check( 5.000000001, 0.000000001 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatPi )
-{
-    check( M_PI, 0.000000001 );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatInfinity )
-{
-    check( INFINITY, INFINITY );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatMinusInfinity )
-{
-    check( -INFINITY, INFINITY );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatNan )
-{
-    check( NAN, NAN );
-}
-
-TEST_F( DataCollectionProtoWriterTest, TestPeculiarFloatRandom )
-{
-    srand( (unsigned)time( NULL ) );
-    for ( auto i = 0; i < 10000000; i++ )
-    {
-        double r = ( (double)rand() * 100000.0 ) / (double)RAND_MAX;
-        check( r, 0.000000001, false );
-    }
-}
 
 // Test the edge to cloud payload fields in the proto
 TEST_F( DataCollectionProtoWriterTest, TestVehicleData )

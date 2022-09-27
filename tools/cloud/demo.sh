@@ -20,7 +20,6 @@ DEFAULT_VEHICLE_NAME="fwdemo"
 VEHICLE_NAME=""
 TIMESTREAM_DB_NAME="IoTFleetWiseDB-${TIMESTAMP}"
 TIMESTREAM_TABLE_NAME="VehicleDataTable"
-SERVICE_ROLE="IoTFleetWiseServiceRole"
 CAMPAIGN_FILE="campaign-brake-event.json"
 CLEAN_UP=false
 FLEET_SIZE=1
@@ -94,7 +93,6 @@ if [ "${VEHICLE_NAME}" == "" ]; then
 fi
 
 NAME="${VEHICLE_NAME}-${TIMESTAMP}"
-SERVICE_ROLE="${SERVICE_ROLE}-${REGION}-${TIMESTAMP}"
 
 echo -n "Date: "
 date --rfc-3339=seconds
@@ -126,7 +124,6 @@ register_account() {
     echo "Registering account..."
     aws iotfleetwise register-account \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --iam-resources "{\"roleArn\":\"${SERVICE_ROLE_ARN}\"}" \
         --timestream-resources "{\"timestreamDatabaseName\":\"${TIMESTREAM_DB_NAME}\", \
             \"timestreamTableName\":\"${TIMESTREAM_TABLE_NAME}\"}" | jq -r .registerAccountStatus
     echo "Waiting for account to be registered..."
@@ -187,74 +184,6 @@ if [ "${ACCOUNT_STATUS}" == "REGISTRATION_SUCCESS" ]; then
 elif [ "${ACCOUNT_STATUS}" == "REGISTRATION_PENDING" ]; then
     echo "Waiting for account to be registered..."
 else
-    echo "Creating service role..."
-    SERVICE_ROLE_TRUST_POLICY=$(cat <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": [
-            "iotfleetwise.amazonaws.com"
-        ]
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-EOF
-)
-    SERVICE_ROLE_ARN=`aws iam create-role \
-        --role-name "${SERVICE_ROLE}" \
-        --assume-role-policy-document "${SERVICE_ROLE_TRUST_POLICY}" | jq -r .Role.Arn`
-    echo ${SERVICE_ROLE_ARN}
-
-    echo "Waiting for role to be created..."
-    aws iam wait role-exists \
-        --role-name "${SERVICE_ROLE}"
-
-    echo "Creating service role policy..."
-    SERVICE_ROLE_POLICY=$(cat <<'EOF'
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "timestreamIngestion",
-            "Effect": "Allow",
-            "Action": [
-                "timestream:WriteRecords",
-                "timestream:Select"
-            ]
-        },
-        {
-            "Sid": "timestreamDescribeEndpoint",
-            "Effect": "Allow",
-            "Action": [
-                "timestream:DescribeEndpoints"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
-EOF
-)
-    SERVICE_ROLE_POLICY=`echo "${SERVICE_ROLE_POLICY}" \
-        | jq ".Statement[0].Resource=\"arn:aws:timestream:${REGION}:${ACCOUNT_ID}:database/${TIMESTREAM_DB_NAME}/*\""`
-    SERVICE_ROLE_POLICY_ARN=`aws iam create-policy \
-        --policy-name ${SERVICE_ROLE}-policy \
-        --policy-document "${SERVICE_ROLE_POLICY}" | jq -r .Policy.Arn`
-    echo ${SERVICE_ROLE_POLICY_ARN}
-
-    echo "Waiting for policy to be created..."
-    aws iam wait policy-exists \
-        --policy-arn "${SERVICE_ROLE_POLICY_ARN}"
-
-    echo "Attaching policy to service role..."
-    aws iam attach-role-policy \
-        --policy-arn ${SERVICE_ROLE_POLICY_ARN} \
-        --role-name "${SERVICE_ROLE}"
-
     echo "Creating Timestream database..."
     aws timestream-write create-database \
         --region ${REGION} \

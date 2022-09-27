@@ -114,17 +114,6 @@ public:
 
     bool serializeVehicleData( std::string *out ) const;
 
-    /**
-     * @brief This function translates the IEEE 754 double format to the quotient and
-     *        divisor format by mapping the fraction to the quotient and the exponent
-     *        to the divisor, clipping and translating as appropriate.
-     *
-     * @param physicalValue  physical value of the signal
-     * @param quotient       Quotient
-     * @param divisor        Divisor
-     */
-    static void convertToPeculiarFloat( double physicalValue, uint32_t &quotient, uint32_t &divisor );
-
 private:
     Timestamp mTriggerTime;
     unsigned mVehicleDataMsgCount{}; // tracks the number of messages being sent in the edge to cloud payload
