@@ -9,7 +9,6 @@ or may not be affiliated with, connected to, or sponsored by Amazon.
 
 **Note**
 
-- AWS IoT FleetWise is in preview release and is subject to change. We recommend that you use the service, including the AWS IoT FleetWise Edge Agent software, only with test data, and not in production environments.
 - AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
 
 **AWS IoT FleetWise** provides a set of tools that enable automakers to collect, transform, and transfer vehicle data to the cloud at scale. With AWS IoT FleetWise you can build virtual representations of vehicle networks and define data collection rules to transfer only high-value data from your vehicles to AWS Cloud.

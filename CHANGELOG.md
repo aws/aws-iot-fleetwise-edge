@@ -1,12 +1,19 @@
 # Change Log
 
-## future release (TBD)
+## v1.0.0 (Sept 27, 2022)
 Bugfixes:
 * Fixed an OBD bug in which software requests more than six PID ranges in one message. The new revision request the extra range in a separate message.
+* Fixed a bug in CANDataSource in which software didn't handle CAN message with extended ID correctly.
+
+Improvements:
+* Remove the html version of developer guide. 
+* Remove source code in S3 bucket. The S3 bucket will only be used to host quick demo cloud formation.
+* Remove convertToPeculiarFloat function from DataCollectionProtoWriter.
+* Set default checkin period to 2-min in static-config.json. The quick demo will still use 5 second as checkin period.
+* Update FleetWise CLI Model to GA release version. 
+* Update Customer Demo to remove service-linked role creation for FleetWise Account Registration.
 
 ## v0.1.4 (Aug 29, 2022)
-https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.4/aws-iot-fleetwise-edge.zip
-
 Bugfixes:
 * Fixed a bug in which software will continue requesting OBD-II PIDs or decoding CAN messages after all collection schemes removed.
 
@@ -17,8 +24,6 @@ Improvements:
 * Improve OBD logging to log CAN ISOTP raw bytes for better debugging
 
 ## v0.1.3 (Aug 3, 2022)
-https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.3/aws-iot-fleetwise-edge.zip
-
 Customer Demo:
 * Updated demo scripts to match with latest AWS IoT FleetWise Cloud [API changes](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/update-sdk-cli.html)
 * Fix a bug in demo script that might render scatter plot incorrectly. 
@@ -44,8 +49,6 @@ Improvements:
 * Improvement to cansim to better handle ISO-TP error. 
 
 ## v0.1.2 (February 24, 2022)
-https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.2/aws-iot-fleetwise-edge.zip
-
 Features:
 * No new features.
 
@@ -66,8 +69,6 @@ Bugfixes/Improvements:
   * Developer guide converted to Markdown.
 
 ## v0.1.1 (January 25, 2022)
-https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.1/aws-iot-fleetwise-edge.zip
-
 Features:
 * No new features.
 
@@ -93,8 +94,6 @@ Bugfixes/Improvements:
     * Edge agent now compiled and run on the same EC2 instance, rather than using CodePipeline.
 
 ## v0.1.0 (November 29, 2021)
-https://s3.console.aws.amazon.com/s3/object/aws-iot-fleetwise?prefix=v0.1.0/aws-iot-fleetwise-edge.zip
-
 Features:
 * Initial preview release
 
