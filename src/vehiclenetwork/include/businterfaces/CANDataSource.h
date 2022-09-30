@@ -22,6 +22,7 @@
 #include "Thread.h"
 #include "Timer.h"
 #include <iostream>
+#include <net/if.h>
 
 using namespace Aws::IoTFleetWise::Platform::Linux;
 
@@ -31,6 +32,38 @@ namespace IoTFleetWise
 {
 namespace VehicleNetwork
 {
+
+// This timestamp is used when uploading data to the cloud
+enum class CAN_TIMESTAMP_TYPE
+{
+    KERNEL_SOFTWARE_TIMESTAMP, // default and the best option in most scenarios
+    KERNEL_HARDWARE_TIMESTAMP, // is not necassary a unix epoch timestamp which will lead to problems and records
+                               // potentially rejected by cloud
+    POLLING_TIME, // fallback if selected value is 0. can lead to multiple can frames having the same timestamp and so
+                  // being dropped by cloud
+};
+
+inline bool
+stringToCanTimestampType( std::string const &timestampType, CAN_TIMESTAMP_TYPE &outTimestampType )
+{
+    if ( timestampType == "Software" )
+    {
+        outTimestampType = CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP;
+    }
+    else if ( timestampType == "Hardware" )
+    {
+        outTimestampType = CAN_TIMESTAMP_TYPE::KERNEL_HARDWARE_TIMESTAMP;
+    }
+    else if ( timestampType == "Polling" )
+    {
+        outTimestampType = CAN_TIMESTAMP_TYPE::POLLING_TIME;
+    }
+    else
+    {
+        return false;
+    }
+    return true;
+}
 /**
  * @brief Linux CAN Bus implementation. Uses Raw Sockets to listen to CAN
  * data on 1 single CAN IF.
@@ -43,9 +76,10 @@ public:
 
     /**
      * @brief Data Source Constructor.
-     * @param useKernelTimestamp the kernel time which is normally more precise will be used
+     * @param timestampTypeToUse which timestamp type should be used to tag the can frames, this timestamp will be
+     * visible in the cloud
      */
-    CANDataSource( bool useKernelTimestamp );
+    CANDataSource( CAN_TIMESTAMP_TYPE timestampTypeToUse );
     CANDataSource();
 
     ~CANDataSource() override;
@@ -81,6 +115,8 @@ private:
     // Current non deterministic size of the circular buffer
     size_t queueSize() const;
 
+    Timestamp extractTimestamp( struct msghdr *msgHeader );
+
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };
     std::atomic<bool> mShouldSleep{ false };
@@ -93,7 +129,7 @@ private:
     uint32_t mIdleTimeMs{ DEFAULT_THREAD_IDLE_TIME_MS };
     uint64_t receivedMessages{ 0 };
     uint64_t discardedMessages{ 0 };
-    bool mUseKernelTimestamp{ true };
+    CAN_TIMESTAMP_TYPE mTimestampTypeToUse{ CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP };
     std::atomic<Timestamp> mResumeTime{ 0 };
 };
 } // namespace VehicleNetwork

@@ -1468,6 +1468,7 @@ Customers can set the System level logging severity externally via the software 
 |                          | protocolVersion                             | Protocol version used- 2.0A, 2.0B.                                                                                        | string   |
 |                          | interfaceId                                 | Every CAN signal decoder is associated with a CAN network interface using a unique Id                                     | string   |
 |                          | type                                        | Specifies if the interface carries CAN or OBD signals over this channel, this will be CAN for a CAN network interface     | string   |
+|                          | timestampType                               | Defines which timestamp type should be used: Software, Hardware or Polling. Default is Software.                          | string   |
 | obdInterface             | interfaceName                               | CAN Interface connected to OBD bus                                                                                        | string   |
 |                          | requestMessageId                            | CAN request message id used for querying OBD signals. Example, 7DF is used in J1979                                       | string   |
 |                          | obdStandard                                 | OBD Standard (eg. J1979 or Enhanced (for advanced standards))                                                             | string   |
