@@ -392,7 +392,19 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                     config["staticConfig"]["threadIdleTimes"]["socketCANThreadIdleTimeMs"].asString() );
                 canSourceConfig.maxNumberOfVehicleDataMessages =
                     config["staticConfig"]["bufferSizes"]["socketCANBufferSize"].asUInt();
-                auto canSourcePtr = std::make_shared<CANDataSource>();
+                CAN_TIMESTAMP_TYPE canTimestampType = CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP; // default
+                if ( interfaceName[CAN_INTERFACE_TYPE].isMember( "timestampType" ) )
+                {
+                    auto timestampTypeInput = interfaceName[CAN_INTERFACE_TYPE]["timestampType"].asString();
+                    bool success = stringToCanTimestampType( timestampTypeInput, canTimestampType );
+                    if ( !success )
+                    {
+                        mLogger.warn( "IoTFleetWiseEngine::connect",
+                                      " Invalid can timestamp type provided: " + timestampTypeInput +
+                                          " so default to Software" );
+                    }
+                }
+                auto canSourcePtr = std::make_shared<CANDataSource>( canTimestampType );
                 auto canConsumerPtr = std::make_shared<CANDataConsumer>();
 
                 if ( canSourcePtr == nullptr || canConsumerPtr == nullptr )
@@ -773,8 +785,13 @@ IoTFleetWiseEngine::doWork( void *data )
                 // Only used for trace logging
                 std::string firstSignalValues = "[";
                 uint32_t signalPrintCounter = 0;
+                std::string firstSignalTimestamp;
                 for ( auto &s : triggeredCollectionSchemeDataPtr->signals )
                 {
+                    if ( firstSignalTimestamp.empty() )
+                    {
+                        firstSignalTimestamp = " first signal timestamp: " + std::to_string( s.receiveTime );
+                    }
                     signalPrintCounter++;
                     if ( signalPrintCounter > MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG )
                     {
@@ -788,8 +805,9 @@ IoTFleetWiseEngine::doWork( void *data )
                     "IoTFleetWiseEngine::doWork",
                     "FWE data ready to send with eventID " +
                         std::to_string( triggeredCollectionSchemeDataPtr->eventID ) + " from " +
-                        triggeredCollectionSchemeDataPtr->metaData.collectionSchemeID + " Signals:" +
-                        std::to_string( triggeredCollectionSchemeDataPtr->signals.size() ) + " " + firstSignalValues +
+                        triggeredCollectionSchemeDataPtr->metaData.collectionSchemeID +
+                        " Signals:" + std::to_string( triggeredCollectionSchemeDataPtr->signals.size() ) + " " +
+                        firstSignalValues + firstSignalTimestamp +
                         " raw CAN frames:" + std::to_string( triggeredCollectionSchemeDataPtr->canFrames.size() ) +
                         " DTCs:" + std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() ) +
                         " Geohash:" + triggeredCollectionSchemeDataPtr->mGeohashInfo.mGeohashString );

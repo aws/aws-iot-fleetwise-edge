@@ -1,5 +1,9 @@
 # Change Log
 
+## future release (TBD)
+Bugfixes:
+* Dont use SocketCAN hardware timestamp as default but software timestamp. Hardware timestamp not being a unix epoch timestamp leads to problems.
+
 ## v1.0.0 (Sept 27, 2022)
 Bugfixes:
 * Fixed an OBD bug in which software requests more than six PID ranges in one message. The new revision request the extra range in a separate message.

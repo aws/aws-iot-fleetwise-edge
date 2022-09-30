@@ -181,6 +181,8 @@ TraceModule::getVariableName( TraceVariable variable )
         return "ObdE3";
     case TraceVariable::DISCARDED_FRAMES:
         return "FrmE0";
+    case TraceVariable::CAN_POLLING_TIMESTAMP_COUNTER:
+        return "CanPollTCnt";
     default:
         return "UNKNOWN";
     }
