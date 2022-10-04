@@ -52,8 +52,8 @@ sudo apt install -y unzip
 8. Run `sudo nano /boot/firmware/usercfg.txt` and add the following lines to enable the CAN hat:
 ```
 dtparam=spi=on
-dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=23
 dtoverlay=mcp2515-can1,oscillator=16000000,interrupt=25
+dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=23
 dtoverlay=spi-bcm2835-overlay
 ```
 9. Save the file (`CTRL+O`, `CTRL+X`) and reboot the Raspberry Pi (`sudo reboot`).
