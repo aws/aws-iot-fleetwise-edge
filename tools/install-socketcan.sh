@@ -40,18 +40,24 @@ if uname -r | grep -q aws; then
     apt install -y linux-modules-extra-aws
 fi
 
-# Install can-isotp kernel module:
-git clone https://github.com/hartkopp/can-isotp.git
-cd can-isotp
-git checkout beb4650660179963a8ed5b5cbf2085cc1b34f608
-cd ..
-if [ -d /usr/src/can-isotp-1.0 ]; then
-    sudo dkms remove can-isotp/1.0 --all
-    sudo rm -rf /usr/src/can-isotp-1.0
-fi
-sudo mv can-isotp /usr/src/can-isotp-1.0
-sudo sed -e s/else// -e s/shell\ uname\ \-r/KERNELRELEASE/ -i /usr/src/can-isotp-1.0/Makefile
-sudo tee /usr/src/can-isotp-1.0/dkms.conf > /dev/null <<EOT
+# Install can-isotp kernel module if not installed
+# can-isotp module is part of the mainline Linux kernel since version 5.10
+MODULE="can_isotp"
+echo "Installing kernel module: $MODULE"
+if lsmod | grep "$MODULE" &> /dev/null ; then
+  echo "$MODULE is already in system. There is no need to install it."
+else
+    git clone https://github.com/hartkopp/can-isotp.git
+    cd can-isotp
+    git checkout beb4650660179963a8ed5b5cbf2085cc1b34f608
+    cd ..
+    if [ -d /usr/src/can-isotp-1.0 ]; then
+        sudo dkms remove can-isotp/1.0 --all
+        sudo rm -rf /usr/src/can-isotp-1.0
+    fi
+    sudo mv can-isotp /usr/src/can-isotp-1.0
+    sudo sed -e s/else// -e s/shell\ uname\ \-r/KERNELRELEASE/ -i /usr/src/can-isotp-1.0/Makefile
+    sudo tee /usr/src/can-isotp-1.0/dkms.conf > /dev/null <<EOT
 PACKAGE_NAME="can-isotp"
 PACKAGE_VERSION="1.0"
 MAKE[0]="make modules"
@@ -61,10 +67,11 @@ DEST_MODULE_LOCATION[0]="/kernel/drivers/net/can"
 BUILT_MODULE_LOCATION[0]="./net/can"
 AUTOINSTALL="yes"
 EOT
-sudo dkms add -m can-isotp -v 1.0
-sudo dkms build -m can-isotp -v 1.0
-sudo dkms install -m can-isotp -v 1.0
-sudo cp /usr/src/can-isotp-1.0/include/uapi/linux/can/isotp.h /usr/include/linux/can
+    sudo dkms add -m can-isotp -v 1.0
+    sudo dkms build -m can-isotp -v 1.0
+    sudo dkms install -m can-isotp -v 1.0
+    sudo cp /usr/src/can-isotp-1.0/include/uapi/linux/can/isotp.h /usr/include/linux/can
+fi
 
 # Load CAN modules, also at startup:
 sudo modprobe -a can-isotp can-gw

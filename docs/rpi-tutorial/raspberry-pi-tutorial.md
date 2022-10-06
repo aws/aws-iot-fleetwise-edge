@@ -66,8 +66,8 @@ sudo ~/aws-iot-fleetwise-edge/tools/install-socketcan.sh
 12. Run `sudo nano /usr/local/bin/setup-socketcan.sh` and add the following lines to bring up the
     `can0` and `can1` interfaces at startup:
 ```
-sudo ip link set up can0 txqueuelen 1000 type can bitrate 500000 restart-ms 100
-sudo ip link set up can1 txqueuelen 1000 type can bitrate 500000 restart-ms 100
+ip link set up can0 txqueuelen 1000 type can bitrate 500000 restart-ms 100
+ip link set up can1 txqueuelen 1000 type can bitrate 500000 restart-ms 100
 ```
 13. Restart the setup-socketcan service and the IoT FleetWise Edge Agent service:
 ```
