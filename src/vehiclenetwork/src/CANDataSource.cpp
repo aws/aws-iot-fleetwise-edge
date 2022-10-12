@@ -36,8 +36,9 @@ namespace VehicleNetwork
 using namespace Aws::IoTFleetWise::Platform::Utility;
 static const std::string INTERFACE_NAME_KEY = "interfaceName";
 static const std::string THREAD_IDLE_TIME_KEY = "threadIdleTimeMs";
-CANDataSource::CANDataSource( bool useKernelTimestamp )
-    : mUseKernelTimestamp{ useKernelTimestamp }
+static constexpr uint32_t MSB_MASK = 0X7FFFFFFFU;
+CANDataSource::CANDataSource( CAN_TIMESTAMP_TYPE timestampTypeToUse )
+    : mTimestampTypeToUse{ timestampTypeToUse }
 {
     mType = VehicleDataSourceType::CAN_SOURCE;
     mNetworkProtocol = VehicleDataSourceProtocol::RAW_SOCKET;
@@ -176,6 +177,48 @@ CANDataSource::shouldSleep() const
     return mShouldSleep.load( std::memory_order_relaxed );
 }
 
+Timestamp
+CANDataSource::extractTimestamp( struct msghdr *msgHeader )
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+    struct cmsghdr *currentHeader = CMSG_FIRSTHDR( msgHeader );
+    Timestamp timestamp = 0;
+    if ( mTimestampTypeToUse != CAN_TIMESTAMP_TYPE::POLLING_TIME )
+    {
+        while ( currentHeader != nullptr )
+        {
+            if ( currentHeader->cmsg_type == SO_TIMESTAMPING )
+            {
+                // With linux kernel 5.1 new return scm_timestamping64 was introduced
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+                scm_timestamping *timestampArray = (scm_timestamping *)( CMSG_DATA( currentHeader ) );
+                // From https://www.kernel.org/doc/Documentation/networking/timestamping.txt
+                // Most timestamps are passed in ts[0]. Hardware timestamps are passed in ts[2].
+                if ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_HARDWARE_TIMESTAMP )
+                {
+                    timestamp = static_cast<Timestamp>( ( timestampArray->ts[2].tv_sec * 1000 ) +
+                                                        ( timestampArray->ts[2].tv_nsec / 1000000 ) );
+                }
+                else if ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP ) // default
+                {
+                    timestamp = static_cast<Timestamp>( ( timestampArray->ts[0].tv_sec * 1000 ) +
+                                                        ( timestampArray->ts[0].tv_nsec / 1000000 ) );
+                }
+            }
+            currentHeader = CMSG_NXTHDR( msgHeader, currentHeader );
+        }
+        TraceModule::get().setVariable( TraceVariable::MAX_SYSTEMTIME_KERNELTIME_DIFF,
+                                        static_cast<uint64_t>( mClock->timeSinceEpochMs() ) -
+                                            static_cast<uint64_t>( timestamp ) );
+    }
+    if ( timestamp == 0 ) // either other timestamp are invalid(=0) or mTimestampTypeToUse == POLLING_TIME
+    {
+        TraceModule::get().incrementVariable( TraceVariable::CAN_POLLING_TIMESTAMP_COUNTER );
+        timestamp = mClock->timeSinceEpochMs();
+    }
+    return timestamp;
+}
+
 void
 CANDataSource::doWork( void *data )
 {
@@ -226,44 +269,10 @@ CANDataSource::doWork( void *data )
         nmsgs = recvmmsg( dataSource->mSocket, msg, PARALLEL_RECEIVED_FRAMES_FROM_KERNEL, 0, nullptr );
         for ( int i = 0; i < nmsgs; i++ )
         {
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-            struct cmsghdr *currentHeader = CMSG_FIRSTHDR( &msg[i].msg_hdr );
             VehicleDataMessage message;
             const std::vector<boost::any> syntheticData{};
             std::vector<std::uint8_t> rawData = {};
-            Timestamp timestamp = 0;
-            if ( dataSource->mUseKernelTimestamp )
-            {
-                while ( currentHeader != nullptr )
-                {
-                    if ( currentHeader->cmsg_type == SO_TIMESTAMPING )
-                    {
-                        // With linux kernel 5.1 new return scm_timestamping64 was introduced
-                        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-                        scm_timestamping *timestampArray = (scm_timestamping *)( CMSG_DATA( currentHeader ) );
-                        // From https://www.kernel.org/doc/Documentation/networking/can.txt
-                        // Most timestamps are passed in ts[0]. Hardware timestamps are passed in ts[2].
-                        if ( timestampArray->ts[2].tv_sec != 0 )
-                        {
-                            timestamp = static_cast<Timestamp>( ( timestampArray->ts[2].tv_sec * 1000 ) +
-                                                                ( timestampArray->ts[2].tv_nsec / 1000000 ) );
-                        }
-                        else
-                        {
-                            timestamp = static_cast<Timestamp>( ( timestampArray->ts[0].tv_sec * 1000 ) +
-                                                                ( timestampArray->ts[0].tv_nsec / 1000000 ) );
-                        }
-                    }
-                    currentHeader = CMSG_NXTHDR( &msg[i].msg_hdr, currentHeader );
-                }
-                TraceModule::get().setVariable( TraceVariable::MAX_SYSTEMTIME_KERNELTIME_DIFF,
-                                                static_cast<uint64_t>( dataSource->mClock->timeSinceEpochMs() ) -
-                                                    static_cast<uint64_t>( timestamp ) );
-            }
-            else
-            {
-                timestamp = dataSource->mClock->timeSinceEpochMs();
-            }
+            Timestamp timestamp = dataSource->extractTimestamp( &msg[i].msg_hdr );
             if ( timestamp < lastFrameTime )
             {
                 TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::NOT_TIME_MONOTONIC_FRAMES );
@@ -284,7 +293,8 @@ CANDataSource::doWork( void *data )
                 {
                     rawData.emplace_back( frame[i].data[j] );
                 }
-                message.setup( frame[i].can_id, rawData, syntheticData, timestamp );
+                // Compose the correct CAN Frame ID by clearing the MSB
+                message.setup( frame[i].can_id & MSB_MASK, rawData, syntheticData, timestamp );
                 if ( message.isValid() )
                 {
                     if ( !dataSource->mCircularBuffPtr->push( message ) )
@@ -354,7 +364,8 @@ CANDataSource::connect()
         close( mSocket );
         return false;
     }
-    if ( mUseKernelTimestamp )
+    if ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP ||
+         mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_HARDWARE_TIMESTAMP )
     {
         const int timestampFlags = ( SOF_TIMESTAMPING_RX_HARDWARE | SOF_TIMESTAMPING_RX_SOFTWARE |
                                      SOF_TIMESTAMPING_SOFTWARE | SOF_TIMESTAMPING_RAW_HARDWARE );

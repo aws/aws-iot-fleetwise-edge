@@ -14,14 +14,6 @@
 // Includes
 #include "DataCollectionProtoWriter.h"
 
-// Refer to the following for definitions of significand and exponent:
-// https://en.wikipedia.org/wiki/Double-precision_floating-point_format
-#define DBL_SIGNIFICAND_BITS 52U
-#define DBL_SIGNIFICAND_MASK ( ( 1ULL << DBL_SIGNIFICAND_BITS ) - 1U )
-#define DBL_SIGNIFICAND_FULL_BITS ( DBL_SIGNIFICAND_BITS + 1U ) // Including 'hidden' 53rd bit
-#define DBL_EXPONENT_BITS 11U
-#define DBL_EXPONENT_MASK ( ( 1U << DBL_EXPONENT_BITS ) - 1U )
-
 namespace Aws
 {
 namespace IoTFleetWise
@@ -38,63 +30,6 @@ DataCollectionProtoWriter::DataCollectionProtoWriter( CANInterfaceIDTranslator &
 DataCollectionProtoWriter::~DataCollectionProtoWriter()
 {
     google::protobuf::ShutdownProtobufLibrary();
-}
-
-void
-DataCollectionProtoWriter::convertToPeculiarFloat( double physicalValue, uint32_t &quotient, uint32_t &divisor )
-{
-    /*
-    IEEE 754 double format:
-        SEEEEEEEEEEEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-        ^^         ^^                                                  ^
-        ||         ||                                                  |
-        ||         |----------------------------------------------------- 52-bit fraction
-        |------------ 11-bit exponent (biased)
-        -- 1-bit sign
-    Formula:
-        number = (-1)^sign * (((2^52 + fraction) / 2^52) * (2^(exponent - 1023))
-
-    Output formula:
-        number = quotient / divisor
-
-    The following code translates the IEEE 754 double format to the quotient and divisor format by
-    mapping the fraction to the quotient and the exponent to the divisor, clipping and translating
-    as appropriate.
-    */
-
-    // Decode IEEE 754 'binary64' (a.k.a. 'double') format (ignore the sign, it is encoded separately):
-    uint64_t raw = 0x0ULL;
-    memcpy( &raw, &physicalValue, sizeof( raw ) );
-    uint64_t fraction = raw & DBL_SIGNIFICAND_MASK;
-    int exponent = static_cast<int>( ( raw >> DBL_SIGNIFICAND_BITS ) & DBL_EXPONENT_MASK );
-
-    fraction |= 1ULL << ( DBL_SIGNIFICAND_FULL_BITS - 1U ); // Set the 'hidden' 53rd bit
-    exponent -= 1023;                                       // Remove exponent bias
-
-    if ( exponent >= UINT32_WIDTH ) // physicalValue is too big, infinite or NaN: return UINT32_MAX
-    {
-        quotient = UINT32_MAX;
-        divisor = 1U;
-        return;
-    }
-    if ( exponent <= -UINT32_WIDTH ) // physicalValue is too small or zero: return zero
-    {
-        quotient = 0U;
-        divisor = 1U;
-        return;
-    }
-    // Note: exponent is now in the range -31 to 31
-
-    if ( exponent < 0 ) // physicalValue is less than 1.0
-    {
-        // Multiply by 2^exponent, i.e. right shift by -exponent, then set the exponent to zero,
-        // so that the divisor will be 2^31 below:
-        fraction >>= static_cast<unsigned>( -exponent );
-        exponent = 0;
-    }
-    // Throw away lowest 21-bits of precision:
-    quotient = static_cast<uint32_t>( fraction >> ( DBL_SIGNIFICAND_FULL_BITS - UINT32_WIDTH ) );
-    divisor = 1U << ( ( UINT32_WIDTH - 1U ) - static_cast<unsigned>( exponent ) );
 }
 
 void

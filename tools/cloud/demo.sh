@@ -21,7 +21,6 @@ DEFAULT_VEHICLE_NAME="fwdemo-${ACCOUNT_ID}"
 VEHICLE_NAME=""
 TIMESTREAM_DB_NAME="IoTFleetWiseDB-${TIMESTAMP}"
 TIMESTREAM_TABLE_NAME="VehicleDataTable"
-SERVICE_ROLE="IoTFleetWiseServiceRole"
 CAMPAIGN_FILE="campaign-brake-event.json"
 CLEAN_UP=false
 FLEET_SIZE=1
@@ -95,7 +94,6 @@ if [ "${VEHICLE_NAME}" == "" ]; then
 fi
 
 NAME="${VEHICLE_NAME}-${TIMESTAMP}"
-SERVICE_ROLE="${SERVICE_ROLE}-${REGION}-${TIMESTAMP}"
 
 echo -n "Date: "
 date +%Y-%m-%dT%H:%M:%S%z
@@ -127,7 +125,6 @@ register_account() {
     echo "Registering account..."
     aws iotfleetwise register-account \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --iam-resources "{\"roleArn\":\"${SERVICE_ROLE_ARN}\"}" \
         --timestream-resources "{\"timestreamDatabaseName\":\"${TIMESTREAM_DB_NAME}\", \
             \"timestreamTableName\":\"${TIMESTREAM_TABLE_NAME}\"}" | jq -r .registerAccountStatus
     echo "Waiting for account to be registered..."
@@ -187,74 +184,6 @@ if [ "${ACCOUNT_STATUS}" == "REGISTRATION_SUCCESS" ]; then
 elif [ "${ACCOUNT_STATUS}" == "REGISTRATION_PENDING" ]; then
     echo "Waiting for account to be registered..."
 else
-    echo "Creating service role..."
-    SERVICE_ROLE_TRUST_POLICY=$(cat <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": [
-            "iotfleetwise.amazonaws.com"
-        ]
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-EOF
-)
-    SERVICE_ROLE_ARN=`aws iam create-role \
-        --role-name "${SERVICE_ROLE}" \
-        --assume-role-policy-document "${SERVICE_ROLE_TRUST_POLICY}" | jq -r .Role.Arn`
-    echo ${SERVICE_ROLE_ARN}
-
-    echo "Waiting for role to be created..."
-    aws iam wait role-exists \
-        --role-name "${SERVICE_ROLE}"
-
-    echo "Creating service role policy..."
-    SERVICE_ROLE_POLICY=$(cat <<'EOF'
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "timestreamIngestion",
-            "Effect": "Allow",
-            "Action": [
-                "timestream:WriteRecords",
-                "timestream:Select"
-            ]
-        },
-        {
-            "Sid": "timestreamDescribeEndpoint",
-            "Effect": "Allow",
-            "Action": [
-                "timestream:DescribeEndpoints"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
-EOF
-)
-    SERVICE_ROLE_POLICY=`echo "${SERVICE_ROLE_POLICY}" \
-        | jq ".Statement[0].Resource=\"arn:aws:timestream:${REGION}:${ACCOUNT_ID}:database/${TIMESTREAM_DB_NAME}/*\""`
-    SERVICE_ROLE_POLICY_ARN=`aws iam create-policy \
-        --policy-name ${SERVICE_ROLE}-policy \
-        --policy-document "${SERVICE_ROLE_POLICY}" | jq -r .Policy.Arn`
-    echo ${SERVICE_ROLE_POLICY_ARN}
-
-    echo "Waiting for policy to be created..."
-    aws iam wait policy-exists \
-        --policy-arn "${SERVICE_ROLE_POLICY_ARN}"
-
-    echo "Attaching policy to service role..."
-    aws iam attach-role-policy \
-        --policy-arn ${SERVICE_ROLE_POLICY_ARN} \
-        --role-name "${SERVICE_ROLE}"
-
     echo "Creating Timestream database..."
     aws timestream-write create-database \
         --region ${REGION} \
@@ -291,7 +220,7 @@ while [ "${ACCOUNT_STATUS}" != "REGISTRATION_SUCCESS" ]; do
     fi
 done
 TIMESTREAM_DB_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamDatabaseName`
-TIMESTREAM_TABLE_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamTableName` 
+TIMESTREAM_TABLE_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamTableName`
 
 if ((FLEET_SIZE==1)); then
     echo "Deleting vehicle ${VEHICLE_NAME} if it already exists..."
@@ -416,7 +345,7 @@ else
             "attribute": {
                 "dataType": "STRING",
                 "description": "Color",
-                "fullyQualifiedName": "Vehicle.OBD.Color",
+                "fullyQualifiedName": "Vehicle.Color",
                 "defaultValue":"Red"
             }}
         ]' 2>&1`; then
@@ -443,7 +372,7 @@ echo "Updating attribute in model manifest..."
 MODEL_MANIFEST_ARN=`aws iotfleetwise update-model-manifest \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
     --name ${NAME}-model-manifest \
-    --nodes-to-add 'Vehicle.OBD.Color' | jq -r .arn`
+    --nodes-to-add 'Vehicle.Color' | jq -r .arn`
 echo ${MODEL_MANIFEST_ARN}
 
 echo "Activating model manifest..."
@@ -465,9 +394,11 @@ DECODER_MANIFEST_ARN=`aws iotfleetwise create-decoder-manifest \
 echo ${DECODER_MANIFEST_ARN}
 
 echo "Adding DBC signals to decoder manifest..."
-DBC=`cat hscan.dbc | base64 -w0`
-# For MAC users, run this command instead:
-#DBC=`cat hscan.dbc | base64`
+if [[ $(uname -s) == 'Darwin'* ]]; then
+  DBC=`cat hscan.dbc | base64`
+else
+  DBC=`cat hscan.dbc | base64 -w0`
+fi
 
 # Make map of node name to DBC signal name, i.e. {"Vehicle.SignalName":"SignalName"...}
 NODE_TO_DBC_MAP=`echo ${DBC_NODES} | jq '.[].sensor.fullyQualifiedName//""|match("Vehicle\\\\.(.+)")|{(.captures[0].string):.string}'|jq -s add`
@@ -493,7 +424,7 @@ if ((FLEET_SIZE==1)); then
         --decoder-manifest-arn ${DECODER_MANIFEST_ARN} \
         --association-behavior ValidateIotThingExists \
         --model-manifest-arn ${MODEL_MANIFEST_ARN} \
-        --attributes '{"Vehicle.OBD.Color":"Red"}' \
+        --attributes '{"Vehicle.Color":"Red"}' \
         --vehicle-name "${VEHICLE_NAME}" | jq -r .arn
 else
     echo "Creating vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1))..."
@@ -507,6 +438,7 @@ else
                     --decoder-manifest-arn ${DECODER_MANIFEST_ARN} \
                     --association-behavior ValidateIotThingExists \
                     --model-manifest-arn ${MODEL_MANIFEST_ARN} \
+                    --attributes '{"Vehicle.Color":"Red"}' \
                     --vehicle-name "${VEHICLE_NAME}-$((i+j))" >/dev/null \
             2>&3 &} 3>&2 2>/dev/null
         done
@@ -573,12 +505,15 @@ aws iotfleetwise update-campaign \
     --name ${NAME}-campaign \
     --action APPROVE | jq -r .arn
 
+# The following two actions(Suspending, Resuming) are only for demo purpose, it won't affect the campaign status
+sleep 2
 echo "Suspending campaign..."
 aws iotfleetwise update-campaign \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
     --name ${NAME}-campaign \
     --action SUSPEND | jq -r .arn
 
+sleep 2
 echo "Resuming campaign..."
 aws iotfleetwise update-campaign \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \

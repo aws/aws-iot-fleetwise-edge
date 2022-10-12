@@ -63,6 +63,10 @@
                         "protocolVersion": {
                             "type": "string",
                             "description": "Protocol version used- CAN 2.0A, 2.0B"
+                        },
+                        "timestampType": {
+                            "type": "string",
+                            "description": "Defines which timestamp type should be used: Software, Hardware or Polling. Default is Software"
                         }
                     },
                     "required": [

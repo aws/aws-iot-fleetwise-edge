@@ -9,7 +9,6 @@ or may not be affiliated with, connected to, or sponsored by Amazon.
 
 **Note**
 
-- AWS IoT FleetWise is in preview release and is subject to change. We recommend that you use the service, including the AWS IoT FleetWise Edge Agent software, only with test data, and not in production environments.
 - AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
 
 **AWS IoT FleetWise** provides a set of tools that enable automakers to collect, transform, and transfer vehicle data to the cloud at scale. With AWS IoT FleetWise you can build virtual representations of vehicle networks and define data collection rules to transfer only high-value data from your vehicles to AWS Cloud.
@@ -1469,6 +1468,7 @@ Customers can set the System level logging severity externally via the software 
 |                          | protocolVersion                             | Protocol version used- 2.0A, 2.0B.                                                                                        | string   |
 |                          | interfaceId                                 | Every CAN signal decoder is associated with a CAN network interface using a unique Id                                     | string   |
 |                          | type                                        | Specifies if the interface carries CAN or OBD signals over this channel, this will be CAN for a CAN network interface     | string   |
+|                          | timestampType                               | Defines which timestamp type should be used: Software, Hardware or Polling. Default is Software.                          | string   |
 | obdInterface             | interfaceName                               | CAN Interface connected to OBD bus                                                                                        | string   |
 |                          | requestMessageId                            | CAN request message id used for querying OBD signals. Example, 7DF is used in J1979                                       | string   |
 |                          | obdStandard                                 | OBD Standard (eg. J1979 or Enhanced (for advanced standards))                                                             | string   |
@@ -1508,10 +1508,10 @@ The device software has been designed with security principles in mind. Security
 
 - Device Authentication: the device software uses Client Certificates (x.509) to communicate with AWS IoT services. All the communications from and to the device software are over a secure TLS Connection. Refer to the [AWS IoT Security documentation](https://docs.aws.amazon.com/iot/latest/developerguide/x509-client-certs.html) for further details.
 - Data in transit: All the data exchanged with the AWS IoT services is encrypted in transit.
-- Data at rest: the current version of the software does not encrypt the data at rest i.e. during persistency. It’s assumed that the software operates in a secure partition that the OEM puts in place.
+- Data at rest: the current version of the software does not encrypt the data at rest i.e. during persistency. It’s assumed that the software operates in a secure partition that the OEM puts in place and rely on the OEM secure storage infrastructure that is applied for all IO operations happening in the gateway e.g. via HSM, OEM crypto stack.
 - Access to vehicle CAN data: the device software assumes that the software operates in a secure execution partition, that guarantees that if needed, the CAN traffic is encrypted/decrypted by the OEM Crypto stack (either on chip/HSM or via separate core running the crypto stack).
 
-The device software can be extended to invoke cryptography APIs to encrypt and decrypt the data as per the need.
+The device software can be extended to invoke cryptography APIs to encrypt and decrypt the data as per the need. 
 
 The device software has been designed to be deployed in a non safety relevant in-vehicle domain/partition. Due to its use of dynamic memory allocation, this software is not suited for deployment on real time/lock step/safety cores.
 

@@ -113,4 +113,5 @@ jq ".staticConfig.mqttConnection.endpointUrl=\"${ENDPOINT_URL}\"" ${INPUT_CONFIG
     | jq ".networkInterfaces[1].obdInterface.pidRequestIntervalSeconds=5" \
     | jq ".networkInterfaces[1].obdInterface.dtcRequestIntervalSeconds=5" \
     | jq ".networkInterfaces[1].interfaceId=\"0\"" \
+    | jq ".staticConfig.publishToCloudParameters.collectionSchemeManagementCheckinIntervalMs=5000" \
     > ${OUTPUT_CONFIG_FILE}

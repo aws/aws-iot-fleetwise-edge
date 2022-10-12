@@ -10,9 +10,6 @@ Amazon.
 
 **Note**
 
-* AWS IoT FleetWise is in preview release and is subject to change. We recommend that you use the
-  service, including the AWS IoT FleetWise Edge Agent software, only with test data, and not in
-  production environments.
 * AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
 * The AWS IoT FleetWise in-vehicle software component is licensed to you under the Amazon Software
   License. You are solely responsible for ensuring such software and any updates and modifications
@@ -55,8 +52,8 @@ sudo apt install -y unzip
 8. Run `sudo nano /boot/firmware/usercfg.txt` and add the following lines to enable the CAN hat:
 ```
 dtparam=spi=on
-dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=25
 dtoverlay=mcp2515-can1,oscillator=16000000,interrupt=25
+dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=23
 dtoverlay=spi-bcm2835-overlay
 ```
 9. Save the file (`CTRL+O`, `CTRL+X`) and reboot the Raspberry Pi (`sudo reboot`).
@@ -64,13 +61,13 @@ dtoverlay=spi-bcm2835-overlay
     [AWS IoT FleetWise Edge Agent Developer Guide](../dev-guide/edge-agent-dev-guide.md#provision-aws-iot-credentials).
 11. Install the [can-isotp](https://en.wikipedia.org/wiki/ISO_15765-2) module:
 ```
-sudo ~/aws-iot-fleetwise-deploy/tools/install-socketcan.sh
+sudo ~/aws-iot-fleetwise-edge/tools/install-socketcan.sh
 ```
 12. Run `sudo nano /usr/local/bin/setup-socketcan.sh` and add the following lines to bring up the
     `can0` and `can1` interfaces at startup:
 ```
-ip link set up can0 txqueuelen 1000 type can bitrate 500000 restart-ms 100
-ip link set up can1 txqueuelen 1000 type can bitrate 500000 restart-ms 100
+sudo ip link set up can0 txqueuelen 1000 type can bitrate 500000 restart-ms 100
+sudo ip link set up can1 txqueuelen 1000 type can bitrate 500000 restart-ms 100
 ```
 13. Restart the setup-socketcan service and the IoT FleetWise Edge Agent service:
 ```
