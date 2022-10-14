@@ -3,6 +3,10 @@
 ## future release (TBD)
 Bugfixes:
 * Dont use SocketCAN hardware timestamp as default but software timestamp. Hardware timestamp not being a unix epoch timestamp leads to problems.
+Improvements:
+* Added Mac-user-friendly commands in quick demo
+* Added an extra attribute, so that users can search vehicle in the FleetWise console
+* Added two extra steps for quick demo: suspending campaigns and resuming campaigns
 
 ## v1.0.0 (Sept 27, 2022)
 Bugfixes:

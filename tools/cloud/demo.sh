@@ -16,6 +16,7 @@ ENDPOINT_URL=""
 ENDPOINT_URL_OPTION=""
 REGION="us-east-1"
 TIMESTAMP=`date +%s`
+ACCOUNT_ID=`aws sts get-caller-identity --query "Account" --output text`
 DEFAULT_VEHICLE_NAME="fwdemo"
 VEHICLE_NAME=""
 TIMESTREAM_DB_NAME="IoTFleetWiseDB-${TIMESTAMP}"
@@ -95,7 +96,7 @@ fi
 NAME="${VEHICLE_NAME}-${TIMESTAMP}"
 
 echo -n "Date: "
-date --rfc-3339=seconds
+date +%Y-%m-%dT%H:%M:%S%z
 echo "Timestamp: ${TIMESTAMP}"
 echo "Vehicle name: ${VEHICLE_NAME}"
 echo "Fleet Size: ${FLEET_SIZE}"
@@ -136,7 +137,6 @@ get_account_status() {
 trap error_handler ERR
 
 echo "Getting AWS account ID..."
-ACCOUNT_ID=`aws sts get-caller-identity | jq -r .Account`
 echo ${ACCOUNT_ID}
 
 echo "Getting account registration status..."
@@ -220,7 +220,7 @@ while [ "${ACCOUNT_STATUS}" != "REGISTRATION_SUCCESS" ]; do
     fi
 done
 TIMESTREAM_DB_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamDatabaseName`
-TIMESTREAM_TABLE_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamTableName` 
+TIMESTREAM_TABLE_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamTableName`
 
 if ((FLEET_SIZE==1)); then
     echo "Deleting vehicle ${VEHICLE_NAME} if it already exists..."
@@ -275,6 +275,20 @@ if [ ${SIGNAL_CATALOG_COUNT} == 0 ]; then
         --name ${NAME}-signal-catalog \
         --description "DBC signals" \
         --nodes-to-add "${DBC_NODES}" | jq -r .arn
+
+    echo "Add an attribute to signal catalog..."
+    aws iotfleetwise update-signal-catalog \
+    ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${NAME}-signal-catalog \
+        --description "DBC Attributes" \
+        --nodes-to-add '[{
+            "attribute": {
+                "dataType": "STRING",
+                "description": "Color",
+                "fullyQualifiedName": "fwdemo.Color",
+                "defaultValue":"Red"
+            }}
+        ]' | jq -r .arn
 else
     SIGNAL_CATALOG_NAME=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].name`
     SIGNAL_CATALOG_ARN=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].arn`
@@ -321,6 +335,27 @@ else
     else
         echo "Signals exist and are in use, continuing"
     fi
+
+    echo "Updating color attribute"
+    if UPDATE_SIGNAL_CATALOG_STATUS=`aws iotfleetwise update-signal-catalog \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${SIGNAL_CATALOG_NAME} \
+        --description "DBC Attributes" \
+        --nodes-to-add '[{
+            "attribute": {
+                "dataType": "STRING",
+                "description": "Color",
+                "fullyQualifiedName": "Vehicle.Color",
+                "defaultValue":"Red"
+            }}
+        ]' 2>&1`; then
+        echo ${UPDATE_SIGNAL_CATALOG_STATUS} | jq -r .arn
+    elif ! echo ${UPDATE_SIGNAL_CATALOG_STATUS} | grep -q "InvalidSignalsException"; then
+        echo ${UPDATE_SIGNAL_CATALOG_STATUS} >&2
+        exit -1
+    else
+        echo "Signals exist and are in use, continuing"
+    fi
 fi
 
 echo "Creating model manifest..."
@@ -332,6 +367,13 @@ aws iotfleetwise create-model-manifest \
     --name ${NAME}-model-manifest \
     --signal-catalog-arn ${SIGNAL_CATALOG_ARN} \
     --nodes "${NODE_LIST}" | jq -r .arn
+
+echo "Updating attribute in model manifest..."
+MODEL_MANIFEST_ARN=`aws iotfleetwise update-model-manifest \
+    ${ENDPOINT_URL_OPTION} --region ${REGION} \
+    --name ${NAME}-model-manifest \
+    --nodes-to-add 'Vehicle.Color' | jq -r .arn`
+echo ${MODEL_MANIFEST_ARN}
 
 echo "Activating model manifest..."
 MODEL_MANIFEST_ARN=`aws iotfleetwise update-model-manifest \
@@ -352,7 +394,12 @@ DECODER_MANIFEST_ARN=`aws iotfleetwise create-decoder-manifest \
 echo ${DECODER_MANIFEST_ARN}
 
 echo "Adding DBC signals to decoder manifest..."
-DBC=`cat hscan.dbc | base64 -w0`
+if [[ $(uname -s) == 'Darwin'* ]]; then
+  DBC=`cat hscan.dbc | base64`
+else
+  DBC=`cat hscan.dbc | base64 -w0`
+fi
+
 # Make map of node name to DBC signal name, i.e. {"Vehicle.SignalName":"SignalName"...}
 NODE_TO_DBC_MAP=`echo ${DBC_NODES} | jq '.[].sensor.fullyQualifiedName//""|match("Vehicle\\\\.(.+)")|{(.captures[0].string):.string}'|jq -s add`
 NETWORK_FILE_DEFINITIONS=`echo [] \
@@ -377,6 +424,7 @@ if ((FLEET_SIZE==1)); then
         --decoder-manifest-arn ${DECODER_MANIFEST_ARN} \
         --association-behavior ValidateIotThingExists \
         --model-manifest-arn ${MODEL_MANIFEST_ARN} \
+        --attributes '{"Vehicle.Color":"Red"}' \
         --vehicle-name "${VEHICLE_NAME}" | jq -r .arn
 else
     echo "Creating vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1))..."
@@ -390,6 +438,7 @@ else
                     --decoder-manifest-arn ${DECODER_MANIFEST_ARN} \
                     --association-behavior ValidateIotThingExists \
                     --model-manifest-arn ${MODEL_MANIFEST_ARN} \
+                    --attributes '{"Vehicle.Color":"Red"}' \
                     --vehicle-name "${VEHICLE_NAME}-$((i+j))" >/dev/null \
             2>&3 &} 3>&2 2>/dev/null
         done
@@ -456,6 +505,21 @@ aws iotfleetwise update-campaign \
     --name ${NAME}-campaign \
     --action APPROVE | jq -r .arn
 
+# The following two actions(Suspending, Resuming) are only for demo purpose, it won't affect the campaign status
+sleep 2
+echo "Suspending campaign..."
+aws iotfleetwise update-campaign \
+    ${ENDPOINT_URL_OPTION} --region ${REGION} \
+    --name ${NAME}-campaign \
+    --action SUSPEND | jq -r .arn
+
+sleep 2
+echo "Resuming campaign..."
+aws iotfleetwise update-campaign \
+    ${ENDPOINT_URL_OPTION} --region ${REGION} \
+    --name ${NAME}-campaign \
+    --action RESUME | jq -r .arn
+
 check_vehicle_healthy() {
     for ((k=0; k<${HEALTH_CHECK_RETRIES}; k++)); do
         VEHICLE_STATUS=`aws iotfleetwise get-vehicle-status \
@@ -505,6 +569,9 @@ fi
 DELAY=30
 echo "Waiting ${DELAY} seconds for data to be collected..."
 sleep ${DELAY}
+
+echo "The DB Name is ${TIMESTREAM_DB_NAME}"
+echo "The DB Table is ${TIMESTREAM_TABLE_NAME}"
 
 echo "Querying Timestream..."
 aws timestream-query query \
