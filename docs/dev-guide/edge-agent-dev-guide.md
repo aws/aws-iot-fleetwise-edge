@@ -50,7 +50,7 @@ This guide assumes you have already logged in to the AWS console in your desired
 
 An AWS CloudFormation template is used to build AWS IoT FleetWise Edge Agent using AWS CodeBuild and deploy it to a new AWS EC2 instance using AWS CodeDeploy.
 
-1. Click here to [**Launch CloudFormation Template**](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-iot-fleetwise.s3.us-west-2.amazonaws.com%2Flatest%2Fcfn-templates%2Ffwdemo.yml&stackName=fwdemo-${your_account_id}).
+1. Click here to [**Launch CloudFormation Template**](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-iot-fleetwise.s3.us-west-2.amazonaws.com%2Flatest%2Fcfn-templates%2Ffwdemo.yml&stackName=fwdemo).
 1. (Optional) You can increase the number of simulated vehicles by updating the `FleetSize` parameter. You can also specify the region IoT Things are created in by updating the `IoTCoreRegion` parameter.
 1. Select the checkbox next to _‘I acknowledge that AWS CloudFormation might create IAM resources with custom names.’_
 1. Choose **Create stack**.
