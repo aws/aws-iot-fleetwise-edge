@@ -35,18 +35,18 @@ This guide showcases AWS IoT FleetWise at a high level. If you are interested in
 
 **Topics:**
 
-- Prerequisites
-- Build the AWS IoT FleetWise Edge Agent software
-- Use the AWS IoT FleetWise cloud demo
-- Explore collected data
+- [Prerequisites for quick start demo](#prerequisites-for-quick-start-demo)
+- [Build the AWS IoT FleetWise Edge Agent software](#build-the-aws-iot-fleetwise-edge-agent-software)
+- [Use the AWS IoT FleetWise cloud demo](#use-the-aws-iot-fleetwise-cloud-demo)
+- [Explore collected data](#explore-collected-data)
 
-### Prerequisites
+## Prerequisites for quick start demo
 
 This guide assumes you have already logged in to the AWS console in your desired region using an account with administrator rights.
 
 - Note: AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
 
-### Build the AWS IoT FleetWise Edge Agent software
+## Build the AWS IoT FleetWise Edge Agent software
 
 An AWS CloudFormation template is used to build AWS IoT FleetWise Edge Agent using AWS CodeBuild and deploy it to a new AWS EC2 instance using AWS CodeDeploy.
 
@@ -58,7 +58,7 @@ An AWS CloudFormation template is used to build AWS IoT FleetWise Edge Agent usi
 
 AWS IoT FleetWise Edge Agent software has been deployed to an AWS EC2 Graviton (ARM64) Instance along with credentials that allow it to connect to AWS IoT Core. CAN data is also being generated on the EC2 instance to simulate periodic hard-braking events. The AWS IoT FleetWise Cloud demo script in the following section will deploy a campaign to the simulated fleet of vehicles to capture the engine torque when a hard braking-event occurs.
 
-### Use the AWS IoT FleetWise cloud demo
+## Use the AWS IoT FleetWise cloud demo
 
 The instructions below will register your AWS account for AWS IoT FleetWise, create a demonstration vehicle model, register the virtual vehicle created in the previous section and run a campaign to collect data from it.
 
@@ -110,7 +110,7 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
 
 1. When the script completes, a path to an HTML file is given in the format `/home/cloudshell-user/aws-iot-fleetwise-cloud/fwdemo-<TIMESTAMP>.html`. Copy the path, then click on the Actions drop down menu in the top-right corner of the CloudShell window and choose **Download file**. Paste the path to the file, choose **Download**, and open the downloaded file in your browser.
 
-### Explore collected data
+## Explore collected data
 
 1. To explore the collected data, you can click and drag to zoom in. The red line shows the simulated brake pressure signal. As you can see that when hard braking events occur (value above 7000), collection is triggered and the engine torque signal data is collected.
    1. Alternatively, if your AWS account is enrolled with Amazon QuickSight or Grafana, you may use them to browse the data from Amazon Timestream directly.
@@ -126,25 +126,25 @@ This guide covers building AWS IoT FleetWise at a detailed technical level, usin
 #### Topics:
 
 - [Getting started with AWS IoT FleetWise on a development machine](#getting-started-with-aws-iot-fleetwise-on-a-development-machine)
-  - Prerequisites
-  - Launch your development machine
-  - Compile the AWS IoT FleetWise Edge Agent software
-  - Deploy the AWS IoT FleetWise Edge Agent software
-  - Run the AWS IoT FleetWise demo script
-- [Getting started with AWS IoT FleetWise Edge Agent on a NXP S32G board](#getting-started-with-aws-iot-fleetwise-edge-agent-on-a-nxp-s32g-board)
-  - Prerequisites
-  - Build an SD-Card Image
-  - Flash the SD-Card Image
-  - Specify initial board configuration
-  - Provision AWS IoT Credentials
-  - Deploy and run AWS IoT FleetWise Edge Agent software on a NXP S32G
-  - Collect OBD Data
+  - [Prerequisites for development machine](#prerequisites-for-development-machine)
+  - [Launch your development machine](#launch-your-development-machine)
+  - [Compile AWS IoT FleetWise Edge Agent software](#compile-aws-iot-fleetwise-edge-agent-software)
+  - [Deploy AWS IoT FleetWise Edge Agent software](#deploy-aws-iot-fleetwise-edge-agent-software)
+  - [Run the AWS IoT FleetWise demo script](#run-the-aws-iot-fleetwise-demo-script)
+- [Getting started with AWS IoT FleetWise Edge Agent on a NXP S32G board](#getting-started-with-aws-iot-fleetwise-edge-agent-on-nxp-s32g)
+  - [Prerequisites for NXP S32G](#prerequisites-for-nxp-s32g)
+  - [Build an SD-Card Image](#build-an-sd-card-image)
+  - [Flash the SD-Card Image](#flash-the-sd-card-image)
+  - [Specify initial board configuration](#specify-initial-board-configuration)
+  - [Provision AWS IoT Credentials](#provision-aws-iot-credentials)
+  - [Deploy AWS IoT FleetWise Edge Agent on NXP S32G](#deploy-aws-iot-fleetwise-edge-agent-on-nxp-s32g)
+  - [Collect OBD Data](#collect-obd-data)
 
 ## Getting started with AWS IoT FleetWise on a development machine
 
 This section describes how to get started with AWS IoT FleetWise Edge Agent on a development machine.
 
-### Prerequisites
+### Prerequisites for development machine
 
 - Access to an AWS Account with administrator privileges.
 - Logged in to the AWS Console in your desired region using the account with administrator privileges.
@@ -177,7 +177,7 @@ An Ubuntu 18.04 development machine with 200GB free disk space will be required.
        && cd ~/aws-iot-fleetwise-edge
    ```
 
-   You can browse the `README.md` and source code while referring to this guide.
+   You can browse the [README.md](../../README.md) and source code while referring to this guide.
 
 1. Install the AWS IoT FleetWise Edge Agent dependencies
 
@@ -309,10 +309,10 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
 
 This section describes how to deploy AWS IoT FleetWise Edge Agent onto an NXP S32G-VNP-RDB2 board.
 
-### Prerequisites
+### Prerequisites for NXP S32G
 
 - **NXP Semiconductors S32G Reference Design 2** — Part number: S32G-VNP-RDB2
-- **AWS IoT FleetWise Edge Agent Compiled for ARM64** — If you are using an EC2 Graviton instance as your development machine, you will have completed this already above.
+- **AWS IoT FleetWise Edge Agent Compiled for ARM64** — If you are using an EC2 Graviton instance as your development machine, you will have completed this already [above](#compile-aws-iot-fleetwise-edge-agent-software).
 
   - _If you are using a local Intel x86_64 (amd64) development machine_, you will need to run the following to cross-compile AWS IoT FleetWise Edge Agent:
 
@@ -382,7 +382,7 @@ The following instructions use the development machine to build an SD-card image
 
 ### Provision AWS IoT Credentials
 
-Run the following commands _on the development machine_ (after compiling AWS IoT FleetWise Edge Agent for ARM64 as explained above), to create an IoT Thing and provision credentials for it. The AWS IoT FleetWise Edge Agent binary and its configuration files will be packaged into a ZIP file ready to be deployed to the board.
+Run the following commands _on the development machine_ (after compiling AWS IoT FleetWise Edge Agent for ARM64 as explained [above](#prerequisites-for-nxp-s32g)), to create an IoT Thing and provision credentials for it. The AWS IoT FleetWise Edge Agent binary and its configuration files will be packaged into a ZIP file ready to be deployed to the board.
 
 ```bash
 mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
