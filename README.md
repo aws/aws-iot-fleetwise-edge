@@ -39,7 +39,7 @@ The  following diagram illustrates a high-level architecture of the system.
 
 AWS IoT FleetWise Edge functional flexibility and its use of dynamic memory allocation means that it cannot reside in the real-time safe vehicle ECUs. AWS IoT FleetWise Edge must also be connected to the internet and preferably has access to a “good” portion of vehicle ECU data. OEMs have the flexibility to decide  where they can deploy AWS IoT FleetWise Edge binary. Possible options include (if present):
 
-1. Vehicle Gateway such as the [NXP S32G](https://www.nxp.com/products/processors-and-microcontrollers/arm-processors/s32g-vehicle-network-processors/s32g2-processors-for-vehicle-networking:S32G2) 
+1. Vehicle Gateway such as the [NXP S32G](https://www.nxp.com/products/processors-and-microcontrollers/arm-processors/s32g-vehicle-network-processors/s32g2-processors-for-vehicle-networking:S32G2) and [Renesas R-Car S4](https://www.renesas.com/jp/en/products/automotive-products/automotive-system-chips-socs/rtp8a779f0askb0sp2s-r-car-s4-reference-boardspider)
 2. Vehicle Head-Unit
 3. Vehicle’s High Performance Computer
 4. Telecommunication Control Unit
