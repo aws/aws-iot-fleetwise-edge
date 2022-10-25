@@ -19,7 +19,7 @@ AWS IoT FleetWise's capability to collect ECU data and store them on cloud datab
 
 You can use the included sample C++ application to learn more about AWS IoT FleetWise Edge Agent interfaces and to test interactions before integration.
 
-**_The AWS IoT FleetWise in-vehicle software component is licensed to you under the [Amazon Software License](https://aws.amazon.com/asl/). You are solely responsible for ensuring such software and any updates and modifications thereto are deployed and maintained safely and securely in any vehicles and do not otherwise impact vehicle safety._**
+**_The AWS IoT FleetWise in-vehicle software component is licensed to you under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0). You are solely responsible for ensuring such software and any updates and modifications thereto are deployed and maintained safely and securely in any vehicles and do not otherwise impact vehicle safety._**
 
 **Topics**
 

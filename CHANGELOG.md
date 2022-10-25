@@ -1,6 +1,9 @@
 # Change Log
 
 ## future release (TBD)
+License Update:
+* License changed from Amazon Software License 1.0 to Apache License Version 2.0
+
 Bugfixes:
 * Dont use SocketCAN hardware timestamp as default but software timestamp. Hardware timestamp not being a unix epoch timestamp leads to problems.
 Improvements:
