@@ -5,6 +5,15 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesa
 ## Prerequisites
 
 - **Renesas Electronics Corporation R-Car S4 Reference Board/Spider**
+  - Spider board has eMMC and micro SD-card slot but the can't use simalutaneously.
+  - For using sdcard, please execute following two steps.
+   1. Please flash IPL which support booting from sdcard.
+      - It requires to build IPL with CA_LOAD_TYPE=1 option.
+      - For more details about building IPL, please refer to section 6.2.3 "How to build" in "RENESAS_ICUMX_IPL_for_R-Car_Gen4_Users_Manual_E.pdf"
+   1. Please change SW3 and SW6 on the CPU board.
+      - For more details, please refer to section 3.7.8.1 "Enable SD Card" in "R-Car S4_StartupGuide_x_x_x.pdf"
+- **DHCP server with internet connection**
+  - In this guide, spider board requires DHCP server to connect internet.
 - **AWS IoT FleetWise Edge Agent Compiled for ARM64**
   — If you are using an EC2 Graviton instance as your development machine, you will have completed this already above.
 
@@ -24,38 +33,42 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesa
 
 The following instructions use the development machine(Ubuntu 20.04) to build an SD-card image based on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 
-1. Run the following _on the development machine_ to build SD card image:
+1. Run the following _on the development machine_ to build SD-card image:
 
    ```bash
     cd ~/aws-iot-fleetwise-edge \
-       && sudo ./tools/renesas-rcar-s4/make-rootfs.sh 20.04.4 spider -sd
+       && sudo ./tools/renesas-rcar-s4/make-rootfs.sh 20.04.5 spider -sd
    ```
 
 ## Flash the SD-Card Image
 
-1. Run the following to write the image to SD card:
+1. Run the following to write the image to micro SD-card:
 
    ```bash
-    sudo dd if=./Ubuntu-20.04.4-rootfs-image-rcar-spider-sdcard.ext4 of=/dev/sdc bs=1M status=progress
+    sudo dd if=./Ubuntu-20.04.5-rootfs-image-rcar-spider-sdcard.ext4 of=/dev/sdc bs=1M status=progress
    ```
 
 ## Specify Initial Board Configuration
 
-1. Insert the SD-card into the R-Car S4 Spider board’s SD-card slot.
+1. Insert the micro SD-card into the R-Car S4 Spider board’s micro SD-card slot.
 1. Connect an Ethernet cable.
 1. Connect develop machine to R-Car S4 Spider board USB port.
-1. Power ON S4 Spider board.
+   - USB port is depending on board revision(until B0-1st or since B0-2nd).
+   - For more detail, please refer to the section 2.1 "Linux BSP" in "R-Car S4_StartupGuide_x_x_x.pdf".
+
+   ![](./images/rcar-s4-spider.png)
+
 1. Use screen command on your develop machine terminal to veiw serial output.
-1. Push Power button to boot the system. You can see the count down during U-Boot. Hit enter key to stop U-Boot.
-1. Enter following settings to flash the SD card data to board
+1. Power on S4 Spider board. You can see the count down during U-Boot. Hit enter key to stop U-Boot.
+1. Enter following settings to flash the micro SD-card data to board
 
    ```bash
      setenv _booti 'booti 0x48080000 - 0x48000000'
-     setenv emmc1 'setenv bootargs rw root=/dev/mmcblk0p1 rootwait ip=dhcp maxcpus=1'
-     setenv emmc2 ext4load mmc 0:1 0x48080000 /boot/Image
-     setenv emmc3 ext4load mmc 0:1 0x48000000 /boot/r8a779f0-spider.dtb
-     setenv emmc 'run emmc1; run emmc2; run emmc3; run _booti'
-     setenv bootcmd 'run emmc'
+     setenv sd1 'setenv bootargs rw root=/dev/mmcblk0p1 rootwait ip=dhcp maxcpus=1'
+     setenv sd2 ext4load mmc 0:1 0x48080000 /boot/Image
+     setenv sd3 ext4load mmc 0:1 0x48000000 /boot/r8a779f0-spider.dtb
+     setenv sd 'run sd1; run sd2; run sd3; run _booti'
+     setenv bootcmd 'run sd'
      saveenv
      boot
    ```

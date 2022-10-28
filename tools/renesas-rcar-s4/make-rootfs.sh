@@ -3,13 +3,9 @@ SCRIPT_DIR=$(cd `dirname $0` && pwd)
 #################################
 # Configuable parameter         #
 #################################
-#DEVICE=ulcb
-#DEVICE=ccpf-sk
 DEVICE=spider
 USERNAME=rcar
 HOSTNAME=${DEVICE}
-
-NET_DEV=eth0
 
 KERNEL_CONFIG_APPEND="
 # for USB3 support
@@ -29,11 +25,9 @@ CONFIG_DMATEST=m
 CONFIG_PCI_ENDPOINT_TEST=y
 CONFIG_SPI_SH_MSIOF=y
 CONFIG_SPI_SPIDEV=y
-# For initramfs
-#CONFIG_INITRAMFS_SOURCE=\"${SCRIPT_DIR}/tiny-rootfs/initramfs\"
 "
-
 #################################
+
 if [[ $# < 2 ]]; then
     echo "Usage: $0 <Ubuntu version> <device_name> (<gui_option>)"
     echo "    Ubuntu version(required):"
@@ -53,6 +47,7 @@ if [[ $# < 2 ]]; then
     exit
 fi
 
+NET_DEV=eth0
 if [[ "$2" == "spider" ]]; then
     DEVICE=spider
     NET_DEV=tsn0
@@ -110,12 +105,10 @@ DHCP=ipv4
 
 NAMESERVER=$(cat /etc/resolv.conf | grep nameserver | head -n 1 | awk '{print $2}')
 UBUNTU_ROOTFS_NAME=ubuntu-base-$1-base-arm64.tar.gz
-#UBUNTU_VER=$(echo $UBUNTU_ROOTFS_NAME | cut -d- -f3 | cut -d. -f-2)
 UBUNTU_VER=$1
 UBUNTU_ROOTFS_URL=http://cdimage.ubuntu.com/ubuntu-base/releases/${UBUNTU_VER}/release/${UBUNTU_ROOTFS_NAME}
 
 ROOTFS=${ROOTFS:-Ubuntu-${UBUNTU_VER}${ROOTFS_APPEND}-rootfs}
-SOURCE_DIR=${ROOTFS}-rcar-${DEVICE}-source
 SDCARD_IMAGE_NAME=${ROOTFS}-image-rcar-${DEVICE}.ext4
 if [[ "${SDCARD_OPTION}" == "True" ]]; then
     SDCARD_IMAGE_NAME=${ROOTFS}-image-rcar-${DEVICE}-sdcard.ext4
@@ -123,13 +116,11 @@ fi
 
 # Cleanup
 rm -rf ${SDCARD_IMAGE_NAME} ${SDCARD_IMAGE_NAME}.gz
-# rm -rf ${SOURCE_DIR} ${SOURCE_DIR}.zip
 rm -rf ${ROOTFS}
 
 # Downlaod ubuntu base
 mkdir -p ${ROOTFS}
 wget ${UBUNTU_ROOTFS_URL} -O- | tar zx -C ${ROOTFS}
-#QEMU_BIN_PATH=`update-binfmts --display | grep aarch64 | tail -1 | cut -f4 -d' '`
 QEMU_BIN_PATH=$(which qemu-aarch64-static)
 cp ${QEMU_BIN_PATH} ./${ROOTFS}/${QEMU_BIN_PATH}
 
@@ -141,10 +132,9 @@ chroot "${ROOTFS}" sh -c " \
     && apt install -y apt-utils perl-modules \
     && apt install -y ubuntu-standard \
     && apt install -y vim net-tools ssh sudo tzdata rsyslog udev iputils-ping \
-    && apt install -y unzip curl kmod iproute2 git python3-pip \
-    && apt install -y nano ${ADDITIONAL_PACKAGE} \
+    && apt install -y unzip curl kmod iproute2 git python3-pip nano \
     && apt upgrade -y \
-    && echo \"${DHCP_CONF}\" > /etc/systemd/network/01-eth0.network \
+    && echo \"${DHCP_CONF}\" > /etc/systemd/network/01-${NET_DEV}.network \
     && useradd -m -s /bin/bash -G sudo ${USERNAME} \
     && echo ${USERNAME}:${USERNAME} | chpasswd \
     && echo \"${USERNAME}   ALL=(ALL) NOPASSWD:ALL\" >> /etc/sudoers \
@@ -162,27 +152,10 @@ chroot "${ROOTFS}" sh -c " \
     && exit \
 "
 
-# mv ./${ROOTFS}/Debian_source_downloader ./${SOURCE_DIR}
-# *** Debug Only *** #
-# set root password for login system using root
-# ( echo root; echo root;) | chroot ${ROOTFS} passwd root
-####################
-
 # Prepare linux-kernel for R-Car
-### prepare initramfs
-if [[ "${SDCARD_OPTION}" != "True" ]]; then
-    cd ${SCRIPT_DIR}
-    rm -rf tiny-rootfs
-    git clone --depth=1 https://github.com/morimoto/tiny-rootfs
-    cd tiny-rootfs
-    make HOST=aarch64-linux-gnu
-    make install
-fi
-
 cd ${SCRIPT_DIR}
 if [ ! -e linux-bsp-${DEVICE} ]; then
     if [[ "${DEVICE}" == "spider" ]] ;then
-        #git clone --depth 1 https://github.com/renesas-rcar/linux-bsp/ -b v5.10.41/rcar-5.1.3.rc8 linux-bsp-${DEVICE}
         git clone --depth 1 https://github.com/renesas-rcar/linux-bsp/ -b v5.10.41/rcar-5.1.6.rc3 linux-bsp-${DEVICE}
     else
         git clone --depth 1 https://github.com/renesas-rcar/linux-bsp/ -b v5.10.41/rcar-5.1.4 linux-bsp-${DEVICE}
@@ -214,11 +187,9 @@ find ./arch/arm64/boot/ -name "*${DEVICE}.dtb" | xargs sudo cp \
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules -j$(grep -c processor /proc/cpuinfo)
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
     INSTALL_MOD_PATH=../${ROOTFS}/ modules_install
-# git archive --format=tar HEAD | gzip > ../${SOURCE_DIR}/linux-kernel.tar.gz
 cd ../
 
-# Prepare sdcard image (+8GB free space)
-#BSIZE_MEGA=$(( 8000 + $(sudo du -hsm ./${ROOTFS} | head -1 | cut -f1) ))
+# Prepare sdcard image (+1GB free space)
 BSIZE_MEGA=$(( 1000 + $(sudo du -hsm ./${ROOTFS} | head -1 | cut -f1) ))
 dd of=image.img count=0 seek=1 bs=${BSIZE_MEGA}M
 LOOP_DEV=$(sudo losetup -f)
@@ -235,5 +206,3 @@ losetup -d ${LOOP_DEV}
 # Prepare to release
 mv -f image.img ${SDCARD_IMAGE_NAME}
 gzip -k ${SDCARD_IMAGE_NAME}
-# zip -qo -r ${SOURCE_DIR}.zip ${SOURCE_DIR}
-
