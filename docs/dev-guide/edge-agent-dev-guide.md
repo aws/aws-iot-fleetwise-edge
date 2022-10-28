@@ -145,7 +145,7 @@ This guide covers building AWS IoT FleetWise at a detailed technical level, usin
   - [Flash the SD-Card Image](./edge-agent-dev-guide-renesas-rcar-s4.md#flash-the-sd-card-image)
   - [Specify initial board configuration](./edge-agent-dev-guide-renesas-rcar-s4.md#specify-initial-board-configuration)
   - [Provision AWS IoT Credentials](./edge-agent-dev-guide-renesas-rcar-s4.md#provision-aws-iot-credentials)
-  - [Deploy and run AWS IoT FleetWise Edge Agent software on R-Car S4 Spider board](./edge-agent-dev-guide-renesas-rcar-s4.md#deploy-and-run-aws-iot-fleetwise-edge-agent-software-on-r-car-s4-spider-board)
+  - [Deploy and run AWS IoT FleetWise Edge Agent software on R-Car S4 Spider board](./edge-agent-dev-guide-renesas-rcar-s4.md#deploy-aws-iot-fleetwise-edge-agent-software-on-r-car-s4-spider-board)
   - [Collect OBD Data](./edge-agent-dev-guide-renesas-rcar-s4.md#collect-obd-data)
 
 ## Getting started with AWS IoT FleetWise on a development machine
