@@ -6,7 +6,7 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesa
 
 - **Renesas Electronics Corporation R-Car S4 Reference Board/Spider**
   - Spider board has eMMC and micro SD-card slot but the can't use simalutaneously.
-  - For using sdcard, please execute following two steps.
+  - For using sdcard, please execute following two steps. The detail files can find in [R-Car S4 SDK Start Up Guide PKG](https://www.renesas.com/us/en/products/automotive-products/automotive-system-chips-socs/r-car-s4-automotive-system-chip-soc-car-servercommunication-gateway#design_development).
    1. Please flash IPL which support booting from sdcard.
       - It requires to build IPL with CA_LOAD_TYPE=1 option.
       - For more details about building IPL, please refer to section 6.2.3 "How to build" in "RENESAS_ICUMX_IPL_for_R-Car_Gen4_Users_Manual_E.pdf"
