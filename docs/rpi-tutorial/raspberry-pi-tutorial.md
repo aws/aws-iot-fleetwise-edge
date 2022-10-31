@@ -11,8 +11,8 @@ Amazon.
 **Note**
 
 * AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
-* The AWS IoT FleetWise in-vehicle software component is licensed to you under the Amazon Software
-  License. You are solely responsible for ensuring such software and any updates and modifications
+* The AWS IoT FleetWise in-vehicle software component is licensed to you under the the Apache License, Version 2.0.
+* You are solely responsible for ensuring such software and any updates and modifications
   thereto are deployed and maintained safely and securely in any vehicles and do not otherwise
   impact vehicle safety.
 
