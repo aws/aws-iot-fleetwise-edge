@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -euo pipefail
+
 SCRIPT_DIR=$(cd `dirname $0` && pwd)
 #################################
 # Configuable parameter         #
@@ -26,8 +29,10 @@ CONFIG_PCI_ENDPOINT_TEST=y
 CONFIG_SPI_SH_MSIOF=y
 CONFIG_SPI_SPIDEV=y
 "
-#################################
 
+#####################################################
+# Setup                                             #
+#####################################################
 if [[ $# < 2 ]]; then
     echo "Usage: $0 <Ubuntu version> <device_name> (<gui_option>)"
     echo "    Ubuntu version(required):"
@@ -121,42 +126,16 @@ rm -rf ${ROOTFS}
 # Downlaod ubuntu base
 mkdir -p ${ROOTFS}
 wget ${UBUNTU_ROOTFS_URL} -O- | tar zx -C ${ROOTFS}
-QEMU_BIN_PATH=$(which qemu-aarch64-static)
-cp ${QEMU_BIN_PATH} ./${ROOTFS}/${QEMU_BIN_PATH}
 
-# Prepare rootfs
-chroot "${ROOTFS}" sh -c " \
-    export DEBIAN_FRONTEND=noninteractive \
-    && echo nameserver ${NAMESERVER} >/etc/resolv.conf \
-    && apt update \
-    && apt install -y apt-utils perl-modules \
-    && apt install -y ubuntu-standard \
-    && apt install -y vim net-tools ssh sudo tzdata rsyslog udev iputils-ping \
-    && apt install -y unzip curl kmod iproute2 git python3-pip nano \
-    && apt upgrade -y \
-    && echo \"${DHCP_CONF}\" > /etc/systemd/network/01-${NET_DEV}.network \
-    && useradd -m -s /bin/bash -G sudo ${USERNAME} \
-    && echo ${USERNAME}:${USERNAME} | chpasswd \
-    && echo \"${USERNAME}   ALL=(ALL) NOPASSWD:ALL\" >> /etc/sudoers \
-    && echo ${HOSTNAME} > /etc/hostname \
-    && systemctl enable systemd-networkd \
-    && cp /usr/share/systemd/tmp.mount /etc/systemd/system/tmp.mount \
-    && systemctl enable tmp.mount \
-    && systemctl enable systemd-resolved \
-    && rm /etc/resolv.conf \
-    && ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf \
-    && echo 127.0.0.1 localhost > /etc/hosts \
-    && echo 127.0.1.1 ${HOSTNAME} >> /etc/hosts \
-    && depmod -a \
-    && apt clean \
-    && exit \
-"
-
+#####################################################
+# Build linux-kernel                                #
+#####################################################
 # Prepare linux-kernel for R-Car
 cd ${SCRIPT_DIR}
 if [ ! -e linux-bsp-${DEVICE} ]; then
     if [[ "${DEVICE}" == "spider" ]] ;then
-        git clone --depth 1 https://github.com/renesas-rcar/linux-bsp/ -b v5.10.41/rcar-5.1.6.rc3 linux-bsp-${DEVICE}
+        BRANCH=v5.10.41/rcar-5.1.6.rc3
+        git clone --depth 1 https://github.com/renesas-rcar/linux-bsp -b ${BRANCH} linux-bsp-${DEVICE}
     else
         git clone --depth 1 https://github.com/renesas-rcar/linux-bsp/ -b v5.10.41/rcar-5.1.4 linux-bsp-${DEVICE}
     fi
@@ -189,6 +168,41 @@ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
     INSTALL_MOD_PATH=../${ROOTFS}/ modules_install
 cd ../
 
+#####################################################
+# Setup rootfs with chroot                          #
+#####################################################
+QEMU_BIN_PATH=$(which qemu-aarch64-static)
+cp ${QEMU_BIN_PATH} ./${ROOTFS}/${QEMU_BIN_PATH}
+# Prepare rootfs
+chroot "${ROOTFS}" sh -c " \
+    export DEBIAN_FRONTEND=noninteractive \
+    && echo nameserver ${NAMESERVER} >/etc/resolv.conf \
+    && apt update \
+    && apt upgrade -y \
+    && apt install -y apt-utils perl-modules \
+    && apt install -y ubuntu-standard \
+    && apt install -y vim net-tools ssh sudo tzdata rsyslog udev iputils-ping \
+    && apt install -y unzip curl kmod iproute2 git python3-pip nano \
+    && echo \"${DHCP_CONF}\" > /etc/systemd/network/01-${NET_DEV}.network \
+    && useradd -m -s /bin/bash -G sudo ${USERNAME} \
+    && echo ${USERNAME}:${USERNAME} | chpasswd \
+    && echo \"${USERNAME}   ALL=(ALL) NOPASSWD:ALL\" >> /etc/sudoers \
+    && echo ${HOSTNAME} > /etc/hostname \
+    && systemctl enable systemd-networkd \
+    && cp /usr/share/systemd/tmp.mount /etc/systemd/system/tmp.mount \
+    && systemctl enable tmp.mount \
+    && systemctl enable systemd-resolved \
+    && rm /etc/resolv.conf \
+    && ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf \
+    && echo 127.0.0.1 localhost > /etc/hosts \
+    && echo 127.0.1.1 ${HOSTNAME} >> /etc/hosts \
+    && depmod -a \`ls /lib/modules\` \
+    && apt clean \
+    && exit \
+"
+#####################################################
+# Create SD card image                              #
+#####################################################
 # Prepare sdcard image (+1GB free space)
 BSIZE_MEGA=$(( 1000 + $(sudo du -hsm ./${ROOTFS} | head -1 | cut -f1) ))
 dd of=image.img count=0 seek=1 bs=${BSIZE_MEGA}M
@@ -206,3 +220,4 @@ losetup -d ${LOOP_DEV}
 # Prepare to release
 mv -f image.img ${SDCARD_IMAGE_NAME}
 gzip -k ${SDCARD_IMAGE_NAME}
+
