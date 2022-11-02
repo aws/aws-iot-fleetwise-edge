@@ -33,7 +33,13 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesa
 
 The following instructions use the development machine(Ubuntu 20.04) to build an SD-card image based on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 
-1. Run the following _on the development machine_ to build SD-card image:
+1. Run the following _on the development machine_ to install the dependencies:
+
+   ```bash
+   sudo apt install qemu-user-static flex bison build-essential crossbuild-essential-arm64 libssl-dev
+   ```
+
+1. Run the following to build SD-card image:
 
    ```bash
     cd ~/aws-iot-fleetwise-edge \

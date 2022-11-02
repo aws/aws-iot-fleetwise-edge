@@ -160,13 +160,13 @@ wget https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
 wget https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/r8a779x_usb3_v3.dlmem
 cd ../
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig Image dtbs -j$(grep -c processor /proc/cpuinfo)
-cp -L arch/arm64/boot/Image -t ../${ROOTFS}/boot
+cp -L arch/arm64/boot/Image -t ../../../${ROOTFS}/boot
 find ./arch/arm64/boot/ -name "*${DEVICE}.dtb" | xargs sudo cp \
-    -t ../${ROOTFS}/boot
+    -t ../../../${ROOTFS}/boot
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules -j$(grep -c processor /proc/cpuinfo)
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-    INSTALL_MOD_PATH=../${ROOTFS}/ modules_install
-cd ../
+    INSTALL_MOD_PATH=../../../${ROOTFS}/ modules_install
+cd ../../..
 
 #####################################################
 # Setup rootfs with chroot                          #
