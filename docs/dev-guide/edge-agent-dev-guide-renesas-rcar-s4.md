@@ -7,13 +7,11 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesa
 - **Renesas Electronics Corporation R-Car S4 Reference Board/Spider**
   - Spider board has eMMC and micro SD-card slot but the can't use simalutaneously.
   - For using sdcard, please execute following two steps. The detail files can find in [R-Car S4 SDK Start Up Guide PKG](https://www.renesas.com/us/en/products/automotive-products/automotive-system-chips-socs/r-car-s4-automotive-system-chip-soc-car-servercommunication-gateway#design_development).
-   1. Please flash IPL which support booting from sdcard.
+  1.  Please flash IPL which support booting from sdcard.
       - It requires to build IPL with CA_LOAD_TYPE=1 option.
       - For more details about building IPL, please refer to section 6.2.3 "How to build" in "RENESAS_ICUMX_IPL_for_R-Car_Gen4_Users_Manual_E.pdf"
-   1. Please change SW3 and SW6 on the CPU board.
+  1.  Please change SW3 and SW6 on the CPU board.
       - For more details, please refer to section 3.7.8.1 "Enable SD Card" in "R-Car S4_StartupGuide_x_x_x.pdf"
-- **DHCP server with internet connection**
-  - In this guide, spider board requires DHCP server to connect internet.
 - **AWS IoT FleetWise Edge Agent Compiled for ARM64**
   — If you are using an EC2 Graviton instance as your development machine, you will have completed this already above.
 
@@ -28,6 +26,8 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesa
         && rm -rf build \
         && ./tools/build-fwe-cross.sh
     ```
+
+- **Internet Router with Ethernet** — The R-Car S4 Spider board must be connected to an internet router via an Ethernet cable for internet connectivity. It is beyond the scope of this document to describe how this is achieved, but one possibility is to use a WiFi to Ethernet bridge and a smartphone acting as an internet hotspot.
 
 ## Build an SD-Card Image
 
@@ -53,12 +53,18 @@ The following instructions use the development machine(Ubuntu 20.04) to build an
 1. Insert the micro SD-card into the R-Car S4 Spider board’s micro SD-card slot.
 1. Connect an Ethernet cable.
 1. Connect develop machine to R-Car S4 Spider board USB port.
+
    - USB port is depending on board revision(until B0-1st or since B0-2nd).
    - For more detail, please refer to the section 2.1 "Linux BSP" in "R-Car S4_StartupGuide_x_x_x.pdf".
 
-   ![](./images/rcar-s4-spider.png)
+   ![](./images/rcar-s4-spider.jpg)
 
-1. Use screen command on your develop machine terminal to veiw serial output.
+1. Use screen command on your develop machine terminal to veiw serial output.(Modify the device path `/dev/xxxxx` to the correct path)
+
+```
+screen /dev/xxxxx 1843200
+```
+
 1. Power on S4 Spider board. You can see the count down during U-Boot. Hit enter key to stop U-Boot.
 1. Enter following settings to flash the micro SD-card data to board
 
@@ -126,7 +132,8 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
        && sudo cp config/* /etc/aws-iot-fleetwise
 
     cp ./tools/install-socketcan.sh ./tools/setup-vcan.sh
-    sed -i '17,68d' ./tools/setup-vcan.sh ./tools/setup-vcan.sh
+    sed -i '17,68d' ./tools/setup-vcan.sh
+    ./tools/setup-vcan.sh
     sudo ./tools/install-fwe.sh
     sed -i 's/python3.7/python3/g' ./tools/cansim/run-cansim.sh
     sed -i 's/python3.7/python3/g' ./tools/install-cansim.sh
