@@ -430,6 +430,7 @@ protected:
         }
         VehicleDataSourceConfig canSourceConfig;
         canSourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
+        canSourceConfig.transportProperties.emplace( "protocolName", "CAN" );
         canSourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
         canSourceConfig.maxNumberOfVehicleDataMessages = 1000;
         std::vector<VehicleDataSourceConfig> canSourceConfigs = { canSourceConfig };
@@ -767,6 +768,7 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderStartupAndShutdownCy
     canSource = std::make_shared<CANDataSource>();
     VehicleDataSourceConfig canSourceConfig;
     canSourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
+    canSourceConfig.transportProperties.emplace( "protocolName", "CAN" );
     canSourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     canSourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> canSourceConfigs = { canSourceConfig };

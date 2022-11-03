@@ -34,7 +34,6 @@ jobs:
     - name: unit-test
       run: |
         cd build
-        # Exclude tests that require SocketCAN
         CTEST_OUTPUT_ON_FAILURE=1 ctest
 
     - name: upload-artifacts

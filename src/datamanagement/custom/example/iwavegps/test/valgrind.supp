@@ -1,0 +1,7 @@
+{
+   boost::lockfree::do_push
+   Memcheck:Cond
+   ...
+   fun:_ZN5boost8lockfree5queue*
+   ...
+}

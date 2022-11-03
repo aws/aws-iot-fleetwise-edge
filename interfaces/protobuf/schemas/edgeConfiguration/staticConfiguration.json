@@ -2,6 +2,7 @@
     "$schema": "http://json-schema.org/draft-04/schema#",
     "id": "http://aws-iot-automotive.com/edgeConfiguration",
     "type": "object",
+    "additionalProperties": false,
     "title": "IoTFleetWise Static Configuration Attributes",
     "description": "The root schema for FWE Static Configuration JSON",
     "properties": {
@@ -27,6 +28,7 @@
             "properties": {
                 "canInterface": {
                     "type": "object",
+                    "additionalProperties": false,
                     "description": "CAN Signal network interface information",
                     "items": {
                         "$ref": "#/definitions/canInterface"
@@ -34,6 +36,7 @@
                 },
                 "obdInterface": {
                     "type": "object",
+                    "additionalProperties": false,
                     "description": "OBD Signal network interface information",
                     "items": {
                         "$ref": "#/definitions/obdInterface"
@@ -51,6 +54,7 @@
             "definitions": {
                 "canInterface": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "interfaceName": {
                             "type": "string",
@@ -77,6 +81,7 @@
                 },
                 "obdInterface": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "interfaceName": {
                             "type": "string",
@@ -122,9 +127,11 @@
         "staticConfig": {
             "description": "Static Configuration Attributes",
             "type": "object",
+            "additionalProperties": false,
             "properties": {
                 "bufferSizes": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "dtcBufferSize": {
                             "type": "integer",
@@ -152,6 +159,7 @@
                 },
                 "threadIdleTimes": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "inspectionThreadIdleTimeMs": {
                             "type": "integer",
@@ -174,6 +182,7 @@
                 },
                 "persistency": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "persistencyPath": {
                             "type": "string",
@@ -195,6 +204,7 @@
                 },
                 "internalParameters": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "readyToPublishDataBufferSize": {
                             "type": "integer",
@@ -207,6 +217,14 @@
                         "dataReductionProbabilityDisabled": {
                             "type": "boolean",
                             "description": "Disables the whole probability-based DDC,can be used for debugging"
+                        },
+                        "metricsCyclicPrintIntervalMs": {
+                            "type": "string",
+                            "description": "Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never"
+                        },
+                        "useJsonBasedCollection": {
+                            "type": "boolean",
+                            "description": "Enables debug JSON output of the collected data"
                         }
                     },
                     "required": [
@@ -217,6 +235,7 @@
                 },
                 "publishToCloudParameters": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "maxPublishMessageCount": {
                             "type": "integer",
@@ -234,6 +253,7 @@
                 },
                 "mqttConnection": {
                     "type": "object",
+                    "additionalProperties": false,
                     "properties": {
                         "endpointUrl": {
                             "type": "string",

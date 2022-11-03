@@ -11,9 +11,9 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an NXP S3
 
     ```bash
     cd ~/aws-iot-fleetwise-edge \
-        && sudo -H ./tools/install-deps-cross.sh \
+        && sudo -H ./tools/install-deps-cross-arm64.sh \
         && rm -rf build \
-        && ./tools/build-fwe-cross.sh
+        && ./tools/build-fwe-cross-arm64.sh
     ```
 
 - **Internet Router with Ethernet** — The S32G-VNP-RDB2 must be connected to an internet router via an Ethernet cable for internet connectivity. It is beyond the scope of this document to describe how this is achieved, but one possibility is to use a WiFi to Ethernet bridge and a smartphone acting as an internet hotspot.

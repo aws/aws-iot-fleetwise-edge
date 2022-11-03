@@ -570,7 +570,8 @@ CollectionInspectionEngine::addNewRawCanFrame( CANRawFrameID canID,
                 {
                     buf.mCurrentPosition = 0;
                 }
-                buf.mBuffer[buf.mCurrentPosition].mSize = std::min( size, static_cast<uint8_t>( buf.mBuffer.size() ) );
+                buf.mBuffer[buf.mCurrentPosition].mSize =
+                    std::min( size, static_cast<uint8_t>( buf.mBuffer[buf.mCurrentPosition].mBuffer.size() ) );
                 for ( size_t i = 0; i < buf.mBuffer[buf.mCurrentPosition].mSize; i++ )
                 {
                     buf.mBuffer[buf.mCurrentPosition].mBuffer[i] = buffer[i];
@@ -763,6 +764,9 @@ CollectionInspectionEngine::eval( const struct ExpressionNode *expression,
         return ExpressionErrorCode::SUCCESSFUL;
     case ExpressionNodeType::OPERATOR_EQUAL:
         resultValueBool = std::abs( leftDouble - rightDouble ) < EVAL_EQUAL_DISTANCE();
+        return ExpressionErrorCode::SUCCESSFUL;
+    case ExpressionNodeType::OPERATOR_NOT_EQUAL:
+        resultValueBool = !( std::abs( leftDouble - rightDouble ) < EVAL_EQUAL_DISTANCE() );
         return ExpressionErrorCode::SUCCESSFUL;
     case ExpressionNodeType::OPERATOR_LOGICAL_AND:
         resultValueBool = leftBool && rightBool;

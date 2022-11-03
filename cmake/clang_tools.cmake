@@ -4,6 +4,7 @@ if(FWE_TEST_CLANG_FORMAT)
 
   file(GLOB_RECURSE ALL_CXX_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/*.[ch]pp
+    ${PROJECT_SOURCE_DIR}/src/*.h
   )
 
   if (CLANG_FORMAT)

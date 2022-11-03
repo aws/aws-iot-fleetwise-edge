@@ -99,7 +99,6 @@ Schema::transmitCheckin()
     }
     else if ( res == ConnectivityError::NoConnection )
     {
-        mLogger.warn( "Schema::transmitCheckin", "Connection not established" );
         return false;
     }
     else

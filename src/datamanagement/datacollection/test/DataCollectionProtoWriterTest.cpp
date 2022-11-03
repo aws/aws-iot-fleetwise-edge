@@ -49,7 +49,7 @@ TEST_F( DataCollectionProtoWriterTest, TestVehicleData )
     protoWriter.append( collectedSignalMsg );
     EXPECT_EQ( protoWriter.getVehicleDataMsgCount(), 1 );
 
-    std::array<uint8_t, 8> data = { 1, 2, 3, 4, 5, 6, 7, 8 };
+    std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> data = { 1, 2, 3, 4, 5, 6, 7, 8 };
     CollectedCanRawFrame canRawFrameMsg(
         12 /*frameId*/, 1 /*nodeId*/, testTriggerTime + 1000 /*receiveTime*/, data, 8 /*sizeof data*/ );
     protoWriter.append( canRawFrameMsg );

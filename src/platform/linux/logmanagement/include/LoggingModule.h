@@ -7,6 +7,7 @@
 
 #include "ConsoleLogger.h"
 #include <memory>
+#include <vector>
 
 namespace Aws
 {
@@ -52,6 +53,15 @@ public:
      * @param logEntry actual messages
      */
     void trace( const std::string &function, const std::string &logEntry );
+    /**
+     * @brief Logs bytes in a vector
+     * @param function Calling function
+     * @param logEntry actual messages
+     * @param inputBytes bytes in vector to be printed
+     */
+    void traceBytesInVector( const std::string &function,
+                             const std::string &logEntry,
+                             const std::vector<uint8_t> &inputBytes );
 
 private:
     ConsoleLogger mLogger;

@@ -10,14 +10,12 @@
 #include "IActiveDecoderDictionaryListener.h"
 #include "LoggingModule.h"
 #include "OBDDataDecoder.h"
-#include "OBDDataTypes.h"
-#include "OBDOverCANSessionManager.h"
+#include "OBDOverCANECU.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "Timer.h"
-#include "businterfaces/ISOTPOverCANSenderReceiver.h"
-#include <boost/lockfree/spsc_queue.hpp>
-#include <iostream>
+#include <linux/can/raw.h>
+#include <sstream>
 
 namespace Aws
 {
@@ -30,16 +28,13 @@ using namespace Aws::IoTFleetWise::VehicleNetwork;
 using namespace Aws::IoTFleetWise::DataManagement;
 
 /**
- * @brief This module handles the collection of Emission related data and DTC codes
- * over the OBD Stack. It manages the OBD Keep Alive Session manager, and issues
- * regularly OBD Requests to the ECU Network. It notifies the Engine thread if
- * certain events are detected as defined in the Collection Scheme.
- * If no event trigger condition is met, the data collected is put in a circular buffer.
+ * @brief This class is responsible for coordinating OBD requests on all ECUs
  */
+
 class OBDOverCANModule : public IActiveDecoderDictionaryListener, public IActiveConditionProcessor
 {
 public:
-    OBDOverCANModule();
+    OBDOverCANModule() = default;
     ~OBDOverCANModule() override;
 
     OBDOverCANModule( const OBDOverCANModule & ) = delete;
@@ -48,27 +43,21 @@ public:
     OBDOverCANModule &operator=( OBDOverCANModule && ) = delete;
 
     /**
-     * @brief Initializes the OBD Diagnostic Session with Engine and TX ECUs.
+     * @brief Initializes the OBD Diagnostic Session.
      * @param signalBufferPtr Signal Buffer shared pointer.
      * @param activeDTCBufferPtr Active DTC buffer shared pointer
      * @param gatewayCanInterfaceName CAN IF Name where the OBD stack on the ECU
      * is running. Typically on the Gateway ECU.
      * @param pidRequestIntervalSeconds Interval in seconds used to schedule PID requests
      * @param dtcRequestIntervalSeconds Interval in seconds used to schedule DTC requests
-     * @param useExtendedIDs use Extended CAN IDs on TX and RX side.
-     * @param hasTransmissionECU specifies whether the vehicle has a Transmission ECU
      * @return True if successful. False if both pidRequestIntervalSeconds
      * and dtcRequestIntervalSeconds are zero i.e. no collection
-     *
      */
     bool init( SignalBufferPtr signalBufferPtr,
                ActiveDTCBufferPtr activeDTCBufferPtr,
                const std::string &gatewayCanInterfaceName,
                const uint32_t &pidRequestIntervalSeconds,
-               const uint32_t &dtcRequestIntervalSeconds = 0,
-               const bool &useExtendedIDs = false,
-               const bool &hasTransmissionECU = false );
-
+               const uint32_t &dtcRequestIntervalSeconds = 0 );
     /**
      * @brief Creates an ISO-TP connection to the Engine/Transmission ECUs. Starts the
      * Keep Alive cyclic thread.
@@ -84,41 +73,28 @@ public:
     bool disconnect();
 
     /**
-     * @brief Returns the health state of the cyclic thread and the
-     * ISO-TP Connection.
+     * @brief Returns the health state of the cyclic thread
      * @return True if successful. False otherwise.
      */
     bool isAlive();
 
-    // From IActiveDecoderDictionaryListener
-    // We need this to know whether PIDs should be requested or not
+    /**
+     * @brief A callback function to be invoked when there's a new Decoder Dictionary. If the networkProtocol
+     * is OBD, this module will update the decoder dictionary.
+     *
+     * @param dictionary decoder dictionary
+     * @param networkProtocol network protocol which can be OBD
+     */
     void onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
                                      VehicleDataSourceProtocol networkProtocol ) override;
 
-    // From IActiveConditionProcessor
-    // We need this to know whether DTCs should be requested or not
+    /**
+     * @brief A callback function to be invoked when there's a new Inspection Matrix. The inspection
+     * matrix will specify whether or not we shall collect DTC
+     *
+     * @param activeConditions Inspection Matrix
+     */
     void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &activeConditions ) override;
-
-    /**
-     * @brief Returns the PIDs that are to be requested from ECU
-     * @param sid the SID e.g. Mode 1
-     * @param supportedPIDs container where the result will be copied
-     * @param type the ECU Type e.g. Engine , Transmission
-     * @return True if successful. False if the SID was not processed.
-     */
-    bool getPIDsToRequest( const SID &sid, const ECUType &type, SupportedPIDs &supportedPIDs ) const;
-
-    /**
-     * @brief Returns the VIN received in this OBD Session
-     * @param[out] vin output string
-     * @return True if VIN has been received, false otherwise
-     */
-    inline bool
-    getVIN( std::string &vin ) const
-    {
-        vin = mVIN;
-        return !vin.empty();
-    }
 
     /**
      * @brief Handle of the Signal Output Buffer. This buffer shared between Collection Engine
@@ -143,6 +119,25 @@ public:
     }
 
 private:
+    /**
+     * @brief Automatically detect all ECUs on a vehicle by sending broadcast request.
+     * A supported PIDs broadcast request is sent.
+     * @param isExtendedID If isExendedID is true, send a 29-bit broadcast. Otherwise, send a 11-bit broadcast
+     * @param canIDResponses Vector saving responses from auto detect process
+     * @return True if no errors occurs. False otherwise.
+     */
+    bool autoDetectECUs( bool isExtendedID, std::vector<uint32_t> &canIDResponses );
+
+    // calculate ECU CAN Transmit ID from Receiver ID
+    static constexpr uint32_t getTxIDByRxID( uint32_t rxId );
+
+    /**
+     * @brief Initialize ECUs by detected CAN IDs
+     * @param canIDResponse Detected CAN ID via broadcast request
+     * @return True if all OBDOverCANECU modules are initialized successfully for ECUs
+     */
+    bool initECUs( std::vector<uint32_t> &canIDResponse );
+
     // Start the  thread
     bool start();
     // Stop the  thread
@@ -150,7 +145,7 @@ private:
     // Intercepts stop signals.
     bool shouldStop() const;
     // Main worker function. The following operations are coded by the function
-    // 1- Sends  Supported PIDs request to Engine and TX ECUs
+    // 1- Sends  Supported PIDs request to detected ECUs
     // 2- Stores the supported PIDs
     // Cyclically:
     // 3- Send  PID requests ( up to 6 at a time )
@@ -159,84 +154,50 @@ private:
     // output buffer
     static void doWork( void *data );
 
-    // Receives the supported PID request to the specific ECU and SID
-    bool receiveSupportedPIDs( const SID &sid,
-                               ISOTPOverCANSenderReceiver &isoTPSendReceive,
-                               SupportedPIDs &supportedPIDs );
-    // Update the PID Request List with PIDs that are common between decoder dictionary and the PIDs supported by ECU
-    void updatePIDRequestList( const SID &sid,
-                               const ECUType &type,
-                               std::map<SID, SupportedPIDs> &supportedPIDs,
-                               std::map<SID, std::vector<PID>> &pidsToRequestPerService );
-    // Request a set of PIDs from one ECU ( up to 6 PIDs at a time )
-    bool requestPIDs( const SID &sid, const std::vector<PID> &pids, ISOTPOverCANSenderReceiver &isoTPSendReceive );
-    bool receivePIDs( const SID &sid,
-                      const std::vector<PID> &pids,
-                      ISOTPOverCANSenderReceiver &isoTPSendReceive,
-                      EmissionInfo &info );
+    // This function will assign PIDs to each ECU
+    bool assignPIDsToECUs();
 
-    bool requestReceiveSupportedPIDs( const SID &sid,
-                                      ISOTPOverCANSenderReceiver &isoTPSendReceive,
-                                      SupportedPIDs &supportedPIDs );
-
-    bool requestReceiveEmissionPIDs( const SID &sid,
-                                     const SupportedPIDs &pids,
-                                     ISOTPOverCANSenderReceiver &isoTPSendReceive,
-                                     EmissionInfo &info );
-
-    // For SID 9/pid 0x02
-    bool requestReceiveVIN( std::string &vin );
-    // For SID 3 and 7
-    bool requestDTCs( const SID &sid, ISOTPOverCANSenderReceiver &isoTPSendReceive );
-    bool receiveDTCs( const SID &sid, ISOTPOverCANSenderReceiver &isoTPSendReceive, DTCInfo &info );
-    bool requestReceiveDTCs( const SID &sid, ISOTPOverCANSenderReceiver &isoTPSendReceive, DTCInfo &info );
-
-    static constexpr size_t MAX_PID_RANGE = 6U;
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };
     std::atomic<bool> mDecoderManifestAvailable{ false };
     std::atomic<bool> mShouldRequestDTCs{ false };
+    std::vector<std::shared_ptr<OBDOverCANECU>> mECUs;
     mutable std::mutex mThreadMutex;
     LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
-    ISOTPOverCANSenderReceiver mEngineECUSenderReceiver;
-    ISOTPOverCANSenderReceiver mTransmissionECUSenderReceiver;
     // Stop signal
     Platform::Linux::Signal mWait;
     // Decoder Manifest and campaigns availability Signal
     Platform::Linux::Signal mDataAvailableWait;
-    std::vector<uint8_t> mTxPDU;
-    std::vector<uint8_t> mRxPDU;
+
     // Signal Buffer shared pointer
     SignalBufferPtr mSignalBufferPtr;
     // Active DTC Buffer shared pointer
     ActiveDTCBufferPtr mActiveDTCBufferPtr;
-    uint32_t mPIDRequestIntervalSeconds;
-    uint32_t mDTCRequestIntervalSeconds;
-    uint32_t mOBDHeartBeatIntervalSeconds;
-    bool mHasTransmission;
-    std::string mVIN;
-    Timer mTimer;
+    uint32_t mPIDRequestIntervalSeconds{ 0 };
+    uint32_t mDTCRequestIntervalSeconds{ 0 };
+    std::string mGatewayCanInterfaceName;
     Timer mDTCTimer;
     Timer mPIDTimer;
-    // Supported PIDs for both ECUs
-    std::map<SID, SupportedPIDs> mSupportedPIDsEngine;
-    std::map<SID, SupportedPIDs> mSupportedPIDsTransmission;
+
+    // This set contains PIDs that have been assigned to ECUs
+    std::unordered_set<PID> mPIDAssigned;
+
     // PIDs that are required by decoder dictionary
     std::unordered_map<SID, std::vector<PID>> mPIDsRequestedByDecoderDict;
-    // The PIDs to request from ECUs. It will be the common PIDs that are required by
-    // decoder dictionary as well as supported by ECU
-    std::map<SID, std::vector<PID>> mPIDsToRequestEngine;
-    std::map<SID, std::vector<PID>> mPIDsToRequestTransmission;
-
-    // OBD Session Manager
-    // Will not be used. This is for Future use for ECU discovery.
-    // OBDOverCANSessionManager mSessionManager;
-    std::unique_ptr<OBDDataDecoder> mOBDDataDecoder;
+    std::shared_ptr<OBDDataDecoder> mOBDDataDecoder;
     // Mutex to ensure atomic decoder dictionary shared pointer content assignment
     std::mutex mDecoderDictMutex;
     // shared pointer to decoder dictionary
     std::shared_ptr<OBDDecoderDictionary> mDecoderDictionaryPtr;
+
+    // Sleep backoff time in seconds for retrial in case an error is encountered during ECU auto-detection.
+    static constexpr int SLEEP_TIME_SECS = 1;
+    static constexpr uint32_t MASKING_GET_BYTE = 0xFF;             // Get last byte
+    static constexpr uint32_t MASKING_SHIFT_BITS = 8;              // Shift 8 bits
+    static constexpr uint32_t MASKING_TEMPLATE_TX_ID = 0x18DA00F1; // All 29-bit tx id has the same bytes
+    static constexpr uint32_t MASKING_REMOVE_BYTE = 0x8;
+    static constexpr uint32_t P2_TIMEOUT_DEFAULT_MS = 1000; // Set 1000 milliseconds timeout for ECU auto detection
 };
 } // namespace DataInspection
 } // namespace IoTFleetWise

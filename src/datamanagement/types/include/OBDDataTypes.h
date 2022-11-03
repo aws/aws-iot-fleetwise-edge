@@ -710,7 +710,7 @@ getPID( SID sid, size_t index )
     switch ( sid )
     {
     case SID::CURRENT_STATS:
-        if ( index < supportedPIDRange.back() + SUPPORTED_PID_STEP )
+        if ( index < static_cast<size_t>( supportedPIDRange.back() + SUPPORTED_PID_STEP ) )
         {
             returnPID = static_cast<PID>( index );
         }
@@ -759,22 +759,6 @@ struct EmissionInfo
 {
     SID mSID;
     std::map<uint32_t, SignalValue> mPIDsToValues;
-};
-
-// A collection of OBD Data per ECU ( DTC + E
-// collected in the current OBD session.
-struct ECUDiagnosticInfo
-{
-    ECUType mEcuType;
-    std::string mVIN;
-    std::vector<EmissionInfo> mPIDInfos;
-    std::vector<DTCInfo> mDTCInfos;
-    Timestamp mReceptionTime{ 0 };
-    bool
-    hasItems() const
-    {
-        return ( !mPIDInfos.empty() || !mDTCInfos.empty() );
-    }
 };
 
 // Structure of a single PID OBD request.

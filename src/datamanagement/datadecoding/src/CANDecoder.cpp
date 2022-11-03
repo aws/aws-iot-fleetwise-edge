@@ -97,8 +97,8 @@ int64_t
 CANDecoder::extractSignalFromFrame( const uint8_t *frameData, const CANSignalFormat &signalDescription )
 {
     const uint8_t BYTE_SIZE = 8;
-    uint8_t startBit = static_cast<uint8_t>( signalDescription.mFirstBitPosition );
-    uint8_t startByte = startBit / BYTE_SIZE;
+    uint16_t startBit = static_cast<uint16_t>( signalDescription.mFirstBitPosition );
+    uint8_t startByte = static_cast<uint8_t>( startBit / BYTE_SIZE );
     uint8_t startBitInByte = startBit % BYTE_SIZE;
     uint8_t resultLength = static_cast<uint8_t>( BYTE_SIZE - startBitInByte );
     uint8_t endByte = 0U;

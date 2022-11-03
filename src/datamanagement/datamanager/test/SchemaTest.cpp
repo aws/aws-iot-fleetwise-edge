@@ -591,7 +591,6 @@ TEST( SchemaTest, SchemaCollectionEventBased )
         CollectionSchemesMsg::ConditionBasedCollectionScheme_ConditionTriggerMode_TRIGGER_ALWAYS );
 
     //  Build the AST Tree shown here:
-    // https://code.amazon.com/packages/IoTAutobahnTools-unofficial/blobs/mainline/--/kDemos/demo4/README.md
     auto *root = new CollectionSchemesMsg::ConditionNode();
     auto *rootOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
     rootOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_AND );

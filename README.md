@@ -80,7 +80,7 @@ AWS IoT FleetWise Edge depends on the following open source libraries. Refer to 
 * [cURL: v7.58.0](https://github.com/curl/curl)
 * [GoogleTest version: release-1.10.0](https://github.com/google/googletest)
 * [Benchmark version: 1.6.1](https://github.com/google/benchmark)
-* [Protobuf version: 3.9.2](https://github.com/protocolbuffers/protobuf)
+* [Protobuf version: 3.21.7](https://github.com/protocolbuffers/protobuf)
 * [Boost version 1.65.1](https://github.com/boostorg/boost)
 * [jsoncpp version 1.7.4](https://github.com/open-source-parsers/jsoncpp)
 * [Snappy version: 1.1.7](https://github.com/google/snappy)

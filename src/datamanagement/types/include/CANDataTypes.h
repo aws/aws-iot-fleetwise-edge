@@ -41,7 +41,7 @@ struct CANFrameInfo
 /**
  * @brief Cloud does not send information about each CAN message, so we set every CAN message size to the maximum.
  */
-static constexpr uint8_t MAX_CAN_FRAME_BYTE_SIZE = 8;
+static constexpr uint8_t MAX_CAN_FRAME_BYTE_SIZE = 64;
 
 struct CANDecodedMessage
 {

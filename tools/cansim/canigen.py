@@ -1,6 +1,7 @@
 import cantools
 import can
 import isotp
+import select
 from threading import Thread
 import time
 import sys
@@ -14,24 +15,32 @@ if __name__ == '__main__':
     import argparse
 
 class canigen:
-    def __init__(self, interface, output_filename=None, database_filename=None, values_filename=None, obd_config_filename=None):
+    __BROADCAST_ID_STANDARD = 0x7DF
+    __BROADCAST_ID_EXTENDED = 0x18DB33F1
+    __MAX_TX_ID_STANDARD = 0x7EF
+    __MIN_RX_ID_EXTENDED = 0x18DA00F1
+
+    def __init__(self, interface, output_filename=None, database_filename=None, values_filename=None, obd_config_filename=None, default_cycle_time_ms=100):
         self.__stop = False
         self.__interface = interface
         self.__output_file = None
-        if not output_filename is None:
-            self.__output_file = open(output_filename, "w")
-        else:
-            self.__can_bus = can.interface.Bus(self.__interface, bustype='socketcan')
         self.__sig_names = []
+        fd = False
         self.__values = {'sig':{},'pid':{},'dtc':{}}
         if not database_filename is None:
             self.__db = cantools.database.load_file(database_filename)
             for msg in self.__db.messages:
+                if not fd and msg.length > 8:
+                    fd= True
                 for sig in msg.signals:
                     self.__sig_names.append(sig.name)
                     self.__values['sig'][sig.name] = 0.0 if sig.initial is None else sig.initial
         if not values_filename is None:
             self.__values = self.__load_json(values_filename)
+        if not output_filename is None:
+            self.__output_file = open(output_filename, "w")
+        else:
+            self.__can_bus = can.interface.Bus(self.__interface, bustype='socketcan',fd= fd)
         self.__obd_config = {}
         self.__pid_names = []
         self.__dtc_names = []
@@ -50,18 +59,18 @@ class canigen:
         self.__threads = []
         if not database_filename is None:
             for msg in self.__db.messages:
-                if msg.cycle_time == 0:
-                    print("Warning: Ignoring frame '%s' with zero cycle time" % msg.name)
-                else:
-                    thread = Thread(target=self.__sig_thread, args=(msg.name,))
-                    thread.start()
-                    self.__threads.append(thread)
+                cycle_time = msg.cycle_time
+                if cycle_time is None or cycle_time == 0:
+                    cycle_time = default_cycle_time_ms
+                    print(f"Warning: Cycle time is None or zero for frame '{msg.name}', setting it to default of {default_cycle_time_ms} ms")
+                thread = Thread(target=self.__sig_thread, args=(msg.name,cycle_time,))
+                thread.start()
+                self.__threads.append(thread)
         if not obd_config_filename is None:
             for ecu in self.__obd_config['ecus']:
-                for rx_id in ecu['rx_ids']:
-                    thread = Thread(target=self.__obd_thread, args=(rx_id, ecu))
-                    thread.start()
-                    self.__threads.append(thread)
+                thread = Thread(target=self.__obd_thread, args=(ecu,))
+                thread.start()
+                self.__threads.append(thread)
 
     def stop(self):
         self.__stop = True
@@ -95,7 +104,7 @@ class canigen:
             data_hex += '%02X' % byte
         self.__output_file.write('(%f) %s %s#%s\n' % (datetime.now().timestamp(), self.__interface, can_id, data_hex))
 
-    def __sig_thread(self, msg_name):
+    def __sig_thread(self, msg_name, cycle_time):
         while not self.__stop:
             msg = self.__db.get_message_by_name(msg_name)
             vals = {}
@@ -105,13 +114,13 @@ class canigen:
                 else:
                     val = self.__values['sig'][sig.name]
                 vals[sig.name] = 0 if val is None else val
-            data = msg.encode(self.__values['sig'])
+            data = msg.encode(vals)
             if not self.__output_file is None:
                 self.__write_frame(msg, data)
             else:
-                frame = can.Message(is_extended_id=msg.is_extended_frame, arbitration_id=msg.frame_id, data=data)
+                frame = can.Message(is_extended_id=msg.is_extended_frame,is_fd= msg.length > 8, arbitration_id=msg.frame_id, data=data)
                 self.__can_bus.send(frame)
-            time.sleep(msg.cycle_time / 1000.0)
+            time.sleep(cycle_time / 1000.0)
 
     def __get_supported_pids(self, num_range, ecu):
         out = [0, 0, 0, 0]
@@ -133,53 +142,67 @@ class canigen:
                 return out
         return None
 
-    def __obd_thread(self, rx_id, ecu):
+    def __create_isotp_socket(self, txid, rxid, zero_padding):
+        s = isotp.socket()
+        if zero_padding:
+            s.set_opts(txpad=0, rxpad=0)
+        addressing_mode = isotp.AddressingMode.Normal_11bits if txid <= self.__MAX_TX_ID_STANDARD else isotp.AddressingMode.Normal_29bits
+        s.bind(self.__interface, isotp.Address(addressing_mode=addressing_mode, rxid=rxid, txid=txid))
+        return s
+
+    def __obd_thread(self, ecu):
+        isotp_socket_phys = None
         create_socket = True
         while not self.__stop:
             if create_socket:
                 create_socket = False
-                isotp_socket = isotp.socket(timeout=0.5)
-                if ecu['zero_padding']:
-                    isotp_socket.set_opts(txpad=0, rxpad=0)
-                rxid=int(rx_id, 0)
-                txid=int(ecu['tx_id'], 0)
-                addressing_mode = isotp.AddressingMode.Normal_11bits if txid <= 0x7FF else isotp.AddressingMode.Normal_29bits
-                isotp_socket.bind(self.__interface, isotp.Address(addressing_mode=addressing_mode, rxid=rxid, txid=txid))
+                if isotp_socket_phys:
+                    time.sleep(1) # Wait one sec, to avoid high CPU usage in the case of persistent bus errors
+                txid = int(ecu['tx_id'], 0)
+                if txid <= self.__MAX_TX_ID_STANDARD:
+                    rxid_phys = txid - 8
+                    rxid_func = self.__BROADCAST_ID_STANDARD
+                else:
+                    rxid_phys = self.__MIN_RX_ID_EXTENDED + ((txid & 0xFF) << 8)
+                    rxid_func = self.__BROADCAST_ID_EXTENDED
+                isotp_socket_phys = self.__create_isotp_socket(txid, rxid_phys, ecu['zero_padding'])
+                isotp_socket_func = self.__create_isotp_socket(txid, rxid_func, ecu['zero_padding'])
+
             try:
-                rx = isotp_socket.recv()
+                res = select.select([isotp_socket_phys, isotp_socket_func], [], [], 0.5)
+                if len(res[0]) == 0:
+                    continue
+                rx = list(res[0][0].recv())
             except OSError:
                 create_socket = True
-                time.sleep(1) # Wait one sec, to avoid high CPU usage in the case of persistent bus errors
                 continue
 
-            if not rx is None:
-                rx = list(rx)
-                #print(ecu['name']+' rx: '+str(rx))
-                sid = rx.pop(0)
-                tx = [sid | 0x40]
-                if sid == 0x01: # PID
-                    while len(rx) > 0:
-                        pid_num = rx.pop(0)
-                        if (pid_num % 0x20) == 0: # Supported PIDs
-                            tx += [pid_num] + self.__get_supported_pids(pid_num, ecu)
-                        else:
-                            data = self.__encode_pid_data(pid_num, ecu)
-                            if not data is None:
-                                tx += [pid_num] + data
-                elif sid == 0x03: # DTCs
-                    num_dtcs = 0
-                    dtc_data = []
-                    for dtc_name in ecu['dtcs']:
-                        if self.__values['dtc'][dtc_name]:
-                            dtc_num = int(ecu['dtcs'][dtc_name]['num'], 16)
-                            dtc_data.append((dtc_num >> 8) & 0xFF)
-                            dtc_data.append(dtc_num & 0xFF)
-                            num_dtcs += 1
-                    tx += [num_dtcs] + dtc_data
-                else:
-                    tx = [0x7F, sid, 0x11] # NRC Service not supported
-                #print(ecu['name']+' tx: '+str(tx))
-                isotp_socket.send(bytearray(tx))
+            #print(ecu['name']+' rx: '+str(rx))
+            sid = rx.pop(0)
+            tx = [sid | 0x40]
+            if sid == 0x01: # PID
+                while len(rx) > 0:
+                    pid_num = rx.pop(0)
+                    if (pid_num % 0x20) == 0: # Supported PIDs
+                        tx += [pid_num] + self.__get_supported_pids(pid_num, ecu)
+                    else:
+                        data = self.__encode_pid_data(pid_num, ecu)
+                        if not data is None:
+                            tx += [pid_num] + data
+            elif sid == 0x03: # DTCs
+                num_dtcs = 0
+                dtc_data = []
+                for dtc_name in ecu['dtcs']:
+                    if self.__values['dtc'][dtc_name]:
+                        dtc_num = int(ecu['dtcs'][dtc_name]['num'], 16)
+                        dtc_data.append((dtc_num >> 8) & 0xFF)
+                        dtc_data.append(dtc_num & 0xFF)
+                        num_dtcs += 1
+                tx += [num_dtcs] + dtc_data
+            else:
+                tx = [0x7F, sid, 0x11] # NRC Service not supported
+            #print(ecu['name']+' tx: '+str(tx))
+            isotp_socket_phys.send(bytearray(tx))
 
     def get_sig_names(self):
         return self.__sig_names

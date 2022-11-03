@@ -262,7 +262,7 @@ CANDataConsumer::doWork( void *data )
                     canRawFrame.frameID = static_cast<uint32_t>( message.getMessageID() );
                     canRawFrame.channelId = consumer->mDataSourceID;
                     canRawFrame.receiveTime = message.getReceptionTimestamp();
-                    // CollectedCanRawFrame only receive 8 CAN Raw Bytes
+                    // CollectedCanRawFrame receive up to 64 CAN Raw Bytes
                     canRawFrame.size =
                         std::min( static_cast<uint8_t>( message.getRawData().size() ), MAX_CAN_FRAME_BYTE_SIZE );
                     std::copy( message.getRawData().begin(),

@@ -314,7 +314,7 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
         profiler->setMetric( std::string( "sectionAvgSinceStartup_" ) +
                                  getSectionName( static_cast<TraceSection>( i ) ) + std::string( "_id" ) +
                                  std::to_string( i ),
-                             v.mTimeSpentSum / v.mHitCounter,
+                             ( v.mHitCounter == 0 ? 0 : v.mTimeSpentSum / v.mHitCounter ),
                              "Seconds" );
         profiler->setMetric( std::string( "sectionMaxSinceStartup_" ) +
                                  getSectionName( static_cast<TraceSection>( i ) ) + std::string( "_id" ) +
@@ -364,19 +364,21 @@ TraceModule::print()
     for ( auto i = 0; i < toUType( TraceSection::TRACE_SECTION_SIZE ); i++ )
     {
         auto &v = mSectionData[i];
-        mLogger.trace(
-            "TraceModule::print",
-            std::string{ " TraceModule-ConsoleLogging-Section '" } + getSectionName( static_cast<TraceSection>( i ) ) +
-                "' [" + std::to_string( i ) + "] times section executed: [" + std::to_string( v.mHitCounter ) +
-                "] avg execution time: "
-                "[" +
-                std::to_string( v.mTimeSpentSum / v.mHitCounter ) + "] max execution time since last print: [" +
-                std::to_string( v.mMaxSpent ) + "] overall: [" + std::to_string( v.mMaxSpentAllTime ) +
-                "] avg interval between execution: "
-                "[" +
-                std::to_string( v.mIntervalSum / ( v.mHitCounter - ( v.mCurrentlyActive ? 0 : 1 ) ) ) +
-                "] max interval since last print: [" + std::to_string( v.mMaxInterval ) + "] overall: [" +
-                std::to_string( v.mMaxIntervalAllTime ) + "]" );
+        auto currentHitCounter = v.mHitCounter - ( v.mCurrentlyActive ? 0 : 1 );
+        mLogger.trace( "TraceModule::print",
+                       std::string{ " TraceModule-ConsoleLogging-Section '" } +
+                           getSectionName( static_cast<TraceSection>( i ) ) + "' [" + std::to_string( i ) +
+                           "] times section executed: [" + std::to_string( v.mHitCounter ) +
+                           "] avg execution time: "
+                           "[" +
+                           std::to_string( ( v.mHitCounter == 0 ? 0 : v.mTimeSpentSum / v.mHitCounter ) ) +
+                           "] max execution time since last print: [" + std::to_string( v.mMaxSpent ) + "] overall: [" +
+                           std::to_string( v.mMaxSpentAllTime ) +
+                           "] avg interval between execution: "
+                           "[" +
+                           std::to_string( ( currentHitCounter == 0 ? 0 : v.mIntervalSum / currentHitCounter ) ) +
+                           "] max interval since last print: [" + std::to_string( v.mMaxInterval ) + "] overall: [" +
+                           std::to_string( v.mMaxIntervalAllTime ) + "]" );
     }
 
     std::fflush( stdout );
