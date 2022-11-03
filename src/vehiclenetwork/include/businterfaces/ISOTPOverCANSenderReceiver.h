@@ -82,6 +82,7 @@ private:
     LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     int mSocket{};
+    std::string mStreamRxID;
 };
 } // namespace VehicleNetwork
 } // namespace IoTFleetWise

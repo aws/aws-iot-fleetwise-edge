@@ -16,6 +16,9 @@
 #ifdef FWE_FEATURE_CAMERA
 #include "DataOverDDSModule.h"
 #endif // FWE_FEATURE_CAMERA
+#ifdef FWE_EXAMPLE_IWAVEGPS
+#include "IWaveGpsSource.h"
+#endif
 #include "IDataReadyToPublishListener.h"
 #include "LoggingModule.h"
 #include "OBDOverCANModule.h"
@@ -128,6 +131,9 @@ private:
     Timer mRetrySendingPersistedDataTimer;
     uint64_t mPersistencyUploadRetryIntervalMs{ DEFAULT_PERSISTENCY_UPLOAD_RETRY_INTERVAL_MS };
 
+    Timer mPrintMetricsCyclicTimer;
+    uint64_t mPrintMetricsCyclicPeriodMs{ 0 }; // default to 0 which means no cyclic printing
+
     LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     std::unique_ptr<VehicleDataSourceBinder> mVehicleDataSourceBinder;
@@ -156,6 +162,9 @@ private:
     // DDS Module
     std::shared_ptr<DataOverDDSModule> mDataOverDDSModule;
 #endif // FWE_FEATURE_CAMERA
+#ifdef FWE_EXAMPLE_IWAVEGPS
+    std::shared_ptr<IWaveGpsSource> mIWaveGpsSource;
+#endif
 };
 } // namespace ExecutionManagement
 } // namespace IoTFleetWise

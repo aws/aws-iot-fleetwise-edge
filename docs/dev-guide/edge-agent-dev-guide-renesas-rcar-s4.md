@@ -22,9 +22,9 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesa
     CODENAME=$(grep UBUNTU_CODENAME /etc/os-release | cut -d'=' -f2 )
     # update the ubuntu version to your host
     sed -i "s/bionic/${CODENAME}/g" ./tools/arm64.list
-    sudo -H ./tools/install-deps-cross.sh \
+    sudo -H ./tools/install-deps-cross-arm64.sh \
         && rm -rf build \
-        && ./tools/build-fwe-cross.sh
+        && ./tools/build-fwe-cross-arm64.sh
     ```
 
 - **Internet Router with Ethernet** — The R-Car S4 Spider board must be connected to an internet router via an Ethernet cable for internet connectivity. It is beyond the scope of this document to describe how this is achieved, but one possibility is to use a WiFi to Ethernet bridge and a smartphone acting as an internet hotspot.
@@ -91,7 +91,7 @@ screen /dev/xxxxx 1843200
 
 ## Provision AWS IoT Credentials
 
-Run the following commands _on the development machine_ (after compiling AWS IoT FleetWise Edge Agent for ARM64 as explained above), to create an IoT Thing and provision credentials for it. The AWS IoT FleetWise Edge Agent binary and its configuration files will be packaged into a ZIP file ready to be deployed to the board.
+Run the following commands _on the development machine_ (after compiling AWS IoT FleetWise Edge Agent for ARM64 as explained [above](#prerequisites)), to create an IoT Thing and provision credentials for it. The AWS IoT FleetWise Edge Agent binary and its configuration files will be packaged into a ZIP file ready to be deployed to the board.
 
 ```bash
 mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \

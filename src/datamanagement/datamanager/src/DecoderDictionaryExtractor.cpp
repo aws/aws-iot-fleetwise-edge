@@ -199,7 +199,6 @@ CollectionSchemeManager::decoderDictionaryExtractor(
 }
 
 // TODO: The collection scheme manager shall support generic decoder dictionary other than only can
-// SIM: https://issues.amazon.com/issues/IoTAutobahn-3800
 void
 CollectionSchemeManager::decoderDictionaryUpdater(
     std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> &decoderDictionaryMap )

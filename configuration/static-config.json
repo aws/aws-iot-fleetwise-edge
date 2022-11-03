@@ -13,10 +13,7 @@
         {
             "obdInterface": {
                 "interfaceName": "vcan0",
-                "requestMessageId": 2015,
                 "obdStandard": "J1979",
-                "useExtendedIds": false,
-                "hasTransmissionEcu": true,
                 "pidRequestIntervalSeconds": 0,
                 "dtcRequestIntervalSeconds": 0
             },
@@ -39,7 +36,7 @@
         "persistency": {
             "persistencyPath": "/path/to/collection-scheme-and-data-persistency",
             "persistencyPartitionMaxSize": 524288,
-            "persistencyUploadRetryInterval": 10000
+            "persistencyUploadRetryIntervalMs": 10000
         },
         "internalParameters": {
             "readyToPublishDataBufferSize": 10000,

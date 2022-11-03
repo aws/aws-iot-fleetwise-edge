@@ -121,6 +121,7 @@ private:
     uint64_t discardedMessages{ 0 };
     CAN_TIMESTAMP_TYPE mTimestampTypeToUse{ CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP };
     std::atomic<Timestamp> mResumeTime{ 0 };
+    bool mForceCanFD{ false };
 };
 } // namespace VehicleNetwork
 } // namespace IoTFleetWise

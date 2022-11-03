@@ -743,9 +743,6 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
                 TimePointInMsec nextCheckinTime = currTime + minimumCheckinInterval;
                 TimeData newPair = std::make_pair( nextCheckinTime, CHECKIN );
                 mTimeLine.push( newPair );
-                mLogger.warn( "CollectionSchemeManager::checkTimeLine",
-                              "The checkin message sending failed. Rescheduling the operation in : " +
-                                  std::to_string( minimumCheckinInterval ) + " ms" );
             }
 
             // after sending checkin, the work on this dataPair is done, move to next dataPair

@@ -120,7 +120,8 @@ struct ISOTPOverCANSenderReceiverOptions
                                        bool isExtendedId = false,
                                        uint8_t blockSize = 0,
                                        uint32_t frameSeparationTimeMs = 0,
-                                       uint32_t p2TimeoutMs = P2_TIMEOUT_DEFAULT_MS )
+                                       uint32_t p2TimeoutMs = P2_TIMEOUT_DEFAULT_MS,
+                                       int broadcastSocket = -1 )
         : mSocketCanIFName( std::move( socketCanIFName ) )
         , mSourceCANId( sourceCANId )
         , mDestinationCANId( destinationCANId )
@@ -128,6 +129,7 @@ struct ISOTPOverCANSenderReceiverOptions
         , mBlockSize( blockSize )
         , mFrameSeparationTimeMs( frameSeparationTimeMs )
         , mP2TimeoutMs( p2TimeoutMs )
+        , mBroadcastSocket( broadcastSocket )
     {
     }
 
@@ -138,6 +140,7 @@ struct ISOTPOverCANSenderReceiverOptions
     uint8_t mBlockSize{ 0x0 };
     uint32_t mFrameSeparationTimeMs{ 0x0 };
     uint32_t mP2TimeoutMs{ P2_TIMEOUT_DEFAULT_MS };
+    int mBroadcastSocket{ -1 };
 };
 } // namespace VehicleNetwork
 } // namespace IoTFleetWise

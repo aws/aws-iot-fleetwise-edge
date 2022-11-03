@@ -251,8 +251,8 @@ CollectionSchemeIngestion::convertOperatorType( CollectionSchemesMsg::ConditionN
         return ExpressionNodeType::OPERATOR_EQUAL;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_NOT_EQUAL:
         mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
-                      "Converting operator NodeOperator_Operator_COMPARE_NOT_EQUAL to BOOLEAN" );
-        return ExpressionNodeType::BOOLEAN;
+                      "Converting operator NodeOperator_Operator_COMPARE_NOT_EQUAL to OPERATOR_NOT_EQUAL" );
+        return ExpressionNodeType::OPERATOR_NOT_EQUAL;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_AND:
         mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
                       "Converting operator to: OPERATOR_LOGICAL_AND" );

@@ -41,6 +41,11 @@ protected:
         {
             GTEST_SKIP() << "Skipping test fixture due to unavailability of socket";
         }
+#ifdef FWE_EXAMPLE_IWAVEGPS
+        std::ofstream iWaveGpsFile( "/tmp/engineTestIWaveGPSfile.txt" );
+        iWaveGpsFile << "NO valid NMEA data";
+        iWaveGpsFile.close();
+#endif
     }
 };
 
@@ -79,7 +84,7 @@ TEST_F( IoTFleetWiseEngineTest, CheckPublishDataQueue )
         collectedDataPtr->signals.push_back( collectedSignalMsg3 );
     }
     {
-        std::array<uint8_t, 8> data = { 1, 2, 3, 4, 5, 6, 7, 8 };
+        std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> data = { 1, 2, 3, 4, 5, 6, 7, 8 };
         CollectedCanRawFrame canFrames1( 12 /*frameId*/, 1 /*nodeId*/, 815 /*receiveTime*/, data, sizeof data );
         collectedDataPtr->canFrames.push_back( canFrames1 );
         CollectedCanRawFrame canFrames2( 4 /*frameId*/, 2 /*nodeId*/, 1100 /*receiveTime*/, data, sizeof data );

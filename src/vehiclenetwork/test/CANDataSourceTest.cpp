@@ -24,7 +24,7 @@ cleanUp( int socketFD )
 }
 
 static int
-setup()
+setup( bool fd = false )
 {
     // Setup a socket
     std::string socketCANIFName( "vcan0" );
@@ -36,6 +36,14 @@ setup()
     if ( socketFD < 0 )
     {
         return -1;
+    }
+    if ( fd )
+    {
+        int canfd_on = 1;
+        if ( setsockopt( socketFD, SOL_CAN_RAW, CAN_RAW_FD_FRAMES, &canfd_on, sizeof( canfd_on ) ) != 0 )
+        {
+            return -1;
+        }
     }
 
     if ( socketCANIFName.size() >= sizeof( interfaceRequest.ifr_name ) )
@@ -106,6 +114,20 @@ sendTestMessage( int socketFD )
 }
 
 static void
+sendTestFDMessage( int socketFD )
+{
+    struct canfd_frame frame = {};
+    frame.can_id = 0x123;
+    frame.len = 64;
+    for ( uint8_t i = 0; i < 64; ++i )
+    {
+        frame.data[i] = i;
+    }
+    ssize_t bytesWritten = write( socketFD, &frame, sizeof( struct canfd_frame ) );
+    ASSERT_EQ( bytesWritten, sizeof( struct canfd_frame ) );
+}
+
+static void
 sendTestMessageExtendedID( int socketFD )
 {
     struct can_frame frame = {};
@@ -151,6 +173,7 @@ TEST_F( CANDataSourceTest, testAquireDataFromNetwork )
     static_cast<void>( socketFD >= 0 );
     VehicleDataSourceConfig sourceConfig;
     sourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
+    sourceConfig.transportProperties.emplace( "protocolName", "CAN" );
     sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     sourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
@@ -185,6 +208,7 @@ TEST_F( CANDataSourceTest, testDoNotAcquireDataFromNetwork )
     static_cast<void>( socketFD >= 0 );
     VehicleDataSourceConfig sourceConfig;
     sourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
+    sourceConfig.transportProperties.emplace( "protocolName", "CAN" );
     sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     sourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
@@ -224,6 +248,7 @@ TEST_F( CANDataSourceTest, testNetworkDataAquisitionStateChange )
     static_cast<void>( socketFD >= 0 );
     VehicleDataSourceConfig sourceConfig;
     sourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
+    sourceConfig.transportProperties.emplace( "protocolName", "CAN" );
     sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     sourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
@@ -289,6 +314,80 @@ TEST_F( CANDataSourceTest, testSourceIdsAreUnique )
     ASSERT_EQ( NUM_SOURCES, sourceIDs.size() );
 }
 
+TEST_F( CANDataSourceTest, testCanFDSocketMode )
+{
+    LocalDataSourceEventListener listener;
+    int socketFD = setup( true );
+    ASSERT_TRUE( socketFD != -1 );
+
+    static_cast<void>( socketFD >= 0 );
+    VehicleDataSourceConfig sourceConfig;
+    sourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
+    sourceConfig.transportProperties.emplace( "protocolName", "CAN-FD" );
+    sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
+    sourceConfig.maxNumberOfVehicleDataMessages = 1000;
+    std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
+    CANDataSource dataSource;
+    ASSERT_TRUE( dataSource.init( sourceConfigs ) );
+    ASSERT_TRUE( dataSource.subscribeListener( &listener ) );
+
+    ASSERT_TRUE( dataSource.connect() );
+    ASSERT_TRUE( listener.gotConnectCallback );
+    ASSERT_TRUE( dataSource.isAlive() );
+    // Set the Channel in an active acquire state
+    dataSource.resumeDataAcquisition();
+
+    ASSERT_EQ( dataSource.getVehicleDataSourceIfName(), "vcan0" );
+    ASSERT_EQ( dataSource.getVehicleDataSourceProtocol(), VehicleDataSourceProtocol::RAW_SOCKET );
+    ASSERT_EQ( dataSource.getVehicleDataSourceType(), VehicleDataSourceType::CAN_SOURCE );
+
+    // Send a CAN-FD message on the bus.
+    sendTestFDMessage( socketFD );
+    // Sleep for sometime on this thread to allow the other thread to finish
+
+    std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
+    VehicleDataMessage msg;
+    ASSERT_TRUE( dataSource.getBuffer()->pop( msg ) );
+    ASSERT_TRUE( dataSource.disconnect() );
+    ASSERT_TRUE( dataSource.unSubscribeListener( &listener ) );
+    ASSERT_TRUE( listener.gotDisConnectCallback );
+}
+
+TEST_F( CANDataSourceTest, testSendRegularID )
+{
+    LocalDataSourceEventListener listener;
+    ASSERT_TRUE( socketFD != -1 );
+
+    static_cast<void>( socketFD >= 0 );
+    VehicleDataSourceConfig sourceConfig;
+    sourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
+    sourceConfig.transportProperties.emplace( "protocolName", "CAN" );
+    sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
+    sourceConfig.maxNumberOfVehicleDataMessages = 1000;
+    std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
+    CANDataSource dataSource;
+    ASSERT_TRUE( dataSource.init( sourceConfigs ) );
+    ASSERT_TRUE( dataSource.subscribeListener( &listener ) );
+
+    ASSERT_TRUE( dataSource.connect() );
+    ASSERT_TRUE( listener.gotConnectCallback );
+    ASSERT_TRUE( dataSource.isAlive() );
+    // Set the Channel in an active acquire state
+    dataSource.resumeDataAcquisition();
+    ASSERT_EQ( dataSource.getVehicleDataSourceIfName(), "vcan0" );
+    ASSERT_EQ( dataSource.getVehicleDataSourceProtocol(), VehicleDataSourceProtocol::RAW_SOCKET );
+    ASSERT_EQ( dataSource.getVehicleDataSourceType(), VehicleDataSourceType::CAN_SOURCE );
+    sendTestMessage( socketFD );
+    // Sleep for sometime on this thread to allow the other thread to finish
+    std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
+    VehicleDataMessage msg;
+    ASSERT_TRUE( dataSource.getBuffer()->pop( msg ) );
+    ASSERT_EQ( msg.getMessageID(), 0x123 );
+    ASSERT_TRUE( dataSource.disconnect() );
+    ASSERT_TRUE( dataSource.unSubscribeListener( &listener ) );
+    ASSERT_TRUE( listener.gotDisConnectCallback );
+}
+
 TEST_F( CANDataSourceTest, testExtractExtendedID )
 {
     LocalDataSourceEventListener listener;
@@ -297,6 +396,7 @@ TEST_F( CANDataSourceTest, testExtractExtendedID )
     static_cast<void>( socketFD >= 0 );
     VehicleDataSourceConfig sourceConfig;
     sourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
+    sourceConfig.transportProperties.emplace( "protocolName", "CAN" );
     sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     sourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
@@ -317,7 +417,7 @@ TEST_F( CANDataSourceTest, testExtractExtendedID )
     std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
     VehicleDataMessage msg;
     ASSERT_TRUE( dataSource.getBuffer()->pop( msg ) );
-    ASSERT_EQ( msg.getMessageID(), 0x123 );
+    ASSERT_EQ( msg.getMessageID(), 0x80000123 );
     ASSERT_TRUE( dataSource.disconnect() );
     ASSERT_TRUE( dataSource.unSubscribeListener( &listener ) );
     ASSERT_TRUE( listener.gotDisConnectCallback );

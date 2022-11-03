@@ -24,8 +24,9 @@ parse_args() {
 
 parse_args "$@"
 
-if [ `dpkg --print-architecture` != "amd64" ]; then
-    echo "Error: Can't install x86_64 (amd64) packages on this machine" >&2
+ARCH=`dpkg --print-architecture`
+if [ "${ARCH}" == "armhf" ]; then
+    echo "Error: Architecture is already ${ARCH}, use install-deps-native.sh" >&2
     exit -1
 fi
 
@@ -34,7 +35,7 @@ mkdir -p /usr/local/arm-linux-gnueabihf/lib/cmake/
 cp tools/armhf-toolchain.cmake /usr/local/arm-linux-gnueabihf/lib/cmake/
 
 dpkg --add-architecture armhf
-sed -i 's/deb http/deb [arch=amd64] http/g' /etc/apt/sources.list
+sed -i "s/deb http/deb [arch=${ARCH}] http/g" /etc/apt/sources.list
 apt update
 apt install -y \
     libssl-dev:armhf \
@@ -70,10 +71,10 @@ if [ ! -d jsoncpp ]; then
 fi
 make install -j`nproc` -C jsoncpp/build
 
-if [ ! -d protobuf-3.9.2 ]; then
-    wget -q https://github.com/protocolbuffers/protobuf/releases/download/v3.9.2/protobuf-all-3.9.2.tar.gz
-    tar -zxf protobuf-all-3.9.2.tar.gz
-    cd protobuf-3.9.2
+if [ ! -d protobuf-21.7 ]; then
+    wget -q https://github.com/protocolbuffers/protobuf/releases/download/v21.7/protobuf-all-21.7.tar.gz
+    tar -zxf protobuf-all-21.7.tar.gz
+    cd protobuf-21.7
     mkdir build && cd build
     ../configure
     cd ..
@@ -82,8 +83,8 @@ if [ ! -d protobuf-3.9.2 ]; then
         ../configure --host=arm-linux --prefix=/usr/local/arm-linux-gnueabihf
     cd ../..
 fi
-make install -j`nproc` -C protobuf-3.9.2/build
-make install -j`nproc` -C protobuf-3.9.2/build_armhf
+make install -j`nproc` -C protobuf-21.7/build
+make install -j`nproc` -C protobuf-21.7/build_armhf
 ldconfig
 
 if [ ! -d can-isotp ]; then

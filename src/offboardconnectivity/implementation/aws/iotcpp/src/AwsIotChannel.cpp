@@ -163,7 +163,6 @@ AwsIotChannel::send( const std::uint8_t *buf, size_t size, struct CollectionSche
 
     if ( !isAliveNotThreadSafe() )
     {
-        mLogger.warn( "AwsIotChannel::send", "There is no active MQTT Connection." );
         if ( mPayloadManager != nullptr )
         {
             bool isDataPersisted = mPayloadManager->storeData( buf, size, collectionSchemeParams );

@@ -13,14 +13,6 @@ namespace IoTFleetWise
 {
 namespace DataManagement
 {
-/**
- * @brief Message ID is an ID provided by Cloud that is unique across all messages found in the vehicle regardless of
- * network bus. Note that this is not the ID of CAN message.
- */
-using MessageID = uint64_t;
-
-static constexpr MessageID MESSAGE_ID_NA = 0xFFFFFFFE;
-static constexpr MessageID INVALID_MESSAGE_ID = 0xFFFFFFFF;
 static constexpr SignalID INVALID_CAN_FRAME_ID = 0xFFFFFFFF;
 
 /**

@@ -148,22 +148,12 @@ struct CollectedSignal
     CollectedSignal() = default;
 
     CollectedSignal( SignalID signalIDIn, Timestamp receiveTimeIn, double valueIn )
-        : messageID( MESSAGE_ID_NA )
-        , signalID( signalIDIn )
+        : signalID( signalIDIn )
         , receiveTime( receiveTimeIn )
         , value( valueIn )
     {
     }
 
-    CollectedSignal( MessageID messageIDIn, SignalID signalIDIn, Timestamp receiveTimeIn, double valueIn )
-        : messageID( messageIDIn )
-        , signalID( signalIDIn )
-        , receiveTime( receiveTimeIn )
-        , value( valueIn )
-    {
-    }
-
-    MessageID messageID{ INVALID_MESSAGE_ID }; // Note that this is a vehicle message ID in the AbstractDataSouce.
     SignalID signalID{ INVALID_SIGNAL_ID };
     Timestamp receiveTime{ 0 };
     double value{ 0.0 };
