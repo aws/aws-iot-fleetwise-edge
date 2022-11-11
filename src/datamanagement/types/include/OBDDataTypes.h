@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
@@ -720,7 +710,7 @@ getPID( SID sid, size_t index )
     switch ( sid )
     {
     case SID::CURRENT_STATS:
-        if ( index < supportedPIDRange.back() + SUPPORTED_PID_STEP )
+        if ( index < static_cast<size_t>( supportedPIDRange.back() + SUPPORTED_PID_STEP ) )
         {
             returnPID = static_cast<PID>( index );
         }
@@ -769,22 +759,6 @@ struct EmissionInfo
 {
     SID mSID;
     std::map<uint32_t, SignalValue> mPIDsToValues;
-};
-
-// A collection of OBD Data per ECU ( DTC + E
-// collected in the current OBD session.
-struct ECUDiagnosticInfo
-{
-    ECUType mEcuType;
-    std::string mVIN;
-    std::vector<EmissionInfo> mPIDInfos;
-    std::vector<DTCInfo> mDTCInfos;
-    Timestamp mReceptionTime{ 0 };
-    bool
-    hasItems() const
-    {
-        return ( !mPIDInfos.empty() || !mDTCInfos.empty() );
-    }
 };
 
 // Structure of a single PID OBD request.

@@ -1,14 +1,6 @@
 #!/bin/bash
-# Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
-# Licensed under the Amazon Software License (the "License").
-# You may not use this file except in compliance with the License.
-# A copy of the License is located at
-# http://aws.amazon.com/asl/
-# or in the "license" file accompanying this file. This file is distributed
-# on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
-# express or implied. See the License for the specific language governing
-# permissions and limitations under the License.
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
 
@@ -108,8 +100,6 @@ jq ".staticConfig.mqttConnection.endpointUrl=\"${ENDPOINT_URL}\"" ${INPUT_CONFIG
     | jq ".staticConfig.persistency.persistencyPath=\"${PERSISTENCY_PATH}\"" \
     | jq ".networkInterfaces[0].canInterface.interfaceName=\"${CAN_BUS0}\"" \
     | jq ".networkInterfaces[1].obdInterface.interfaceName=\"${CAN_BUS0}\"" \
-    | jq ".networkInterfaces[1].obdInterface.useExtendedIds=${USE_EXTENDED_IDS}" \
-    | jq ".networkInterfaces[1].obdInterface.hasTransmissionEcu=${HAS_TRANSMISSION_ECU}" \
     | jq ".networkInterfaces[1].obdInterface.pidRequestIntervalSeconds=5" \
     | jq ".networkInterfaces[1].obdInterface.dtcRequestIntervalSeconds=5" \
     | jq ".networkInterfaces[1].interfaceId=\"0\"" \

@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 #include "CANDecoder.h"
 #include <gtest/gtest.h>
@@ -161,6 +151,72 @@ TEST( CANDecoderTest, CANDecoderTestSimpleMessage3 )
     EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[0].mRawValue, 0x2301 );
     EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[1].mRawValue, 0x4567 );
     EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[2].mRawValue, 0x89AB );
+}
+TEST( CANDecoderTest, CANDecoderTestSimpleCanFdMessage )
+{
+    // Test for BigEndian & LittleEndian Signals
+    std::vector<uint8_t> frameData;
+    for ( int i = 0; i < 16; i++ )
+    {
+        frameData.emplace_back( 0x01 );
+        frameData.emplace_back( 0x23 );
+        frameData.emplace_back( 0x45 );
+        frameData.emplace_back( 0x67 );
+    }
+
+    CANSignalFormat sigFormat1;
+    sigFormat1.mSignalID = 1;
+    sigFormat1.mIsBigEndian = false;
+    sigFormat1.mIsSigned = false;
+    sigFormat1.mFirstBitPosition = 0;
+    sigFormat1.mSizeInBits = 16;
+    sigFormat1.mOffset = 0.0;
+    sigFormat1.mFactor = 1.0;
+
+    CANSignalFormat sigFormat2;
+    sigFormat2.mSignalID = 2;
+    sigFormat2.mIsBigEndian = true;
+    sigFormat2.mIsSigned = false;
+    sigFormat2.mFirstBitPosition = 124;
+    sigFormat2.mSizeInBits = 32;
+    sigFormat2.mOffset = 0.0;
+    sigFormat2.mFactor = 1.0;
+
+    CANSignalFormat sigFormat3;
+    sigFormat3.mSignalID = 3;
+    sigFormat3.mIsBigEndian = true;
+    sigFormat3.mIsSigned = false;
+    sigFormat3.mFirstBitPosition = 256;
+    sigFormat3.mSizeInBits = 24;
+    sigFormat3.mOffset = 0.0;
+    sigFormat3.mFactor = 1.0;
+
+    CANSignalFormat sigFormat4;
+    sigFormat4.mSignalID = 4;
+    sigFormat4.mIsBigEndian = true;
+    sigFormat4.mIsSigned = false;
+    sigFormat4.mFirstBitPosition = 300;
+    sigFormat4.mSizeInBits = 16;
+    sigFormat4.mOffset = 0.0;
+    sigFormat4.mFactor = 1.0;
+
+    CANMessageFormat msgFormat;
+    msgFormat.mMessageID = 0;
+    msgFormat.mSizeInBytes = 64;
+    msgFormat.mSignals.emplace_back( sigFormat1 );
+    msgFormat.mSignals.emplace_back( sigFormat2 );
+    msgFormat.mSignals.emplace_back( sigFormat3 );
+    msgFormat.mSignals.emplace_back( sigFormat4 );
+
+    CANDecoder decoder;
+    CANDecodedMessage decodedMsg;
+    std::unordered_set<SignalID> signalIDsToCollect = { 1, 2, 3, 4 };
+    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 64, msgFormat, signalIDsToCollect, decodedMsg ) );
+    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 4 );
+    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[0].mRawValue, 0x2301 );
+    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[1].mRawValue, 0x70123456 );
+    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[2].mRawValue, 0x456701 );
+    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[3].mRawValue, 0x7012 );
 }
 
 TEST( CANDecoderTest, CANDecoderTestOnlyDecodeSomeSignals )

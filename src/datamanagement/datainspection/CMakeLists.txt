@@ -9,7 +9,7 @@ set(SRCS
   src/CollectionInspectionWorkerThread.cpp
   $<$<BOOL:${FWE_FEATURE_CAMERA}>:src/dds/DataOverDDSModule.cpp>
   src/diag/OBDOverCANModule.cpp
-  src/diag/OBDOverCANSessionManager.cpp
+  src/diag/OBDOverCANECU.cpp
   src/location/GeohashFunctionNode.cpp
   src/vehicledatasource/VehicleDataSourceBinder.cpp
   src/vehicledatasource/CANDataConsumer.cpp
@@ -57,7 +57,7 @@ install(
   include/IVehicleDataConsumer.h
   include/CANDataConsumer.h
   include/OBDOverCANModule.h
-  include/OBDOverCANSessionManager.h
+  include/OBDOverCANECU.h
   include/CANDataConsumer.h
   include/VehicleDataSourceBinder.h
   DESTINATION include
@@ -69,7 +69,7 @@ install(
 set(
   testSources
   test/GeohashFunctionNodeTest.cpp
-  test/OBDOverCANModuleTest.cpp
+  test/OBDOverCANModuleTest.cpp 
   test/CollectionInspectionEngineTest.cpp
   test/CollectionInspectionWorkerThreadTest.cpp
   test/VehicleDataSourceBinderTest.cpp

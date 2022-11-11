@@ -19,7 +19,7 @@ AWS IoT FleetWise's capability to collect ECU data and store them on cloud datab
 
 You can use the included sample C++ application to learn more about AWS IoT FleetWise Edge Agent interfaces and to test interactions before integration.
 
-**_The AWS IoT FleetWise in-vehicle software component is licensed to you under the [Amazon Software License](https://aws.amazon.com/asl/). You are solely responsible for ensuring such software and any updates and modifications thereto are deployed and maintained safely and securely in any vehicles and do not otherwise impact vehicle safety._**
+**_The AWS IoT FleetWise in-vehicle software component is licensed to you under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0). You are solely responsible for ensuring such software and any updates and modifications thereto are deployed and maintained safely and securely in any vehicles and do not otherwise impact vehicle safety._**
 
 **Topics**
 
@@ -119,7 +119,7 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
 
 # Getting started with AWS IoT FleetWise Edge Agent
 
-This guide is intended to demonstrate the basic features of AWS IoT FleetWise by firstly building AWS IoT FleetWise Edge and running it on a development machine (locally or on AWS EC2) in order to represent a simulated vehicle. A script is then run to interact with AWS IoT FleetWise Cloud in order collect data from the simulated vehicle. Instructions are also provided for running AWS IoT FleetWise Edge Agent on an NXP S32G-VNP-RDB2 development board and deploying a campaign to collect OBD data.
+This guide is intended to demonstrate the basic features of AWS IoT FleetWise by firstly building AWS IoT FleetWise Edge and running it on a development machine (locally or on AWS EC2) in order to represent a simulated vehicle. A script is then run to interact with AWS IoT FleetWise Cloud in order collect data from the simulated vehicle. Instructions are also provided for running AWS IoT FleetWise Edge Agent on an NXP S32G-VNP-RDB2 development board or Renesas R-Car S4 Spider board and deploying a campaign to collect OBD data.
 
 This guide covers building AWS IoT FleetWise at a detailed technical level, using a development machine to build and run the Edge Agent executable. If you would prefer to learn about AWS IoT FleetWise at a higher level that does not require use of a development machine, see [AWS IoT FleetWise quick start demo](#aws-iot-fleetwise-quick-start-demo).
 
@@ -131,14 +131,22 @@ This guide covers building AWS IoT FleetWise at a detailed technical level, usin
   - [Compile AWS IoT FleetWise Edge Agent software](#compile-aws-iot-fleetwise-edge-agent-software)
   - [Deploy AWS IoT FleetWise Edge Agent software](#deploy-aws-iot-fleetwise-edge-agent-software)
   - [Run the AWS IoT FleetWise demo script](#run-the-aws-iot-fleetwise-demo-script)
-- [Getting started with AWS IoT FleetWise Edge Agent on a NXP S32G board](#getting-started-with-aws-iot-fleetwise-edge-agent-on-nxp-s32g)
-  - [Prerequisites for NXP S32G](#prerequisites-for-nxp-s32g)
-  - [Build an SD-Card Image](#build-an-sd-card-image)
-  - [Flash the SD-Card Image](#flash-the-sd-card-image)
-  - [Specify initial board configuration](#specify-initial-board-configuration)
-  - [Provision AWS IoT Credentials](#provision-aws-iot-credentials)
-  - [Deploy AWS IoT FleetWise Edge Agent on NXP S32G](#deploy-aws-iot-fleetwise-edge-agent-on-nxp-s32g)
-  - [Collect OBD Data](#collect-obd-data)
+- [Getting started with AWS IoT FleetWise Edge Agent on a NXP S32G board](./edge-agent-dev-guide-nxp-s32g.md)
+  - [Prerequisites for NXP S32G](./edge-agent-dev-guide-nxp-s32g.md#prerequisites)
+  - [Build an SD-Card Image](./edge-agent-dev-guide-nxp-s32g.md#build-an-sd-card-image)
+  - [Flash the SD-Card Image](./edge-agent-dev-guide-nxp-s32g.md#flash-the-sd-card-image)
+  - [Specify initial board configuration](./edge-agent-dev-guide-nxp-s32g.md#specify-initial-board-configuration)
+  - [Provision AWS IoT Credentials](./edge-agent-dev-guide-nxp-s32g.md#provision-aws-iot-credentials)
+  - [Deploy AWS IoT FleetWise Edge Agent on NXP S32G](./edge-agent-dev-guide-nxp-s32g.md#deploy-aws-iot-fleetwise-edge-agent-on-nxp-s32g)
+  - [Collect OBD Data](./edge-agent-dev-guide-nxp-s32g.md#collect-obd-data)
+- [Getting started with AWS IoT FleetWise Edge Agent on a Renesas R-Car S4 board](./edge-agent-dev-guide-renesas-rcar-s4.md)
+  - [Prerequisites](./edge-agent-dev-guide-renesas-rcar-s4.md#prerequisites)
+  - [Build an SD-Card Image](./edge-agent-dev-guide-renesas-rcar-s4.md#build-an-sd-card-image)
+  - [Flash the SD-Card Image](./edge-agent-dev-guide-renesas-rcar-s4.md#flash-the-sd-card-image)
+  - [Specify initial board configuration](./edge-agent-dev-guide-renesas-rcar-s4.md#specify-initial-board-configuration)
+  - [Provision AWS IoT Credentials](./edge-agent-dev-guide-renesas-rcar-s4.md#provision-aws-iot-credentials)
+  - [Deploy and run AWS IoT FleetWise Edge Agent software on R-Car S4 Spider board](./edge-agent-dev-guide-renesas-rcar-s4.md#deploy-aws-iot-fleetwise-edge-agent-software-on-r-car-s4-spider-board)
+  - [Collect OBD Data](./edge-agent-dev-guide-renesas-rcar-s4.md#collect-obd-data)
 
 ## Getting started with AWS IoT FleetWise on a development machine
 
@@ -307,147 +315,11 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
 
 ## Getting started with AWS IoT FleetWise Edge Agent on NXP S32G
 
-This section describes how to deploy AWS IoT FleetWise Edge Agent onto an NXP S32G-VNP-RDB2 board.
+[Getting started with AWS IoT FleetWise Edge Agent on NXP S32G](./edge-agent-dev-guide-nxp-s32g.md)
 
-### Prerequisites for NXP S32G
+## Getting started with AWS IoT FleetWise Edge Agent on Renesas S4
 
-- **NXP Semiconductors S32G Reference Design 2** — Part number: S32G-VNP-RDB2
-- **AWS IoT FleetWise Edge Agent Compiled for ARM64** — If you are using an EC2 Graviton instance as your development machine, you will have completed this already [above](#compile-aws-iot-fleetwise-edge-agent-software).
-
-  - _If you are using a local Intel x86_64 (amd64) development machine_, you will need to run the following to cross-compile AWS IoT FleetWise Edge Agent:
-
-    ```bash
-    cd ~/aws-iot-fleetwise-edge \
-        && sudo -H ./tools/install-deps-cross.sh \
-        && rm -rf build \
-        && ./tools/build-fwe-cross.sh
-    ```
-
-- **Internet Router with Ethernet** — The S32G-VNP-RDB2 must be connected to an internet router via an Ethernet cable for internet connectivity. It is beyond the scope of this document to describe how this is achieved, but one possibility is to use a WiFi to Ethernet bridge and a smartphone acting as an internet hotspot.
-
-### Build an SD-Card Image
-
-The following instructions use the development machine to build an SD-card image based on the Ubuntu variant of the NXP Linux BSP version 28.0, with the addition of the `can-isotp` kernel module required by AWS IoT FleetWise Edge Agent, an updated version of the `canutils` package and a `systemd` service called `setup-socketcan` for bringing up the CAN interfaces at startup.
-
-1. Run the following _on the development machine_ to install the dependencies of the `bitbake` tool of the Yocto / OpenEmbedded project.
-
-   ```bash
-   cd ~/aws-iot-fleetwise-edge \
-       && sudo ./tools/install-deps-yocto.sh
-   ```
-
-1. Run the following to create a build folder and setup the Yocto project:
-
-   ```bash
-   mkdir -p ~/yocto-build && cd ~/yocto-build \
-       && ~/aws-iot-fleetwise-edge/tools/setup-yocto-s32g.sh
-   ```
-
-1. Run the following to run `bitbake` to create the SD-card image and compress it. This can take several hours to complete depending on the performance of the development machine and the speed of the internet connection.
-
-   ```bash
-   source sources/poky/oe-init-build-env build_s32g274ardb2ubuntu \
-       && bitbake fsl-image-ubuntu \
-       && gzip -fk tmp/deploy/images/s32g274ardb2/fsl-image-ubuntu-s32g274ardb2.sdcard
-   ```
-
-1. Run the following _on your local machine_ to download the compressed SD-card image:
-
-   ```bash
-   scp -i <PATH_TO_PEM> ubuntu@<EC2_IP_ADDRESS>:yocto-build/build_s32g274ardb2ubuntu/tmp/deploy/images/s32g274ardb2/fsl-image-ubuntu-s32g274ardb2.sdcard.gz .
-   ```
-
-### Flash the SD-Card Image
-
-1. Download and install Balena Etcher _on your local machine_: https://www.balena.io/etcher/
-1. Run Balena Etcher, choose ‘Select image’ and select the compressed SD-card image
-   `fsl-image-ubuntu-s32g274ardb2.sdcard.gz`
-1. Insert the SD-card supplied with the S32G-VNP-RDB2 into your local machine’s SD-card reader
-1. Choose ‘Select target’ and select the SD-card
-1. Choose ‘Flash!’
-
-### Specify Initial Board Configuration
-
-1. Insert the SD-card into the S32G-VNP-RDB2’s SD-card slot.
-1. Connect the S32G-VNP-RDB2’s power supply.
-1. Connect an Ethernet cable from port P3A of the S32G-VNP-RDB2 to the internet router.
-
-   ![](./images/s32g_golden_box.png)
-
-1. Connect your local machine to the internet router, for example via WiFi or via Ethernet.
-1. Connect to the S32G-VNP-RDB2 via SSH, entering password `bluebox`:
-   `ssh bluebox@ubuntu-s32g274ardb2`
-   1. If you can’t connect using the hostname `ubuntu-s32g274ardb2`, you will need to connect to the administration webpage of the internet router to obtain the IP address assigned to the S32G-VNP-RDB2. Use this IP address in place of `ubuntu-s32g274ardb2` used throughout this guide.
-1. Once connected via SSH, check the board’s internet connection by running: `ping amazon.com`. There should be 0% packet loss.
-
-### Provision AWS IoT Credentials
-
-Run the following commands _on the development machine_ (after compiling AWS IoT FleetWise Edge Agent for ARM64 as explained [above](#prerequisites-for-nxp-s32g)), to create an IoT Thing and provision credentials for it. The AWS IoT FleetWise Edge Agent binary and its configuration files will be packaged into a ZIP file ready to be deployed to the board.
-
-```bash
-mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
-&& cp -r ~/aws-iot-fleetwise-edge/tools . \
-&& mkdir -p build/src/executionmanagement \
-&& cp ~/aws-iot-fleetwise-edge/build/src/executionmanagement/aws-iot-fleetwise-edge \
-  build/src/executionmanagement/ \
-&& mkdir -p config && cd config \
-&& ../tools/provision.sh \
-  --vehicle-name fwdemo-s32g \
-  --certificate-pem-outfile certificate.pem \
-  --private-key-outfile private-key.key \
-  --endpoint-url-outfile endpoint.txt \
-  --vehicle-name-outfile vehicle-name.txt \
-&& ../tools/configure-fwe.sh \
-  --input-config-file ~/aws-iot-fleetwise-edge/configuration/static-config.json \
-  --output-config-file config-0.json \
-  --vehicle-name `cat vehicle-name.txt` \
-  --endpoint-url `cat endpoint.txt` \
-  --can-bus0 can0 \
-&& cd .. && zip -r aws-iot-fleetwise-deploy.zip .
-```
-
-### Deploy AWS IoT FleetWise Edge Agent on NXP S32G
-
-1. Run the following _on your local machine_ to copy the deployment ZIP file from the EC2 machine to your local machine:
-
-   ```bash
-   scp -i <PATH_TO_PEM> ubuntu@<EC2_IP_ADDRESS>:aws-iot-fleetwise-deploy/aws-iot-fleetwise-deploy.zip .
-   ```
-
-1. Run the following _on your local machine_ to copy the deployment ZIP file from your local machine to the S32G (replacing `ubuntu-s32g274ardb2` with the IP address of the S32G if using the hostname is not supported):
-
-   ```bash
-   scp aws-iot-fleetwise-deploy.zip bluebox@ubuntu-s32g274ardb2:
-   ```
-
-1. SSH to the S32G board, as described above, then run the following **_on the S32G_** to install AWS IoT FleetWise Edge Agent as a service:
-
-   ```bash
-   mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
-       && unzip -o ~/aws-iot-fleetwise-deploy.zip \
-       && sudo mkdir -p /etc/aws-iot-fleetwise \
-       && sudo cp config/* /etc/aws-iot-fleetwise \
-       && sudo ./tools/install-fwe.sh
-   ```
-
-1. Run the following **_on the S32G_** to view and follow the AWS IoT FleetWise Edge Agent log (press CTRL+C to exit):
-
-   ```bash
-   sudo journalctl -fu fwe@0
-   ```
-
-### Collect OBD Data
-
-1. Run the following _on the development machine_ to deploy a ‘heartbeat’ campaign that periodically collects OBD data:
-
-   ```bash
-   cd ~/aws-iot-fleetwise-edge/tools/cloud \
-       && ./demo.sh --vehicle-name fwdemo-s32g --campaign-file campaign-obd-heartbeat.json
-   ```
-
-**Note:**
-If you unable to collect OBD data from a real vehicle, it is possible that the vehicle uses extended CAN identifiers for diagnostic communication. In this case, SSH to the S32G board and edit the file `/etc/aws-iot-fleetwise/config-0.json`, changing the key `useExtendedIds` to `true.` Restart AWS IoT FleetWise Edge Agent by running
-`sudo systemctl restart fwe@0` and try running the demo script again.
+[Getting started with AWS IoT FleetWise Edge Agent on Renesas R-Car S4](./edge-agent-dev-guide-renesas-rcar-s4.md)
 
 # AWS IoT FleetWise Edge Agent Architecture
 
@@ -1470,12 +1342,9 @@ Customers can set the System level logging severity externally via the software 
 |                          | type                                        | Specifies if the interface carries CAN or OBD signals over this channel, this will be CAN for a CAN network interface     | string   |
 |                          | timestampType                               | Defines which timestamp type should be used: Software, Hardware or Polling. Default is Software.                          | string   |
 | obdInterface             | interfaceName                               | CAN Interface connected to OBD bus                                                                                        | string   |
-|                          | requestMessageId                            | CAN request message id used for querying OBD signals. Example, 7DF is used in J1979                                       | string   |
 |                          | obdStandard                                 | OBD Standard (eg. J1979 or Enhanced (for advanced standards))                                                             | string   |
 |                          | pidRequestIntervalSeconds                   | Interval used to schedule PID requests (in seconds)                                                                       | integer  |
 |                          | dtcRequestIntervalSeconds                   | Interval used to schedule DTC requests (in seconds)                                                                       | integer  |
-|                          | useExtendedIds                              | Flag to specify use of Extended CAN IDs on Tx and Rx.                                                                     | boolean  |
-|                          | hasTransmissionEcu                          | specifies whether the vehicle has a Transmission ECU                                                                      | boolean  |
 |                          | interfaceId                                 | Every OBD signal decoder is associated with a OBD network interface using a unique Id                                     | string   |
 |                          | type                                        | Specifies if the interface carries CAN or OBD signals over this channel, this will be OBD for a OBD network interface     | string   |
 | bufferSizes              | dtcBufferSize                               | Max size of the buffer shared between data collection module (Collection Engine) and Vehicle Data Consumer. This is a single producer single consumer buffer.                                                                                                                                                                                                                      | integer  |
@@ -1487,10 +1356,11 @@ Customers can set the System level logging severity externally via the software 
 |                          | canDecoderThreadIdleTimeMs                  | Sleep time for CAN decoder thread if no new data is available (in milliseconds)                                           | integer  |
 | persistency              | persistencyPath                             | Local storage path to persist Collection Scheme, decoder manifest and data snapshot                                       | string   |
 |                          | persistencyPartitionMaxSize                 | Maximum size allocated for persistency (Bytes)                                                                            | integer  |
-|                          | persistencyUploadRetryInterval              | Interval to wait before retrying to upload persisted signal data (in milliseconds). After successfully uploading, the persisted signal data will be cleared. Only signal data that could not be uploaded will be persisted. (in milliseconds) | integer  |
+|                          | persistencyUploadRetryIntervalMs            | Interval to wait before retrying to upload persisted signal data (in milliseconds). After successfully uploading, the persisted signal data will be cleared. Only signal data that could not be uploaded will be persisted. (in milliseconds) | integer  |
 | internalParameters       | readyToPublishDataBufferSize                | Size of the buffer used for storing ready to publish, filtered data                                                       | integer  |
 |                          | systemWideLogLevel                          | Sets logging level severity- Trace, Info, Warning, Error                                                                  | string   |
 |                          | dataReductionProbabilityDisabled            | Disables probability-based DDC (only for debug purpose)                                                                   | boolean  |
+|                          | metricsCyclicPrintIntervalMs                | Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never    | string   |
 | publishToCloudParameters | maxPublishMessageCount                      | Maximum messages that can be published to the cloud in one payload                                                        | integer  |
 |                          | collectionSchemeManagementCheckinIntervalMs | Time interval between collection schemes checkins(in milliseconds)                                                        | integer  |
 | mqttConnection           | endpointUrl                                 | AWS account’s IoT device endpoint                                                                                         | string   |
@@ -1517,7 +1387,7 @@ The device software has been designed to be deployed in a non safety relevant in
 
 ### Best Practices and recommendation
 
-You can use the cmake build option, `FWE_SECURITY_COMPILE_FLAGS`, to enable security-related compile options when building the binary. Consult the compiler manual for the effect of each option in `./cmake/compiler_gcc.cmake`. This flag is already enabled in the default [native compilation script](./tools/build-fwe-native.sh) and [cross compilation script](./tools/build-fwe-cross.sh)
+You can use the cmake build option, `FWE_SECURITY_COMPILE_FLAGS`, to enable security-related compile options when building the binary. Consult the compiler manual for the effect of each option in `./cmake/compiler_gcc.cmake`. This flag is already enabled in the default [native compilation script](./tools/build-fwe-native.sh) and [cross compilation script for ARM64](./tools/build-fwe-cross-arm64.sh)
 
 Customers are encouraged to store key materials on hardware modules, such as hardware security module (HSM), Trusted Platform Modules (TPM), or other cryptographic elements. 
 A HSM is a removable or external device that can generate, store, and manage RSA keys used in asymmetric encryption. A TPM is a cryptographic processor present on most commercial PCs and servers.

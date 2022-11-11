@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
@@ -21,6 +11,7 @@
 #include <linux/can/isotp.h>
 #include <net/if.h>
 #include <poll.h>
+#include <sstream>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -42,6 +33,9 @@ ISOTPOverCANSenderReceiver::init( const ISOTPOverCANSenderReceiverOptions &sende
 {
     mTimer.reset();
     mSenderReceiverOptions = senderReceiverOptions;
+    std::stringstream streamRxId;
+    streamRxId << std::hex << mSenderReceiverOptions.mDestinationCANId;
+    mStreamRxID = streamRxId.str();
     return true;
 }
 
@@ -75,7 +69,8 @@ ISOTPOverCANSenderReceiver::connect()
     if ( mSocket < 0 )
     {
         mLogger.error( "ISOTPOverCANSenderReceiver::connect",
-                       " Failed to create the ISOTP Socket to IF:" + mSenderReceiverOptions.mSocketCanIFName );
+                       " Failed to create the ISOTP rx id " + mStreamRxID +
+                           " to IF:" + mSenderReceiverOptions.mSocketCanIFName );
         return false;
     }
 
@@ -100,12 +95,13 @@ ISOTPOverCANSenderReceiver::connect()
     if ( bind( mSocket, (struct sockaddr *)&interfaceAddress, sizeof( interfaceAddress ) ) < 0 )
     {
         mLogger.error( "ISOTPOverCANSenderReceiver::connect",
-                       " Failed to bind the ISOTP Socket to IF:" + mSenderReceiverOptions.mSocketCanIFName );
+                       " Failed to bind the ISOTP rx id " + mStreamRxID +
+                           " to IF:" + mSenderReceiverOptions.mSocketCanIFName );
         close( mSocket );
         return false;
     }
     mLogger.trace( "ISOTPOverCANSenderReceiver::connect",
-                   " ISOTP Socket connected to IF:" + mSenderReceiverOptions.mSocketCanIFName );
+                   " ISOTP rx id " + mStreamRxID + " connected to IF:" + mSenderReceiverOptions.mSocketCanIFName );
     return true;
 }
 
@@ -115,11 +111,12 @@ ISOTPOverCANSenderReceiver::disconnect()
     if ( close( mSocket ) < 0 )
     {
         mLogger.error( "ISOTPOverCANSenderReceiver::connect",
-                       " Failed to disconnect the ISOTP Socket from IF:" + mSenderReceiverOptions.mSocketCanIFName );
+                       " Failed to disconnect the ISOTP rx id " + mStreamRxID +
+                           " from IF:" + mSenderReceiverOptions.mSocketCanIFName );
         return false;
     }
     mLogger.trace( "ISOTPOverCANSenderReceiver::disconnect",
-                   " ISOTP Socket disconnected from IF:" + mSenderReceiverOptions.mSocketCanIFName );
+                   " ISOTP rx id " + mStreamRxID + " disconnected from IF:" + mSenderReceiverOptions.mSocketCanIFName );
     return true;
 }
 
@@ -142,6 +139,9 @@ ISOTPOverCANSenderReceiver::receivePDU( std::vector<uint8_t> &pduData )
         int res = poll( &pfd, 1U, static_cast<int>( mSenderReceiverOptions.mP2TimeoutMs ) );
         if ( res <= 0 )
         {
+            mLogger.warn( "ISOTPOverCANSenderReceiver::receivePDU",
+                          " Failed to read PDU from socket:" + mStreamRxID + " with error code " +
+                              std::to_string( res ) );
             // Error (<0) or timeout (==0):
             return false;
         }
@@ -150,7 +150,6 @@ ISOTPOverCANSenderReceiver::receivePDU( std::vector<uint8_t> &pduData )
     pduData.resize( MAX_PDU_SIZE );
     // coverity[check_return : SUPPRESS]
     int bytesRead = static_cast<int>( read( mSocket, pduData.data(), MAX_PDU_SIZE ) );
-    mLogger.trace( "ISOTPOverCANSenderReceiver::receivePDU", " Received a PDU of size:" + std::to_string( bytesRead ) );
     // Remove the unnecessary bytes from the PDU container.
     if ( bytesRead > 0 )
     {
@@ -160,6 +159,9 @@ ISOTPOverCANSenderReceiver::receivePDU( std::vector<uint8_t> &pduData )
     {
         pduData.resize( 0 );
     }
+    mLogger.traceBytesInVector( "ISOTPOverCANSenderReceiver::receivePDU",
+                                "Socket:" + mStreamRxID + " received a PDU of size " + std::to_string( bytesRead ),
+                                pduData );
 
     return bytesRead > 0;
 }
@@ -167,8 +169,11 @@ ISOTPOverCANSenderReceiver::receivePDU( std::vector<uint8_t> &pduData )
 bool
 ISOTPOverCANSenderReceiver::sendPDU( const std::vector<uint8_t> &pduData )
 {
-    int bytesWritten = static_cast<int>( write( mSocket, pduData.data(), pduData.size() ) );
-    mLogger.trace( "ISOTPOverCANSenderReceiver::sendPDU", " sent a PDU of size:" + std::to_string( bytesWritten ) );
+    auto socket = mSenderReceiverOptions.mBroadcastSocket < 0 ? mSocket : mSenderReceiverOptions.mBroadcastSocket;
+    int bytesWritten = static_cast<int>( write( socket, pduData.data(), pduData.size() ) );
+    mLogger.traceBytesInVector( "ISOTPOverCANSenderReceiver::sendPDU",
+                                "Socket:" + mStreamRxID + " sent a PDU of size " + std::to_string( bytesWritten ),
+                                pduData );
     return ( bytesWritten > 0 && bytesWritten == static_cast<int>( pduData.size() ) );
 }
 

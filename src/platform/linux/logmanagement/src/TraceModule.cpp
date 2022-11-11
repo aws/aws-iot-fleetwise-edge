@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 // Includes
 
@@ -324,7 +314,7 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
         profiler->setMetric( std::string( "sectionAvgSinceStartup_" ) +
                                  getSectionName( static_cast<TraceSection>( i ) ) + std::string( "_id" ) +
                                  std::to_string( i ),
-                             v.mTimeSpentSum / v.mHitCounter,
+                             ( v.mHitCounter == 0 ? 0 : v.mTimeSpentSum / v.mHitCounter ),
                              "Seconds" );
         profiler->setMetric( std::string( "sectionMaxSinceStartup_" ) +
                                  getSectionName( static_cast<TraceSection>( i ) ) + std::string( "_id" ) +
@@ -374,19 +364,21 @@ TraceModule::print()
     for ( auto i = 0; i < toUType( TraceSection::TRACE_SECTION_SIZE ); i++ )
     {
         auto &v = mSectionData[i];
-        mLogger.trace(
-            "TraceModule::print",
-            std::string{ " TraceModule-ConsoleLogging-Section '" } + getSectionName( static_cast<TraceSection>( i ) ) +
-                "' [" + std::to_string( i ) + "] times section executed: [" + std::to_string( v.mHitCounter ) +
-                "] avg execution time: "
-                "[" +
-                std::to_string( v.mTimeSpentSum / v.mHitCounter ) + "] max execution time since last print: [" +
-                std::to_string( v.mMaxSpent ) + "] overall: [" + std::to_string( v.mMaxSpentAllTime ) +
-                "] avg interval between execution: "
-                "[" +
-                std::to_string( v.mIntervalSum / ( v.mHitCounter - ( v.mCurrentlyActive ? 0 : 1 ) ) ) +
-                "] max interval since last print: [" + std::to_string( v.mMaxInterval ) + "] overall: [" +
-                std::to_string( v.mMaxIntervalAllTime ) + "]" );
+        auto currentHitCounter = v.mHitCounter - ( v.mCurrentlyActive ? 0 : 1 );
+        mLogger.trace( "TraceModule::print",
+                       std::string{ " TraceModule-ConsoleLogging-Section '" } +
+                           getSectionName( static_cast<TraceSection>( i ) ) + "' [" + std::to_string( i ) +
+                           "] times section executed: [" + std::to_string( v.mHitCounter ) +
+                           "] avg execution time: "
+                           "[" +
+                           std::to_string( ( v.mHitCounter == 0 ? 0 : v.mTimeSpentSum / v.mHitCounter ) ) +
+                           "] max execution time since last print: [" + std::to_string( v.mMaxSpent ) + "] overall: [" +
+                           std::to_string( v.mMaxSpentAllTime ) +
+                           "] avg interval between execution: "
+                           "[" +
+                           std::to_string( ( currentHitCounter == 0 ? 0 : v.mIntervalSum / currentHitCounter ) ) +
+                           "] max interval since last print: [" + std::to_string( v.mMaxInterval ) + "] overall: [" +
+                           std::to_string( v.mMaxIntervalAllTime ) + "]" );
     }
 
     std::fflush( stdout );

@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 #include "CollectionInspectionEngine.h"
 #include <cstring>
@@ -48,6 +38,28 @@ protected:
         expressionNodes.back()->nodeType = ExpressionNodeType::BOOLEAN;
         expressionNodes.back()->booleanValue = false;
         return ( expressionNodes.back() );
+    }
+
+    std::shared_ptr<ExpressionNode>
+    getNotEqualCondition( SignalID id1, SignalID id2 )
+    {
+        expressionNodes.push_back( std::make_shared<ExpressionNode>() );
+        auto notEqual = expressionNodes.back();
+        expressionNodes.push_back( std::make_shared<ExpressionNode>() );
+        auto signal1 = expressionNodes.back();
+        expressionNodes.push_back( std::make_shared<ExpressionNode>() );
+        auto signal2 = expressionNodes.back();
+
+        signal1->nodeType = ExpressionNodeType::SIGNAL;
+        signal1->signalID = id1;
+
+        signal2->nodeType = ExpressionNodeType::SIGNAL;
+        signal2->signalID = id2;
+
+        notEqual->nodeType = ExpressionNodeType::OPERATOR_NOT_EQUAL;
+        notEqual->left = signal1.get();
+        notEqual->right = signal2.get();
+        return ( notEqual );
     }
 
     std::shared_ptr<ExpressionNode>
@@ -551,6 +563,38 @@ TEST_F( CollectionInspectionEngineTest, CollectRawCanFrames )
 
     uint64_t timestamp = 160000000;
     std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = { 0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0 };
+    engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp, buf, sizeof( buf ) );
+
+    engine.evaluateConditions( timestamp );
+
+    uint32_t waitTimeMs = 0;
+    auto collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs );
+    ASSERT_NE( collectedData, nullptr );
+    ASSERT_EQ( collectedData->canFrames.size(), 1 );
+
+    EXPECT_EQ( collectedData->canFrames[0].frameID, c1.frameID );
+    EXPECT_EQ( collectedData->canFrames[0].channelId, c1.channelID );
+    EXPECT_EQ( collectedData->canFrames[0].size, sizeof( buf ) );
+    EXPECT_TRUE( 0 == std::memcmp( collectedData->canFrames[0].data.data(), buf.data(), sizeof( buf ) ) );
+}
+
+TEST_F( CollectionInspectionEngineTest, CollectRawCanFDFrames )
+{
+    CollectionInspectionEngine engine;
+    // minimumSampleIntervalMs=0 means no subsampling
+    InspectionMatrixCanFrameCollectionInfo c1;
+    c1.frameID = 0x380;
+    c1.channelID = 3;
+    c1.sampleBufferSize = 10;
+    c1.minimumSampleIntervalMs = 0;
+    collectionSchemes->conditions[0].canFrames.push_back( c1 );
+
+    collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
+    engine.onChangeInspectionMatrix( consCollectionSchemes );
+
+    uint64_t timestamp = 160000000;
+    std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = {
+        0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0, 0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0 };
     engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp, buf, sizeof( buf ) );
 
     engine.evaluateConditions( timestamp );
@@ -1457,6 +1501,47 @@ TEST_F( CollectionInspectionEngineTest, MultiWindowCondition )
     engine.addNewSignal( s1.signalID, timestamp + 200, +30.0 );
     engine.evaluateConditions( timestamp + 200 );
     ASSERT_NE( engine.collectNextDataToSend( timestamp + 200, waitTimeMs ), nullptr );
+}
+
+TEST_F( CollectionInspectionEngineTest, TestNotEqualOperator )
+{
+    CollectionInspectionEngine engine;
+    InspectionMatrixSignalCollectionInfo s1{};
+    s1.signalID = 123;
+    s1.sampleBufferSize = 50;
+    s1.minimumSampleIntervalMs = 0;
+    s1.fixedWindowPeriod = 100;
+    InspectionMatrixSignalCollectionInfo s2{};
+    s2.signalID = 456;
+    s2.sampleBufferSize = 50;
+    s2.minimumSampleIntervalMs = 0;
+    s2.fixedWindowPeriod = 100;
+    addSignalToCollect( collectionSchemes->conditions[0], s1 );
+    addSignalToCollect( collectionSchemes->conditions[0], s2 );
+
+    // function is: !(!(SignalID(123) <= 0.001) && !((SignalID(123) / SignalID(456)) >= 0.5))
+    collectionSchemes->conditions[0].condition = getNotEqualCondition( s1.signalID, s2.signalID ).get();
+    engine.onChangeInspectionMatrix( consCollectionSchemes );
+
+    uint64_t timestamp = 160000000;
+    // Expression should be false because they are equal
+    engine.addNewSignal( s1.signalID, timestamp, 100.0 );
+    engine.addNewSignal( s2.signalID, timestamp, 100.0 );
+    engine.evaluateConditions( timestamp );
+    uint32_t waitTimeMs = 0;
+    ASSERT_EQ( engine.collectNextDataToSend( timestamp, waitTimeMs ), nullptr );
+
+    // Expression should be true: because they are not equal
+    timestamp++;
+    engine.addNewSignal( s1.signalID, timestamp, 50 );
+    engine.evaluateConditions( timestamp );
+    ASSERT_NE( engine.collectNextDataToSend( timestamp, waitTimeMs ), nullptr );
+
+    // Expression should be false because they are equal again
+    timestamp++;
+    engine.addNewSignal( s2.signalID, timestamp, 50.0 );
+    engine.evaluateConditions( timestamp );
+    ASSERT_EQ( engine.collectNextDataToSend( timestamp, waitTimeMs ), nullptr );
 }
 
 TEST_F( CollectionInspectionEngineTest, TwoSignalsRatioCondition )

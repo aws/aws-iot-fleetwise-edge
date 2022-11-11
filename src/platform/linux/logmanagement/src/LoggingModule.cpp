@@ -1,20 +1,12 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
 
 #include "LoggingModule.h"
+#include <iomanip>
+#include <sstream>
 
 namespace Aws
 {
@@ -49,6 +41,31 @@ LoggingModule::trace( const std::string &function, const std::string &logEntry )
 {
     mLogger.logMessage( LogLevel::Trace, function, logEntry );
 }
+
+void
+LoggingModule::traceBytesInVector( const std::string &function,
+                                   const std::string &logEntry,
+                                   const std::vector<uint8_t> &inputBytes )
+{
+    std::stringstream stream_bytes;
+
+    // Push the elements of the array into the stream:
+    // Add a prefix to the start of the output stream.
+    // std::hex            - prints the item in hex representation
+    // std::uppercase      - Makes the letters in the hex codes uppercase
+    // std::setfill( '0' ) - Fills the width of each output with zeros
+    // std::setw( ... )    - makes all of the output values 2 characters wide
+    // static_cast< int >()- std::streams treat 'char' variables specially, so you need to cast to an int to see the
+    // hex values
+    for ( size_t i = 0; i < inputBytes.size(); i++ )
+    {
+        stream_bytes << std::hex << std::uppercase << std::setfill( '0' ) << std::setw( 2 * sizeof( uint8_t ) )
+                     << static_cast<unsigned>( inputBytes[i] ) << " ";
+    }
+    const std::string logMsg = logEntry + ": " + stream_bytes.str();
+    mLogger.logMessage( LogLevel::Trace, function, logMsg );
+}
+
 } // namespace Linux
 } // namespace Platform
 } // namespace IoTFleetWise

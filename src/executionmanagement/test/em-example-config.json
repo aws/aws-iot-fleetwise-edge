@@ -13,10 +13,7 @@
         {
             "obdInterface": {
                 "interfaceName": "vcan0",
-                "requestMessageId": 2015,
                 "obdStandard": "J1979",
-                "useExtendedIds": true,
-                "hasTransmissionEcu": false,
                 "pidRequestIntervalSeconds": 0,
                 "dtcRequestIntervalSeconds": 0
             },
@@ -59,6 +56,13 @@
             "checkinTopic": "checkin",
             "certificateFilename": "path/to/my-certificate.pem.crt",
             "privateKeyFilename": "path/to/my-private.pem.key"
+        },
+        "iWaveGpsExample": {
+            "nmeaFilePath": "/tmp/engineTestIWaveGPSfile.txt",
+            "canChannel" : "IWAVE-GPS-CAN",
+            "canFrameId" : "1",
+            "longitudeStartBit" : "32",
+            "latitudeStartBit" : "0"
         }
     },
     "dds-nodes-configuration": [

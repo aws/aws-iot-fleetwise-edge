@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
@@ -130,7 +120,8 @@ struct ISOTPOverCANSenderReceiverOptions
                                        bool isExtendedId = false,
                                        uint8_t blockSize = 0,
                                        uint32_t frameSeparationTimeMs = 0,
-                                       uint32_t p2TimeoutMs = P2_TIMEOUT_DEFAULT_MS )
+                                       uint32_t p2TimeoutMs = P2_TIMEOUT_DEFAULT_MS,
+                                       int broadcastSocket = -1 )
         : mSocketCanIFName( std::move( socketCanIFName ) )
         , mSourceCANId( sourceCANId )
         , mDestinationCANId( destinationCANId )
@@ -138,6 +129,7 @@ struct ISOTPOverCANSenderReceiverOptions
         , mBlockSize( blockSize )
         , mFrameSeparationTimeMs( frameSeparationTimeMs )
         , mP2TimeoutMs( p2TimeoutMs )
+        , mBroadcastSocket( broadcastSocket )
     {
     }
 
@@ -148,6 +140,7 @@ struct ISOTPOverCANSenderReceiverOptions
     uint8_t mBlockSize{ 0x0 };
     uint32_t mFrameSeparationTimeMs{ 0x0 };
     uint32_t mP2TimeoutMs{ P2_TIMEOUT_DEFAULT_MS };
+    int mBroadcastSocket{ -1 };
 };
 } // namespace VehicleNetwork
 } // namespace IoTFleetWise

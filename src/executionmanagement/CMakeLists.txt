@@ -24,6 +24,7 @@ target_link_libraries(
   IoTFleetWise::DataDecoding
   IoTFleetWise::Platform::Linux
   IoTFleetWise::OffboardConnectivityAwsIot
+  $<$<BOOL:${FWE_EXAMPLE_IWAVEGPS}>:IoTFleetWise::CustomDataSource>
 )
 
 add_library(${libraryAliasName} ALIAS ${libraryTargetName})

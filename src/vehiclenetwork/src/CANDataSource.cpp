@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
@@ -36,7 +26,7 @@ namespace VehicleNetwork
 using namespace Aws::IoTFleetWise::Platform::Utility;
 static const std::string INTERFACE_NAME_KEY = "interfaceName";
 static const std::string THREAD_IDLE_TIME_KEY = "threadIdleTimeMs";
-static constexpr uint32_t MSB_MASK = 0X7FFFFFFFU;
+static const std::string PROTOCOL_NAME_KEY = "protocolName";
 CANDataSource::CANDataSource( CAN_TIMESTAMP_TYPE timestampTypeToUse )
     : mTimestampTypeToUse{ timestampTypeToUse }
 {
@@ -102,6 +92,17 @@ CANDataSource::init( const std::vector<VehicleDataSourceConfig> &sourceConfigs )
                            "Could not cast the threadIdleTimeMs, invalid input: " + std::string( e.what() ) );
             return false;
         }
+    }
+
+    settingsIterator = sourceConfigs[0].transportProperties.find( std::string( PROTOCOL_NAME_KEY ) );
+    if ( settingsIterator == sourceConfigs[0].transportProperties.end() )
+    {
+        mLogger.error( "CANDataSource::init", "Could not find protocolName in the config" );
+        return false;
+    }
+    else
+    {
+        mForceCanFD = settingsIterator->second == "CAN-FD";
     }
 
     mTimer.reset();
@@ -196,13 +197,15 @@ CANDataSource::extractTimestamp( struct msghdr *msgHeader )
                 // Most timestamps are passed in ts[0]. Hardware timestamps are passed in ts[2].
                 if ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_HARDWARE_TIMESTAMP )
                 {
-                    timestamp = static_cast<Timestamp>( ( timestampArray->ts[2].tv_sec * 1000 ) +
-                                                        ( timestampArray->ts[2].tv_nsec / 1000000 ) );
+                    timestamp =
+                        static_cast<Timestamp>( ( static_cast<Timestamp>( timestampArray->ts[2].tv_sec ) * 1000 ) +
+                                                ( static_cast<Timestamp>( timestampArray->ts[2].tv_nsec ) / 1000000 ) );
                 }
                 else if ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP ) // default
                 {
-                    timestamp = static_cast<Timestamp>( ( timestampArray->ts[0].tv_sec * 1000 ) +
-                                                        ( timestampArray->ts[0].tv_nsec / 1000000 ) );
+                    timestamp =
+                        static_cast<Timestamp>( ( static_cast<Timestamp>( timestampArray->ts[0].tv_sec ) * 1000 ) +
+                                                ( static_cast<Timestamp>( timestampArray->ts[0].tv_nsec ) / 1000000 ) );
                 }
             }
             currentHeader = CMSG_NXTHDR( msgHeader, currentHeader );
@@ -246,7 +249,7 @@ CANDataSource::doWork( void *data )
 
         dataSource->mTimer.reset();
         int nmsgs = 0;
-        struct can_frame frame[PARALLEL_RECEIVED_FRAMES_FROM_KERNEL];
+        struct canfd_frame frame[PARALLEL_RECEIVED_FRAMES_FROM_KERNEL];
         struct iovec frame_buffer[PARALLEL_RECEIVED_FRAMES_FROM_KERNEL];
         struct mmsghdr msg[PARALLEL_RECEIVED_FRAMES_FROM_KERNEL];
         // we expect only one timestamp to return
@@ -288,13 +291,12 @@ CANDataSource::doWork( void *data )
                                                     ? traceFrames
                                                     : TraceVariable::READ_SOCKET_FRAMES_MAX,
                                                 dataSource->receivedMessages );
-                rawData.reserve( frame[i].can_dlc );
-                for ( size_t j = 0; j < frame[i].can_dlc; ++j )
+                rawData.reserve( frame[i].len );
+                for ( size_t j = 0; j < frame[i].len; ++j )
                 {
                     rawData.emplace_back( frame[i].data[j] );
                 }
-                // Compose the correct CAN Frame ID by clearing the MSB
-                message.setup( frame[i].can_id & MSB_MASK, rawData, syntheticData, timestamp );
+                message.setup( frame[i].can_id, rawData, syntheticData, timestamp );
                 if ( message.isValid() )
                 {
                     if ( !dataSource->mCircularBuffPtr->push( message ) )
@@ -344,11 +346,26 @@ CANDataSource::connect()
     struct ifreq interfaceRequest = {};
     // Open a Socket but make sure it's not blocking to not
     // cause a thread hang.
+    int canfd_on = 1;
     int type = SOCK_RAW | SOCK_NONBLOCK;
     mSocket = socket( PF_CAN, type, CAN_RAW );
     if ( mSocket < 0 )
     {
         return false;
+    }
+    // Switch Socket can_fd mode on or fallback with a log if it fails
+    if ( setsockopt( mSocket, SOL_CAN_RAW, CAN_RAW_FD_FRAMES, &canfd_on, sizeof( canfd_on ) ) != 0 )
+    {
+        if ( mForceCanFD )
+        {
+            mLogger.error( "CANDataSource::connect", "setsockopt CAN_RAW_FD_FRAMES FAILED" );
+            return false;
+        }
+        else
+        {
+            mLogger.info( "CANDataSource::connect",
+                          "setsockopt CAN_RAW_FD_FRAMES FAILED, falling back to regular CAN" );
+        }
     }
 
     // Set the IF Name, address

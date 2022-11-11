@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 // Includes
 #include "IoTFleetWiseConfig.h"
@@ -22,7 +12,8 @@
 
 using namespace Aws::IoTFleetWise::ExecutionManagement;
 
-bool mSignal = false;
+static std::atomic<bool> mSignal( false );
+static std::atomic<int> mExitCode( 0 );
 
 static void
 signalHandler( int signum )
@@ -30,7 +21,17 @@ signalHandler( int signum )
     static_cast<void>( signum ); // unused parameter
     std::cout << "Stopping AWS IoT FleetWise Edge Service " << std::endl;
 
-    mSignal = true;
+    mSignal.store( true );
+}
+
+static void
+fatalSignalHandler( int signum )
+{
+    static_cast<void>( signum ); // unused parameter
+    std::cout << "Fatal error, stopping AWS IoT FleetWise Edge Service " << std::endl;
+
+    mSignal.store( true );
+    mExitCode.store( -1 );
 }
 
 static void
@@ -60,6 +61,7 @@ main( int argc, char *argv[] )
 
     IoTFleetWiseEngine engine;
     signal( SIGINT, signalHandler );
+    signal( SIGUSR1, fatalSignalHandler );
     std::string configFilename = argv[1];
     Json::Value config;
     if ( !IoTFleetWiseConfig::read( configFilename, config ) )
@@ -80,14 +82,14 @@ main( int argc, char *argv[] )
         return EXIT_FAILURE;
     }
 
-    while ( !mSignal )
+    while ( !mSignal.load() )
     {
         sleep( 1 );
     }
     if ( engine.stop() && engine.disconnect() )
     {
         std::cout << " AWS IoT FleetWise Edge Service Stopped successfully " << std::endl;
-        return EXIT_SUCCESS;
+        return mExitCode.load();
     }
 
     std::cout << " AWS IoT FleetWise Edge Service Stopped with errors " << std::endl;

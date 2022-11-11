@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 // Includes
 #include "IoTFleetWiseEngine.h"
@@ -116,10 +106,10 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         {
             mLogger.error( "IoTFleetWiseEngine::connect", " Failed to init persistency library " );
         }
-        if ( config["staticConfig"]["persistency"].isMember( "PersistencyUploadRetryIntervalMs" ) )
+        if ( config["staticConfig"]["persistency"].isMember( "persistencyUploadRetryIntervalMs" ) )
         {
             mPersistencyUploadRetryIntervalMs =
-                static_cast<uint64_t>( config["staticConfig"]["PersistencyUploadRetryIntervalMs"].asInt() );
+                static_cast<uint64_t>( config["staticConfig"]["persistencyUploadRetryIntervalMs"].asInt() );
         }
         else
         {
@@ -141,6 +131,17 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 canIDTranslator.add( interfaceName["interfaceId"].asString() );
             }
         }
+#ifdef FWE_EXAMPLE_IWAVEGPS
+        if ( config["staticConfig"].isMember( "iWaveGpsExample" ) )
+        {
+            canIDTranslator.add(
+                config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::CAN_CHANNEL_NUMBER].asString() );
+        }
+        else
+        {
+            canIDTranslator.add( "IWAVE-GPS-CAN" );
+        }
+#endif
         /*************************CAN InterfaceID to InternalID Translator end*********/
 
         /**************************Connectivity bootstrap begin*******************************/
@@ -388,6 +389,8 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 canSourceConfig.transportProperties.emplace(
                     "interfaceName", interfaceName[CAN_INTERFACE_TYPE]["interfaceName"].asString() );
                 canSourceConfig.transportProperties.emplace(
+                    "protocolName", interfaceName[CAN_INTERFACE_TYPE]["protocolName"].asString() );
+                canSourceConfig.transportProperties.emplace(
                     "threadIdleTimeMs",
                     config["staticConfig"]["threadIdleTimes"]["socketCANThreadIdleTimeMs"].asString() );
                 canSourceConfig.maxNumberOfVehicleDataMessages =
@@ -459,9 +462,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                              activeDTCBufferPtr,
                              interfaceName[OBD_INTERFACE_TYPE]["interfaceName"].asString(),
                              interfaceName[OBD_INTERFACE_TYPE]["pidRequestIntervalSeconds"].asUInt(),
-                             interfaceName[OBD_INTERFACE_TYPE]["dtcRequestIntervalSeconds"].asUInt(),
-                             interfaceName[OBD_INTERFACE_TYPE]["useExtendedIds"].asBool(),
-                             interfaceName[OBD_INTERFACE_TYPE]["hasTransmissionEcu"].asBool() ) )
+                             interfaceName[OBD_INTERFACE_TYPE]["dtcRequestIntervalSeconds"].asUInt() ) )
                     {
                         // Connect the OBD Module
                         mOBDOverCANModule = obdOverCANModule;
@@ -601,6 +602,59 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 
         /********************************DDS Module bootstrap end*********************************/
 #endif // FWE_FEATURE_CAMERA
+
+#ifdef FWE_EXAMPLE_IWAVEGPS
+        /********************************IWave GPS Example NMEA reader *********************************/
+        mIWaveGpsSource = std::make_shared<IWaveGpsSource>( signalBufferPtr );
+        bool iWaveInitSuccessful = false;
+        if ( config["staticConfig"].isMember( "iWaveGpsExample" ) )
+        {
+            mLogger.trace( "IoTFleetWiseEngine::connect", "Found 'iWaveGpsExample' section in config file" );
+            std::vector<VehicleDataSourceConfig> iWaveGpsConfigs( 1 );
+            for ( auto const &key : config["staticConfig"]["iWaveGpsExample"].getMemberNames() )
+            {
+                if ( key == IWaveGpsSource::CAN_CHANNEL_NUMBER )
+                {
+                    iWaveGpsConfigs.back().transportProperties.emplace(
+                        key,
+                        std::to_string( canIDTranslator.getChannelNumericID(
+                            config["staticConfig"]["iWaveGpsExample"][key].asString() ) ) );
+                }
+                else
+                {
+                    iWaveGpsConfigs.back().transportProperties.emplace(
+                        key, config["staticConfig"]["iWaveGpsExample"][key].asString() );
+                }
+            }
+            iWaveInitSuccessful = mIWaveGpsSource->init( iWaveGpsConfigs );
+        }
+        else
+        {
+            // If not config available default to this values
+            iWaveInitSuccessful = mIWaveGpsSource->init(
+                "/dev/ttyUSB1", canIDTranslator.getChannelNumericID( "IWAVE-GPS-CAN" ), 1, 32, 0 );
+        }
+        if ( iWaveInitSuccessful && mIWaveGpsSource->connect() )
+        {
+            if ( !mCollectionSchemeManagerPtr->subscribeListener(
+                     static_cast<IActiveDecoderDictionaryListener *>( mIWaveGpsSource.get() ) ) )
+            {
+                mLogger.error( "IoTFleetWiseEngine::connect",
+                               " Failed to register the IWaveGps to the CollectionScheme Manager" );
+                return false;
+            }
+            mIWaveGpsSource->start();
+        }
+        else
+        {
+            mLogger.error( "IoTFleetWiseEngine::connect", " IWaveGps initialization failed " );
+            return false;
+        }
+        /********************************IWave GPS Example NMEA reader end******************************/
+#endif
+
+        mPrintMetricsCyclicPeriodMs =
+            config["staticConfig"]["internalParameters"]["metricsCyclicPrintIntervalMs"].asUInt(); // default to 0
     }
     catch ( const std::exception &e )
     {
@@ -761,13 +815,25 @@ IoTFleetWiseEngine::doWork( void *data )
                               std::max( IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS, timeToWaitMs ) ) /
                           1000.0;
         }
+
+        if ( engine->mPrintMetricsCyclicPeriodMs != 0 )
+        {
+            uint64_t timeToWaitMs =
+                engine->mPrintMetricsCyclicPeriodMs -
+                std::min( static_cast<uint64_t>( engine->mPrintMetricsCyclicTimer.getElapsedMs().count() ),
+                          engine->mPrintMetricsCyclicPeriodMs );
+            timeTrigger = std::min( timeTrigger, static_cast<double>( timeToWaitMs ) / 1000.0 );
+        }
         if ( timeTrigger > 0 )
         {
             engine->mLogger.trace(
                 "IoTFleetWiseEngine::doWork",
-                "Waiting for :" + std::to_string( timeTrigger ) + " seconds " +
-                    std::to_string( engine->mPersistencyUploadRetryIntervalMs ) + " config" +
-                    std::to_string( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) + " timer" );
+                "Waiting for :" + std::to_string( timeTrigger ) + " seconds. Persistency " +
+                    std::to_string( engine->mPersistencyUploadRetryIntervalMs ) + " configured, " +
+                    std::to_string( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) +
+                    " timer. Cyclic Metrics Print:" + std::to_string( engine->mPrintMetricsCyclicPeriodMs ) +
+                    " configured,  " + std::to_string( engine->mPrintMetricsCyclicTimer.getElapsedMs().count() ) +
+                    " timer." );
             engine->mWait.wait( static_cast<uint32_t>( timeTrigger * 1000 ) );
         }
         else
@@ -828,6 +894,14 @@ IoTFleetWiseEngine::doWork( void *data )
                 // Check if data was persisted, Retrieve all the data and send
                 uploadedPersistedDataOnce |= engine->checkAndSendRetrievedData();
             }
+        }
+        if ( engine->mPrintMetricsCyclicPeriodMs > 0 &&
+             ( static_cast<uint64_t>( engine->mPrintMetricsCyclicTimer.getElapsedMs().count() ) >=
+               engine->mPrintMetricsCyclicPeriodMs ) )
+        {
+            engine->mPrintMetricsCyclicTimer.reset();
+            TraceModule::get().print();
+            TraceModule::get().startNewObservationWindow();
         }
     }
 }

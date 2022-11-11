@@ -1,8 +1,26 @@
 # Change Log
 
-## future release (TBD)
+## v1.0.1 (Nov 3, 2022)
+License Update:
+* License changed from Amazon Software License 1.0 to Apache License Version 2.0
+
+Security Updates:
+* Update protcol buffer version used in customer build script to v3.21.7
+
+Features:
+* OBD module will automatic detect ECUs for both 11-bit and 29-bit. ECU address is no longer hardcoded.
+* Support CAN-FD frames with up to 64 bytes
+* Add an CustomDataSource for the IWave GPS module (NMEA output)
+* iWave G26 TCU tutorial
+* Renesas R-Car S4 setup guide
+
 Bugfixes:
-* Dont use SocketCAN hardware timestamp as default but software timestamp. Hardware timestamp not being a unix epoch timestamp leads to problems.
+* Fix name of `persistencyUploadRetryIntervalMs` config. The dev guide wasn't including the `Ms` suffix and the code was mistakenly capitalizing the first letter.
+* Don't use SocketCAN hardware timestamp as default but software timestamp. Hardware timestamp not being a unix epoch timestamp leads to problems.
+* install-socketcan.sh checks now if can-isotp is already loaded.
+* The not equal operator =! in expression is now working as expected
+* Fix kernel timestamps in 32-bit systems
+
 Improvements:
 * Added Mac-user-friendly commands in quick demo
 * Added an extra attribute, so that users can search vehicle in the FleetWise console

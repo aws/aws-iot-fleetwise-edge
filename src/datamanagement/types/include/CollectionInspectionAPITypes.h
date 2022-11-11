@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 #pragma once
 
 #include "CANDataTypes.h"
@@ -158,22 +148,12 @@ struct CollectedSignal
     CollectedSignal() = default;
 
     CollectedSignal( SignalID signalIDIn, Timestamp receiveTimeIn, double valueIn )
-        : messageID( MESSAGE_ID_NA )
-        , signalID( signalIDIn )
+        : signalID( signalIDIn )
         , receiveTime( receiveTimeIn )
         , value( valueIn )
     {
     }
 
-    CollectedSignal( MessageID messageIDIn, SignalID signalIDIn, Timestamp receiveTimeIn, double valueIn )
-        : messageID( messageIDIn )
-        , signalID( signalIDIn )
-        , receiveTime( receiveTimeIn )
-        , value( valueIn )
-    {
-    }
-
-    MessageID messageID{ INVALID_MESSAGE_ID }; // Note that this is a vehicle message ID in the AbstractDataSouce.
     SignalID signalID{ INVALID_SIGNAL_ID };
     Timestamp receiveTime{ 0 };
     double value{ 0.0 };

@@ -1,15 +1,5 @@
-/**
- * Copyright 2020 Amazon.com, Inc. and its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
- * Licensed under the Amazon Software License (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- * http://aws.amazon.com/asl/
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
@@ -26,6 +16,9 @@
 #ifdef FWE_FEATURE_CAMERA
 #include "DataOverDDSModule.h"
 #endif // FWE_FEATURE_CAMERA
+#ifdef FWE_EXAMPLE_IWAVEGPS
+#include "IWaveGpsSource.h"
+#endif
 #include "IDataReadyToPublishListener.h"
 #include "LoggingModule.h"
 #include "OBDOverCANModule.h"
@@ -138,6 +131,9 @@ private:
     Timer mRetrySendingPersistedDataTimer;
     uint64_t mPersistencyUploadRetryIntervalMs{ DEFAULT_PERSISTENCY_UPLOAD_RETRY_INTERVAL_MS };
 
+    Timer mPrintMetricsCyclicTimer;
+    uint64_t mPrintMetricsCyclicPeriodMs{ 0 }; // default to 0 which means no cyclic printing
+
     LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     std::unique_ptr<VehicleDataSourceBinder> mVehicleDataSourceBinder;
@@ -166,6 +162,9 @@ private:
     // DDS Module
     std::shared_ptr<DataOverDDSModule> mDataOverDDSModule;
 #endif // FWE_FEATURE_CAMERA
+#ifdef FWE_EXAMPLE_IWAVEGPS
+    std::shared_ptr<IWaveGpsSource> mIWaveGpsSource;
+#endif
 };
 } // namespace ExecutionManagement
 } // namespace IoTFleetWise
