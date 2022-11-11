@@ -28,6 +28,8 @@ WORKDIR /root
 COPY --from=build-step /root/aws-iot-fleetwise-edge/build/src/executionmanagement/aws-iot-fleetwise-edge /usr/bin/
 COPY --from=build-step /root/aws-iot-fleetwise-edge/tools/configure-fwe.sh /usr/bin/
 COPY --from=build-step /root/aws-iot-fleetwise-edge/configuration/static-config.json /etc/
+COPY LICENCE /usr/share/doc/aws-iot-fleetwise-edge/
+COPY THIRD-PARTY-LICENSES /usr/share/doc/aws-iot-fleetwise-edge/
 
 ADD tools/container/start-fwe.sh /usr/bin
 RUN chmod +x /usr/bin/start-fwe.sh
