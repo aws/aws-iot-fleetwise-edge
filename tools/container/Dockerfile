@@ -1,4 +1,4 @@
-FROM ubuntu:18.04 as build-step
+FROM public.ecr.aws/ubuntu/ubuntu:18.04 as build-step
 
 ARG version=v1.0.0
 LABEL version=${version}
@@ -14,7 +14,7 @@ RUN git clone --depth 1 --branch ${version} https://github.com/aws/aws-iot-fleet
     ./tools/install-deps-native.sh && \
     ./tools/build-fwe-native.sh 
 
-FROM ubuntu:18.04
+FROM public.ecr.aws/ubuntu/ubuntu:18.04
 
 LABEL version=${version}
 
@@ -28,10 +28,8 @@ WORKDIR /root
 COPY --from=build-step /root/aws-iot-fleetwise-edge/build/src/executionmanagement/aws-iot-fleetwise-edge /usr/bin/
 COPY --from=build-step /root/aws-iot-fleetwise-edge/tools/configure-fwe.sh /usr/bin/
 COPY --from=build-step /root/aws-iot-fleetwise-edge/configuration/static-config.json /etc/
-COPY LICENCE /usr/share/doc/aws-iot-fleetwise-edge/
-COPY THIRD-PARTY-LICENSES /usr/share/doc/aws-iot-fleetwise-edge/
-
-ADD tools/container/start-fwe.sh /usr/bin
-RUN chmod +x /usr/bin/start-fwe.sh
+COPY --from=build-step /root/aws-iot-fleetwise-edge/LICENSE /usr/share/doc/aws-iot-fleetwise-edge/
+COPY --from=build-step /root/aws-iot-fleetwise-edge/THIRD-PARTY-LICENSES /usr/share/doc/aws-iot-fleetwise-edge/
+ADD start-fwe.sh /usr/bin
 
 ENTRYPOINT /usr/bin/start-fwe.sh
