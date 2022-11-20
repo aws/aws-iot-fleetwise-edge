@@ -99,7 +99,7 @@ processor present in the Raspberry Pi.
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
-     && cd ~/aws-iot-fleetwise-edge
+     && cd ~/aws-iot-fleetwise-edge/tools
    ```
 
 1. Install the AWS IoT FleetWise Edge Agent dependencies. The command `install-deps-cross-arm64.sh` installs the following Ubuntu packages for cross-compiling the Edge Agent for ARM 64-bit:
