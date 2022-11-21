@@ -46,7 +46,6 @@ install(TARGETS ${libraryTargetName} DESTINATION lib)
 install(
   FILES
   include/CANInterfaceIDTranslator.h
-  include/CollectionFileUploadManager.h
   include/CollectionScheme.h
   include/CollectionSchemeIngestion.h
   include/CollectionSchemeIngestionList.h

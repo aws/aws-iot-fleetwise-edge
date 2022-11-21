@@ -341,10 +341,10 @@ OBDOverCANModule::autoDetectECUs( bool isExtendedID, std::vector<uint32_t> &canI
         // 11-bit range 7E8, 7E9, 7EA ... 7EF ==> [7E8, 7EF]
         // 29-bit range: [18DAF100, 18DAF1FF]
         auto frameCANId = ( isExtendedID ) ? ( frame.can_id & CAN_EFF_MASK ) : frame.can_id;
-        auto smallestCANId = ( isExtendedID ) ? ( u_int32_t )( ECUID::LOWEST_ECU_EXTENDED_RX_ID )
-                                              : ( u_int32_t )( ECUID::LOWEST_ECU_RX_ID );
-        auto biggestCANId = ( isExtendedID ) ? ( u_int32_t )( ECUID::HIGHEST_ECU_EXTENDED_RX_ID )
-                                             : ( u_int32_t )( ECUID::HIGHEST_ECU_RX_ID );
+        auto smallestCANId = ( isExtendedID ) ? ( uint32_t )( ECUID::LOWEST_ECU_EXTENDED_RX_ID )
+                                              : ( uint32_t )( ECUID::LOWEST_ECU_RX_ID );
+        auto biggestCANId = ( isExtendedID ) ? ( uint32_t )( ECUID::HIGHEST_ECU_EXTENDED_RX_ID )
+                                             : ( uint32_t )( ECUID::HIGHEST_ECU_RX_ID );
         // Check if CAN ID is valid
         if ( smallestCANId <= frameCANId && frameCANId <= biggestCANId )
         {

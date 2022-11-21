@@ -11,6 +11,7 @@
 #include "businterfaces/AbstractVehicleDataSource.h"
 #include "businterfaces/CANDataSource.h"
 #include <boost/lockfree/spsc_queue.hpp>
+#include <fstream>
 
 namespace Aws
 {
