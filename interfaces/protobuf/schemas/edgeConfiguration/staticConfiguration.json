@@ -16,7 +16,7 @@
             "anyOf": [
                 {
                     "required": [
-                        "canInterface"
+                        "socketCANInterface"
                     ]
                 },
                 {
@@ -26,12 +26,12 @@
                 }
             ],
             "properties": {
-                "canInterface": {
+                "socketCANInterface": {
                     "type": "object",
                     "additionalProperties": false,
-                    "description": "CAN Signal network interface information",
+                    "description": "SocketCAN Signal network interface information",
                     "items": {
-                        "$ref": "#/definitions/canInterface"
+                        "$ref": "#/definitions/socketCANInterface"
                     }
                 },
                 "obdInterface": {
@@ -52,7 +52,7 @@
                 }
             },
             "definitions": {
-                "canInterface": {
+                "socketCANInterface": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {

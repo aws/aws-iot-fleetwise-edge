@@ -2,13 +2,13 @@
     "version": "1.0",
     "networkInterfaces": [
         {
-            "canInterface": {
+            "socketCANInterface": {
                 "interfaceName": "vcan0",
                 "protocolName": "CAN",
                 "protocolVersion": "2.0A"
             },
             "interfaceId": "1",
-            "type": "canInterface"
+            "type": "socketCANInterface"
         },
         {
             "obdInterface": {

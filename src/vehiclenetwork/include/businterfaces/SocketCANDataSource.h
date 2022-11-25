@@ -58,7 +58,7 @@ stringToCanTimestampType( std::string const &timestampType, CAN_TIMESTAMP_TYPE &
  * @brief Linux CAN Bus implementation. Uses Raw Sockets to listen to CAN
  * data on 1 single CAN IF.
  */
-class CANDataSource : public AbstractVehicleDataSource
+class SocketCANDataSource : public AbstractVehicleDataSource
 {
 public:
     static constexpr int PARALLEL_RECEIVED_FRAMES_FROM_KERNEL = 10;
@@ -69,15 +69,15 @@ public:
      * @param timestampTypeToUse which timestamp type should be used to tag the can frames, this timestamp will be
      * visible in the cloud
      */
-    CANDataSource( CAN_TIMESTAMP_TYPE timestampTypeToUse );
-    CANDataSource();
+    SocketCANDataSource( CAN_TIMESTAMP_TYPE timestampTypeToUse );
+    SocketCANDataSource();
 
-    ~CANDataSource() override;
+    ~SocketCANDataSource() override;
 
-    CANDataSource( const CANDataSource & ) = delete;
-    CANDataSource &operator=( const CANDataSource & ) = delete;
-    CANDataSource( CANDataSource && ) = delete;
-    CANDataSource &operator=( CANDataSource && ) = delete;
+    SocketCANDataSource( const SocketCANDataSource & ) = delete;
+    SocketCANDataSource &operator=( const SocketCANDataSource & ) = delete;
+    SocketCANDataSource( SocketCANDataSource && ) = delete;
+    SocketCANDataSource &operator=( SocketCANDataSource && ) = delete;
 
     bool init( const std::vector<VehicleDataSourceConfig> &sourceConfigs ) override;
     bool connect() override;

@@ -1335,7 +1335,7 @@ Customers can set the System level logging severity externally via the software 
 
 | Category                 | Attributes                                  | Description                                            | DataType |
 | ------------------------ | ------------------------------------------- | -------------------------------------------------------| -------- |
-| canInterface             | interfaceName                               | Interface name for CAN network                                                                                            | string   |
+| socketCANInterface       | interfaceName                               | Interface name for CAN network                                                                                            | string   |
 |                          | protocolName                                | Protocol used- CAN or CAN-FD                                                                                              | string   |
 |                          | protocolVersion                             | Protocol version used- 2.0A, 2.0B.                                                                                        | string   |
 |                          | interfaceId                                 | Every CAN signal decoder is associated with a CAN network interface using a unique Id                                     | string   |
@@ -1523,13 +1523,13 @@ The following documents or websites provide more information about AWS IoT Fleet
   "version": "1.0",
   "networkInterfaces": [
     {
-      "canInterface": {
+      "socketCANInterface": {
         "interfaceName": "vcan0",
         "protocolName": "CAN",
         "protocolVersion": "2.0B"
       },
       "interfaceId": "1",
-      "type": "canInterface"
+      "type": "socketCANInterface"
     },
     {
       "obdInterface": {

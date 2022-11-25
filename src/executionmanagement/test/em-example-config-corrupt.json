@@ -6,7 +6,7 @@
         "FWE Corrupt File test"
     ],
     "staticConfig": {
-        "canInterface": [
+        "socketCANInterface": [
             "FWE Corrupt File test"
         ]
     }

@@ -9,7 +9,7 @@
 #include "CollectionSchemeJSONParser.h"
 #include "TraceModule.h"
 #include "businterfaces/AbstractVehicleDataSource.h"
-#include "businterfaces/CANDataSource.h"
+#include "businterfaces/SocketCANDataSource.h"
 #include <boost/lockfree/spsc_queue.hpp>
 #include <fstream>
 
@@ -28,7 +28,7 @@ const uint32_t IoTFleetWiseEngine::MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG = 6;
 const uint64_t IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 1000;
 const uint64_t IoTFleetWiseEngine::DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 10000;
 
-static const std::string CAN_INTERFACE_TYPE = "canInterface";
+static const std::string SOCKET_CAN_INTERFACE_TYPE = "socketCANInterface";
 static const std::string OBD_INTERFACE_TYPE = "obdInterface";
 
 namespace
@@ -127,7 +127,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         // Initialize
         for ( const auto &interfaceName : config["networkInterfaces"] )
         {
-            if ( interfaceName["type"].asString() == CAN_INTERFACE_TYPE )
+            if ( interfaceName["type"].asString() == SOCKET_CAN_INTERFACE_TYPE )
             {
                 canIDTranslator.add( interfaceName["interfaceId"].asString() );
             }
@@ -383,23 +383,23 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         {
             const auto &interfaceType = interfaceName["type"].asString();
 
-            if ( interfaceType == CAN_INTERFACE_TYPE )
+            if ( interfaceType == SOCKET_CAN_INTERFACE_TYPE )
             {
                 std::vector<VehicleDataSourceConfig> canSourceConfigs( 1 );
                 auto &canSourceConfig = canSourceConfigs.back();
                 canSourceConfig.transportProperties.emplace(
-                    "interfaceName", interfaceName[CAN_INTERFACE_TYPE]["interfaceName"].asString() );
+                    "interfaceName", interfaceName[SOCKET_CAN_INTERFACE_TYPE]["interfaceName"].asString() );
                 canSourceConfig.transportProperties.emplace(
-                    "protocolName", interfaceName[CAN_INTERFACE_TYPE]["protocolName"].asString() );
+                    "protocolName", interfaceName[SOCKET_CAN_INTERFACE_TYPE]["protocolName"].asString() );
                 canSourceConfig.transportProperties.emplace(
                     "threadIdleTimeMs",
                     config["staticConfig"]["threadIdleTimes"]["socketCANThreadIdleTimeMs"].asString() );
                 canSourceConfig.maxNumberOfVehicleDataMessages =
                     config["staticConfig"]["bufferSizes"]["socketCANBufferSize"].asUInt();
                 CAN_TIMESTAMP_TYPE canTimestampType = CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP; // default
-                if ( interfaceName[CAN_INTERFACE_TYPE].isMember( "timestampType" ) )
+                if ( interfaceName[SOCKET_CAN_INTERFACE_TYPE].isMember( "timestampType" ) )
                 {
-                    auto timestampTypeInput = interfaceName[CAN_INTERFACE_TYPE]["timestampType"].asString();
+                    auto timestampTypeInput = interfaceName[SOCKET_CAN_INTERFACE_TYPE]["timestampType"].asString();
                     bool success = stringToCanTimestampType( timestampTypeInput, canTimestampType );
                     if ( !success )
                     {
@@ -408,7 +408,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                                           " so default to Software" );
                     }
                 }
-                auto canSourcePtr = std::make_shared<CANDataSource>( canTimestampType );
+                auto canSourcePtr = std::make_shared<SocketCANDataSource>( canTimestampType );
                 auto canConsumerPtr = std::make_shared<CANDataConsumer>();
 
                 if ( canSourcePtr == nullptr || canConsumerPtr == nullptr )

@@ -2,7 +2,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "businterfaces/CANDataSource.h"
+#include "businterfaces/SocketCANDataSource.h"
 #include <functional>
 #include <gtest/gtest.h>
 #include <linux/can.h>
@@ -142,7 +142,7 @@ sendTestMessageExtendedID( int socketFD )
     ASSERT_EQ( bytesWritten, sizeof( struct can_frame ) );
 }
 
-class CANDataSourceTest : public ::testing::Test
+class SocketCANDataSourceTest : public ::testing::Test
 {
 public:
     int socketFD;
@@ -165,7 +165,7 @@ protected:
     }
 };
 
-TEST_F( CANDataSourceTest, testAquireDataFromNetwork )
+TEST_F( SocketCANDataSourceTest, testAquireDataFromNetwork )
 {
     LocalDataSourceEventListener listener;
     ASSERT_TRUE( socketFD != -1 );
@@ -177,7 +177,7 @@ TEST_F( CANDataSourceTest, testAquireDataFromNetwork )
     sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     sourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
-    CANDataSource dataSource;
+    SocketCANDataSource dataSource;
     ASSERT_TRUE( dataSource.init( sourceConfigs ) );
     ASSERT_TRUE( dataSource.subscribeListener( &listener ) );
 
@@ -199,7 +199,7 @@ TEST_F( CANDataSourceTest, testAquireDataFromNetwork )
     ASSERT_TRUE( listener.gotDisConnectCallback );
 }
 
-TEST_F( CANDataSourceTest, testDoNotAcquireDataFromNetwork )
+TEST_F( SocketCANDataSourceTest, testDoNotAcquireDataFromNetwork )
 {
     LocalDataSourceEventListener listener;
     int socketFD = setup();
@@ -212,7 +212,7 @@ TEST_F( CANDataSourceTest, testDoNotAcquireDataFromNetwork )
     sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     sourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
-    CANDataSource dataSource;
+    SocketCANDataSource dataSource;
     ASSERT_TRUE( dataSource.init( sourceConfigs ) );
     ASSERT_TRUE( dataSource.subscribeListener( &listener ) );
 
@@ -237,7 +237,7 @@ TEST_F( CANDataSourceTest, testDoNotAcquireDataFromNetwork )
     ASSERT_TRUE( listener.gotDisConnectCallback );
 }
 
-TEST_F( CANDataSourceTest, testNetworkDataAquisitionStateChange )
+TEST_F( SocketCANDataSourceTest, testNetworkDataAquisitionStateChange )
 {
     // In this test, we want to start the channel with the default settings i.e. sleep mode,
     // then activate data acquisition and check that the channel buffer effectively has a message,
@@ -252,7 +252,7 @@ TEST_F( CANDataSourceTest, testNetworkDataAquisitionStateChange )
     sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     sourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
-    CANDataSource dataSource;
+    SocketCANDataSource dataSource;
     ASSERT_TRUE( dataSource.init( sourceConfigs ) );
     ASSERT_TRUE( dataSource.subscribeListener( &listener ) );
 
@@ -299,7 +299,7 @@ TEST_F( CANDataSourceTest, testNetworkDataAquisitionStateChange )
     ASSERT_TRUE( listener.gotDisConnectCallback );
 }
 
-TEST_F( CANDataSourceTest, testSourceIdsAreUnique )
+TEST_F( SocketCANDataSourceTest, testSourceIdsAreUnique )
 {
     ASSERT_TRUE( socketFD != -1 );
     static_cast<void>( socketFD >= 0 );
@@ -308,13 +308,13 @@ TEST_F( CANDataSourceTest, testSourceIdsAreUnique )
     std::unordered_set<VehicleDataSourceID> sourceIDs;
     for ( auto i = 0; i < NUM_SOURCES; ++i )
     {
-        CANDataSource source;
+        SocketCANDataSource source;
         sourceIDs.insert( source.getVehicleDataSourceID() );
     }
     ASSERT_EQ( NUM_SOURCES, sourceIDs.size() );
 }
 
-TEST_F( CANDataSourceTest, testCanFDSocketMode )
+TEST_F( SocketCANDataSourceTest, testCanFDSocketMode )
 {
     LocalDataSourceEventListener listener;
     int socketFD = setup( true );
@@ -327,7 +327,7 @@ TEST_F( CANDataSourceTest, testCanFDSocketMode )
     sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     sourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
-    CANDataSource dataSource;
+    SocketCANDataSource dataSource;
     ASSERT_TRUE( dataSource.init( sourceConfigs ) );
     ASSERT_TRUE( dataSource.subscribeListener( &listener ) );
 
@@ -353,7 +353,7 @@ TEST_F( CANDataSourceTest, testCanFDSocketMode )
     ASSERT_TRUE( listener.gotDisConnectCallback );
 }
 
-TEST_F( CANDataSourceTest, testSendRegularID )
+TEST_F( SocketCANDataSourceTest, testSendRegularID )
 {
     LocalDataSourceEventListener listener;
     ASSERT_TRUE( socketFD != -1 );
@@ -365,7 +365,7 @@ TEST_F( CANDataSourceTest, testSendRegularID )
     sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     sourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
-    CANDataSource dataSource;
+    SocketCANDataSource dataSource;
     ASSERT_TRUE( dataSource.init( sourceConfigs ) );
     ASSERT_TRUE( dataSource.subscribeListener( &listener ) );
 
@@ -388,7 +388,7 @@ TEST_F( CANDataSourceTest, testSendRegularID )
     ASSERT_TRUE( listener.gotDisConnectCallback );
 }
 
-TEST_F( CANDataSourceTest, testExtractExtendedID )
+TEST_F( SocketCANDataSourceTest, testExtractExtendedID )
 {
     LocalDataSourceEventListener listener;
     ASSERT_TRUE( socketFD != -1 );
@@ -400,7 +400,7 @@ TEST_F( CANDataSourceTest, testExtractExtendedID )
     sourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
     sourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> sourceConfigs = { sourceConfig };
-    CANDataSource dataSource;
+    SocketCANDataSource dataSource;
     ASSERT_TRUE( dataSource.init( sourceConfigs ) );
     ASSERT_TRUE( dataSource.subscribeListener( &listener ) );
 

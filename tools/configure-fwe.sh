@@ -81,7 +81,7 @@ parse_args() {
 
 parse_args "$@"
 
-if [ "`jq '.networkInterfaces[0].canInterface' ${INPUT_CONFIG_FILE}`" == "null" ] \
+if [ "`jq '.networkInterfaces[0].socketCANInterface' ${INPUT_CONFIG_FILE}`" == "null" ] \
     || [ "`jq '.networkInterfaces[1].obdInterface' ${INPUT_CONFIG_FILE}`" == "null" ]; then
     echo "Error: Unexpected format in input config file"
     exit -1
@@ -98,7 +98,7 @@ jq ".staticConfig.mqttConnection.endpointUrl=\"${ENDPOINT_URL}\"" ${INPUT_CONFIG
     | jq ".staticConfig.mqttConnection.privateKeyFilename=\"/etc/aws-iot-fleetwise/private-key.key\"" \
     | jq ".staticConfig.internalParameters.systemWideLogLevel=\"Info\"" \
     | jq ".staticConfig.persistency.persistencyPath=\"${PERSISTENCY_PATH}\"" \
-    | jq ".networkInterfaces[0].canInterface.interfaceName=\"${CAN_BUS0}\"" \
+    | jq ".networkInterfaces[0].socketCANInterface.interfaceName=\"${CAN_BUS0}\"" \
     | jq ".networkInterfaces[1].obdInterface.interfaceName=\"${CAN_BUS0}\"" \
     | jq ".networkInterfaces[1].obdInterface.pidRequestIntervalSeconds=5" \
     | jq ".networkInterfaces[1].obdInterface.dtcRequestIntervalSeconds=5" \

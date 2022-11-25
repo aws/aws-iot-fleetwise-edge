@@ -7,7 +7,7 @@
 #include "IActiveDecoderDictionaryListener.h"
 #include "Signal.h"
 #include "Thread.h"
-#include "businterfaces/CANDataSource.h"
+#include "businterfaces/SocketCANDataSource.h"
 #include <functional>
 #include <gtest/gtest.h>
 #include <linux/can.h>
@@ -434,8 +434,8 @@ protected:
         canSourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
         canSourceConfig.maxNumberOfVehicleDataMessages = 1000;
         std::vector<VehicleDataSourceConfig> canSourceConfigs = { canSourceConfig };
-        canSourcePtr = std::make_shared<CANDataSource>();
-        canSourcePtr2 = std::make_shared<CANDataSource>();
+        canSourcePtr = std::make_shared<SocketCANDataSource>();
+        canSourcePtr2 = std::make_shared<SocketCANDataSource>();
         ASSERT_TRUE( canSourcePtr->init( canSourceConfigs ) );
         ASSERT_TRUE( canSourcePtr2->init( canSourceConfigs ) );
         sourceID = canSourcePtr->getVehicleDataSourceID();
@@ -759,13 +759,13 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestDiscardInputBuff
  */
 TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderStartupAndShutdownCycle )
 {
-    std::shared_ptr<CANDataSource> canSource;
+    std::shared_ptr<SocketCANDataSource> canSource;
     std::shared_ptr<CANDataConsumer> canConsumer;
     std::shared_ptr<const CANDecoderDictionary> dictionary;
     VehicleDataSourceID sourceID;
     VehicleDataSourceBinder networkBinder;
     ASSERT_TRUE( socketFD != -1 );
-    canSource = std::make_shared<CANDataSource>();
+    canSource = std::make_shared<SocketCANDataSource>();
     VehicleDataSourceConfig canSourceConfig;
     canSourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
     canSourceConfig.transportProperties.emplace( "protocolName", "CAN" );
