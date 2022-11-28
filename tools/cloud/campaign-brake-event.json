@@ -5,7 +5,7 @@
     "collectionScheme": {
         "conditionBasedCollectionScheme": {
             "conditionLanguageVersion": 1,
-            "expression": "$variable.`Vehicle.DemoBrakePedalPressure` > 7000",
+            "expression": "$variable.`Vehicle.ABS.DemoBrakePedalPressure` > 7000",
             "minimumTriggerIntervalMs": 1000,
             "triggerMode": "ALWAYS"
         }
@@ -13,10 +13,10 @@
     "postTriggerCollectionDuration": 1000,
     "signalsToCollect": [
         {
-            "name": "Vehicle.DemoEngineTorque"
+            "name": "Vehicle.ECM.DemoEngineTorque"
         },
         {
-            "name": "Vehicle.DemoBrakePedalPressure"
+            "name": "Vehicle.ABS.DemoBrakePedalPressure"
         }
     ]
 }

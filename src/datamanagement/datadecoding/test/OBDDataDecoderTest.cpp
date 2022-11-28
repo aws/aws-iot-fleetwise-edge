@@ -4,6 +4,7 @@
 
 #include "OBDDataDecoder.h"
 #include "EnumUtility.h"
+#include "datatypes/OBDDataTypesUnitTestOnly.h"
 #include <gtest/gtest.h>
 #include <unistd.h>
 

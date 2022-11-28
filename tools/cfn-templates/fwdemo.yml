@@ -4,14 +4,10 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
 Parameters:
-  SourceUrl:
-    Description: Source Git clone URL (leave as default)
+  BinaryUrl:
+    Description: Binary URL (leave as default)
     Type: String
-    Default: https://github.com/aws/aws-iot-fleetwise-edge.git
-  SourceRef:
-    Description: Source Git branch, tag or commit ID (leave blank for HEAD)
-    Type: String
-    Default: ''
+    Default: https://github.com/aws/aws-iot-fleetwise-edge/releases/latest/download/aws-iot-fleetwise-edge-arm64.tar.gz
   Ec2KeyPair:
     Description: Name of SSH key pair (leave blank for none)
     Type: String
@@ -151,26 +147,25 @@ Resources:
           printf "RateLimitBurst=0\nSystemMaxUse=1G\n" >> /etc/systemd/journald.conf
 
           # Install packages
-          apt update && apt install -y git ec2-instance-connect htop jq unzip
+          apt update && apt install -y wget ec2-instance-connect htop jq unzip
 
           # Install AWS CLI:
           curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
+          unzip -q awscliv2.zip
           ./aws/install
           rm awscliv2.zip
 
-          # Download source
+          # Download agent:
           cd /home/ubuntu
-          if echo ${SourceUrl} | grep -q 's3://'; then
-            sudo -u ubuntu aws s3 cp ${SourceUrl} aws-iot-fleetwise-edge.zip
-            sudo -u ubuntu unzip aws-iot-fleetwise-edge.zip -d aws-iot-fleetwise-edge
+          if echo ${BinaryUrl} | grep -q 's3://'; then
+            sudo -u ubuntu aws s3 cp ${BinaryUrl} aws-iot-fleetwise-edge.tar.gz
           else
-            sudo -u ubuntu git clone ${SourceUrl} aws-iot-fleetwise-edge
+            sudo -u ubuntu wget ${BinaryUrl} -O aws-iot-fleetwise-edge.tar.gz
           fi
-          cd aws-iot-fleetwise-edge
-          if [ '${SourceRef}' != '' ]; then
-            git checkout ${SourceRef}
-          fi
+          sudo -u ubuntu mkdir dist && cd dist
+          sudo -u ubuntu tar -zxf ../aws-iot-fleetwise-edge.tar.gz
+          sudo -u ubuntu mkdir -p build/src/executionmanagement
+          sudo -u ubuntu mv aws-iot-fleetwise-edge build/src/executionmanagement
           
           # Install SocketCAN modules:
           ./tools/install-socketcan.sh --bus-count ${FleetSize}
@@ -215,12 +210,6 @@ Resources:
               wait
             done
           fi
-
-          # Install source deps
-          ./tools/install-deps-native.sh
-
-          # Build source
-          sudo -u ubuntu ./tools/build-fwe-native.sh
 
           # Install FWE
           ./tools/install-fwe.sh

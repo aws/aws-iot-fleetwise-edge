@@ -21,7 +21,7 @@ namespace Linux
 class Timer
 {
 public:
-    using Clock = std::chrono::high_resolution_clock;
+    using Clock = std::chrono::steady_clock;
     using Duration = Clock::duration;
     using DurationUs = std::chrono::microseconds;
     using DurationMs = std::chrono::milliseconds;

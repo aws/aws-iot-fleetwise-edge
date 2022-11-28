@@ -6,41 +6,77 @@ name: CI
 on:
   push:
     branches: [ '*' ]
+    tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ '*' ]
 
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
-  build-and-test:
+  build-amd64:
     runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - uses: "./.github/template/fwe-build"
+        with:
+          build-arch: "native"
+          upload-arch: "amd64"
 
-    - name: cache-deps
-      id: cache-deps
-      uses: actions/cache@v2
-      with:
-        path: deps-native
-        key: ${{ runner.os }}-deps
-  
-    - name: install-deps
-      run: sudo ./tools/install-deps-native.sh
+  build-arm64:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: "./.github/template/fwe-build"
+        with:
+          build-arch: "cross-arm64"
+          upload-arch: "arm64"
 
-    - name: build
-      run: |
-        mkdir -p build && cd build
-        cmake ..
-        make -j`nproc`
+  build-armhf:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: "./.github/template/fwe-build"
+        with:
+          build-arch: "cross-armhf"
+          upload-arch: "armhf"
 
-    - name: unit-test
-      run: |
-        cd build
-        CTEST_OUTPUT_ON_FAILURE=1 ctest
-
-    - name: upload-artifacts
-      uses: actions/upload-artifact@v2
-      if: always()
-      with:
-        name: logs
-        path: |
-          build/Testing/Temporary/
-          build/**/report-*.xml
+  build-docker:
+    runs-on: ubuntu-18.04
+    needs:
+      - build-amd64
+      - build-arm64
+      - build-armhf
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+      - name: Move artifacts to match buildx TARGETPLATFORM structure
+        run: |
+          mkdir -p linux/arm
+          mv build-amd64 linux/amd64
+          mv build-arm64 linux/arm64
+          mv build-armhf linux/arm/v7
+          find linux -name aws-iot-fleetwise-edge -exec chmod +x {} \;
+      - uses: docker/setup-qemu-action@v2
+      - uses: docker/setup-buildx-action@v2
+      - uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ env.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      - uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: "./tools/container/Dockerfile"
+          push: ${{ github.ref_type == 'tag' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,5 +1,20 @@
 # Change Log
 
+## v1.0.2 (Nov 28, 2022)
+
+Bugfixes:
+* Fix `Timer` to use a monotonic clock instead of system time. This ensures the `Timer` will correctly measure the elapsed time when the system time changes.
+* Use `std::condition_variable::wait_until` instead of `wait_for` to avoid the [bug](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=41861) when `wait_for` uses system time.
+* Fix extended id not working with cloud.
+* Handle `SIGTERM` signal. Now when stopping the agent with `systemctl` or `kill` without additional args, it should gracefully shutdown.
+* Fix bug in canigen.py when signal offset is greater than zero.
+
+Improvements:
+* Pass `signalIDsToCollect` to `CANDecoder` by reference. This was causing unnecessary allocations/deallocations, impacting the performance on high load.
+* Add binary distribution of executables and container images built using GitHub actions.
+* Add support for DBC files with the same signal name in different CAN messages to cloud demo script.
+* Improve CERT-CPP compliance.
+
 ## v1.0.1 (Nov 3, 2022)
 License Update:
 * License changed from Amazon Software License 1.0 to Apache License Version 2.0

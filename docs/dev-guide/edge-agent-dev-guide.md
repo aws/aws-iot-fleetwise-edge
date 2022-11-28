@@ -76,7 +76,7 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
    The AWS IoT FleetWise Cloud demo script performs the following:
 
    - Registers your AWS account with AWS IoT FleetWise, if not already registered
-   - Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and secondly based on the the DBC file `hscan.dbc` to add CAN signals in a flat signal list
+   - Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list
    - Creates a model manifest that references the signal catalog with all of the OBD and DBC signals
    - Activates the model manifest
    - Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for decoding OBD signals from the network interfaces defined in `network-interfaces.json`
@@ -189,10 +189,11 @@ An Ubuntu 18.04 development machine with 200GB free disk space will be required.
 
 1. Install the AWS IoT FleetWise Edge Agent dependencies
 
-   1. `install-deps-native.sh` — installs the following Ubuntu packages:
+  Commands below will:
+   1. Install the following Ubuntu packages:
       `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`. Additionally it installs the following: `jsoncpp protobuf aws-sdk-cpp`
-   1. `install-socketcan.sh` — installs the following Ubuntu packages: `build-essential dkms can-utils git linux-modules-extra-aws`. Additionally it installs the following: `can-isotp`. It also installs a systemd service called `setup-socketcan` that brings up the virtual SocketCAN interface `vcan0` at startup.
-   1. `install-cansim.sh` — installs the following Ubuntu packages: `python3.7 python3-setuptools curl`. It then installs Python PIP for Python 3.7 and the following PIP packages: `wrapt cantools prompt_toolkit python-can can-isotp matplotlib`. It also installs a systemd service called `cansim` that periodically transmits data on the virtual SocketCAN bus `vcan0` to simulate vehicle data.
+   1. Install the following Ubuntu packages: `build-essential dkms can-utils git linux-modules-extra-aws`. Additionally it installs the following: `can-isotp`. It also installs a systemd service called `setup-socketcan` that brings up the virtual SocketCAN interface `vcan0` at startup.
+   1. Install the following Ubuntu packages: `python3.7 python3-setuptools curl`. It then installs Python PIP for Python 3.7 and the following PIP packages: `wrapt cantools prompt_toolkit python-can can-isotp matplotlib`. It also installs a systemd service called `cansim` that periodically transmits data on the virtual SocketCAN bus `vcan0` to simulate vehicle data.
 
    ```bash
    sudo -H ./tools/install-deps-native.sh \
@@ -243,7 +244,7 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
 
 1. Run the following _on the development machine_ to install the dependencies of the AWS IoT FleetWise Cloud demo script and add AWS IoT FleetWise commands to the AWS CLI:
 
-   1. `install-deps.sh` — installs the following Ubuntu packages: `python3.7 python3-setuptools curl`. It then installs Python PIP for Python 3.7 and the following PIP packages: `wrapt plotly pandas cantools`
+   1. Following command installs the following Ubuntu packages: `python3.7 python3-setuptools curl`. It then installs Python PIP for Python 3.7 and the following PIP packages: `wrapt plotly pandas cantools`
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
@@ -274,7 +275,7 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
 
    1. The demo script:
       1. Registers your AWS account with AWS IoT FleetWise, if not already registered
-      1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and secondly based on the the DBC file `hscan.dbc` to add CAN signals in a flat signal list
+      1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list
       1. Creates a vehicle model (model manifest) that references the signal catalog with all of the OBD and DBC signals
       1. Activates the vehicle model
       1. Creates a decoder manifest linked to the vehicle model using `obd-decoders.json` for decoding OBD signals from the network interfaces defined in `network-interfaces.json`
@@ -312,6 +313,19 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
    ```bash
    ./demo.sh --vehicle-name fwdemo-ec2 --campaign-file campaign-obd-heartbeat.json --region eu-central-1
    ```
+
+1. Run the following _on the development machine_ to import your custom DBC file. You also have to provide your custom campaign file. There is no support of simulation of custom signals so you have to test data collection with the real vehicle or custom simulator.  
+
+   ```bash
+   ./demo.sh --vehicle-name fwdemo-ec2 --dbc-file <DBC_FILE> --campaign-file <CAMPAIGN_FILE>
+   ```
+
+   Similarly, if you chose to deploy the ‘heartbeat’ campaign that collects OBD data from an AWS IoT thing created in in Europe (Frankfurt), you must configure `--region`:
+
+   ```bash
+   ./demo.sh --vehicle-name fwdemo-ec2 --dbc-file <DBC_FILE> --campaign-file <CAMPAIGN_FILE> --region eu-central-1
+   ```
+
 
 ## Getting started with AWS IoT FleetWise Edge Agent on NXP S32G
 
@@ -1534,10 +1548,7 @@ The following documents or websites provide more information about AWS IoT Fleet
     {
       "obdInterface": {
         "interfaceName": "vcan0",
-        "requestMessageId": 2015,
         "obdStandard": "J1979",
-        "useExtendedIds": false,
-        "hasTransmissionEcu": true,
         "pidRequestIntervalSeconds": 0,
         "dtcRequestIntervalSeconds": 0
       },

@@ -58,8 +58,11 @@ PayloadManager::storeData( const std::uint8_t *buf,
     if ( collectionSchemeParams.persist )
     {
         mLogger.trace( "PayloadManager::storeData", "The schema activates data persistency" );
-
-        std::string payload( reinterpret_cast<const char *>( buf ), size );
+        std::string payload;
+        if ( buf != nullptr )
+        {
+            payload.assign( reinterpret_cast<const char *>( buf ), size );
+        }
         std::string compressedData;
         // if compression was not specified in the collectionScheme, DCSender did not compress
         // compress it anyway for storage

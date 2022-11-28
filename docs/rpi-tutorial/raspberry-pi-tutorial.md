@@ -58,7 +58,11 @@ Amazon.
      && sudo apt upgrade -y \
      && sudo apt install -y unzip
    ```
-1. Run `sudo nano /boot/firmware/usercfg.txt` and add the following lines to enable the CAN hat:
+1. Run 
+   ```
+   sudo nano /boot/firmware/usercfg.txt
+   ``` 
+   and add the following lines to enable the CAN hat:
    ```bash
    dtparam=spi=on
    dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=23
@@ -102,7 +106,7 @@ processor present in the Raspberry Pi.
      && cd ~/aws-iot-fleetwise-edge
    ```
 
-1. Install the AWS IoT FleetWise Edge Agent dependencies. The command `install-deps-cross-arm64.sh` installs the following Ubuntu packages for cross-compiling the Edge Agent for ARM 64-bit:
+1. Install the AWS IoT FleetWise Edge Agent dependencies. The command below installs the following Ubuntu packages for cross-compiling the Edge Agent for ARM 64-bit:
 
    `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`.
 
@@ -175,8 +179,11 @@ The AWS IoT FleetWise Edge Agent binary and its configuration files are packaged
    ```
    sudo -H ~/aws-iot-fleetwise-deploy/tools/install-socketcan.sh
    ```
-1. Run `sudo nano /usr/local/bin/setup-socketcan.sh` and add the following lines to bring up the
-    `can0` and `can1` interfaces at startup:
+1. Run 
+   ```
+   sudo nano /usr/local/bin/setup-socketcan.sh
+   ```
+   and add the following lines to bring up the `can0` and `can1` interfaces at startup:
    ```
    ip link set up can0 txqueuelen 1000 type can bitrate 500000 restart-ms 100
    ip link set up can1 txqueuelen 1000 type can bitrate 500000 restart-ms 100
@@ -245,8 +252,3 @@ The AWS IoT FleetWise Edge Agent binary and its configuration files are packaged
 
 1. To explore the collected data, click and drag on the graph to zoom in. Alternatively, if your AWS account is enrolled with QuickSight or Amazon Managed Grafana, you can use them to browse the data from Amazon Timestream directly.
 
-**Note:**
-* If you can't collect OBD data from the vehicle, it's possible the vehicle uses extended
-CAN identifiers for diagnostic communication. In this case, SSH to the Raspberry Pi and edit the file
-`/etc/aws-iot-fleetwise/config-0.json`, changing the key `useExtendedIds` to `true`. Restart AWS IoT
-FleetWise Edge Agent by running `sudo systemctl restart fwe@0` and try running the demo script again.

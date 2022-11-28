@@ -50,7 +50,6 @@ apt install -y \
     wget \
     curl \
     zlib1g-dev:armhf \
-    libcurl4-openssl-dev:armhf \
     libsnappy-dev:armhf
 
 mkdir -p deps-cross-armhf && cd deps-cross-armhf
@@ -85,7 +84,6 @@ if [ ! -d protobuf-21.7 ]; then
 fi
 make install -j`nproc` -C protobuf-21.7/build
 make install -j`nproc` -C protobuf-21.7/build_armhf
-ldconfig
 
 if [ ! -d can-isotp ]; then
     git clone https://github.com/hartkopp/can-isotp.git
@@ -95,15 +93,30 @@ if [ ! -d can-isotp ]; then
 fi
 cp can-isotp/include/uapi/linux/can/isotp.h /usr/include/linux/can
 
+if [ ! -d curl-7.86.0 ]; then
+    wget -q https://github.com/curl/curl/releases/download/curl-7_86_0/curl-7.86.0.tar.gz
+    tar -zxf curl-7.86.0.tar.gz
+    cd curl-7.86.0
+    mkdir build && cd build
+    LDFLAGS="-static" PKG_CONFIG="pkg-config --static" CC=arm-linux-gnueabihf-gcc ../configure \
+        --disable-shared --enable-static --disable-ldap --enable-ipv6 --with-ssl --disable-unix-sockets \
+        --disable-rtsp --host=arm-linux --prefix=/usr/local/arm-linux-gnueabihf
+    cd ../..
+fi
+make install -j`nproc` -C curl-7.86.0/build V=1 LDFLAGS="-static"
+
 if [ ! -d aws-sdk-cpp ]; then
     git clone -b 1.9.253 --recursive https://github.com/aws/aws-sdk-cpp.git
     cd aws-sdk-cpp
     mkdir build && cd build
     cmake \
+        -DENABLE_TESTING=OFF \
         -DBUILD_SHARED_LIBS=OFF \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_ONLY='s3-crt;iot' \
         -DAWS_CUSTOM_MEMORY_MANAGEMENT=ON \
+        -DZLIB_LIBRARY=/usr/lib/arm-linux-gnueabihf/libz.a \
+        -DCURL_LIBRARY=/usr/local/arm-linux-gnueabihf/lib/libcurl.a \
         -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
         -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
         ..
@@ -136,8 +149,6 @@ if [ ! -d benchmark ]; then
     cd ../.. 
 fi
 make install -j`nproc` -C benchmark/build
-
-sudo ldconfig
 
 # AWS IoT FleetWise Edge camera support requires Fast-DDS and its dependencies:
 if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
@@ -214,3 +225,5 @@ if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
     cp Fast-DDS-Gen/share/fastddsgen/java/fastddsgen.jar /usr/local/share/fastddsgen/java
     cp Fast-DDS-Gen/scripts/fastddsgen /usr/local/bin
 fi
+
+ldconfig

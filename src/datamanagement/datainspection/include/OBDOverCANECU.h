@@ -122,8 +122,10 @@ private:
     bool receiveSupportedPIDs( const SID sid, SupportedPIDs &supportedPIDs );
 
     // Request a set of PIDs from one ECU
-    void requestReceivePIDs(
-        size_t range, bool isRangeCountPositive, const SID sid, const SupportedPIDs &pids, EmissionInfo &info );
+    void requestReceivePIDs( SupportedPIDs::iterator &pidItr,
+                             const SID sid,
+                             const SupportedPIDs &pids,
+                             EmissionInfo &info );
     bool requestPIDs( const SID sid, const std::vector<PID> &pids );
     bool receivePIDs( const SID sid, const std::vector<PID> &pids, EmissionInfo &info );
 

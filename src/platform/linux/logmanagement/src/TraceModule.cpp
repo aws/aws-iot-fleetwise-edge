@@ -283,13 +283,13 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
     for ( auto i = 0; i < toUType( TraceVariable::TRACE_VARIABLE_SIZE ); i++ )
     {
         auto &v = mVariableData[i];
-        profiler->setMetric( std::string( "variableMaxSinceStartup_" ) +
-                                 getVariableName( static_cast<TraceVariable>( i ) ) + std::string( "_id" ) +
+        auto variableNamePtr = getVariableName( static_cast<TraceVariable>( i ) );
+        auto variableName = variableNamePtr != nullptr ? variableNamePtr : "Unknown variable name";
+        profiler->setMetric( std::string( "variableMaxSinceStartup_" ) + variableName + std::string( "_id" ) +
                                  std::to_string( i ),
                              static_cast<double>( v.mMaxValue ),
                              "Count" );
-        profiler->setMetric( std::string( "variableMaxSinceLast_" ) +
-                                 getVariableName( static_cast<TraceVariable>( i ) ) + std::string( "_id" ) +
+        profiler->setMetric( std::string( "variableMaxSinceLast_" ) + variableName + std::string( "_id" ) +
                                  std::to_string( i ),
                              static_cast<double>( v.mMaxValueAllTime ),
                              "Count" );
@@ -297,13 +297,14 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
     for ( auto i = 0; i < toUType( TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE ); i++ )
     {
         auto &v = mAtomicVariableData[i];
-        profiler->setMetric( ( std::string( "variableMaxSinceStartup_atomic_" ) +
-                               getAtomicVariableName( static_cast<TraceAtomicVariable>( i ) ) ) +
+        auto atomicVariableNamePtr = getAtomicVariableName( static_cast<TraceAtomicVariable>( i ) );
+        auto atomicVariableName =
+            atomicVariableNamePtr != nullptr ? atomicVariableNamePtr : "Unknown atomic variable name";
+        profiler->setMetric( std::string( "variableMaxSinceStartup_atomic_" ) + atomicVariableName +
                                  std::string( "_id" ) + std::to_string( i ),
                              static_cast<double>( v.mMaxValueAllTime ),
                              "Count" );
-        profiler->setMetric( std::string( "variableMaxSinceLast_atomic_" ) +
-                                 getAtomicVariableName( static_cast<TraceAtomicVariable>( i ) ) + std::string( "_id" ) +
+        profiler->setMetric( std::string( "variableMaxSinceLast_atomic_" ) + atomicVariableName + std::string( "_id" ) +
                                  std::to_string( i ),
                              static_cast<double>( v.mMaxValue ),
                              "Count" );
@@ -311,22 +312,21 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
     for ( auto i = 0; i < toUType( TraceSection::TRACE_SECTION_SIZE ); i++ )
     {
         auto &v = mSectionData[i];
-        profiler->setMetric( std::string( "sectionAvgSinceStartup_" ) +
-                                 getSectionName( static_cast<TraceSection>( i ) ) + std::string( "_id" ) +
+        auto sectionNamePtr = getSectionName( static_cast<TraceSection>( i ) );
+        auto sectionName = sectionNamePtr != nullptr ? sectionNamePtr : "Unknown section name";
+        profiler->setMetric( std::string( "sectionAvgSinceStartup_" ) + sectionName + std::string( "_id" ) +
                                  std::to_string( i ),
                              ( v.mHitCounter == 0 ? 0 : v.mTimeSpentSum / v.mHitCounter ),
                              "Seconds" );
-        profiler->setMetric( std::string( "sectionMaxSinceStartup_" ) +
-                                 getSectionName( static_cast<TraceSection>( i ) ) + std::string( "_id" ) +
+        profiler->setMetric( std::string( "sectionMaxSinceStartup_" ) + sectionName + std::string( "_id" ) +
                                  std::to_string( i ),
                              v.mMaxSpentAllTime,
                              "Seconds" );
-        profiler->setMetric( std::string( "sectionMaxSinceLast_" ) + getSectionName( static_cast<TraceSection>( i ) ) +
-                                 std::string( "_id" ) + std::to_string( i ),
+        profiler->setMetric( std::string( "sectionMaxSinceLast_" ) + sectionName + std::string( "_id" ) +
+                                 std::to_string( i ),
                              v.mMaxSpent,
                              "Seconds" );
-        profiler->setMetric( std::string( "sectionCountSinceStartup_" ) +
-                                 getSectionName( static_cast<TraceSection>( i ) ) + std::string( "_id" ) +
+        profiler->setMetric( std::string( "sectionCountSinceStartup_" ) + sectionName + std::string( "_id" ) +
                                  std::to_string( i ),
                              v.mHitCounter,
                              "Seconds" );
@@ -340,10 +340,11 @@ TraceModule::print()
     for ( auto i = 0; i < toUType( TraceVariable::TRACE_VARIABLE_SIZE ); i++ )
     {
         auto &v = mVariableData[i];
+        auto variableNamePtr = getVariableName( static_cast<TraceVariable>( i ) );
+        auto variableName = variableNamePtr != nullptr ? variableNamePtr : "Unknown variable name";
         mLogger.trace( "TraceModule::print",
-                       std::string{ " TraceModule-ConsoleLogging-Variable '" } +
-                           getVariableName( static_cast<TraceVariable>( i ) ) + "' [" + std::to_string( i ) +
-                           "] current value: [" + std::to_string( v.mCurrentValue ) +
+                       std::string{ " TraceModule-ConsoleLogging-Variable '" } + variableName + "' [" +
+                           std::to_string( i ) + "] current value: [" + std::to_string( v.mCurrentValue ) +
                            "] max value since last print: "
                            "[" +
                            std::to_string( v.mMaxValue ) + "] overall max value: [" +
@@ -352,9 +353,11 @@ TraceModule::print()
     for ( auto i = 0; i < toUType( TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE ); i++ )
     {
         auto &v = mAtomicVariableData[i];
+        auto atomicVariableNamePtr = getAtomicVariableName( static_cast<TraceAtomicVariable>( i ) );
+        auto atomicVariableName =
+            atomicVariableNamePtr != nullptr ? atomicVariableNamePtr : "Unknown atomic variable name";
         mLogger.trace( "TraceModule::print",
-                       std::string{ " TraceModule-ConsoleLogging-TraceAtomicVariable '" } +
-                           getAtomicVariableName( static_cast<TraceAtomicVariable>( i ) ) + "' [" +
+                       std::string{ " TraceModule-ConsoleLogging-TraceAtomicVariable '" } + atomicVariableName + "' [" +
                            std::to_string( i ) + "] current value: [" + std::to_string( v.mCurrentValue.load() ) +
                            "] max value since "
                            "last print: [" +
@@ -365,10 +368,11 @@ TraceModule::print()
     {
         auto &v = mSectionData[i];
         auto currentHitCounter = v.mHitCounter - ( v.mCurrentlyActive ? 0 : 1 );
+        auto sectionNamePtr = getSectionName( static_cast<TraceSection>( i ) );
+        auto sectionName = sectionNamePtr != nullptr ? sectionNamePtr : "Unknown section name";
         mLogger.trace( "TraceModule::print",
-                       std::string{ " TraceModule-ConsoleLogging-Section '" } +
-                           getSectionName( static_cast<TraceSection>( i ) ) + "' [" + std::to_string( i ) +
-                           "] times section executed: [" + std::to_string( v.mHitCounter ) +
+                       std::string{ " TraceModule-ConsoleLogging-Section '" } + sectionName + "' [" +
+                           std::to_string( i ) + "] times section executed: [" + std::to_string( v.mHitCounter ) +
                            "] avg execution time: "
                            "[" +
                            std::to_string( ( v.mHitCounter == 0 ? 0 : v.mTimeSpentSum / v.mHitCounter ) ) +

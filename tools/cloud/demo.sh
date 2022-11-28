@@ -13,7 +13,10 @@ DEFAULT_VEHICLE_NAME="fwdemo"
 VEHICLE_NAME=""
 TIMESTREAM_DB_NAME="IoTFleetWiseDB-${TIMESTAMP}"
 TIMESTREAM_TABLE_NAME="VehicleDataTable"
-CAMPAIGN_FILE="campaign-brake-event.json"
+CAMPAIGN_FILE=""
+DEFAULT_CAMPAIGN_FILE="campaign-brake-event.json"
+DBC_FILE=""
+DEFAULT_DBC_FILE="hscan.dbc"
 CLEAN_UP=false
 FLEET_SIZE=1
 BATCH_SIZE=$((`nproc`*4))
@@ -36,6 +39,9 @@ parse_args() {
         --campaign-file)
             CAMPAIGN_FILE=$2
             ;;
+        --dbc-file)
+            DBC_FILE=$2
+            ;;
         --endpoint-url)
             ENDPOINT_URL=$2
             ;;
@@ -47,11 +53,12 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --vehicle-name <ID>     Vehicle name"
+            echo "  --vehicle-name <NAME>   Vehicle name"
             echo "  --fleet-size <SIZE>     Size of fleet, default: ${FLEET_SIZE}. When greater than 1,"
             echo "                          the instance number will be appended to each"
             echo "                          Vehicle name after a '-', e.g. ${DEFAULT_VEHICLE_NAME}-42"
-            echo "  --campaign-file <FILE>  Campaign JSON file, default: ${CAMPAIGN_FILE}"
+            echo "  --campaign-file <FILE>  Campaign JSON file, default: ${DEFAULT_CAMPAIGN_FILE}"
+            echo "  --dbc-file <FILE>       DBC file, default: ${DEFAULT_DBC_FILE}"
             echo "  --clean-up              Delete created resources"
             echo "  --endpoint-url <URL>    The endpoint URL used for AWS CLI calls"
             echo "  --region <REGION>       The region used for AWS CLI calls, default: ${REGION}"
@@ -83,6 +90,19 @@ if [ "${VEHICLE_NAME}" == "" ]; then
     if [ "${VEHICLE_NAME}" == "" ]; then
         VEHICLE_NAME=${DEFAULT_VEHICLE_NAME}
     fi
+fi
+
+if [ "${DBC_FILE}" != "" ] && [ "${CAMPAIGN_FILE}" == "" ]; then
+    echo -n "Enter campaign file name: "
+    read CAMPAIGN_FILE
+    if [ "${CAMPAIGN_FILE}" == "" ]; then
+        echo "Error: Please provide campaign file name for custom DBC file" >&2
+        exit -1
+    fi
+fi
+
+if [ "${CAMPAIGN_FILE}" == "" ]; then
+    CAMPAIGN_FILE=${DEFAULT_CAMPAIGN_FILE}
 fi
 
 NAME="${VEHICLE_NAME}-${TIMESTAMP}"
@@ -238,7 +258,11 @@ fi
 
 VEHICLE_NODE=`cat vehicle-node.json`
 OBD_NODES=`cat obd-nodes.json`
-DBC_NODES=`python3.7 dbc-to-nodes.py hscan.dbc`
+if [ "${DBC_FILE}" == "" ]; then
+    DBC_NODES=`python3.7 dbc-to-nodes.py ${DEFAULT_DBC_FILE}`
+else
+    DBC_NODES=`python3.7 dbc-to-nodes.py ${DBC_FILE}`
+fi
 
 echo "Checking for existing signal catalog..."
 SIGNAL_CATALOG_LIST=`aws iotfleetwise list-signal-catalogs \
@@ -277,7 +301,7 @@ if [ ${SIGNAL_CATALOG_COUNT} == 0 ]; then
             "attribute": {
                 "dataType": "STRING",
                 "description": "Color",
-                "fullyQualifiedName": "fwdemo.Color",
+                "fullyQualifiedName": "Vehicle.Color",
                 "defaultValue":"Red"
             }}
         ]' | jq -r .arn
@@ -386,22 +410,25 @@ DECODER_MANIFEST_ARN=`aws iotfleetwise create-decoder-manifest \
 echo ${DECODER_MANIFEST_ARN}
 
 echo "Adding DBC signals to decoder manifest..."
-if [[ $(uname -s) == 'Darwin'* ]]; then
-  DBC=`cat hscan.dbc | base64`
+if [ "${DBC_FILE}" == "" ]; then
+    DBC=`cat ${DEFAULT_DBC_FILE} | base64 -w0`
+    # Make map of node name to DBC signal name, i.e. {"Vehicle.SignalName":"SignalName"...}
+    NODE_TO_DBC_MAP=`echo ${DBC_NODES} | jq '.[].sensor.fullyQualifiedName//""|match("Vehicle\\\\.\\\\w+\\\\.(.+)")|{(.captures[0].string):.string}'|jq -s add`
+    NETWORK_FILE_DEFINITIONS=`echo [] \
+        | jq .[0].canDbc.signalsMap="${NODE_TO_DBC_MAP}" \
+        | jq .[0].canDbc.networkInterface="\"1\"" \
+        | jq .[0].canDbc.canDbcFiles[0]="\"${DBC}\""`
+    aws iotfleetwise import-decoder-manifest \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${NAME}-decoder-manifest \
+        --network-file-definitions "${NETWORK_FILE_DEFINITIONS}" | jq -r .arn
 else
-  DBC=`cat hscan.dbc | base64 -w0`
+    SIGNAL_DECODERS=`python3.7 dbc-to-json.py ${DBC_FILE}`
+    aws iotfleetwise update-decoder-manifest \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${NAME}-decoder-manifest \
+        --signal-decoders-to-add "${SIGNAL_DECODERS}" | jq -r .arn
 fi
-
-# Make map of node name to DBC signal name, i.e. {"Vehicle.SignalName":"SignalName"...}
-NODE_TO_DBC_MAP=`echo ${DBC_NODES} | jq '.[].sensor.fullyQualifiedName//""|match("Vehicle\\\\.(.+)")|{(.captures[0].string):.string}'|jq -s add`
-NETWORK_FILE_DEFINITIONS=`echo [] \
-    | jq .[0].canDbc.signalsMap="${NODE_TO_DBC_MAP}" \
-    | jq .[0].canDbc.networkInterface="\"1\"" \
-    | jq .[0].canDbc.canDbcFiles[0]="\"${DBC}\""`
-aws iotfleetwise import-decoder-manifest \
-    ${ENDPOINT_URL_OPTION} --region ${REGION} \
-    --name ${NAME}-decoder-manifest \
-    --network-file-definitions "${NETWORK_FILE_DEFINITIONS}" | jq -r .arn
 
 echo "Activating decoder manifest..."
 aws iotfleetwise update-decoder-manifest \
@@ -573,15 +600,17 @@ aws timestream-query query \
         AND time between ago(1m) and now() ORDER BY time ASC" \
     > ${NAME}-timestream-result.json
 
-echo "Converting to HTML..."
-OUTPUT_FILE_HTML="${NAME}.html"
-python3.7 timestream-to-html.py ${NAME}-timestream-result.json ${OUTPUT_FILE_HTML}
+if [ "${DBC_FILE}" == "" ]; then
+    echo "Converting to HTML..."
+    OUTPUT_FILE_HTML="${NAME}.html"
+    python3.7 timestream-to-html.py ${NAME}-timestream-result.json ${OUTPUT_FILE_HTML}
 
-echo "You can now view the collected data."
-echo "----------------------------------"
-echo "| Collected data in HTML format: |"
-echo "----------------------------------"
-echo `pwd`/${OUTPUT_FILE_HTML}
+    echo "You can now view the collected data."
+    echo "----------------------------------"
+    echo "| Collected data in HTML format: |"
+    echo "----------------------------------"
+    echo `pwd`/${OUTPUT_FILE_HTML}
+fi
 
 if [ ${CLEAN_UP} == true ]; then
     ./clean-up.sh \

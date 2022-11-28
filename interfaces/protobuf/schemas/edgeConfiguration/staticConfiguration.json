@@ -87,10 +87,6 @@
                             "type": "string",
                             "description": "CAN Interface Name where the OBD stack on the ECU is running"
                         },
-                        "requestMessageId": {
-                            "type": "string",
-                            "description": "CAN request message id used for querying OBD signals. Example, 7DF is used in J1979"
-                        },
                         "obdStandard": {
                             "type": "string",
                             "description": "OBD Standard (eg. J1979 or Enhanced (for advanced standards))"
@@ -103,23 +99,17 @@
                             "type": "integer",
                             "description": "Interval  used to schedule DTC requests (in seconds)"
                         },
-                        "useExtendedIds": {
+                        "broadcastRequests": {
                             "type": "boolean",
-                            "description": "Flag to specify use of Extended CAN IDs on Tx and Rx."
-                        },
-                        "hasTransmissionEcu": {
-                            "type": "boolean",
-                            "description": "specifies whether the vehicle has a Transmission ECU"
+                            "description": "Specifies whether OBD requests should be sent in broadcast (functional) mode, rather than the unicast (physical) mode"
                         }
                     },
                     "required": [
                         "interfaceName",
-                        "requestMessageId",
                         "obdStandard",
                         "pidRequestIntervalSeconds",
                         "dtcRequestIntervalSeconds",
-                        "useExtendedIds",
-                        "hasTransmissionEcu"
+                        "broadcastRequests"
                     ]
                 }
             }

@@ -6,6 +6,7 @@
 #include "TraceModule.h"
 #include <boost/lockfree/spsc_queue.hpp>
 #include <cstring>
+#include <linux/can.h>
 #include <sstream>
 
 namespace Aws
@@ -153,6 +154,35 @@ CANDataConsumer::shouldSleep() const
     return mShouldSleep.load( std::memory_order_relaxed );
 }
 
+bool
+CANDataConsumer::findDecoderMethod( uint32_t &messageId,
+                                    const CANDecoderDictionary::CANMsgDecoderMethodType &decoderMethod,
+                                    CANDecodedMessage &decodedMessage,
+                                    CANMessageDecoderMethod &currentMessageDecoderMethod )
+{
+    auto outerMapIt = decoderMethod.find( mDataSourceID );
+    if ( outerMapIt != decoderMethod.cend() )
+    {
+        auto it = outerMapIt->second.find( messageId );
+
+        if ( it != outerMapIt->second.cend() )
+        {
+            currentMessageDecoderMethod = it->second;
+            return true;
+        }
+        it = outerMapIt->second.find( messageId & CAN_EFF_MASK );
+
+        if ( it != outerMapIt->second.cend() )
+        {
+            messageId = messageId & CAN_EFF_MASK;
+            currentMessageDecoderMethod = it->second;
+            decodedMessage.mFrameInfo.mFrameID = messageId;
+            return true;
+        }
+    }
+    return false;
+}
+
 void
 CANDataConsumer::doWork( void *data )
 {
@@ -205,24 +235,36 @@ CANDataConsumer::doWork( void *data )
             decodedMessage.mChannelIfName = consumer->mIfName;
             decodedMessage.mReceptionTime = message.getReceptionTimestamp();
             decodedMessage.mFrameInfo.mFrameID = static_cast<uint32_t>( message.getMessageID() );
-            decodedMessage.mFrameInfo.mFrameRawData.assign( message.getRawData().data(),
-                                                            message.getRawData().size() + message.getRawData().data() );
+
+            const auto messageRawData = message.getRawData().data();
+            if ( messageRawData != nullptr )
+            {
+                decodedMessage.mFrameInfo.mFrameRawData.assign( messageRawData,
+                                                                message.getRawData().size() + messageRawData );
+            }
             // get decoderMethod from the decoder dictionary
             const auto &decoderMethod = decoderDictPtr->canMessageDecoderMethod;
             // a set of signalID specifying which signal to collect
             const auto &signalIDsToCollect = decoderDictPtr->signalIDsToCollect;
+
             // check if this CAN message ID on this CAN Channel has the decoder method
-            if ( decoderMethod.find( consumer->mDataSourceID ) != decoderMethod.cend() &&
-                 decoderMethod.at( consumer->mDataSourceID ).find( static_cast<uint32_t>( message.getMessageID() ) ) !=
-                     decoderMethod.at( consumer->mDataSourceID ).cend() )
+            uint32_t messageId = static_cast<uint32_t>( message.getMessageID() );
+            CANMessageDecoderMethod currentMessageDecoderMethod;
+
+            // The value of messageId may be changed by the findDecoderMethod function. This is a
+            // workaround as the cloud as of now does not send extended id messages.
+            // If the decoder method for this message is not found in
+            // decoderMethod dictionary, we check for the same id without the MSB set.
+            // The message id which has a decoderMethod gets passed into messageId
+
+            bool hasDecoderMethod =
+                consumer->findDecoderMethod( messageId, decoderMethod, decodedMessage, currentMessageDecoderMethod );
+
+            if ( hasDecoderMethod )
             {
                 // format to be used for decoding
-                const auto &format = decoderMethod.at( consumer->mDataSourceID )
-                                         .at( static_cast<uint32_t>( message.getMessageID() ) )
-                                         .format;
-                const auto &collectType = decoderMethod.at( consumer->mDataSourceID )
-                                              .at( static_cast<uint32_t>( message.getMessageID() ) )
-                                              .collectType;
+                const auto &format = currentMessageDecoderMethod.format;
+                const auto &collectType = currentMessageDecoderMethod.collectType;
 
                 // Only used for TRACE log level logging
                 if ( collectType == CANMessageCollectType::RAW ||
@@ -232,7 +274,7 @@ CANDataConsumer::doWork( void *data )
                     bool found = false;
                     for ( auto &p : lastFrameIds )
                     {
-                        if ( p.first == static_cast<uint32_t>( message.getMessageID() ) )
+                        if ( p.first == messageId )
                         {
                             found = true;
                             p.second++;
@@ -246,8 +288,7 @@ CANDataConsumer::doWork( void *data )
                         {
                             lastFrameIdPos = 0;
                         }
-                        lastFrameIds[lastFrameIdPos] =
-                            std::pair<uint32_t, uint32_t>( static_cast<uint32_t>( message.getMessageID() ), 1 );
+                        lastFrameIds[lastFrameIdPos] = std::pair<uint32_t, uint32_t>( messageId, 1 );
                     }
                     processedFramesCounter++;
                 }
@@ -259,7 +300,7 @@ CANDataConsumer::doWork( void *data )
                 {
                     // prepare the raw CAN Frame
                     struct CollectedCanRawFrame canRawFrame;
-                    canRawFrame.frameID = static_cast<uint32_t>( message.getMessageID() );
+                    canRawFrame.frameID = messageId;
                     canRawFrame.channelId = consumer->mDataSourceID;
                     canRawFrame.receiveTime = message.getReceptionTimestamp();
                     // CollectedCanRawFrame receive up to 64 CAN Raw Bytes
@@ -284,7 +325,7 @@ CANDataConsumer::doWork( void *data )
                         // consumer->mLogger.trace( "CANDataConsumer::doWork",
                         //                             "Collect RAW CAN Frame ID: " +
                         //                                 std::to_string( static_cast<uint32_t>(
-                        //                                 message.getMessageID() ) ) );
+                        //                                 messageId ) ) );
                     }
                 }
                 // check if we want to decode can frame into signals and collect signals
@@ -327,10 +368,8 @@ CANDataConsumer::doWork( void *data )
                         else
                         {
                             // The decoding was not fully successful
-                            consumer->mLogger.warn(
-                                "CANDataConsumer::doWork",
-                                "CAN Frame " + std::to_string( static_cast<uint32_t>( message.getMessageID() ) ) +
-                                    " decoding failed! " );
+                            consumer->mLogger.warn( "CANDataConsumer::doWork",
+                                                    "CAN Frame " + std::to_string( messageId ) + " decoding failed! " );
                         }
                     }
                     else
@@ -339,8 +378,7 @@ CANDataConsumer::doWork( void *data )
                         consumer->mLogger.warn(
                             "CANDataConsumer::doWork",
                             "CANMessageFormat Invalid for format message id: " + std::to_string( format.mMessageID ) +
-                                " can message id: " +
-                                std::to_string( static_cast<uint32_t>( message.getMessageID() ) ) +
+                                " can message id: " + std::to_string( messageId ) +
                                 " on CAN Channel Id: " + std::to_string( consumer->mDataSourceID ) );
                     }
                 }

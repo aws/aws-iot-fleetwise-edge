@@ -48,7 +48,7 @@ install(
   FILES
   include/CollectionInspectionEngine.h
   include/CollectionInspectionWorkerThread.h
-  $<$<BOOL:${FWE_FEATURE_CAMERA}>:include/DataOverDDSModule.h>
+  $<$<BOOL:${FWE_FEATURE_CAMERA}>:${CMAKE_CURRENT_LIST_DIR}/include/DataOverDDSModule.h>
   include/DataReduction.h
   include/GeohashFunctionNode.h
   include/IActiveConditionProcessor.h
@@ -100,6 +100,7 @@ if(${BUILD_TESTING})
     get_filename_component(testName ${testSource} NAME_WE)
 
     add_executable(${testName} ${testSource})
+
     # Link to the project library and GTest main
     target_link_libraries(
       ${testName}

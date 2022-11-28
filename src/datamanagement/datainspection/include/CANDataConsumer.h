@@ -7,6 +7,7 @@
 
 #include "CANDecoder.h"
 #include "ClockHandler.h"
+#include "IDecoderDictionary.h"
 #include "IVehicleDataConsumer.h"
 #include "LoggingModule.h"
 #include "Signal.h"
@@ -79,6 +80,16 @@ private:
     bool shouldStop() const;
     // Intercepts sleep signals.
     bool shouldSleep() const;
+    /**
+     * @brief Finds whether there exists a decoder method for a message id or not
+     * If found, returns the method by reference
+     * messageId is an input-output parameter that has the correct value
+     * for the current message's id with either the MSB set or unset
+     */
+    bool findDecoderMethod( uint32_t &messageId,
+                            const CANDecoderDictionary::CANMsgDecoderMethodType &decoderMethod,
+                            CANDecodedMessage &decodedMessage,
+                            CANMessageDecoderMethod &currentMessageDecoderMethod );
     // Main work function. consumes messages from the channel Circular buffer.
     // Decodes the messages and puts the results in the output buffer.
     static void doWork( void *data );

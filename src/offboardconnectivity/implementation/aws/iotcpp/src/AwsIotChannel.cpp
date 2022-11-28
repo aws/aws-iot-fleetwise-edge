@@ -96,9 +96,11 @@ AwsIotChannel::subscribe()
         mSubscribed = false;
         if ( errorCode != 0 )
         {
+            auto errString = aws_error_debug_str( errorCode );
             TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
             mLogger.error( "AwsIotChannel::subscribeTopic", "Subscribe failed with error" );
-            mLogger.error( "AwsIotChannel::subscribeTopic", aws_error_debug_str( errorCode ) );
+            mLogger.error( "AwsIotChannel::subscribeTopic",
+                           errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
         }
         else
         {
@@ -227,8 +229,9 @@ AwsIotChannel::send( const std::uint8_t *buf, size_t size, struct CollectionSche
             }
             else
             {
-                mLogger.error( "AwsIotChannel::send",
-                               std::string( "Operation failed with error" ) + aws_error_debug_str( errorCode ) );
+                auto errSting = aws_error_debug_str( errorCode );
+                std::string errLog = errSting != nullptr ? std::string( errSting ) : std::string( "Unknown error" );
+                mLogger.error( "AwsIotChannel::send", std::string( "Operation failed with error" ) + errLog );
             }
         };
     connection->Publish( mTopicName.c_str(), Mqtt::QOS::AWS_MQTT_QOS_AT_MOST_ONCE, false, payload, onPublishComplete );
