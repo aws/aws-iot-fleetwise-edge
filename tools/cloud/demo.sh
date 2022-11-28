@@ -168,7 +168,6 @@ fi
 if [ "${ACCOUNT_STATUS}" == "REGISTRATION_SUCCESS" ]; then
     echo "Account is already registered"
     TIMESTREAM_DB_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamDatabaseName`
-    SERVICE_ROLE=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .iamRegistrationResponse.roleArn | cut -d / -f 2`
 
     echo "Checking if Timestream database exists..."
     if TIMESTREAM_INFO=`aws timestream-write describe-database \
@@ -179,18 +178,6 @@ if [ "${ACCOUNT_STATUS}" == "REGISTRATION_SUCCESS" ]; then
         exit -1
     else
         echo "Error: Timestream database no longer exists. Try running script again with option --force-registration" >&2
-        exit -1
-    fi
-
-    echo "Checking if service role exists..."
-    if SERVICE_ROLE_INFO=`aws iam get-role --role-name ${SERVICE_ROLE} 2>&1`; then
-        SERVICE_ROLE_ARN=`echo ${SERVICE_ROLE_INFO} | jq -r .Role.Arn`
-        echo ${SERVICE_ROLE_ARN}
-    elif ! echo ${SERVICE_ROLE_INFO} | grep -q "NoSuchEntity"; then
-        echo ${SERVICE_ROLE_INFO}
-        exit -1
-    else
-        echo "Error: Service role no longer exists. Try running script again with option --force-registration" >&2
         exit -1
     fi
 elif [ "${ACCOUNT_STATUS}" == "REGISTRATION_PENDING" ]; then
