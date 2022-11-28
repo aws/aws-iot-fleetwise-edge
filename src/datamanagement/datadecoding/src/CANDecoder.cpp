@@ -18,7 +18,7 @@ bool
 CANDecoder::decodeCANMessage( const uint8_t *frameData,
                               size_t frameSize,
                               const CANMessageFormat &format,
-                              const std::unordered_set<uint32_t> signalIDsToCollect,
+                              const std::unordered_set<uint32_t> &signalIDsToCollect,
                               CANDecodedMessage &decodedMessage )
 {
     uint8_t errorCounter = 0;

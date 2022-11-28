@@ -122,19 +122,12 @@ OBDOverCANECU::requestReceiveEmissionPIDs( const SID sid )
     // and wait for the response.
     if ( getRequestedPIDs( sid, pids ) && !pids.empty() )
     {
-        size_t rangeCount = pids.size() / MAX_PID_RANGE;
-        size_t rangeLeft = pids.size() % MAX_PID_RANGE;
+        SupportedPIDs::iterator pidItr = pids.begin();
+        while ( pidItr != pids.end() )
+        {
+            requestReceivePIDs( pidItr, sid, pids, info );
+        }
 
-        while ( rangeCount > 0 )
-        {
-            requestReceivePIDs( rangeCount, true, sid, pids, info );
-            rangeCount--;
-        }
-        // request the remaining PIDs if any.
-        if ( rangeLeft > 0 )
-        {
-            requestReceivePIDs( rangeLeft, false, sid, pids, info );
-        }
         if ( !info.mPIDsToValues.empty() )
         {
             auto receptionTime = mClock->timeSinceEpochMs();
@@ -177,19 +170,15 @@ OBDOverCANECU::getDTCData( DTCInfo &dtcInfo )
 }
 
 void
-OBDOverCANECU::requestReceivePIDs(
-    size_t range, bool isRangeCountPositive, const SID sid, const SupportedPIDs &pids, EmissionInfo &info )
+OBDOverCANECU::requestReceivePIDs( SupportedPIDs::iterator &pidItr,
+                                   const SID sid,
+                                   const SupportedPIDs &pids,
+                                   EmissionInfo &info )
 {
     std::vector<PID> currPIDs;
-    if ( isRangeCountPositive )
+    while ( currPIDs.size() < MAX_PID_RANGE && pidItr != pids.end() )
     {
-        // start from the tail and walk backwards.
-        currPIDs = std::vector<PID>( pids.begin() + static_cast<uint32_t>( range - 1U ) * MAX_PID_RANGE,
-                                     pids.begin() + static_cast<uint32_t>( range ) * MAX_PID_RANGE );
-    }
-    else
-    {
-        currPIDs = std::vector<PID>( pids.end() - static_cast<uint32_t>( range ), pids.end() );
+        currPIDs.push_back( *pidItr++ );
     }
 
     if ( requestPIDs( sid, currPIDs ) )

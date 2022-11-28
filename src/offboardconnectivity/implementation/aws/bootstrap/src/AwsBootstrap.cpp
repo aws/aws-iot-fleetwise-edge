@@ -41,9 +41,9 @@ struct AwsBootstrap::Impl
             Aws::Crt::Io::EventLoopGroup eventLoopGroup( NUM_THREADS );
             if ( !eventLoopGroup )
             {
-                mLogger.error( "AwsBootstrap::Impl::Impl",
-                               "Event Loop Group Creation failed with error " +
-                                   std::string( Crt::ErrorDebugString( eventLoopGroup.LastError() ) ) );
+                auto errString = Crt::ErrorDebugString( eventLoopGroup.LastError() );
+                auto errLog = errString != nullptr ? std::string( errString ) : std::string( "Unknown error" );
+                mLogger.error( "AwsBootstrap::Impl::Impl", "Event Loop Group Creation failed with error " + errLog );
             }
             else
             {

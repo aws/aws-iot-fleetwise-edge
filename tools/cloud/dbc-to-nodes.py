@@ -6,24 +6,36 @@ import sys
 import cantools
 import json
 
+FQN_KEY = 'fullyQualifiedName'
+
 if len(sys.argv) < 2:
-    print("Usage: python3 "+sys.argv[0]+" <INPUT_DBC_FILE> [<OUTPUT_JSON_FILE>]")
+    print(
+        "Usage: python3 " +
+        sys.argv[0] +
+        " <INPUT_DBC_FILE> [<OUTPUT_JSON_FILE>]")
     exit(-1)
 
 db = cantools.database.load_file(sys.argv[1])
 
+vehicle_branch = {FQN_KEY: "Vehicle"}
 nodes = []
-signals = []
-for message in db.messages:
-    for signal in message.signals:
-        if signal.name in signals:
-            print(f"Signal {signal.name} occurs multiple times in the DBC file, only the first occurrence will be used")
-            continue
-        signals.append(signal.name)
 
+signals = {}
+for message in db.messages:
+    message_text = message.name if message.name else message.frame_id
+    message_branch = {FQN_KEY: f"{vehicle_branch[FQN_KEY]}.{message_text}"}
+    nodes.append({"branch": message_branch})
+    for signal in message.signals:
+        if message_text not in signals:
+            signals[message_text] = set()
+        if signal.name in signals[message_text]:
+            print(
+                f"Signal {signal.name} occurs multiple times in the message {message_text}, only the first occurrence will be used")
+            continue
+        signals[message_text].add(signal.name)
         if signal.choices and len(signal.choices) <= 2 \
-            and ((0 in signal.choices and str(signal.choices[0]).lower() == "false") \
-            or (1 in signal.choices and str(signal.choices[1]).lower() == "true")):
+            and ((0 in signal.choices and str(signal.choices[0]).lower() == "false")
+                 or (1 in signal.choices and str(signal.choices[1]).lower() == "true")):
             datatype = "BOOLEAN"
         elif signal.scale != 1 or signal.offset != 0 or signal.length > 64 or signal.is_float:
             datatype = "DOUBLE"
@@ -38,7 +50,7 @@ for message in db.messages:
         node = {
             "sensor": {
                 "dataType": datatype,
-                "fullyQualifiedName": "Vehicle."+signal.name,
+                FQN_KEY: f"{message_branch[FQN_KEY]}.{signal.name}",
             }
         }
         if signal.comment:

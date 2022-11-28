@@ -41,7 +41,7 @@ public:
     bool decodeCANMessage( const uint8_t *frameData,
                            size_t frameSize,
                            const CANMessageFormat &format,
-                           const std::unordered_set<SignalID> signalIDsToCollect,
+                           const std::unordered_set<SignalID> &signalIDsToCollect,
                            CANDecodedMessage &decodedMessage );
 
     /**

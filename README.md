@@ -78,21 +78,23 @@ See [SECURITY](./SECURITY.md) for more information
 Edge Agent Reference Implementation for AWS IoT FleetWise depends on the following open source libraries. Refer to the corresponding links for more information.
 
 * [AWS SDK for C++: v1.9.253](https://github.com/aws/aws-sdk-cpp)
-* [cURL: v7.58.0](https://github.com/curl/curl)
-* [GoogleTest version: release-1.10.0](https://github.com/google/googletest)
-* [Benchmark version: 1.6.1](https://github.com/google/benchmark)
-* [Protobuf version: 3.21.7](https://github.com/protocolbuffers/protobuf)
-* [Boost version 1.65.1](https://github.com/boostorg/boost)
-* [jsoncpp version 1.7.4](https://github.com/open-source-parsers/jsoncpp)
-* [Snappy version: 1.1.7](https://github.com/google/snappy)
+  * [Curl: v7.58.0](https://github.com/curl/curl)
+  * [OpenSSL: v1.1.1](https://github.com/openssl/openssl)
+  * [zlib: v1.2.11](https://github.com/madler/zlib)
+* [GoogleTest: v1.10.0](https://github.com/google/googletest)
+* [Google Benchmark: v1.6.1](https://github.com/google/benchmark)
+* [Protobuf: v3.21.7](https://github.com/protocolbuffers/protobuf)
+* [Boost: v1.65.1](https://github.com/boostorg/boost)
+* [JsonCpp: v1.7.4](https://github.com/open-source-parsers/jsoncpp)
+* [Snappy: v1.1.7](https://github.com/google/snappy)
 
 Optional: The following dependencies are only required when the experimental option `FWE_FEATURE_CAMERA` is enabled.
 
-* [Fast-DDS version: 2.3.3](https://github.com/eProsima/Fast-DDS.git)
-  * [Fast-CDR version: v1.0.21](https://github.com/eProsima/Fast-CDR.git)
-  * [Foonathan memory vendor version: v1.1.0](https://github.com/eProsima/foonathan_memory_vendor.git)
-  * [Foonathan memory version: v0.7](https://github.com/foonathan/memory)
-  * [tinyxml2 version: 6.0.0](https://github.com/leethomason/tinyxml2.git)
+* [Fast-DDS: v2.3.3](https://github.com/eProsima/Fast-DDS)
+  * [Fast-CDR: v1.0.21](https://github.com/eProsima/Fast-CDR)
+  * [Foonathan Memory Vendor: v1.1.0](https://github.com/eProsima/foonathan_memory_vendor)
+  * [Foonathan Memory: v0.7](https://github.com/foonathan/memory)
+  * [TinyXML-2: v6.0.0](https://github.com/leethomason/tinyxml2)
 
 See [LICENSE](./LICENSE) for more information.
 

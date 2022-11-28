@@ -4,15 +4,36 @@
 
 set -euo pipefail
 
-INPUT_CONFIG_FILE=""
-OUTPUT_CONFIG_FILE=""
-VEHICLE_NAME=""
-ENDPOINT_URL=""
-CAN_BUS0="vcan0"
-USE_EXTENDED_IDS=false
-HAS_TRANSMISSION_ECU=false
-PERSISTENCY_PATH="/var/aws-iot-fleetwise/"
-TOPIC_PREFIX="\$aws/iotfleetwise/"
+if [ -z "${INPUT_CONFIG_FILE+x}" ]; then
+    INPUT_CONFIG_FILE=""
+fi
+if [ -z "${OUTPUT_CONFIG_FILE+x}" ]; then
+    OUTPUT_CONFIG_FILE=""
+fi
+if [ -z "${CERTIFICATE_FILE+x}" ]; then
+    CERTIFICATE_FILE="/etc/aws-iot-fleetwise/certificate.pem"
+fi
+if [ -z "${PRIVATE_KEY_FILE+x}" ]; then
+    PRIVATE_KEY_FILE="/etc/aws-iot-fleetwise/private-key.key"
+fi
+if [ -z "${VEHICLE_NAME+x}" ]; then
+    VEHICLE_NAME=""
+fi
+if [ -z "${ENDPOINT_URL+x}" ]; then
+    ENDPOINT_URL=""
+fi
+if [ -z "${CAN_BUS0+x}" ]; then
+    CAN_BUS0="vcan0"
+fi
+if [ -z "${LOG_LEVEL+x}" ]; then
+    LOG_LEVEL="Info"
+fi
+if [ -z "${PERSISTENCY_PATH+x}" ]; then
+    PERSISTENCY_PATH="/var/aws-iot-fleetwise/"
+fi
+if [ -z "${TOPIC_PREFIX+x}" ]; then
+    TOPIC_PREFIX="\$aws/iotfleetwise/"
+fi
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -29,11 +50,11 @@ parse_args() {
         --endpoint-url)
             ENDPOINT_URL=$2
             ;;
-        --use-extended-ids)
-            USE_EXTENDED_IDS=true
+        --certificate-file)
+            CERTIFICATE_FILE=$2
             ;;
-        --has-transmission-ecu)
-            HAS_TRANSMISSION_ECU=true
+        --private-key-file)
+            PRIVATE_KEY_FILE=$2
             ;;
         --can-bus0)
             CAN_BUS0=$2
@@ -44,17 +65,21 @@ parse_args() {
         --topic-prefix)
             TOPIC_PREFIX=$2
             ;;
+        --log-level)
+            LOG_LEVEL=$2
+            ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --input-config-file <CONFIG_FILE>   Input JSON config file"
-            echo "  --output-config-file <CONFIG_FILE>  Output JSON config file"
-            echo "  --vehicle-name <ID>                 Vehicle name"
-            echo "  --endpoint-url <URL>                IoT Core MQTT endpoint URL"
-            echo "  --can-bus0 <BUS>                    CAN bus 0, default: ${CAN_BUS0}"
-            echo "  --use-extended-ids                  Use extended CAN IDs for diagnostic communication"
-            echo "  --has-transmission-ecu              Vehicle has automatic transmission"
-            echo "  --persistency-path <PATH>           Desired persistency path, default: ${PERSISTENCY_PATH}"
-            echo "  --topic-prefix <PREFIX>             IoT MQTT topic prefix, default: ${TOPIC_PREFIX}"
+            echo "  --input-config-file <FILE>   Input JSON config file"
+            echo "  --output-config-file <FILE>  Output JSON config file"
+            echo "  --vehicle-name <NAME>        Vehicle name"
+            echo "  --endpoint-url <URL>         IoT Core MQTT endpoint URL"
+            echo "  --can-bus0 <BUS>             CAN bus 0, default: ${CAN_BUS0}"
+            echo "  --certificate-file <FILE>    Certificate file, default: ${CERTIFICATE_FILE}"
+            echo "  --private-key-file <FILE>    Private key file, default: ${PRIVATE_KEY_FILE}"
+            echo "  --persistency-path <PATH>    Persistency path, default: ${PERSISTENCY_PATH}"
+            echo "  --topic-prefix <PREFIX>      IoT MQTT topic prefix, default: ${TOPIC_PREFIX}"
+            echo "  --log-level <LEVEL>          Log level. Either: Off, Error, Warning, Info, Trace. Default: ${LOG_LEVEL}"
             exit 0
             ;;
         esac
@@ -94,9 +119,9 @@ jq ".staticConfig.mqttConnection.endpointUrl=\"${ENDPOINT_URL}\"" ${INPUT_CONFIG
     | jq ".staticConfig.mqttConnection.decoderManifestTopic=\"${TOPIC_PREFIX}vehicles/${VEHICLE_NAME}/decoder_manifests\"" \
     | jq ".staticConfig.mqttConnection.canDataTopic=\"${TOPIC_PREFIX}vehicles/${VEHICLE_NAME}/signals\"" \
     | jq ".staticConfig.mqttConnection.checkinTopic=\"${TOPIC_PREFIX}vehicles/${VEHICLE_NAME}/checkins\"" \
-    | jq ".staticConfig.mqttConnection.certificateFilename=\"/etc/aws-iot-fleetwise/certificate.pem\"" \
-    | jq ".staticConfig.mqttConnection.privateKeyFilename=\"/etc/aws-iot-fleetwise/private-key.key\"" \
-    | jq ".staticConfig.internalParameters.systemWideLogLevel=\"Info\"" \
+    | jq ".staticConfig.mqttConnection.certificateFilename=\"${CERTIFICATE_FILE}\"" \
+    | jq ".staticConfig.mqttConnection.privateKeyFilename=\"${PRIVATE_KEY_FILE}\"" \
+    | jq ".staticConfig.internalParameters.systemWideLogLevel=\"${LOG_LEVEL}\"" \
     | jq ".staticConfig.persistency.persistencyPath=\"${PERSISTENCY_PATH}\"" \
     | jq ".networkInterfaces[0].canInterface.interfaceName=\"${CAN_BUS0}\"" \
     | jq ".networkInterfaces[1].obdInterface.interfaceName=\"${CAN_BUS0}\"" \

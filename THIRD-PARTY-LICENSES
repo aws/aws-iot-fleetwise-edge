@@ -1,13 +1,11 @@
-** github.com/aws/aws-sdk-cpp; version 1.9.253 --
-https://github.com/aws/aws-sdk-cpp
-** github.com/eProsima/Fast-DDS; version 2.3.3 --
-https://github.com/eProsima/Fast-DDS
-** github.com/eProsima/Fast-CDR; version 1.0.21 --
-https://github.com/eProsima/Fast-CDR.git
-** github.com/eProsima/foonathan_memory_vendor; version 1.1.0 --
- https://github.com/eProsima/foonathan_memory_vendor
+AWS IoT FleetWise Edge includes the following third-party software/licensing:
 
-
+** AWS SDK for C++: v1.9.253 - https://github.com/aws/aws-sdk-cpp
+** Fast-DDS: v2.3.3 - https://github.com/eProsima/Fast-DDS
+** Fast-CDR: v1.0.21 - https://github.com/eProsima/Fast-CDR
+** Foonathan Memory Vendor: v1.1.0 - https://github.com/eProsima/foonathan_memory_vendor
+** Google Benchmark: v1.6.1 - https://github.com/google/benchmark
+** OpenSSL: v1.1.1 - https://github.com/openssl/openssl
 
                                  Apache License
                            Version 2.0, January 2004
@@ -212,12 +210,10 @@ https://github.com/eProsima/Fast-CDR.git
    See the License for the specific language governing permissions and
    limitations under the License.
 
-------
+----------------
 
-** github.com/google/googletest; version 1.10.0 --
-https://github.com/google/googletest
-** https://github.com/protocolbuffers/protobuf; version 3.21.7 --
-https://github.com/protocolbuffers/protobuf
+** GoogleTest: v1.10.0 - https://github.com/google/googletest
+** Protobuf: v3.21.7 - https://github.com/protocolbuffers/protobuf
 
 Copyright 2008, Google Inc.
 All rights reserved.
@@ -248,11 +244,9 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+----------------
 
-------
-
-** github.com/boostorg/boost; version 1.65.1 --
-https://github.com/boostorg/boost
+** Boost: v1.65.1 - https://github.com/boostorg/boost
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -278,13 +272,11 @@ FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
-------
+----------------
 
-** github.com/open-source-parsers/jsoncpp; version 1.7.4 --
-https://github.com/open-source-parsers/jsoncpp
+** JsonCpp: v1.7.4 - https://github.com/open-source-parsers/jsoncpp
 
-
-The JsonCpp library's source code, including accompanying documentation,
+The JsonCpp library's source code, including accompanying documentation, 
 tests and demonstration applications, are licensed under the following
 conditions...
 
@@ -340,11 +332,9 @@ and license text in the source code. Note also that by accepting the
 Public Domain "license" you can re-license your copy using whatever
 license you like.
 
-------
+----------------
 
-** github.com/google/snappy; version 1.1.7 --
-https://github.com/google/snappy
-
+** Snappy: v1.1.7 - https://github.com/google/snappy
 
 Copyright 2011, Google Inc.
 All rights reserved.
@@ -402,11 +392,9 @@ Some of the benchmark data in testdata/ is licensed differently:
    (http://www.gutenberg.org/ebooks/53).
 
 
-------
+----------------
 
-** github.com/foonathan/memory; version 0.7 --
-https://github.com/foonathan/memory
-
+** Foonathan Memory: v0.7 - https://github.com/foonathan/memory
 
 Copyright (C) 2015-2020 Jonathan Müller <jonathanmueller.dev@gmail.com>
 
@@ -430,10 +418,9 @@ it freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any
    source distribution.
 
-------
+----------------
 
-** github.com/leethomason/tinyxml2; version 6.0.0 --
- https://github.com/leethomason/tinyxml2
+** TinyXML-2: v6.0.0 - https://github.com/leethomason/tinyxml2
 
 This software is provided 'as-is', without any express or implied
 warranty. In no event will the authors be held liable for any
@@ -453,4 +440,57 @@ must not be misrepresented as being the original software.
 
 3. This notice may not be removed or altered from any source
 distribution.
-------
+
+----------------
+
+** Curl: v7.58.0 - https://github.com/curl/curl
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright (c) 1996 - 2022, Daniel Stenberg, <daniel@haxx.se>, and many
+contributors, see the THANKS file.
+
+All rights reserved.
+
+Permission to use, copy, modify, and distribute this software for any purpose
+with or without fee is hereby granted, provided that the above copyright
+notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF THIRD PARTY RIGHTS. IN
+NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall not
+be used in advertising or otherwise to promote the sale, use or other dealings
+in this Software without prior written authorization of the copyright holder.
+
+----------------
+
+** zlib: v1.2.11 - https://github.com/madler/zlib
+
+Copyright notice:
+
+ (C) 1995-2017 Jean-loup Gailly and Mark Adler
+
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
+  Jean-loup Gailly        Mark Adler
+  jloup@gzip.org          madler@alumni.caltech.edu

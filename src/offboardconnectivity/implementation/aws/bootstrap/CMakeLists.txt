@@ -17,7 +17,7 @@ add_library(
 )
 
 set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
-set(BUILD_SHARED_LIBS ${FWE_IOT_SDK_SHARED_LIBS})
+set(BUILD_SHARED_LIBS ${FWE_AWS_SDK_SHARED_LIBS})
 find_package(AWSSDK REQUIRED COMPONENTS core)
 set(BUILD_SHARED_LIBS ${OLD_BUILD_SHARED_LIBS})
 
@@ -27,6 +27,7 @@ target_link_libraries(
   ${libraryTargetName}
   IoTFleetWise::Platform::Linux
   ${AWSSDK_LINK_LIBRARIES}
+  ${FWE_AWS_SDK_EXTRA_LIBS}
 )
 
 add_library(${libraryAliasName} ALIAS ${libraryTargetName})

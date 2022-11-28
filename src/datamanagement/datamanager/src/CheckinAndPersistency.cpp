@@ -99,7 +99,9 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
     ret = mSchemaPersistency->read( protoOutput.data(), protoSize, retrieveType );
     if ( ret != ErrorCode::SUCCESS )
     {
-        mLogger.error( "CollectionSchemeManager::retrieve", errStr + mSchemaPersistency->getErrorString( ret ) );
+        auto error = mSchemaPersistency->getErrorString( ret );
+        errStr += error != nullptr ? error : "Unknown error";
+        mLogger.error( "CollectionSchemeManager::retrieve", errStr );
         return false;
     }
     mLogger.info( "CollectionSchemeManager::retrieve", infoStr + std::to_string( protoSize ) + " successfully." );
@@ -173,9 +175,10 @@ CollectionSchemeManager::store( DataType storeType )
     ret = mSchemaPersistency->write( protoInput.data(), protoInput.size(), storeType );
     if ( ret != ErrorCode::SUCCESS )
     {
-        mLogger.error( "CollectionSchemeManager::store",
-                       "failed to persist " + logStr +
-                           " because of this error: " + mSchemaPersistency->getErrorString( ret ) );
+        logStr += " because of this error: ";
+        auto error = mSchemaPersistency->getErrorString( ret );
+        logStr += error != nullptr ? error : "Unknown error";
+        mLogger.error( "CollectionSchemeManager::store", "failed to persist " + logStr );
     }
     else
     {

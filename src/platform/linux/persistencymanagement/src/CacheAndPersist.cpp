@@ -89,9 +89,10 @@ CacheAndPersist::write( const uint8_t *bufPtr, size_t size, DataType dataType )
     {
         return ErrorCode::INVALID_DATA;
     }
-
-    if ( getSize( DataType::COLLECTION_SCHEME_LIST ) + getSize( DataType::DECODER_MANIFEST ) +
-             getSize( DataType::EDGE_TO_CLOUD_PAYLOAD ) + size >=
+    size_t collectionSchemeListSize = getSize( DataType::COLLECTION_SCHEME_LIST );
+    size_t decoderManifestSize = getSize( DataType::DECODER_MANIFEST );
+    size_t edgeToCloudPayloadSize = getSize( DataType::EDGE_TO_CLOUD_PAYLOAD );
+    if ( collectionSchemeListSize + decoderManifestSize + edgeToCloudPayloadSize + size >=
          mMaxPersistencePartitionSize )
     {
         return ErrorCode::MEMORY_FULL;

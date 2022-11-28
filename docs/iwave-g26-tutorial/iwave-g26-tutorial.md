@@ -293,7 +293,7 @@ i.MX6 processor present in the G26 TCU device.
      && cd ~/aws-iot-fleetwise-edge
    ```
 
-2. Install the AWS IoT FleetWise Edge Agent dependencies. The command `install-deps-cross-armhf.sh` installs the following Ubuntu packages for cross-compiling the Edge Agent for ARM 32-bit:
+2. Install the AWS IoT FleetWise Edge Agent dependencies. The command below installs the following Ubuntu packages for cross-compiling the Edge Agent for ARM 32-bit:
 
  `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`.
 
@@ -433,10 +433,6 @@ On the development machine, create an IoT thing and provision its credentials by
 1. To explore the collected data, click and drag on the graph to zoom in. Alternatively, if your AWS account is enrolled with QuickSight or Amazon Managed Grafana, you can use them to browse the data from Amazon Timestream directly.
 
 **Note:**
-* If you can't collect OBD data from the vehicle, it's possible the vehicle uses extended
-CAN identifiers for diagnostic communication. In this case, SSH to the TCU board and edit the file
-`/etc/aws-iot-fleetwise/config-0.json`, changing the key `useExtendedIds` to `true`. Restart AWS IoT
-FleetWise Edge Agent by running `systemctl restart fwe@0` and try running the demo script again.
 * After the vehicle is turned off, the iWave device will stay on for certain period before it goes to 
 sleep. The duration depends on when the ECUs stop sending CAN messages, which varies across different
 vehicle models. For this reason, if you're not going to turn on the vehicle for an extended period (like a week), unplug the iWave device from the J1962 DCL port to avoid depleting the battery.

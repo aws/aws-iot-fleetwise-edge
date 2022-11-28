@@ -41,7 +41,7 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --vehicle-name <ID>                   Vehicle name"
+            echo "  --vehicle-name <NAME>                 Vehicle name"
             echo "  --certificate-pem-outfile <FILENAME>  Certificate output file, default: ${CERT_OUT_FILE}"
             echo "  --private-key-outfile <FILENAME>      Private key output file, default: ${PRIVATE_KEY_OUT_FILE}"
             echo "  --endpoint-url-outfile <FILENAME>     Endpoint URL for MQTT connections output file"

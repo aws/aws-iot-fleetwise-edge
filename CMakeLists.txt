@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.10.2)
 
-project(iotfleetwise VERSION 1.0.1)
+project(iotfleetwise VERSION 1.0.2)
 
 # AWS IoT FleetWise Edge uses C++14 for compatibility reasons with 
 # Automotive middlewares ( Adaptive AUTOSAR, ROS2)
@@ -24,8 +24,10 @@ option(FWE_STRIP_SYMBOLS "Strips symbols from output binaries" OFF)
 option(FWE_FEATURE_CAMERA "Enable Camera Data Collection feature" OFF)
 option(FWE_TEST_CLANG_TIDY "Add clang-tidy test" ON)
 option(FWE_TEST_CLANG_FORMAT "Add clang-format test" ON)
+option(FWE_TEST_FAKETIME "Enable tests that use the faketime library" OFF)
 option(FWE_SECURITY_COMPILE_FLAGS "Add security related compile options" OFF)
-option(FWE_IOT_SDK_SHARED_LIBS "Use AWS IoT Device SDK shared libs" OFF)
+option(FWE_AWS_SDK_SHARED_LIBS "Use AWS SDK shared libs. Needs to be set to the same value of BUILD_SHARED_LIBS that the SDK was compiled with." OFF)
+option(FWE_AWS_SDK_EXTRA_LIBS "Extra libs required to link with the AWS SDK. When FWE_STATIC_LINK is ON, setting this to ON will automatically find the standard libs. Can be a space-separated list of libs." ON)
 option(FWE_EXAMPLE_IWAVEGPS "Include the IWave GPS example for a custom data source" OFF)
 if(FWE_EXAMPLE_IWAVEGPS)
   add_compile_options("-DFWE_EXAMPLE_IWAVEGPS")

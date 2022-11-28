@@ -32,13 +32,13 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --vehicle-name <ID>   Vehicle name"
-            echo "  --fleet-size <SIZE>   Size of fleet, default: ${FLEET_SIZE}. When greater than 1,"
-            echo "                        the instance number will be appended to each"
-            echo "                        Vehicle name after a '-', e.g. fwdemo-42"
-            echo "  --timestamp <TS>      Timestamp of demo.sh script"
-            echo "  --endpoint-url <URL>  The endpoint URL used for AWS CLI calls"
-            echo "  --region <REGION>     The region used for AWS CLI calls, default: ${REGION}"
+            echo "  --vehicle-name <NAME>  Vehicle name"
+            echo "  --fleet-size <SIZE>    Size of fleet, default: ${FLEET_SIZE}. When greater than 1,"
+            echo "                         the instance number will be appended to each"
+            echo "                         Vehicle name after a '-', e.g. fwdemo-42"
+            echo "  --timestamp <TS>       Timestamp of demo.sh script"
+            echo "  --endpoint-url <URL>   The endpoint URL used for AWS CLI calls"
+            echo "  --region <REGION>      The region used for AWS CLI calls, default: ${REGION}"
             exit 0
             ;;
         esac

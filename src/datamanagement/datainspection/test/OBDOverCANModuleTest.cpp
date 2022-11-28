@@ -5,6 +5,7 @@
 #include "EnumUtility.h"
 #include "OBDDataTypes.h"
 #include "businterfaces/ISOTPOverCANReceiver.h"
+#include "datatypes/OBDDataTypesUnitTestOnly.h"
 #include <gtest/gtest.h>
 #include <stdio.h>
 #include <stdlib.h>

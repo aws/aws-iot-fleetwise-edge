@@ -33,3 +33,7 @@ endif()
 if(FWE_BUILD_CONNECTIVITY)
   add_subdirectory(offboardconnectivity)
 endif()
+
+if(BUILD_TESTING)
+  add_subdirectory(testingsupport)
+endif()

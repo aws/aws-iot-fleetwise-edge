@@ -138,6 +138,3 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
        && ./demo.sh --vehicle-name fwdemo-s32g --campaign-file campaign-obd-heartbeat.json
    ```
 
-**Note:**
-If you unable to collect OBD data from a real vehicle, it is possible that the vehicle uses extended CAN identifiers for diagnostic communication. In this case, SSH to the S32G board and edit the file `/etc/aws-iot-fleetwise/config-0.json`, changing the key `useExtendedIds` to `true.` Restart AWS IoT FleetWise Edge Agent by running
-`sudo systemctl restart fwe@0` and try running the demo script again.

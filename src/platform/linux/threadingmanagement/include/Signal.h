@@ -67,7 +67,15 @@ public:
             else
             {
                 // Waits until either the predicate returns true or the timeout expires.
-                mSignalCondition.wait_for( mWaitMutex, std::chrono::milliseconds( timeoutMs ), predicate );
+                // We don't use wait_for() here because there is a bug that is only fixed with GLIBC 2.30+ and GCC9+
+                // - https://gcc.gnu.org/bugzilla/show_bug.cgi?id=41861
+                // - https://github.com/gcc-mirror/gcc/commit/9e68aa3cc52956ea99bb726c3c29ce0581b9f7e7
+                // The reason why wait_until works is that the time is a templated type which includes the clock, so
+                // the implementation will always compare against the same clock we used. For example:
+                //
+                // https://github.com/gcc-mirror/gcc/blob/releases/gcc-7.5.0/libstdc++-v3/include/std/condition_variable#L114
+                mSignalCondition.wait_until(
+                    mWaitMutex, std::chrono::steady_clock::now() + std::chrono::milliseconds( timeoutMs ), predicate );
             }
         }
 

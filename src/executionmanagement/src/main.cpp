@@ -61,6 +61,7 @@ main( int argc, char *argv[] )
 
     IoTFleetWiseEngine engine;
     signal( SIGINT, signalHandler );
+    signal( SIGTERM, signalHandler );
     signal( SIGUSR1, fatalSignalHandler );
     std::string configFilename = argv[1];
     Json::Value config;
