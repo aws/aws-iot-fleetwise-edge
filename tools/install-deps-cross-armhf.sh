@@ -45,6 +45,7 @@ apt install -y \
     build-essential \
     crossbuild-essential-armhf \
     cmake \
+    faketime:armhf \
     unzip \
     git \
     wget \

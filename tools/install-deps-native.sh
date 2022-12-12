@@ -32,6 +32,7 @@ apt install -y \
     libboost-thread-dev \
     build-essential \
     cmake \
+    faketime \
     unzip \
     git \
     wget \
