@@ -45,6 +45,7 @@ apt install -y \
     build-essential \
     crossbuild-essential-arm64 \
     cmake \
+    faketime:arm64 \
     unzip \
     git \
     wget \
