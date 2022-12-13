@@ -32,8 +32,18 @@ for message in db.messages:
         signal_to_add["isSigned"] = signal.is_signed
         signal_to_add["length"] = signal.length
         signal_to_add["offset"] = signal.offset
-        signal_to_add["startBit"] = signal.start
         signal_to_add["messageId"] = message.frame_id
+
+        if signal.byte_order == 'big_endian':
+            pos = 7 - ( signal.start % 8 ) + ( signal.length - 1 )
+            if pos < 8:
+                signal_to_add["startBit"] = signal.start - signal.length + 1
+            else:
+                byte_count = int( pos / 8 )
+                signal_to_add["startBit"] =  int(7 - ( pos % 8 ) + ( byte_count * 8 ) + int(signal.start / 8) * 8 )
+        else:
+            signal_to_add["startBit"] = signal.start
+
         signalDecodersToAdd.append( 
             { 
                 "type": "CAN_SIGNAL",
