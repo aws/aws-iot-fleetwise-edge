@@ -10,6 +10,7 @@ repos:
       - id: check-yaml
         exclude: cfn-templates|public-ecr
       - id: check-merge-conflict
+      - id: check-vcs-permalinks
       - id: debug-statements
       - id: destroyed-symlinks
       - id: detect-aws-credentials

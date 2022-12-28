@@ -73,7 +73,7 @@ public:
                 // The reason why wait_until works is that the time is a templated type which includes the clock, so
                 // the implementation will always compare against the same clock we used. For example:
                 //
-                // https://github.com/gcc-mirror/gcc/blob/releases/gcc-7.5.0/libstdc++-v3/include/std/condition_variable#L114
+                // https://github.com/gcc-mirror/gcc/blob/b2d961e7342b5ba4e57adfa81cb189b738d10901/libstdc%2B%2B-v3/include/std/condition_variable#L114
                 mSignalCondition.wait_until(
                     mWaitMutex, std::chrono::steady_clock::now() + std::chrono::milliseconds( timeoutMs ), predicate );
             }
