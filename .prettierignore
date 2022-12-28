@@ -1,0 +1,7 @@
+# prose wrap option should not be used in GitHub comments:
+# https://prettier.io/docs/en/options.html#prose-wrap
+.github/ISSUE_TEMPLATE
+.github/PULL_REQUEST_TEMPLATE.md
+
+# manually formatted json to visually align the properties
+obd_config*.json
