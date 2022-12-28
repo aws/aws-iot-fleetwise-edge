@@ -9,6 +9,8 @@ repos:
       - id: check-json
       - id: check-yaml
         exclude: cfn-templates|public-ecr
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
       - id: check-merge-conflict
       - id: check-vcs-permalinks
       - id: debug-statements
