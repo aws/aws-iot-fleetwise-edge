@@ -23,9 +23,9 @@ TEST( CollectionSchemeManagerTest, StopMainTest )
     /* build collectionScheme list1 */
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
-    TimePointInMsec startTime = currTime + SECOND_TO_MILLISECOND( 1 );
-    TimePointInMsec stopTime = startTime + SECOND_TO_MILLISECOND( 25 );
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startTime = currTime.systemTimeMs + SECOND_TO_MILLISECOND( 1 );
+    Timestamp stopTime = startTime + SECOND_TO_MILLISECOND( 25 );
     ICollectionSchemePtr collectionScheme =
         std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startTime, stopTime );
     testList1.emplace_back( collectionScheme );
@@ -135,14 +135,14 @@ TEST( CollectionSchemeManagerTest, MockProducerTest )
 
     /* build collectionScheme list1 */
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
-    TimePointInMsec startTime = currTime + 100;
-    TimePointInMsec stopTime = startTime + 500;
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startTime = currTime.systemTimeMs + 100;
+    Timestamp stopTime = startTime + 500;
     ICollectionSchemePtr collectionScheme =
         std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startTime, stopTime );
     testList1.emplace_back( collectionScheme );
 
-    startTime = currTime + 300;
+    startTime = currTime.systemTimeMs + 300;
     stopTime = startTime + 500;
     collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME2", "DM1", startTime, stopTime );
     testList1.emplace_back( collectionScheme );
@@ -167,8 +167,8 @@ TEST( CollectionSchemeManagerTest, MockProducerTest )
 
     /* add COLLECTIONSCHEME3  */
     std::cout << COUT_GTEST_MGT << "Step3: add COLLECTIONSCHEME3 " << ANSI_TXT_DFT << std::endl;
-    currTime = testClock->timeSinceEpochMs();
-    startTime = currTime + 100;
+    currTime = testClock->timeSinceEpoch();
+    startTime = currTime.systemTimeMs + 100;
     stopTime = startTime + 500;
     collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME3", "DM1", startTime, stopTime );
     testList2.emplace_back( collectionScheme );
@@ -193,12 +193,12 @@ TEST( CollectionSchemeManagerTest, MockProducerTest )
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     /* build list3 with DM2 */
-    currTime = testClock->timeSinceEpochMs();
-    startTime = currTime + 100;
+    currTime = testClock->timeSinceEpoch();
+    startTime = currTime.systemTimeMs + 100;
     stopTime = startTime + 500;
     collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME4", "DM2", startTime, stopTime );
     testList3.emplace_back( collectionScheme );
-    startTime = currTime + 200;
+    startTime = currTime.systemTimeMs + 200;
     stopTime = startTime + 500;
     collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME5", "DM2", startTime, stopTime );
     testList3.emplace_back( collectionScheme );

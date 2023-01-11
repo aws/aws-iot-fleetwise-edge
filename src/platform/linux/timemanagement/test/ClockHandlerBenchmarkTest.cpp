@@ -10,18 +10,18 @@ BM_timestampToString( benchmark::State &state )
     auto clock = ClockHandler::getClock();
     for ( auto _ : state )
     {
-        clock->timestampToString();
+        clock->currentTimeToIsoString();
     }
 }
 BENCHMARK( BM_timestampToString );
 
 static void
-BM_timeSinceEpochMs( benchmark::State &state )
+BM_systemTimeSinceEpochMs( benchmark::State &state )
 {
     auto clock = ClockHandler::getClock();
     for ( auto _ : state )
-        clock->timeSinceEpochMs();
+        clock->systemTimeSinceEpochMs();
 }
-BENCHMARK( BM_timeSinceEpochMs );
+BENCHMARK( BM_systemTimeSinceEpochMs );
 
 BENCHMARK_MAIN();

@@ -47,10 +47,10 @@ struct EventTrigger
     bool
     isValid() const
     {
-        return ( mTriggerType == TriggerType::SIGNALVALUE && mSignalID > 0 &&
-                 mValuePredicate.mCondition != PredicateCondition::EVERY ) ||
-               ( mTriggerType == TriggerType::TIMEPOINT && mValuePredicate.mCondition == PredicateCondition::EVERY &&
-                 mValuePredicate.mValue > 0.0 );
+        return ( ( mTriggerType == TriggerType::SIGNALVALUE ) && ( mSignalID > 0 ) &&
+                 ( mValuePredicate.mCondition != PredicateCondition::EVERY ) ) ||
+               ( ( mTriggerType == TriggerType::TIMEPOINT ) &&
+                 ( mValuePredicate.mCondition == PredicateCondition::EVERY ) && ( mValuePredicate.mValue > 0.0 ) );
     }
     bool
     operator<( const EventTrigger &a ) const
@@ -81,7 +81,6 @@ public:
     const EventTriggers &getEventTriggers() const;
     const EventTrigger &getTimeTrigger() const;
 
-    void insertMessageToBeWatched( const uint32_t &messageID, const EventTriggers &triggers );
     void insertMessageToCollected( const uint32_t &messageID, const CANMessageFormat &messageFormat );
     void insertSignalTriggerToMessage( const uint32_t &messageID, const EventTrigger &trigger );
     void clear();

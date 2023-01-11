@@ -12,7 +12,6 @@
 #include <net/if.h>
 #include <poll.h>
 #include <sstream>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -69,8 +68,8 @@ ISOTPOverCANSenderReceiver::connect()
     if ( mSocket < 0 )
     {
         mLogger.error( "ISOTPOverCANSenderReceiver::connect",
-                       " Failed to create the ISOTP rx id " + mStreamRxID +
-                           " to IF:" + mSenderReceiverOptions.mSocketCanIFName );
+                       "Failed to create the ISOTP rx id " + mStreamRxID +
+                           " to IF: " + mSenderReceiverOptions.mSocketCanIFName );
         return false;
     }
 
@@ -80,9 +79,9 @@ ISOTPOverCANSenderReceiver::connect()
     int retFrameCtrFlag =
         setsockopt( mSocket, SOL_CAN_ISOTP, CAN_ISOTP_RECV_FC, &frameControlFlags, sizeof( frameControlFlags ) );
 
-    if ( retOptFlag < 0 || retFrameCtrFlag < 0 )
+    if ( ( retOptFlag < 0 ) || ( retFrameCtrFlag < 0 ) )
     {
-        mLogger.error( "ISOTPOverCANSenderReceiver::connect", " Failed to set ISO-TP socket option flags" );
+        mLogger.error( "ISOTPOverCANSenderReceiver::connect", "Failed to set ISO-TP socket option flags" );
         return false;
     }
     // CAN PF and Interface Index
@@ -95,13 +94,13 @@ ISOTPOverCANSenderReceiver::connect()
     if ( bind( mSocket, (struct sockaddr *)&interfaceAddress, sizeof( interfaceAddress ) ) < 0 )
     {
         mLogger.error( "ISOTPOverCANSenderReceiver::connect",
-                       " Failed to bind the ISOTP rx id " + mStreamRxID +
-                           " to IF:" + mSenderReceiverOptions.mSocketCanIFName );
+                       "Failed to bind the ISOTP rx id " + mStreamRxID +
+                           " to IF: " + mSenderReceiverOptions.mSocketCanIFName );
         close( mSocket );
         return false;
     }
     mLogger.trace( "ISOTPOverCANSenderReceiver::connect",
-                   " ISOTP rx id " + mStreamRxID + " connected to IF:" + mSenderReceiverOptions.mSocketCanIFName );
+                   "ISOTP rx id " + mStreamRxID + " connected to IF: " + mSenderReceiverOptions.mSocketCanIFName );
     return true;
 }
 
@@ -111,12 +110,12 @@ ISOTPOverCANSenderReceiver::disconnect()
     if ( close( mSocket ) < 0 )
     {
         mLogger.error( "ISOTPOverCANSenderReceiver::connect",
-                       " Failed to disconnect the ISOTP rx id " + mStreamRxID +
-                           " from IF:" + mSenderReceiverOptions.mSocketCanIFName );
+                       "Failed to disconnect the ISOTP rx id " + mStreamRxID +
+                           " from IF: " + mSenderReceiverOptions.mSocketCanIFName );
         return false;
     }
     mLogger.trace( "ISOTPOverCANSenderReceiver::disconnect",
-                   " ISOTP rx id " + mStreamRxID + " disconnected from IF:" + mSenderReceiverOptions.mSocketCanIFName );
+                   "ISOTP rx id " + mStreamRxID + " disconnected from IF: " + mSenderReceiverOptions.mSocketCanIFName );
     return true;
 }
 
@@ -127,7 +126,33 @@ ISOTPOverCANSenderReceiver::isAlive() const
     socklen_t len = sizeof( error );
     // Get the error status of the socket
     int retSockOpt = getsockopt( mSocket, SOL_SOCKET, SO_ERROR, &error, &len );
-    return ( retSockOpt == 0 && error == 0 );
+    return ( ( retSockOpt == 0 ) && ( error == 0 ) );
+}
+
+uint32_t
+ISOTPOverCANSenderReceiver::flush( uint32_t timeout )
+{
+    struct pollfd pfd = { mSocket, POLLIN, 0 };
+    // start time measurement
+    Timer flushTimer;
+    flushTimer.reset();
+    int res = poll( &pfd, 1U, static_cast<int>( timeout ) );
+    // end time measurement
+    uint32_t pollNeededTime = static_cast<uint32_t>( flushTimer.getElapsedMs().count() );
+    if ( res <= 0 )
+    {
+        return timeout;
+    }
+    std::vector<uint8_t> flushBuffer;
+    flushBuffer.resize( MAX_PDU_SIZE );
+    auto readRes = read( mSocket, flushBuffer.data(), MAX_PDU_SIZE );
+    if ( readRes <= 0 )
+    {
+        mLogger.error( "ISOTPOverCANSenderReceiver::flush",
+                       "Failed to read PDU from socket: " + mStreamRxID + " with error code " +
+                           std::to_string( readRes ) );
+    }
+    return pollNeededTime;
 }
 
 bool
@@ -137,10 +162,18 @@ ISOTPOverCANSenderReceiver::receivePDU( std::vector<uint8_t> &pduData )
     {
         struct pollfd pfd = { mSocket, POLLIN, 0 };
         int res = poll( &pfd, 1U, static_cast<int>( mSenderReceiverOptions.mP2TimeoutMs ) );
-        if ( res <= 0 )
+        if ( res == 0 )
+        {
+            // Responses are not always expected, so use trace level logging. E.g. supported PID requests for
+            // unsupported PIDs can be ignored by some ECUs.
+            mLogger.trace( "ISOTPOverCANSenderReceiver::receivePDU",
+                           "Timeout reading PDU from socket: " + mStreamRxID );
+            return false;
+        }
+        if ( res < 0 )
         {
             mLogger.warn( "ISOTPOverCANSenderReceiver::receivePDU",
-                          " Failed to read PDU from socket:" + mStreamRxID + " with error code " +
+                          "Failed to read PDU from socket: " + mStreamRxID + " with error code " +
                               std::to_string( res ) );
             // Error (<0) or timeout (==0):
             return false;
@@ -160,7 +193,7 @@ ISOTPOverCANSenderReceiver::receivePDU( std::vector<uint8_t> &pduData )
         pduData.resize( 0 );
     }
     mLogger.traceBytesInVector( "ISOTPOverCANSenderReceiver::receivePDU",
-                                "Socket:" + mStreamRxID + " received a PDU of size " + std::to_string( bytesRead ),
+                                "Socket: " + mStreamRxID + " received a PDU of size " + std::to_string( bytesRead ),
                                 pduData );
 
     return bytesRead > 0;
@@ -172,9 +205,9 @@ ISOTPOverCANSenderReceiver::sendPDU( const std::vector<uint8_t> &pduData )
     auto socket = mSenderReceiverOptions.mBroadcastSocket < 0 ? mSocket : mSenderReceiverOptions.mBroadcastSocket;
     int bytesWritten = static_cast<int>( write( socket, pduData.data(), pduData.size() ) );
     mLogger.traceBytesInVector( "ISOTPOverCANSenderReceiver::sendPDU",
-                                "Socket:" + mStreamRxID + " sent a PDU of size " + std::to_string( bytesWritten ),
+                                "Socket: " + mStreamRxID + " sent a PDU of size " + std::to_string( bytesWritten ),
                                 pduData );
-    return ( bytesWritten > 0 && bytesWritten == static_cast<int>( pduData.size() ) );
+    return ( ( bytesWritten > 0 ) && ( bytesWritten == static_cast<int>( pduData.size() ) ) );
 }
 
 } // namespace VehicleNetwork

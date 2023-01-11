@@ -8,7 +8,7 @@
 #include <ios>
 #include <sstream>
 constexpr int POSITIVE_ECU_RESPONSE_BASE = 0x40;
-#define IS_BIT_SET( var, pos ) ( ( var ) & ( 1 << ( pos ) ) )
+#define IS_BIT_SET( var, pos ) ( ( ( var ) & ( 1 << ( pos ) ) ) != 0 )
 
 namespace Aws
 {
@@ -32,8 +32,8 @@ OBDDataDecoder::decodeSupportedPIDs( const SID &sid,
     // If the input size is less than 6 ( Response byte + Requested PID + 4 data bytes )
     // or if the input size minus SID is not a multiple of 5
     // this is also not a valid input
-    if ( inputData.size() < 6 || POSITIVE_ECU_RESPONSE_BASE + toUType( sid ) != inputData[0] ||
-         ( inputData.size() - 1 ) % 5 != 0 )
+    if ( ( inputData.size() < 6 ) || ( POSITIVE_ECU_RESPONSE_BASE + toUType( sid ) != inputData[0] ) ||
+         ( ( inputData.size() - 1 ) % 5 != 0 ) )
     {
         mLogger.warn( "OBDDataDecoder::decodeSupportedPIDs", "Invalid Supported PID Input" );
         return false;
@@ -59,8 +59,8 @@ OBDDataDecoder::decodeSupportedPIDs( const SID &sid,
             basePID = inputData[i];
             if ( basePID % SUPPORTED_PID_STEP != 0 )
             {
-                mLogger.warn( " OBDDataDecoder::decodeSupportedPIDs ",
-                              " Invalid PID for support range: " + std::to_string( basePID ) );
+                mLogger.warn( "OBDDataDecoder::decodeSupportedPIDs",
+                              "Invalid PID for support range: " + std::to_string( basePID ) );
                 break;
             }
             baseIdx = i;
@@ -79,9 +79,9 @@ OBDDataDecoder::decodeSupportedPIDs( const SID &sid,
                 // To remain consistent with the spec, we don't want to mix Supported PID IDs with
                 // PIDs. We validate that the PID received is supported by the software, but also
                 // exclude the Supported PID IDs from the output list
-                if ( decodedID != INVALID_PID &&
-                     std::find( supportedPIDRange.begin(), supportedPIDRange.end(), decodedID ) ==
-                         supportedPIDRange.end() )
+                if ( ( decodedID != INVALID_PID ) &&
+                     ( std::find( supportedPIDRange.begin(), supportedPIDRange.end(), decodedID ) ==
+                       supportedPIDRange.end() ) )
                 {
                     supportedPIDs.emplace_back( decodedID );
                 }
@@ -112,14 +112,14 @@ OBDDataDecoder::decodeEmissionPIDs( const SID &sid,
     // If the input size is less than 3 ( Positive Response + Response byte + Requested PID )
 
     // this is also not a valid input as we expect at least one by response.
-    if ( inputData.size() < 3 || POSITIVE_ECU_RESPONSE_BASE + toUType( sid ) != inputData[0] )
+    if ( ( inputData.size() < 3 ) || ( POSITIVE_ECU_RESPONSE_BASE + toUType( sid ) != inputData[0] ) )
     {
         mLogger.warn( "OBDDataDecoder::decodeEmissionPIDs", "Invalid response to PID request" );
         return false;
     }
     if ( mDecoderDictionaryConstPtr == nullptr )
     {
-        mLogger.warn( "OBDDataDecoder::decodeEmissionPIDs", "Invalid Decoder Dictionary!" );
+        mLogger.warn( "OBDDataDecoder::decodeEmissionPIDs", "Invalid Decoder Dictionary" );
         return false;
     }
     // Validate 1) The PIDs in response match with expected PID; 2) Total length of PID response matches with Decoder
@@ -208,7 +208,7 @@ OBDDataDecoder::decodeDTCs( const SID &sid, const std::vector<uint8_t> &inputDat
     // First look at whether we received a positive response
     // The positive response can be identified by 0x40 + SID.
     // If an ECU has no DTCs, it should respond with 2 Bytes ( 1 for Positive response + 1 number of DTCs( 0) )
-    if ( inputData.size() < 2 || POSITIVE_ECU_RESPONSE_BASE + toUType( sid ) != inputData[0] )
+    if ( ( inputData.size() < 2 ) || ( POSITIVE_ECU_RESPONSE_BASE + toUType( sid ) != inputData[0] ) )
     {
         return false;
     }
@@ -290,9 +290,9 @@ OBDDataDecoder::decodeVIN( const std::vector<uint8_t> &inputData, std::string &v
     // The positive response can be identified by 0x40 + SID.
     // The response is usually 1 byte of the positive response, 1 byte for the InfoType(PID), 1 byte for the number of
     // data item.
-    if ( inputData.size() < 3 ||
-         POSITIVE_ECU_RESPONSE_BASE + toUType( vehicleIdentificationNumberRequest.mSID ) != inputData[0] ||
-         vehicleIdentificationNumberRequest.mPID != inputData[1] )
+    if ( ( inputData.size() < 3 ) ||
+         ( POSITIVE_ECU_RESPONSE_BASE + toUType( vehicleIdentificationNumberRequest.mSID ) != inputData[0] ) ||
+         ( vehicleIdentificationNumberRequest.mPID != inputData[1] ) )
     {
         return false;
     }
@@ -311,7 +311,7 @@ OBDDataDecoder::isPIDResponseValid( const std::vector<PID> &pids, const std::vec
     {
         // if the response length is shorter than expected or the PID in ECU response mismatches with
         // the requested PID, it's an invalid ECU response
-        if ( responseByteIndex >= ecuResponse.size() || ecuResponse[responseByteIndex] != pid )
+        if ( ( responseByteIndex >= ecuResponse.size() ) || ( ecuResponse[responseByteIndex] != pid ) )
         {
             mLogger.warn( "OBDDataDecoder::isPIDResponseValid",
                           "Cannot find PID " + std::to_string( pid ) + " in ECU response" );
@@ -347,12 +347,12 @@ OBDDataDecoder::isFormulaValid( PID pid, CANSignalFormat formula )
     // 2. Last Bit Position (first bit + sizeInBits) has to be less than or equal to last bit position of PID response
     // length
     // 3. If mSizeInBits are greater or equal than 8, both mSizeInBits and first bit position has to be multiple of 8
-    if ( mDecoderDictionaryConstPtr->find( pid ) != mDecoderDictionaryConstPtr->end() &&
-         formula.mFirstBitPosition < mDecoderDictionaryConstPtr->at( pid ).mSizeInBytes * BYTE_SIZE &&
+    if ( ( mDecoderDictionaryConstPtr->find( pid ) != mDecoderDictionaryConstPtr->end() ) &&
+         ( formula.mFirstBitPosition < mDecoderDictionaryConstPtr->at( pid ).mSizeInBytes * BYTE_SIZE ) &&
          ( formula.mSizeInBits + formula.mFirstBitPosition <=
            mDecoderDictionaryConstPtr->at( pid ).mSizeInBytes * BYTE_SIZE ) &&
-         ( formula.mSizeInBits < 8 ||
-           ( ( formula.mSizeInBits & 0x7 ) == 0 && ( formula.mFirstBitPosition & 0x7 ) == 0 ) ) )
+         ( ( formula.mSizeInBits < 8 ) ||
+           ( ( ( formula.mSizeInBits & 0x7 ) == 0 ) && ( ( formula.mFirstBitPosition & 0x7 ) == 0 ) ) ) )
     {
         isValid = true;
     }

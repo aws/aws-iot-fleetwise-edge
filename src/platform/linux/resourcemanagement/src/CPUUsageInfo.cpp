@@ -79,7 +79,7 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
     while ( ( dp = readdir( taskDir ) ) != nullptr )
     {
         std::string taskFileName = dp->d_name;
-        if ( taskFileName.length() > 0 && taskFileName[0] != '.' )
+        if ( ( taskFileName.length() > 0 ) && ( taskFileName[0] != '.' ) )
         {
             FILE *fp = nullptr;
             std::string pathToThreadCPUUsageInfo = "/proc/self/task/" + taskFileName + "/stat";
@@ -123,7 +123,7 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
                     {
                         if ( currentField == 2 )
                         {
-                            if ( commStringFinished && *c == ' ' )
+                            if ( commStringFinished && ( *c == ' ' ) )
                             {
                                 currentField++;
                             }
@@ -153,7 +153,7 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
 
                     int64_t uTime = strtoll( utimeString.c_str(), nullptr, 10 );
                     int64_t sTime = strtoll( stimeString.c_str(), nullptr, 10 );
-                    if ( uTime != LONG_MAX && uTime >= 0 && sTime != LONG_MAX && sTime >= 0 )
+                    if ( ( uTime != LONG_MAX ) && ( uTime >= 0 ) && ( sTime != LONG_MAX ) && ( sTime >= 0 ) )
                     {
                         threadCPUUsageInfos.emplace_back(
                             CPUUsageInfo::ThreadCPUUsageInfo{ tid,

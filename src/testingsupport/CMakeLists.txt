@@ -7,18 +7,21 @@ set(libraryAliasName IoTFleetWise::TestingSupport)
 
 add_library(
   ${libraryTargetName}
-  INTERFACE # Note: Header only library - remove this line if sources are added
+  # STATIC or SHARED left out to depend on BUILD_SHARED_LIBS
+  src/main.cpp
 )
 
+find_package(GTest REQUIRED)
+
 target_include_directories(${libraryTargetName}
-  INTERFACE # Note: Header only library - remove this line if sources are added above
+  PUBLIC
   include
 )
 
 target_link_libraries(
   ${libraryTargetName}
-  INTERFACE # Note: Header only library - remove this line if sources are added above
   IoTFleetWise::Platform::Linux
+  GTest::GTest
 )
 
 add_library(${libraryAliasName} ALIAS ${libraryTargetName})
@@ -30,6 +33,7 @@ install(TARGETS ${libraryTargetName} DESTINATION lib)
 install(
   FILES
   include/Faketime.h
+  include/Testing.h
   DESTINATION include
 )
 
@@ -37,8 +41,6 @@ install(
 
 if(${BUILD_TESTING} AND FWE_TEST_FAKETIME)
   message(STATUS "Building tests for ${libraryTargetName}")
-
-  find_package(GTest REQUIRED)
 
   set(
     testSources
@@ -51,12 +53,12 @@ if(${BUILD_TESTING} AND FWE_TEST_FAKETIME)
 
     add_executable(${testName} ${testSource})
 
-    # Link to the project library and GTest main
+    # Link to the project library and testing library main
     target_link_libraries(
       ${testName}
       PRIVATE
       ${libraryTargetName}
-      GTest::Main
+      IoTFleetWise::TestingSupport
     )
 
     add_unit_test_with_faketime(${testName})

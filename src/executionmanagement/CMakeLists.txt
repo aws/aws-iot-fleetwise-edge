@@ -78,8 +78,6 @@ if(${BUILD_TESTING})
 
   
 
-  find_package(GTest REQUIRED)
-
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/em-example-config.json
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -98,12 +96,12 @@ if(${BUILD_TESTING})
 
     add_executable(${testName} ${testSource})
 
-    # Link to the project library and GTest main
+    # Link to the project library and testing library main
     target_link_libraries(
       ${testName}
       PRIVATE
       ${libraryTargetName}
-      GTest::Main
+      IoTFleetWise::TestingSupport
     )
 
     add_unit_test(${testName})

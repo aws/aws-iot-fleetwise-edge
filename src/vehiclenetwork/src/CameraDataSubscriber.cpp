@@ -75,7 +75,7 @@ CameraDataSubscriber::init( const DDSDataSourceConfig &dataSourceConfig )
     }
     else if ( dataSourceConfig.transportType == DDSTransportType::TCP )
     {
-        mLogger.trace( "CameraDataSubscriber::init", " TCP Transport is NOT yet supported " );
+        mLogger.trace( "CameraDataSubscriber::init", "TCP Transport is NOT yet supported" );
         return false;
     }
     // Create the DDS participant
@@ -124,11 +124,11 @@ CameraDataSubscriber::start()
     mShouldStop.store( false );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "CameraDataSubscriber::start", " Camera Subscriber Thread failed to start " );
+        mLogger.trace( "CameraDataSubscriber::start", "Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "CameraDataSubscriber::start", " Camera Subscriber Thread started " );
+        mLogger.trace( "CameraDataSubscriber::start", "Thread started" );
         mThread.setThreadName( "fwVNDDSCamSub" + std::to_string( mID ) );
     }
     return mThread.isActive() && mThread.isValid();
@@ -142,7 +142,7 @@ CameraDataSubscriber::stop()
     mWait.notify();
     mThread.release();
     mShouldStop.store( false, std::memory_order_relaxed );
-    mLogger.trace( "CameraDataSubscriber::stop", " Camera Subscriber Thread stopped " );
+    mLogger.trace( "CameraDataSubscriber::stop", "Thread stopped" );
     return !mThread.isActive();
 }
 
@@ -178,12 +178,12 @@ CameraDataSubscriber::doWork( void *data )
                 subscriber->notifyListeners<const SensorArtifactMetadata &>(
                     &SensorDataListener::onSensorArtifactAvailable, cameraArtifact );
                 subscriber->mLogger.info( "CameraDataSubscriber::doWork",
-                                          " Data Collected from the Camera and made available " );
+                                          "Data Collected from the Camera and made available" );
             }
             else
             {
                 subscriber->mLogger.error( "CameraDataSubscriber::doWork",
-                                           " Could not persist the data received into disk " );
+                                           "Could not persist the data received into disk" );
             }
 
             // Reset the response
@@ -218,7 +218,7 @@ CameraDataSubscriber::on_subscription_matched( DataReader *reader, const Subscri
     if ( info.current_count_change == 1 )
     {
         mIsAlive.store( true, std::memory_order_relaxed );
-        mLogger.trace( "CameraDataSubscriber::on_subscription_matched", " A publisher is available " );
+        mLogger.trace( "CameraDataSubscriber::on_subscription_matched", "A publisher is available" );
     }
     else if ( info.current_count_change == -1 )
     {
@@ -235,7 +235,7 @@ CameraDataSubscriber::on_data_available( DataReader *reader )
         if ( info.valid_data )
         {
             mNewResponseReceived.store( true, std::memory_order_relaxed );
-            mLogger.trace( "CameraDataSubscriber::on_data_available", " Data received from the DDS Node " );
+            mLogger.trace( "CameraDataSubscriber::on_data_available", "Data received from the DDS Node" );
             mWait.notify();
         }
     }

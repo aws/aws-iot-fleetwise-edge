@@ -45,6 +45,10 @@ public:
         inline double
         getCPUPercentage( const ThreadCPUUsageInfo &previousUsage, const double &elapsedSeconds ) const
         {
+            if ( elapsedSeconds == 0.0 )
+            {
+                return 0.0;
+            }
             double userSpaceTime = ( mUserSpaceTime - previousUsage.mUserSpaceTime );
             double kernelSpaceTime = ( mKernelSpaceTime - previousUsage.mKernelSpaceTime );
             return round( ( ( userSpaceTime + kernelSpaceTime ) / elapsedSeconds ) * 10000.0 ) / 100.0;
@@ -152,6 +156,10 @@ CPUUsageInfo::getNumCPUCores() const
 inline double
 CPUUsageInfo::getCPUPercentage( const CPUUsageInfo &previousUsage, const double &elapsedSeconds ) const
 {
+    if ( elapsedSeconds == 0.0 )
+    {
+        return 0.0;
+    }
     double userTime = ( mUserSpaceTime - previousUsage.getUserSpaceTime() );
     double systemTime = ( mKernelSpaceTime - previousUsage.getKernelSpaceTime() );
     return round( ( userTime + systemTime ) / elapsedSeconds * 10000.0 ) / 100.0;
@@ -160,6 +168,10 @@ CPUUsageInfo::getCPUPercentage( const CPUUsageInfo &previousUsage, const double 
 inline double
 CPUUsageInfo::getTotalCPUPercentage( const CPUUsageInfo &previousUsage, const double &elapsedSeconds ) const
 {
+    if ( ( mNumCPUCores == 0 ) || ( elapsedSeconds == 0.0 ) )
+    {
+        return 0.0;
+    }
     double userTime = ( mUserSpaceTime - previousUsage.getUserSpaceTime() ) / mNumCPUCores;
     double systemTime = ( mKernelSpaceTime - previousUsage.getKernelSpaceTime() ) / mNumCPUCores;
     return round( ( userTime + systemTime ) / elapsedSeconds * 10000.0 ) / 100.0;

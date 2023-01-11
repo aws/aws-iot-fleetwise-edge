@@ -19,18 +19,17 @@ namespace Linux
 void
 TraceModule::sectionBegin( TraceSection section )
 {
-    if ( section < TraceSection::TRACE_SECTION_SIZE )
+    auto index = toUType( section );
+    if ( ( section < TraceSection::TRACE_SECTION_SIZE ) && ( index >= 0 ) )
     {
         auto time = std::chrono::high_resolution_clock::now();
-        mSectionData[toUType( section )].mLastStartTime = time;
-        mSectionData[toUType( section )].mCurrentlyActive = true;
-        if ( mSectionData[toUType( section )].mHitCounter > 0 )
+        mSectionData[index].mLastStartTime = time;
+        mSectionData[index].mCurrentlyActive = true;
+        if ( mSectionData[index].mHitCounter > 0 )
         {
-            double interval =
-                std::chrono::duration<double>( ( time - mSectionData[toUType( section )].mLastEndTime ) ).count();
-            mSectionData[toUType( section )].mIntervalSum += interval;
-            mSectionData[toUType( section )].mMaxInterval =
-                std::max( mSectionData[toUType( section )].mMaxInterval, interval );
+            double interval = std::chrono::duration<double>( ( time - mSectionData[index].mLastEndTime ) ).count();
+            mSectionData[index].mIntervalSum += interval;
+            mSectionData[index].mMaxInterval = std::max( mSectionData[index].mMaxInterval, interval );
         }
     }
 }
@@ -38,16 +37,16 @@ TraceModule::sectionBegin( TraceSection section )
 void
 TraceModule::sectionEnd( TraceSection section )
 {
-    if ( section < TraceSection::TRACE_SECTION_SIZE && mSectionData[toUType( section )].mCurrentlyActive )
+    auto index = toUType( section );
+    if ( ( section < TraceSection::TRACE_SECTION_SIZE ) && ( index >= 0 ) && mSectionData[index].mCurrentlyActive )
     {
         auto time = std::chrono::high_resolution_clock::now();
-        mSectionData[toUType( section )].mLastEndTime = time;
-        double spent =
-            std::chrono::duration<double>( ( time - mSectionData[toUType( section )].mLastStartTime ) ).count();
-        mSectionData[toUType( section )].mHitCounter++;
-        mSectionData[toUType( section )].mCurrentlyActive = false;
-        mSectionData[toUType( section )].mTimeSpentSum += spent;
-        mSectionData[toUType( section )].mMaxSpent = std::max( mSectionData[toUType( section )].mMaxSpent, spent );
+        mSectionData[index].mLastEndTime = time;
+        double spent = std::chrono::duration<double>( ( time - mSectionData[index].mLastStartTime ) ).count();
+        mSectionData[index].mHitCounter++;
+        mSectionData[index].mCurrentlyActive = false;
+        mSectionData[index].mTimeSpentSum += spent;
+        mSectionData[index].mMaxSpent = std::max( mSectionData[index].mMaxSpent, spent );
     }
 }
 
@@ -173,6 +172,12 @@ TraceModule::getVariableName( TraceVariable variable )
         return "FrmE0";
     case TraceVariable::CAN_POLLING_TIMESTAMP_COUNTER:
         return "CanPollTCnt";
+    case TraceVariable::CE_PROCESSED_SIGNALS:
+        return "CeSCnt";
+    case TraceVariable::CE_PROCESSED_CAN_FRAMES:
+        return "CeCCnt";
+    case TraceVariable::CE_TRIGGERS:
+        return "CeTrgCnt";
     default:
         return "UNKNOWN";
     }
@@ -223,6 +228,46 @@ TraceModule::getSectionName( TraceSection section )
         return "COL_BUILD";
     case TraceSection::MANAGER_EXTRACTION:
         return "EXTRACT";
+    case TraceSection::CAN_DECODER_CYCLE_0:
+        return "CD_0";
+    case TraceSection::CAN_DECODER_CYCLE_1:
+        return "CD_1";
+    case TraceSection::CAN_DECODER_CYCLE_2:
+        return "CD_2";
+    case TraceSection::CAN_DECODER_CYCLE_3:
+        return "CD_3";
+    case TraceSection::CAN_DECODER_CYCLE_4:
+        return "CD_4";
+    case TraceSection::CAN_DECODER_CYCLE_5:
+        return "CD_5";
+    case TraceSection::CAN_DECODER_CYCLE_6:
+        return "CD_6";
+    case TraceSection::CAN_DECODER_CYCLE_7:
+        return "CD_7";
+    case TraceSection::CAN_DECODER_CYCLE_8:
+        return "CD_8";
+    case TraceSection::CAN_DECODER_CYCLE_9:
+        return "CD_9";
+    case TraceSection::CAN_DECODER_CYCLE_10:
+        return "CD_10";
+    case TraceSection::CAN_DECODER_CYCLE_11:
+        return "CD_11";
+    case TraceSection::CAN_DECODER_CYCLE_12:
+        return "CD_12";
+    case TraceSection::CAN_DECODER_CYCLE_13:
+        return "CD_13";
+    case TraceSection::CAN_DECODER_CYCLE_14:
+        return "CD_14";
+    case TraceSection::CAN_DECODER_CYCLE_15:
+        return "CD_15";
+    case TraceSection::CAN_DECODER_CYCLE_16:
+        return "CD_16";
+    case TraceSection::CAN_DECODER_CYCLE_17:
+        return "CD_17";
+    case TraceSection::CAN_DECODER_CYCLE_18:
+        return "CD_18";
+    case TraceSection::CAN_DECODER_CYCLE_19:
+        return "CD_19";
     default:
         return "UNKNOWN";
     }

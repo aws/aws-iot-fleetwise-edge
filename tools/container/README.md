@@ -1,6 +1,7 @@
 # Containerized Edge Agent
 
-A containerized version of the edge agent is built using Github Actions, for amd64, arm64 and armv7.
+A containerized version of the edge agent is built using Github Actions, and is available from
+AWS ECR Public Gallery: https://gallery.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge
 
 ## Running the Container
 
@@ -22,5 +23,5 @@ docker run \
     --env VEHICLE_NAME=<VEHICLE_NAME> \
     --env ENDPOINT_URL=<ENDPOINT_URL> \
     --env CAN_BUS0=<CAN_BUS0> \
-    ghcr.io/aws/aws-iot-fleetwise-edge
+    public.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge
 ```

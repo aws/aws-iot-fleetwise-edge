@@ -18,7 +18,7 @@ void
 CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectionScheme,
                                            ConditionWithCollectedData &conditionData )
 {
-    conditionData.minimumPublishInterval = collectionScheme->getMinimumPublishIntervalMs();
+    conditionData.minimumPublishIntervalMs = collectionScheme->getMinimumPublishIntervalMs();
     conditionData.afterDuration = collectionScheme->getAfterDurationMs();
     conditionData.includeActiveDtcs = collectionScheme->isActiveDTCsIncluded();
     conditionData.triggerOnlyOnRisingEdge = collectionScheme->isTriggerOnlyOnRisingEdge();
@@ -52,7 +52,7 @@ CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectio
         if ( CANFrame.channelID == INVALID_CAN_SOURCE_NUMERIC_ID )
         {
             mLogger.warn( "CollectionSchemeManager::addConditionData",
-                          "Invalid Interface ID provided:" + collectionCANFrames[i].interfaceID );
+                          "Invalid Interface ID provided: " + collectionCANFrames[i].interfaceID );
         }
         else
         {

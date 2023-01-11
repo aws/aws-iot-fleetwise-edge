@@ -5,14 +5,11 @@
 // Includes
 #include "businterfaces/ISOTPOverCANSender.h"
 #include "ClockHandler.h"
-#include <cstring>
 #include <iostream>
 #include <linux/can.h>
 #include <linux/can/isotp.h>
 #include <net/if.h>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 namespace Aws
@@ -54,7 +51,7 @@ ISOTPOverCANSender::connect()
     if ( mSocket < 0 )
     {
         mLogger.error( "ISOTPOverCANSender::connect",
-                       " Failed to create the ISOTP Socket to IF:" + mSenderOptions.mSocketCanIFName );
+                       "Failed to create the ISOTP Socket to IF: " + mSenderOptions.mSocketCanIFName );
         return false;
     }
 
@@ -62,7 +59,7 @@ ISOTPOverCANSender::connect()
     int retOptFlag = setsockopt( mSocket, SOL_CAN_ISOTP, CAN_ISOTP_OPTS, &optionalFlags, sizeof( optionalFlags ) );
     if ( retOptFlag < 0 )
     {
-        mLogger.error( "ISOTPOverCANSender::connect", " Failed to set ISO-TP socket option flags" );
+        mLogger.error( "ISOTPOverCANSender::connect", "Failed to set ISO-TP socket option flags" );
         return false;
     }
     // CAN PF and Interface Index
@@ -74,11 +71,11 @@ ISOTPOverCANSender::connect()
     if ( bind( mSocket, (struct sockaddr *)&interfaceAddress, sizeof( interfaceAddress ) ) < 0 )
     {
         mLogger.error( "ISOTPOverCANSender::connect",
-                       " Failed to bind the ISOTP Socket to IF:" + mSenderOptions.mSocketCanIFName );
+                       "Failed to bind the ISOTP Socket to IF: " + mSenderOptions.mSocketCanIFName );
         close( mSocket );
         return false;
     }
-    mLogger.trace( "ISOTPOverCANSender::connect", " ISOTP Socket connected to IF:" + mSenderOptions.mSocketCanIFName );
+    mLogger.trace( "ISOTPOverCANSender::connect", "ISOTP Socket connected to IF: " + mSenderOptions.mSocketCanIFName );
     return true;
 }
 
@@ -88,11 +85,11 @@ ISOTPOverCANSender::disconnect()
     if ( close( mSocket ) < 0 )
     {
         mLogger.error( "ISOTPOverCANSender::connect",
-                       " Failed to disconnect the ISOTP Socket from IF:" + mSenderOptions.mSocketCanIFName );
+                       "Failed to disconnect the ISOTP Socket from IF: " + mSenderOptions.mSocketCanIFName );
         return false;
     }
     mLogger.trace( "ISOTPOverCANSender::disconnect",
-                   " ISOTP Socket disconnected from IF:" + mSenderOptions.mSocketCanIFName );
+                   "ISOTP Socket disconnected from IF: " + mSenderOptions.mSocketCanIFName );
     return true;
 }
 
@@ -103,15 +100,15 @@ ISOTPOverCANSender::isAlive() const
     socklen_t len = sizeof( error );
     // Get the error status of the socket
     int retSockOpt = getsockopt( mSocket, SOL_SOCKET, SO_ERROR, &error, &len );
-    return ( retSockOpt == 0 && error == 0 );
+    return ( ( retSockOpt == 0 ) && ( error == 0 ) );
 }
 
 bool
 ISOTPOverCANSender::sendPDU( const std::vector<uint8_t> &pduData )
 {
     int bytesWritten = static_cast<int>( write( mSocket, pduData.data(), pduData.size() ) );
-    mLogger.trace( "ISOTPOverCANSender::sendPDU", " sent a PDU of size:" + std::to_string( bytesWritten ) );
-    return ( bytesWritten > 0 && bytesWritten == static_cast<int>( pduData.size() ) );
+    mLogger.trace( "ISOTPOverCANSender::sendPDU", "Sent a PDU of size: " + std::to_string( bytesWritten ) );
+    return ( ( bytesWritten > 0 ) && ( bytesWritten == static_cast<int>( pduData.size() ) ) );
 }
 
 } // namespace VehicleNetwork

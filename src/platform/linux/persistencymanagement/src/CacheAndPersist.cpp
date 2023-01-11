@@ -26,24 +26,24 @@ CacheAndPersist::init()
 {
     if ( createFile( mDecoderManifestFile ) != ErrorCode::SUCCESS )
     {
-        mLogger.error( "PersistencyManagement::init", " Failed to create decoder manifest file " );
+        mLogger.error( "PersistencyManagement::init", "Failed to create decoder manifest file" );
         return false;
     }
 
     if ( createFile( mCollectionSchemeListFile ) != ErrorCode::SUCCESS )
     {
-        mLogger.error( "PersistencyManagement::init", " Failed to create collectionScheme list file " );
+        mLogger.error( "PersistencyManagement::init", "Failed to create collectionScheme list file" );
         return false;
     }
 
     if ( createFile( mCollectedDataFile ) != ErrorCode::SUCCESS )
     {
-        mLogger.error( "PersistencyManagement::init", " Failed to create collected data file " );
+        mLogger.error( "PersistencyManagement::init", "Failed to create collected data file" );
 
         return false;
     }
 
-    mLogger.info( "PersistencyManagement::init", " Persistency library successfully initialised. " );
+    mLogger.info( "PersistencyManagement::init", "Persistency library successfully initialised" );
     return true;
 }
 
@@ -114,7 +114,7 @@ CacheAndPersist::write( const uint8_t *bufPtr, size_t size, DataType dataType )
 
     default:
         status = ErrorCode::INVALID_DATATYPE;
-        mLogger.error( "PersistencyManagement::write", " Invalid data type specified " );
+        mLogger.error( "PersistencyManagement::write", "Invalid data type specified" );
         return status;
     }
 
@@ -132,7 +132,7 @@ CacheAndPersist::write( const uint8_t *bufPtr, size_t size, DataType dataType )
     if ( !file.is_open() )
     {
         status = ErrorCode::FILESYSTEM_ERROR;
-        mLogger.error( "PersistencyManagement::write", " Could not open file " );
+        mLogger.error( "PersistencyManagement::write", "Could not open file" );
     }
     else
     {
@@ -140,7 +140,7 @@ CacheAndPersist::write( const uint8_t *bufPtr, size_t size, DataType dataType )
         if ( !file.good() )
         {
             status = ErrorCode::FILESYSTEM_ERROR;
-            mLogger.error( "PersistencyManagement::write", " Error writing to the file " );
+            mLogger.error( "PersistencyManagement::write", "Error writing to the file" );
         }
         file.close();
     }
@@ -170,7 +170,7 @@ CacheAndPersist::getSize( DataType dataType )
         break;
 
     default:
-        mLogger.error( "PersistencyManagement::getSize", " Invalid data type specified " );
+        mLogger.error( "PersistencyManagement::getSize", "Invalid data type specified" );
         return INVALID_FILE_SIZE;
     }
 
@@ -210,7 +210,7 @@ CacheAndPersist::read( uint8_t *const readBufPtr, size_t size, DataType dataType
 
     default:
         status = ErrorCode::INVALID_DATATYPE;
-        mLogger.error( "PersistencyManagement::read", " Invalid data type specified " );
+        mLogger.error( "PersistencyManagement::read", "Invalid data type specified" );
         return status;
     }
 
@@ -218,7 +218,7 @@ CacheAndPersist::read( uint8_t *const readBufPtr, size_t size, DataType dataType
 
     if ( !file.is_open() )
     {
-        mLogger.error( "PersistencyManagement::read", " Error opening file" );
+        mLogger.error( "PersistencyManagement::read", "Error opening file" );
         status = ErrorCode::FILESYSTEM_ERROR;
     }
     else
@@ -235,7 +235,7 @@ CacheAndPersist::read( uint8_t *const readBufPtr, size_t size, DataType dataType
             // coverity[uninit_use_in_call : SUPPRESS]
             if ( file.fail() )
             {
-                mLogger.error( "PersistencyManagement::read", " Error reading file" );
+                mLogger.error( "PersistencyManagement::read", "Error reading file" );
                 status = ErrorCode::FILESYSTEM_ERROR;
             }
         }
@@ -267,7 +267,7 @@ CacheAndPersist::erase( DataType dataType )
 
     default:
         status = ErrorCode::INVALID_DATATYPE;
-        mLogger.error( "PersistencyManagement::erase", " Invalid data type specified " );
+        mLogger.error( "PersistencyManagement::erase", "Invalid data type specified" );
         return status;
     }
 
@@ -277,7 +277,7 @@ CacheAndPersist::erase( DataType dataType )
     if ( !file.is_open() )
     {
         status = ErrorCode::FILESYSTEM_ERROR;
-        mLogger.error( "PersistencyManagement::erase", " Error erasing the file " );
+        mLogger.error( "PersistencyManagement::erase", "Error erasing the file" );
     }
     else
     {

@@ -102,8 +102,6 @@ private:
     // Main work function. Listens on the socket for CAN Messages
     // and push data to the circular buffer.
     static void doWork( void *data );
-    // Current non deterministic size of the circular buffer
-    size_t queueSize() const;
 
     Timestamp extractTimestamp( struct msghdr *msgHeader );
 

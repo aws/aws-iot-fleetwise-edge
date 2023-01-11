@@ -47,8 +47,8 @@ DecoderManifestIngestion::getCANMessageFormat( CANRawFrameID canID, CANInterface
     }
 
     // Check if the message for this CANRawFrameID and interfaceID exists
-    if ( mCANMessageFormatDictionary.count( interfaceID ) > 0 &&
-         mCANMessageFormatDictionary.at( interfaceID ).count( canID ) > 0 )
+    if ( ( mCANMessageFormatDictionary.count( interfaceID ) > 0 ) &&
+         ( mCANMessageFormatDictionary.at( interfaceID ).count( canID ) > 0 ) )
     {
         // It exists, so return it
         return mCANMessageFormatDictionary.at( interfaceID ).at( canID );
@@ -116,16 +116,16 @@ bool
 DecoderManifestIngestion::copyData( const std::uint8_t *inputBuffer, const size_t size )
 {
     // check for a null input buffer or size set to 0
-    if ( inputBuffer == nullptr || size == 0 )
+    if ( ( inputBuffer == nullptr ) || ( size == 0 ) )
     {
-        mLogger.error( "DecoderManifestIngestion::copyData()", "Input buffer invalid" );
+        mLogger.error( "DecoderManifestIngestion::copyData", "Input buffer invalid" );
         return false;
     }
 
     // We have to guard against document sizes that are too large
     if ( size > DECODER_MANIFEST_BYTE_SIZE_LIMIT )
     {
-        mLogger.error( "DecoderManifestIngestion::copyData()",
+        mLogger.error( "DecoderManifestIngestion::copyData",
                        "Decoder Manifest binary too big. Size: " + std::to_string( size ) +
                            " limit: " + std::to_string( DECODER_MANIFEST_BYTE_SIZE_LIMIT ) );
         return false;
@@ -137,14 +137,14 @@ DecoderManifestIngestion::copyData( const std::uint8_t *inputBuffer, const size_
     // Check to make sure the vector size is the same as our input size
     if ( mProtoBinaryData.size() != size )
     {
-        mLogger.error( "DecoderManifestIngestion::copyData()", "Copied data not the same size as input data." );
+        mLogger.error( "DecoderManifestIngestion::copyData", "Copied data not the same size as input data" );
         return false;
     }
 
     // Set the ready flag to false, as we have new data that needs to be parsed
     mReady = false;
 
-    mLogger.trace( "DecoderManifestIngestion::copyData()", "Copy of DecoderManifest data success." );
+    mLogger.trace( "DecoderManifestIngestion::copyData", "Copy of DecoderManifest data success" );
     return true;
 }
 
@@ -161,7 +161,7 @@ DecoderManifestIngestion::build()
     // Ensure that we have data to parse
     if ( mProtoBinaryData.empty() )
     {
-        mLogger.error( "DecoderManifestIngestion::build", "Failed to build due to an empty Decoder Manifest." );
+        mLogger.error( "DecoderManifestIngestion::build", "Failed to build due to an empty Decoder Manifest" );
         // Error, input buffer empty or invalid
         return false;
     }
@@ -169,13 +169,13 @@ DecoderManifestIngestion::build()
     // Try to parse the binary data into our mProtoDecoderManifest member variable
     if ( !mProtoDecoderManifest.ParseFromArray( mProtoBinaryData.data(), static_cast<int>( mProtoBinaryData.size() ) ) )
     {
-        mLogger.error( "DecoderManifestIngestion::build", "Failed to parse DecoderManifest proto." );
+        mLogger.error( "DecoderManifestIngestion::build", "Failed to parse DecoderManifest proto" );
         // Error parsing proto binary
         return false;
     }
 
     // Do some validation of the DecoderManifest. Either CAN or OBD or both should be specified.
-    if ( mProtoDecoderManifest.can_signals_size() == 0 && mProtoDecoderManifest.obd_pid_signals_size() == 0 )
+    if ( ( mProtoDecoderManifest.can_signals_size() == 0 ) && ( mProtoDecoderManifest.obd_pid_signals_size() == 0 ) )
     {
         // Error, missing required decoding information in the Decoder mProtoDecoderManifest
         mLogger.error(
@@ -221,8 +221,8 @@ DecoderManifestIngestion::build()
         // existing one.
 
         // First check if CANMessageFormat exists for this message id and node id
-        if ( mCANMessageFormatDictionary.count( canSignal.interface_id() ) == 1 &&
-             mCANMessageFormatDictionary[canSignal.interface_id()].count( canSignal.message_id() ) == 1 )
+        if ( ( mCANMessageFormatDictionary.count( canSignal.interface_id() ) == 1 ) &&
+             ( mCANMessageFormatDictionary[canSignal.interface_id()].count( canSignal.message_id() ) == 1 ) )
         {
             // CANMessageFormat exists for a given node id and message id. Add this signal format to it
             mCANMessageFormatDictionary[canSignal.interface_id()][canSignal.message_id()].mSignals.emplace_back(
@@ -281,7 +281,7 @@ DecoderManifestIngestion::build()
         mSignalToPIDDictionary[pidSignal.signal_id()] = obdPIDSignalDecoderFormat;
     }
 
-    mLogger.trace( "DecoderManifestIngestion::build", "Decoder Manifest build succeeded." );
+    mLogger.trace( "DecoderManifestIngestion::build", "Decoder Manifest build succeeded" );
     // Set our ready flag to true
     mReady = true;
     return true;

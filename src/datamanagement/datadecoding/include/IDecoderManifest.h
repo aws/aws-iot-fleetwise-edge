@@ -144,10 +144,10 @@ public:
     bool
     operator==( const PIDSignalDecoderFormat &other ) const
     {
-        return mPidResponseLength == other.mPidResponseLength && mServiceMode == other.mServiceMode &&
-               mPID == other.mPID && mScaling == other.mScaling && mOffset == other.mOffset &&
-               mStartByte == other.mStartByte && mByteLength == other.mByteLength &&
-               mBitRightShift == other.mBitRightShift && mBitMaskLength == other.mBitMaskLength;
+        return ( mPidResponseLength == other.mPidResponseLength ) && ( mServiceMode == other.mServiceMode ) &&
+               ( mPID == other.mPID ) && ( mScaling == other.mScaling ) && ( mOffset == other.mOffset ) &&
+               ( mStartByte == other.mStartByte ) && ( mByteLength == other.mByteLength ) &&
+               ( mBitRightShift == other.mBitRightShift ) && ( mBitMaskLength == other.mBitMaskLength );
     }
 };
 

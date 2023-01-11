@@ -11,7 +11,6 @@
 #include <linux/can/isotp.h>
 #include <net/if.h>
 #include <poll.h>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -64,7 +63,7 @@ ISOTPOverCANReceiver::connect()
     if ( mSocket < 0 )
     {
         mLogger.error( "ISOTPOverCANReceiver::connect",
-                       " Failed to create the ISOTP Socket to IF:" + mReceiverOptions.mSocketCanIFName );
+                       "Failed to create the ISOTP Socket to IF: " + mReceiverOptions.mSocketCanIFName );
         return false;
     }
 
@@ -73,9 +72,9 @@ ISOTPOverCANReceiver::connect()
     int retFrameCtrFlag =
         setsockopt( mSocket, SOL_CAN_ISOTP, CAN_ISOTP_RECV_FC, &frameControlFlags, sizeof( frameControlFlags ) );
 
-    if ( retOptFlag < 0 || retFrameCtrFlag < 0 )
+    if ( ( retOptFlag < 0 ) || ( retFrameCtrFlag < 0 ) )
     {
-        mLogger.error( "ISOTPOverCANReceiver::connect", " Failed to set ISO-TP socket option flags" );
+        mLogger.error( "ISOTPOverCANReceiver::connect", "Failed to set ISO-TP socket option flags" );
         return false;
     }
     // CAN PF and Interface Index
@@ -87,12 +86,12 @@ ISOTPOverCANReceiver::connect()
     if ( bind( mSocket, (struct sockaddr *)&interfaceAddress, sizeof( interfaceAddress ) ) < 0 )
     {
         mLogger.error( "ISOTPOverCANReceiver::connect",
-                       " Failed to bind the ISOTP Socket to IF:" + mReceiverOptions.mSocketCanIFName );
+                       "Failed to bind the ISOTP Socket to IF: " + mReceiverOptions.mSocketCanIFName );
         close( mSocket );
         return false;
     }
     mLogger.trace( "ISOTPOverCANReceiver::connect",
-                   " ISOTP Socket connected to IF:" + mReceiverOptions.mSocketCanIFName );
+                   "ISOTP Socket connected to IF: " + mReceiverOptions.mSocketCanIFName );
     return true;
 }
 
@@ -102,11 +101,11 @@ ISOTPOverCANReceiver::disconnect()
     if ( close( mSocket ) < 0 )
     {
         mLogger.error( "ISOTPOverCANReceiver::connect",
-                       " Failed to disconnect the ISOTP Socket from IF:" + mReceiverOptions.mSocketCanIFName );
+                       "Failed to disconnect the ISOTP Socket from IF: " + mReceiverOptions.mSocketCanIFName );
         return false;
     }
     mLogger.trace( "ISOTPOverCANReceiver::disconnect",
-                   " ISOTP Socket disconnected from IF:" + mReceiverOptions.mSocketCanIFName );
+                   "ISOTP Socket disconnected from IF: " + mReceiverOptions.mSocketCanIFName );
     return true;
 }
 
@@ -117,7 +116,7 @@ ISOTPOverCANReceiver::isAlive() const
     socklen_t len = sizeof( error );
     // Get the error status of the socket
     int retSockOpt = getsockopt( mSocket, SOL_SOCKET, SO_ERROR, &error, &len );
-    return ( retSockOpt == 0 && error == 0 );
+    return ( ( retSockOpt == 0 ) && ( error == 0 ) );
 }
 
 bool
@@ -137,7 +136,7 @@ ISOTPOverCANReceiver::receivePDU( std::vector<uint8_t> &pduData )
     pduData.resize( MAX_PDU_SIZE );
     // coverity[check_return : SUPPRESS]
     int bytesRead = static_cast<int>( read( mSocket, pduData.data(), MAX_PDU_SIZE ) );
-    mLogger.trace( "ISOTPOverCANReceiver::receivePDU", " Received a PDU of size:" + std::to_string( bytesRead ) );
+    mLogger.trace( "ISOTPOverCANReceiver::receivePDU", "Received a PDU of size: " + std::to_string( bytesRead ) );
     // Remove the unnecessary bytes from the PDU container.
     if ( bytesRead > 0 )
     {

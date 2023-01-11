@@ -56,9 +56,9 @@ CANDataSource::init( const std::vector<VehicleDataSourceConfig> &sourceConfigs )
 {
     // Only one source config is supported on the CAN stack i.e. we manage one socket with
     // one single thread.
-    if ( sourceConfigs.size() > 1 || sourceConfigs.empty() )
+    if ( ( sourceConfigs.size() > 1 ) || sourceConfigs.empty() )
     {
-        mLogger.error( "CANDataSource::init", " Only one source config is supported " );
+        mLogger.error( "CANDataSource::init", "Only one source config is supported" );
         return false;
     }
     auto settingsIterator = sourceConfigs[0].transportProperties.find( std::string( INTERFACE_NAME_KEY ) );
@@ -122,11 +122,11 @@ CANDataSource::start()
     mShouldSleep.store( true );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "CANDataSource::start", " CAN Data Source Thread failed to start " );
+        mLogger.trace( "CANDataSource::start", "Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "CANDataSource::start", " CAN Data Source Thread started " );
+        mLogger.trace( "CANDataSource::start", "Thread started" );
         mThread.setThreadName( "fwVNLinuxCAN" + std::to_string( mID ) );
     }
     return mThread.isActive() && mThread.isValid();
@@ -137,7 +137,7 @@ CANDataSource::suspendDataAcquisition()
 {
     // Go back to sleep
     mLogger.trace( "CANDataSource::suspendDataAcquisition",
-                   "Going to sleep until a the resume signal. CAN Data Source : " + std::to_string( mID ) );
+                   "Going to sleep until a the resume signal. CAN Data Source: " + std::to_string( mID ) );
     mShouldSleep.store( true, std::memory_order_relaxed );
 }
 
@@ -146,9 +146,9 @@ CANDataSource::resumeDataAcquisition()
 {
 
     mLogger.trace( "CANDataSource::resumeDataAcquisition",
-                   " Resuming Network data acquisition on Data Source :" + std::to_string( mID ) );
+                   "Resuming Network data acquisition on Data Source: " + std::to_string( mID ) );
     // Make sure the thread does not sleep anymore
-    mResumeTime = mClock->timeSinceEpochMs();
+    mResumeTime = mClock->systemTimeSinceEpochMs();
     mShouldSleep.store( false );
     // Wake up the worker thread.
     mWait.notify();
@@ -162,7 +162,7 @@ CANDataSource::stop()
     mWait.notify();
     mThread.release();
     mShouldStop.store( false, std::memory_order_relaxed );
-    mLogger.trace( "CANDataSource::stop", " CAN Data Source Thread stopped " );
+    mLogger.trace( "CANDataSource::stop", "Thread stopped" );
     return !mThread.isActive();
 }
 
@@ -211,13 +211,13 @@ CANDataSource::extractTimestamp( struct msghdr *msgHeader )
             currentHeader = CMSG_NXTHDR( msgHeader, currentHeader );
         }
         TraceModule::get().setVariable( TraceVariable::MAX_SYSTEMTIME_KERNELTIME_DIFF,
-                                        static_cast<uint64_t>( mClock->timeSinceEpochMs() ) -
+                                        static_cast<uint64_t>( mClock->systemTimeSinceEpochMs() ) -
                                             static_cast<uint64_t>( timestamp ) );
     }
     if ( timestamp == 0 ) // either other timestamp are invalid(=0) or mTimestampTypeToUse == POLLING_TIME
     {
         TraceModule::get().incrementVariable( TraceVariable::CAN_POLLING_TIMESTAMP_COUNTER );
-        timestamp = mClock->timeSinceEpochMs();
+        timestamp = mClock->systemTimeSinceEpochMs();
     }
     return timestamp;
 }
@@ -242,7 +242,7 @@ CANDataSource::doWork( void *data )
             // We either just started or there was a decoder manifest update that we can't use
             // We should sleep
             dataSource->mLogger.trace( "CANDataSource::doWork",
-                                       "No valid decoding dictionary available, Channel going to sleep " );
+                                       "No valid decoding dictionary available, channel going to sleep" );
             dataSource->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
             wokeUpFromSleep = true;
         }
@@ -281,7 +281,7 @@ CANDataSource::doWork( void *data )
                 TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::NOT_TIME_MONOTONIC_FRAMES );
             }
             // After waking up the Socket Can old messages in the kernel queue need to be ignored
-            if ( !wokeUpFromSleep || timestamp >= dataSource->mResumeTime )
+            if ( ( !wokeUpFromSleep ) || ( timestamp >= dataSource->mResumeTime ) )
             {
                 lastFrameTime = timestamp;
                 dataSource->receivedMessages++;
@@ -304,7 +304,7 @@ CANDataSource::doWork( void *data )
                         dataSource->discardedMessages++;
                         TraceModule::get().setVariable( TraceVariable::DISCARDED_FRAMES,
                                                         dataSource->discardedMessages );
-                        dataSource->mLogger.warn( "CANDataSource::doWork", " Circular Buffer is full" );
+                        dataSource->mLogger.warn( "CANDataSource::doWork", "Circular Buffer is full" );
                     }
                 }
                 else
@@ -330,12 +330,6 @@ CANDataSource::doWork( void *data )
             wokeUpFromSleep = false;
         }
     } while ( !dataSource->shouldStop() );
-}
-
-size_t
-CANDataSource::queueSize() const
-{
-    return mCircularBuffPtr->read_available();
 }
 
 bool
@@ -377,19 +371,19 @@ CANDataSource::connect()
 
     if ( ioctl( mSocket, SIOCGIFINDEX, &interfaceRequest ) != 0 )
     {
-        mLogger.error( "CANDataSource::connect", " CAN Interface with name " + mIfName + " is not accessible" );
+        mLogger.error( "CANDataSource::connect", "CAN Interface with name " + mIfName + " is not accessible" );
         close( mSocket );
         return false;
     }
-    if ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP ||
-         mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_HARDWARE_TIMESTAMP )
+    if ( ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP ) ||
+         ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_HARDWARE_TIMESTAMP ) )
     {
         const int timestampFlags = ( SOF_TIMESTAMPING_RX_HARDWARE | SOF_TIMESTAMPING_RX_SOFTWARE |
                                      SOF_TIMESTAMPING_SOFTWARE | SOF_TIMESTAMPING_RAW_HARDWARE );
         if ( setsockopt( mSocket, SOL_SOCKET, SO_TIMESTAMPING, &timestampFlags, sizeof( timestampFlags ) ) != 0 )
         {
             mLogger.error( "CANDataSource::connect",
-                           " Hardware timestamp not supported by socket but requested by config" );
+                           "Hardware timestamp not supported by socket but requested by config" );
             close( mSocket );
             return false;
         }
@@ -415,7 +409,7 @@ CANDataSource::connect()
 bool
 CANDataSource::disconnect()
 {
-    if ( !stop() && close( mSocket ) < 0 )
+    if ( ( !stop() ) && ( close( mSocket ) < 0 ) )
     {
         return false;
     }
@@ -431,7 +425,7 @@ CANDataSource::isAlive()
     socklen_t len = sizeof( error );
     // Get the error status of the socket
     int retSockOpt = getsockopt( mSocket, SOL_SOCKET, SO_ERROR, &error, &len );
-    if ( retSockOpt == -1 || !mThread.isValid() || !mThread.isActive() || error != 0 )
+    if ( ( retSockOpt == -1 ) || ( !mThread.isValid() ) || ( !mThread.isActive() ) || ( error != 0 ) )
     {
         return false;
     }

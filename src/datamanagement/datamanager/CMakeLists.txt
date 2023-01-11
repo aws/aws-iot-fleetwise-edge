@@ -55,8 +55,6 @@ install(
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
 
-  find_package(GTest REQUIRED)
-
   find_library(GMOCK_LIB
   NAMES
     gmock)
@@ -88,13 +86,12 @@ if(${BUILD_TESTING})
       include
       test/include)
 
-    # Link to the project library and GTest main
+    # Link to the project library and testing library main
     target_link_libraries(
       ${testName}
       PRIVATE
       ${libraryTargetName}
-      GTest::Main
-      GTest::GTest
+      IoTFleetWise::TestingSupport
       ${GMOCK_LIB}
     )
 

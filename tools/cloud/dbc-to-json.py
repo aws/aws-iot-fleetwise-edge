@@ -34,6 +34,9 @@ for message in db.messages:
         signal_to_add["offset"] = signal.offset
         signal_to_add["messageId"] = message.frame_id
 
+        # In a DBC file, the start bit indicates the LSB for little endian and MSB for big endian
+        # signals. AWS IoT Fleetwise considers start bit to always be the LSB regardless of
+        # endianess. That is why we need to convert the value obtained from DBC.
         if signal.byte_order == 'big_endian':
             pos = 7 - ( signal.start % 8 ) + ( signal.length - 1 )
             if pos < 8:

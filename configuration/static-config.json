@@ -15,7 +15,8 @@
                 "interfaceName": "vcan0",
                 "obdStandard": "J1979",
                 "pidRequestIntervalSeconds": 0,
-                "dtcRequestIntervalSeconds": 0
+                "dtcRequestIntervalSeconds": 0,
+                "broadcastRequests": true
             },
             "interfaceId": "2",
             "type": "obdInterface"

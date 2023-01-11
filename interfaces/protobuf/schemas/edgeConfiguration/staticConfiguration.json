@@ -204,6 +204,11 @@
                             "type": "string",
                             "description": "Set log level severity- Trace, Info, Warning, Error"
                         },
+                        "logColor": {
+                            "type": "string",
+                            "enum": ["Auto", "Yes", "No"],
+                            "description": "Whether the logs should be colored. Default to auto."
+                        },
                         "dataReductionProbabilityDisabled": {
                             "type": "boolean",
                             "description": "Disables the whole probability-based DDC,can be used for debugging"

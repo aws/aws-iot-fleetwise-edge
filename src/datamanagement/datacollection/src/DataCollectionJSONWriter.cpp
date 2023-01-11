@@ -85,7 +85,8 @@ DataCollectionJSONWriter::flushToFile()
 
     static constexpr char SEP = '-';
     std::ostringstream oss;
-    oss << "IoTFleetWise" << SEP << "Data" << SEP << eventId << SEP << std::to_string( mClock->timeSinceEpochMs() );
+    oss << "IoTFleetWise" << SEP << "Data" << SEP << eventId << SEP
+        << std::to_string( mClock->systemTimeSinceEpochMs() );
     return flushToFile( oss.str() );
 }
 

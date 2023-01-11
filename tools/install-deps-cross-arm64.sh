@@ -45,7 +45,6 @@ apt install -y \
     build-essential \
     crossbuild-essential-arm64 \
     cmake \
-    faketime:arm64 \
     unzip \
     git \
     wget \
@@ -60,6 +59,7 @@ if [ ! -d jsoncpp ]; then
     cd jsoncpp
     mkdir build && cd build
     cmake \
+        -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=OFF \
         -DCMAKE_POSITION_INDEPENDENT_CODE=On \
         -DJSONCPP_WITH_TESTS=Off \
@@ -71,10 +71,10 @@ if [ ! -d jsoncpp ]; then
 fi
 make install -j`nproc` -C jsoncpp/build
 
-if [ ! -d protobuf-21.7 ]; then
-    wget -q https://github.com/protocolbuffers/protobuf/releases/download/v21.7/protobuf-all-21.7.tar.gz
-    tar -zxf protobuf-all-21.7.tar.gz
-    cd protobuf-21.7
+if [ ! -d protobuf-3.21.7 ]; then
+    wget -q https://github.com/protocolbuffers/protobuf/releases/download/v21.7/protobuf-cpp-3.21.7.tar.gz
+    tar -zxf protobuf-cpp-3.21.7.tar.gz
+    cd protobuf-3.21.7
     mkdir build && cd build
     ../configure
     cd ..
@@ -83,8 +83,8 @@ if [ ! -d protobuf-21.7 ]; then
         ../configure --host=aarch64-linux --prefix=/usr/local/aarch64-linux-gnu
     cd ../..
 fi
-make install -j`nproc` -C protobuf-21.7/build
-make install -j`nproc` -C protobuf-21.7/build_arm64
+make install -j`nproc` -C protobuf-3.21.7/build
+make install -j`nproc` -C protobuf-3.21.7/build_arm64
 
 if [ ! -d can-isotp ]; then
     git clone https://github.com/hartkopp/can-isotp.git
@@ -125,32 +125,6 @@ if [ ! -d aws-sdk-cpp ]; then
 fi
 make install -j`nproc` -C aws-sdk-cpp/build
 
-if [ ! -d googletest ]; then
-    git clone -b release-1.10.0 https://github.com/google/googletest.git
-    cd googletest
-    mkdir build && cd build
-    cmake \
-        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
-        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
-        ..
-    cd ../.. 
-fi
-make install -j`nproc` -C googletest/build
-
-if [ ! -d benchmark ]; then
-    git clone -b v1.6.1 https://github.com/google/benchmark.git
-    cd benchmark
-    mkdir build && cd build
-    cmake \
-        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
-        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
-        -DBENCHMARK_DOWNLOAD_DEPENDENCIES=on \
-        -DCMAKE_BUILD_TYPE=Release \
-        ..
-    cd ../.. 
-fi
-make install -j`nproc` -C benchmark/build
-
 # AWS IoT FleetWise Edge camera support requires Fast-DDS and its dependencies:
 if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
     apt install -y \
@@ -163,6 +137,7 @@ if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
         cd tinyxml2
         mkdir build && cd build
         cmake \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DBUILD_STATIC_LIBS=ON \
             -DBUILD_TESTING=OFF \
@@ -179,6 +154,7 @@ if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
         cd foonathan_memory_vendor
         mkdir build && cd build
         cmake \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -Dextra_cmake_args="-DCMAKE_CROSSCOMPILING_EMULATOR=qemu-aarch64" \
             -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
@@ -193,6 +169,7 @@ if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
         cd Fast-CDR
         mkdir build && cd build
         cmake \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
             -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
@@ -206,6 +183,7 @@ if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
         cd Fast-DDS
         mkdir build && cd build
         cmake \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DCOMPILE_TOOLS=OFF \
             -DCMAKE_CXX_FLAGS="-DUSE_FOONATHAN_NODE_SIZES=1" \

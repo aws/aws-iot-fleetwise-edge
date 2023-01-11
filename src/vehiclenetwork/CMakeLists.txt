@@ -114,7 +114,6 @@ if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/CameraSubscriberTestPNG.png
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-  find_package(GTest REQUIRED)
 
   # Add the executable targets
   foreach(testSource ${testSources})
@@ -122,12 +121,12 @@ if(${BUILD_TESTING})
     get_filename_component(testName ${testSource} NAME_WE)
 
     add_executable(${testName} ${testSource})
-    # Link to the project library and GTest main
+    # Link to the project library and testing library main
     target_link_libraries(
       ${testName}
       PRIVATE
       ${libraryTargetName}
-      GTest::Main
+      IoTFleetWise::TestingSupport
     )
     add_unit_test(${testName})
     add_valgrind_test(${testName})

@@ -90,7 +90,6 @@ protected:
     /**
      * @brief Helper function for test cases to assert the event data written to JSON.
      *
-     * @param persistencyPath File path where files will be written
      * @param signals Expected signals to be present in the output files
      * @param expectedToCompress Whether compression is expected or not.
      */

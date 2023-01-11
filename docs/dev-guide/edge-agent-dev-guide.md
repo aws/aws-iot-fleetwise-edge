@@ -29,14 +29,14 @@ You can use the included sample C++ application to learn more about AWS IoT Flee
 
 # AWS IoT FleetWise quick start demo
 
-This guide is intended to quickly demonstrate the basic features of AWS IoT FleetWise by firstly building AWS IoT FleetWise Edge Agent and running it on an AWS EC2 instance representing one or more simulated vehicles. A script is then run using the AWS CLI to control AWS IoT FleetWise Cloud in order collect data from the vehicle.
+This guide is intended to quickly demonstrate the basic features of AWS IoT FleetWise by firstly deploying the AWS IoT FleetWise Edge Agent to an AWS EC2 instance representing one or more simulated vehicles. A script is then run using the AWS CLI to control AWS IoT FleetWise Cloud in order collect data from the vehicle.
 
 This guide showcases AWS IoT FleetWise at a high level. If you are interested in exploring AWS IoT FleetWise at a more detailed technical level, see [Getting started with AWS IoT FleetWise Edge Agent](#getting-started-with-aws-iot-fleetwise-edge-agent).
 
 **Topics:**
 
 - [Prerequisites for quick start demo](#prerequisites-for-quick-start-demo)
-- [Build the AWS IoT FleetWise Edge Agent software](#build-the-aws-iot-fleetwise-edge-agent-software)
+- [Deploy the AWS IoT FleetWise Edge Agent software](#deploy-the-aws-iot-fleetwise-edge-agent-software)
 - [Use the AWS IoT FleetWise cloud demo](#use-the-aws-iot-fleetwise-cloud-demo)
 - [Explore collected data](#explore-collected-data)
 
@@ -46,15 +46,15 @@ This guide assumes you have already logged in to the AWS console in your desired
 
 - Note: AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
 
-## Build the AWS IoT FleetWise Edge Agent software
+## Deploy the AWS IoT FleetWise Edge Agent software
 
-An AWS CloudFormation template is used to build AWS IoT FleetWise Edge Agent using AWS CodeBuild and deploy it to a new AWS EC2 instance using AWS CodeDeploy.
+An AWS CloudFormation template is used to deploy the AWS IoT FleetWise Edge Agent to a new AWS EC2 instance.
 
 1. Click here to [**Launch CloudFormation Template**](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-iot-fleetwise.s3.us-west-2.amazonaws.com%2Flatest%2Fcfn-templates%2Ffwdemo.yml&stackName=fwdemo).
 1. (Optional) You can increase the number of simulated vehicles by updating the `FleetSize` parameter. You can also specify the region IoT Things are created in by updating the `IoTCoreRegion` parameter.
 1. Select the checkbox next to _‘I acknowledge that AWS CloudFormation might create IAM resources with custom names.’_
 1. Choose **Create stack**.
-1. Wait until the status of the Stack is ‘CREATE_COMPLETE’, this will take approximately 15 minutes.
+1. Wait until the status of the Stack is ‘CREATE_COMPLETE’, this will take approximately 10 minutes.
 
 AWS IoT FleetWise Edge Agent software has been deployed to an AWS EC2 Graviton (ARM64) Instance along with credentials that allow it to connect to AWS IoT Core. CAN data is also being generated on the EC2 instance to simulate periodic hard-braking events. The AWS IoT FleetWise Cloud demo script in the following section will deploy a campaign to the simulated fleet of vehicles to capture the engine torque when a hard braking-event occurs.
 
@@ -63,14 +63,12 @@ AWS IoT FleetWise Edge Agent software has been deployed to an AWS EC2 Graviton (
 The instructions below will register your AWS account for AWS IoT FleetWise, create a demonstration vehicle model, register the virtual vehicle created in the previous section and run a campaign to collect data from it.
 
 1. Open the AWS CloudShell: [Launch CloudShell](https://console.aws.amazon.com/cloudshell/home)
-1. Copy and paste the following commands to clone the latest AWS IoT FleetWise Edge Agent software from GitHub, install the dependencies of the cloud demo script and enable IoT FleetWise commands in the AWS CLI.
+1. Copy and paste the following commands to clone the latest AWS IoT FleetWise Edge Agent software from GitHub and install the dependencies of the cloud demo script.
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
        && cd ~/aws-iot-fleetwise-edge/tools/cloud \
-       && pip3 install wrapt==1.10.0 plotly==5.3.1 pandas==1.3.4 cantools==36.4.0 \
-       && aws configure add-model --service-model file://iotfleetwise-2021-06-17.json \
-           --service-name iotfleetwise
+       && pip3 install wrapt==1.10.0 plotly==5.3.1 pandas==1.3.4 cantools==36.4.0
    ```
 
    The AWS IoT FleetWise Cloud demo script performs the following:
@@ -189,7 +187,8 @@ An Ubuntu 18.04 development machine with 200GB free disk space will be required.
 
 1. Install the AWS IoT FleetWise Edge Agent dependencies
 
-  Commands below will:
+   Commands below will:
+
    1. Install the following Ubuntu packages:
       `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`. Additionally it installs the following: `jsoncpp protobuf aws-sdk-cpp`
    1. Install the following Ubuntu packages: `build-essential dkms can-utils git linux-modules-extra-aws`. Additionally it installs the following: `can-isotp`. It also installs a systemd service called `setup-socketcan` that brings up the virtual SocketCAN interface `vcan0` at startup.
@@ -224,6 +223,7 @@ An Ubuntu 18.04 development machine with 200GB free disk space will be required.
        && sudo ./tools/configure-fwe.sh \
            --input-config-file configuration/static-config.json \
            --output-config-file /etc/aws-iot-fleetwise/config-0.json \
+           --log-color Yes \
            --vehicle-name `cat /etc/aws-iot-fleetwise/vehicle-name.txt` \
            --endpoint-url `cat /etc/aws-iot-fleetwise/endpoint.txt` \
            --can-bus0 vcan0 \
@@ -235,23 +235,20 @@ An Ubuntu 18.04 development machine with 200GB free disk space will be required.
 1. Run the following to view and follow the AWS IoT FleetWise Edge Agent log. You can open a new SSH session with the development machine and run this command to follow the log in real time as the campaign is deployed in the next section. To exit the logs, use CTRL + C.
 
    ```bash
-   sudo journalctl -fu fwe@0
+   sudo journalctl -fu fwe@0 --output=cat
    ```
 
 ### Run the AWS IoT FleetWise demo script
 
 The instructions below will register your AWS account for AWS IoT FleetWise, create a demonstration vehicle model, register the virtual vehicle created in the previous section, and run a campaign to collect data from it.
 
-1. Run the following _on the development machine_ to install the dependencies of the AWS IoT FleetWise Cloud demo script and add AWS IoT FleetWise commands to the AWS CLI:
+1. Run the following _on the development machine_ to install the dependencies of the AWS IoT FleetWise Cloud demo script:
 
    1. Following command installs the following Ubuntu packages: `python3.7 python3-setuptools curl`. It then installs Python PIP for Python 3.7 and the following PIP packages: `wrapt plotly pandas cantools`
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
-       && sudo -H ./install-deps.sh \
-       && aws configure add-model \
-           --service-model file://iotfleetwise-2021-06-17.json \
-           --service-name iotfleetwise
+       && sudo -H ./install-deps.sh
    ```
 
 1. Run the following to explore the AWS IoT FleetWise CLI:
@@ -314,7 +311,7 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
    ./demo.sh --vehicle-name fwdemo-ec2 --campaign-file campaign-obd-heartbeat.json --region eu-central-1
    ```
 
-1. Run the following _on the development machine_ to import your custom DBC file. You also have to provide your custom campaign file. There is no support of simulation of custom signals so you have to test data collection with the real vehicle or custom simulator.  
+1. Run the following _on the development machine_ to import your custom DBC file. You also have to provide your custom campaign file. There is no support of simulation of custom signals so you have to test data collection with the real vehicle or custom simulator.
 
    ```bash
    ./demo.sh --vehicle-name fwdemo-ec2 --dbc-file <DBC_FILE> --campaign-file <CAMPAIGN_FILE>
@@ -325,7 +322,6 @@ The instructions below will register your AWS account for AWS IoT FleetWise, cre
    ```bash
    ./demo.sh --vehicle-name fwdemo-ec2 --dbc-file <DBC_FILE> --campaign-file <CAMPAIGN_FILE> --region eu-central-1
    ```
-
 
 ## Getting started with AWS IoT FleetWise Edge Agent on NXP S32G
 
@@ -1372,7 +1368,8 @@ Customers can set the System level logging severity externally via the software 
 |                          | persistencyPartitionMaxSize                 | Maximum size allocated for persistency (Bytes)                                                                            | integer  |
 |                          | persistencyUploadRetryIntervalMs            | Interval to wait before retrying to upload persisted signal data (in milliseconds). After successfully uploading, the persisted signal data will be cleared. Only signal data that could not be uploaded will be persisted. (in milliseconds) | integer  |
 | internalParameters       | readyToPublishDataBufferSize                | Size of the buffer used for storing ready to publish, filtered data                                                       | integer  |
-|                          | systemWideLogLevel                          | Sets logging level severity- Trace, Info, Warning, Error                                                                  | string   |
+|                          | systemWideLogLevel                          | Sets logging level severity: `Trace`, `Info`, `Warning`, `Error`                                                          | string   |
+|                          | logColor                                    | Whether logs should be colored: `Auto`, `Yes`, `No`. Default to `Auto`, meaning the agent will try to detect whether colored output is supported (for example when connected to a tty)                                                        | string   |
 |                          | dataReductionProbabilityDisabled            | Disables probability-based DDC (only for debug purpose)                                                                   | boolean  |
 |                          | metricsCyclicPrintIntervalMs                | Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never    | string   |
 | publishToCloudParameters | maxPublishMessageCount                      | Maximum messages that can be published to the cloud in one payload                                                        | integer  |
@@ -1395,7 +1392,7 @@ The device software has been designed with security principles in mind. Security
 - Data at rest: the current version of the software does not encrypt the data at rest i.e. during persistency. It’s assumed that the software operates in a secure partition that the OEM puts in place and rely on the OEM secure storage infrastructure that is applied for all IO operations happening in the gateway e.g. via HSM, OEM crypto stack.
 - Access to vehicle CAN data: the device software assumes that the software operates in a secure execution partition, that guarantees that if needed, the CAN traffic is encrypted/decrypted by the OEM Crypto stack (either on chip/HSM or via separate core running the crypto stack).
 
-The device software can be extended to invoke cryptography APIs to encrypt and decrypt the data as per the need. 
+The device software can be extended to invoke cryptography APIs to encrypt and decrypt the data as per the need.
 
 The device software has been designed to be deployed in a non safety relevant in-vehicle domain/partition. Due to its use of dynamic memory allocation, this software is not suited for deployment on real time/lock step/safety cores.
 
@@ -1403,7 +1400,7 @@ The device software has been designed to be deployed in a non safety relevant in
 
 You can use the cmake build option, `FWE_SECURITY_COMPILE_FLAGS`, to enable security-related compile options when building the binary. Consult the compiler manual for the effect of each option in `./cmake/compiler_gcc.cmake`. This flag is already enabled in the default [native compilation script](./tools/build-fwe-native.sh) and [cross compilation script for ARM64](./tools/build-fwe-cross-arm64.sh)
 
-Customers are encouraged to store key materials on hardware modules, such as hardware security module (HSM), Trusted Platform Modules (TPM), or other cryptographic elements. 
+Customers are encouraged to store key materials on hardware modules, such as hardware security module (HSM), Trusted Platform Modules (TPM), or other cryptographic elements.
 A HSM is a removable or external device that can generate, store, and manage RSA keys used in asymmetric encryption. A TPM is a cryptographic processor present on most commercial PCs and servers.
 
 Please refer to [AWS IoT Security Best Practices](https://docs.aws.amazon.com/iot/latest/developerguide/security-best-practices.html) for recommended security best practices.

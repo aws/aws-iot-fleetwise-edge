@@ -22,7 +22,8 @@ Geohash::encode( double lat, double lon, uint8_t precision, uint64_t &hashBits )
     static_assert( sizeof( hashBits ) * 8 >= MAX_PRECISION * BASE32_BITS,
                    "Not enough bits to support maximum precision" );
 
-    if ( precision > MAX_PRECISION || lat < LAT_MIN || lat > LAT_MAX || lon < LON_MIN || lon > LON_MAX )
+    if ( ( precision > MAX_PRECISION ) || ( lat < LAT_MIN ) || ( lat > LAT_MAX ) || ( lon < LON_MIN ) ||
+         ( lon > LON_MAX ) )
     {
         // INVALID INPUT, need to return as we cannot proceed for calculation
         return false;
@@ -86,7 +87,8 @@ Geohash::encode( double lat, double lon, uint8_t precision, uint64_t &hashBits )
 bool
 Geohash::encode( double lat, double lon, uint8_t precision, std::string &hashString )
 {
-    if ( precision > MAX_PRECISION || lat < LAT_MIN || lat > LAT_MAX || lon < LON_MIN || lon > LON_MAX )
+    if ( ( precision > MAX_PRECISION ) || ( lat < LAT_MIN ) || ( lat > LAT_MAX ) || ( lon < LON_MIN ) ||
+         ( lon > LON_MAX ) )
     {
         // INVALID INPUT, need to return as we cannot proceed for calculation
         return false;

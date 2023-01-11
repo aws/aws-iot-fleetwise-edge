@@ -8,7 +8,6 @@
 #include <atomic>
 #include <cstdio>
 #include <sys/resource.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 namespace Aws

@@ -803,6 +803,8 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestDiscardInputBuff
 {
     // set decoder dictionary as invalid
     binder.onChangeOfActiveDictionary( nullptr, VehicleDataSourceProtocol::RAW_SOCKET );
+    // give one second for all producer and consumer to shut down
+    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
     struct can_frame frame = {};
     auto f = []( int socketFD, struct can_frame frame, int msgCnt ) {
         for ( int i = 0; i < msgCnt; ++i )

@@ -16,8 +16,8 @@ namespace DataManagement
 bool
 CollectionScheme::isValid()
 {
-    return ( !mMessageIDsToBeWatched.empty() && !mEventTriggers.empty() ) ||
-           ( !mMessageIDsToBeCollected.empty() && mTimeTrigger.isValid() );
+    return ( ( !mMessageIDsToBeWatched.empty() ) && ( !mEventTriggers.empty() ) ) ||
+           ( ( !mMessageIDsToBeCollected.empty() ) && ( mTimeTrigger.isValid() ) );
 }
 
 void
@@ -187,8 +187,8 @@ CollectionScheme::shouldTriggerUpload( const CANFrameInfo &frameInfo, EventTrigg
         {
             for ( size_t j = 0; j < it->second.size(); ++j )
             {
-                if ( it->second[j].mTriggerType == TriggerType::SIGNALVALUE &&
-                     it->second[j].mSignalID == frameInfo.mSignals[i].mSignalID )
+                if ( ( it->second[j].mTriggerType == TriggerType::SIGNALVALUE ) &&
+                     ( it->second[j].mSignalID == frameInfo.mSignals[i].mSignalID ) )
                 {
                     if ( it->second[j].mValuePredicate.mCondition == PredicateCondition::LESS )
                     {

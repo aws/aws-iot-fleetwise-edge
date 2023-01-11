@@ -329,6 +329,7 @@ On the development machine, create an IoT thing and provision its credentials by
      && ../tools/configure-fwe.sh \
        --input-config-file ~/aws-iot-fleetwise-edge/configuration/static-config.json \
        --output-config-file config-0.json \
+       --log-color Yes \
        --vehicle-name `cat vehicle-name.txt` \
        --endpoint-url `cat endpoint.txt` \
        --can-bus0 can0 \
@@ -364,13 +365,13 @@ On the development machine, create an IoT thing and provision its credentials by
 1. On the TCU, view and follow the AWS IoT FleetWise Edge Agent log (press CTRL+C to exit) by running the following command:
 
    ```bash
-   journalctl -fu fwe@0
+   journalctl -fu fwe@0 --output=cat
    ```
 
    The following line appears, confirming the AWS IoT FleetWise Edge Agent successfully connected to AWS IoT Core:
 
    ```
-   [INFO] [AwsIotConnectivityModule::connect]: [Connection completed successfully.]
+   [INFO ] [AwsIotConnectivityModule::connect] [Connection completed successfully]
    ```
 
 ## Step 6: Connect the TCU to the vehicle

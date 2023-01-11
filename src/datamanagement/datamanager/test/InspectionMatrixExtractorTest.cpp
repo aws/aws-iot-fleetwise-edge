@@ -149,7 +149,7 @@ TEST( CollectionSchemeManager, InpsectionMatrixExtractorTreeTest )
     test.setDecoderManifest( DM1 );
     test.setCollectionSchemeList( PL1 );
     // All three polices are expected to be enabled
-    ASSERT_TRUE( test.updateMapsandTimeLine( 0 ) );
+    ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
     std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
     test.inspectionMatrixExtractor( output );
 
@@ -202,7 +202,7 @@ TEST( CollectionSchemeManager, InpsectionMatrixExtractorConditionDataTest )
     test.setDecoderManifest( DM1 );
     test.setCollectionSchemeList( PL1 );
 
-    ASSERT_TRUE( test.updateMapsandTimeLine( 0 ) );
+    ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
     std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
     test.inspectionMatrixExtractor( output );
     for ( auto conditionData : output->conditions )

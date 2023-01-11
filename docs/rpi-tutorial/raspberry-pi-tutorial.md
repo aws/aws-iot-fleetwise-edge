@@ -143,6 +143,7 @@ The AWS IoT FleetWise Edge Agent binary and its configuration files are packaged
      && ../tools/configure-fwe.sh \
        --input-config-file ~/aws-iot-fleetwise-edge/configuration/static-config.json \
        --output-config-file config-0.json \
+       --log-color Yes \
        --vehicle-name `cat vehicle-name.txt` \
        --endpoint-url `cat endpoint.txt` \
        --can-bus0 can0 \
@@ -196,11 +197,11 @@ The AWS IoT FleetWise Edge Agent binary and its configuration files are packaged
 1. To verify the IoT FleetWise Edge Agent is running and is connected to the cloud, check the Edge
     Agent log files:
    ``` 
-   sudo journalctl -fu fwe@0
+   sudo journalctl -fu fwe@0 --output=cat
    ```
    - Look for this message to verify:
       ```
-      [INFO] [AwsIotConnectivityModule::connect]: [Connection completed successfully.]
+      [INFO ] [AwsIotConnectivityModule::connect] [Connection completed successfully]
       ```
    - Use the [troubleshooting information and solutions](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/troubleshooting.html)
    in the AWS IoT FleetWise Developer Guide to help resolve issues with AWS IoT FleetWise Edge Agent.

@@ -5,7 +5,7 @@
 #include "CANDecoder.h"
 #include <algorithm>
 #include <cmath>
-#define MASK64( nbits ) ( ( 0xffffffffffffffffULL ) >> ( 64 - ( nbits ) ) )
+#define MASK64( nbits ) ( ( 0xFFFFFFFFFFFFFFFFULL ) >> ( 64 - ( nbits ) ) )
 
 namespace Aws
 {
@@ -36,8 +36,8 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
         if ( it == format.mSignals.end() )
         {
             mLogger.error( "CANDecoder::decodeCANMessage",
-                           "Message ID" + std::to_string( format.mMessageID ) +
-                               " is multiplexed but no Multiplexor signal has been found " );
+                           "Message ID " + std::to_string( format.mMessageID ) +
+                               " is multiplexed but no Multiplexor signal has been found" );
             return false;
         }
         if ( signalIDsToCollect.find( it->mSignalID ) != signalIDsToCollect.end() )
@@ -55,13 +55,13 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
         if ( signalIDsToCollect.find( format.mSignals[i].mSignalID ) != signalIDsToCollect.end() )
         {
             // Skip the signals that don't match the MUX value
-            if ( multiplexorValue != UINT8_MAX && format.mSignals[i].mMultiplexorValue != multiplexorValue )
+            if ( ( multiplexorValue != UINT8_MAX ) && ( format.mSignals[i].mMultiplexorValue != multiplexorValue ) )
             {
                 continue;
             }
 
             if ( ( format.mSignals[i].mFirstBitPosition >= frameSizeInBits ) ||
-                 ( format.mSignals[i].mSizeInBits < 1 ) || ( format.mSignals[i].mSizeInBits > frameSizeInBits ) )
+                 ( ( format.mSignals[i].mSizeInBits < 1 ) || ( format.mSignals[i].mSizeInBits > frameSizeInBits ) ) )
             {
                 // Wrongly coded Signal, skip it
                 mLogger.error( "CANDecoder::decodeCANMessage", "Signal Out of Range" );
@@ -88,7 +88,7 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
     }
 
     // Message decoding time
-    decodedMessage.mDecodingTime = mClock->timeSinceEpochMs();
+    decodedMessage.mDecodingTime = mClock->systemTimeSinceEpochMs();
     // Should not harm, callers will ignore the return code.
     return errorCounter == 0;
 }
@@ -104,6 +104,9 @@ CANDecoder::extractSignalFromFrame( const uint8_t *frameData, const CANSignalFor
     uint8_t endByte = 0U;
 
     // Write first bits to result
+    // NOTE: The start bit here is different from how it appears in a DBC file. In a DBC file, the
+    // start bit indicates the LSB for little endian and MSB for big endian signals.
+    // But AWS IoT Fleetwise considers start bit to always be the LSB regardless of endianess.
     uint64_t result = frameData[startByte] >> startBitInByte;
 
     // Write residual bytes

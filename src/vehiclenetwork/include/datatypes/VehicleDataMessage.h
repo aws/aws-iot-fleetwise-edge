@@ -86,7 +86,7 @@ public:
     inline bool
     isValid() const
     {
-        return !mSyntheticData.empty() || !mRawData.empty();
+        return ( !mSyntheticData.empty() ) || ( !mRawData.empty() );
     }
 
     /**

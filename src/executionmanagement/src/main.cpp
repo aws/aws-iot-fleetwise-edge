@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Includes
+#include "ConsoleLogger.h"
 #include "IoTFleetWiseConfig.h"
 #include "IoTFleetWiseEngine.h"
 #include "IoTFleetWiseVersion.h"
@@ -12,26 +13,16 @@
 
 using namespace Aws::IoTFleetWise::ExecutionManagement;
 
-static std::atomic<bool> mSignal( false );
-static std::atomic<int> mExitCode( 0 );
+// coverity[autosar_cpp14_a2_11_1_violation]
+static volatile sig_atomic_t mSignal = 0; // volatile has to be used since it will be modified by a signal handler,
+                                          // executed as result of an asynchronous interrupt
 
-static void
+extern "C" void
 signalHandler( int signum )
 {
-    static_cast<void>( signum ); // unused parameter
-    std::cout << "Stopping AWS IoT FleetWise Edge Service " << std::endl;
-
-    mSignal.store( true );
-}
-
-static void
-fatalSignalHandler( int signum )
-{
-    static_cast<void>( signum ); // unused parameter
-    std::cout << "Fatal error, stopping AWS IoT FleetWise Edge Service " << std::endl;
-
-    mSignal.store( true );
-    mExitCode.store( -1 );
+    // Very few things are safe in a signal handler. So we never do anything other than set the atomic int, not even
+    // print a message: https://stackoverflow.com/a/16891799
+    mSignal = signum;
 }
 
 static void
@@ -42,57 +33,100 @@ printVersion()
 }
 
 static void
-setSystemWideLogLevel( const Json::Value &config )
+configureLogging( const Json::Value &config )
 {
     Aws::IoTFleetWise::Platform::Linux::LogLevel logLevel = Aws::IoTFleetWise::Platform::Linux::LogLevel::Trace;
     stringToLogLevel( config["staticConfig"]["internalParameters"]["systemWideLogLevel"].asString(), logLevel );
     gSystemWideLogLevel = logLevel;
+
+    auto logColorOption = Aws::IoTFleetWise::Platform::Linux::LogColorOption::Auto;
+    if ( config["staticConfig"]["internalParameters"].isMember( "logColor" ) )
+    {
+        std::string logColorConfig = config["staticConfig"]["internalParameters"]["logColor"].asString();
+        if ( !stringToLogColorOption( logColorConfig, logColorOption ) )
+        {
+            std::cout << "Invalid logColor config: " << logColorConfig << std::endl;
+        }
+    }
+    gLogColorOption = logColorOption;
+}
+
+static int
+signalToExitCode( int signalNumber )
+{
+    switch ( signalNumber )
+    {
+    case SIGUSR1:
+        std::cout << "Fatal error, stopping AWS IoT FleetWise Edge Service " << std::endl;
+        return -1;
+    case SIGINT:
+    case SIGTERM:
+        std::cout << "Stopping AWS IoT FleetWise Edge Service " << std::endl;
+        return 0;
+    default:
+        std::cout << "Received unexpected signal " << signalNumber << std::endl;
+        return 0;
+    }
 }
 
 int
 main( int argc, char *argv[] )
 {
-    printVersion();
-    if ( argc != 2 )
+    try
     {
-        std::cout << "error: invalid argument - only a config file is required" << std::endl;
+        printVersion();
+        if ( argc != 2 )
+        {
+            std::cout << "error: invalid argument - only a config file is required" << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        signal( SIGINT, signalHandler );
+        signal( SIGTERM, signalHandler );
+        signal( SIGUSR1, signalHandler );
+        std::string configFilename = argv[1];
+        Json::Value config;
+        if ( !IoTFleetWiseConfig::read( configFilename, config ) )
+        {
+            std::cout << " AWS IoT FleetWise Edge Service failed to read config file: " + configFilename << std::endl;
+            return EXIT_FAILURE;
+        }
+        // Set system wide log level
+        configureLogging( config );
+
+        IoTFleetWiseEngine engine;
+        // Connect the Engine
+        if ( engine.connect( config ) && engine.start() )
+        {
+            std::cout << " AWS IoT FleetWise Edge Service Started successfully " << std::endl;
+        }
+        else
+        {
+            return EXIT_FAILURE;
+        }
+
+        while ( mSignal == 0 )
+        {
+            sleep( 1 );
+        }
+        int exitCode = signalToExitCode( mSignal );
+        if ( engine.stop() && engine.disconnect() )
+        {
+            std::cout << " AWS IoT FleetWise Edge Service Stopped successfully " << std::endl;
+            return exitCode;
+        }
+
+        std::cout << " AWS IoT FleetWise Edge Service Stopped with errors " << std::endl;
         return EXIT_FAILURE;
     }
-
-    IoTFleetWiseEngine engine;
-    signal( SIGINT, signalHandler );
-    signal( SIGTERM, signalHandler );
-    signal( SIGUSR1, fatalSignalHandler );
-    std::string configFilename = argv[1];
-    Json::Value config;
-    if ( !IoTFleetWiseConfig::read( configFilename, config ) )
+    catch ( const std::exception &e )
     {
-        std::cout << " AWS IoT FleetWise Edge Service failed to read config file: " + configFilename << std::endl;
+        std::cout << "Unhandled exception: " << std::string( e.what() ) << std::endl;
         return EXIT_FAILURE;
     }
-    // Set system wide log level
-    setSystemWideLogLevel( config );
-
-    // Connect the Engine
-    if ( engine.connect( config ) && engine.start() )
+    catch ( ... )
     {
-        std::cout << " AWS IoT FleetWise Edge Service Started successfully " << std::endl;
-    }
-    else
-    {
+        std::cout << "Unknown exception" << std::endl;
         return EXIT_FAILURE;
     }
-
-    while ( !mSignal.load() )
-    {
-        sleep( 1 );
-    }
-    if ( engine.stop() && engine.disconnect() )
-    {
-        std::cout << " AWS IoT FleetWise Edge Service Stopped successfully " << std::endl;
-        return mExitCode.load();
-    }
-
-    std::cout << " AWS IoT FleetWise Edge Service Stopped with errors " << std::endl;
-    return EXIT_FAILURE;
 }

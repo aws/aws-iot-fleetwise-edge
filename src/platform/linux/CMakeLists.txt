@@ -104,7 +104,6 @@ set(
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
 
-  find_package(GTest REQUIRED)
   find_package(benchmark REQUIRED)
 
   # Add the executable targets
@@ -114,12 +113,12 @@ if(${BUILD_TESTING})
 
     add_executable(${testName} ${testSource})
 
-    # Link to the project library and GTest main
+    # Link to the project library and testing library main
     target_link_libraries(
       ${testName}
       PRIVATE
       ${libraryTargetName}
-      GTest::Main
+      IoTFleetWise::TestingSupport
     )
 
     add_unit_test(${testName})
@@ -135,7 +134,7 @@ if(${BUILD_TESTING})
 
     add_executable(${testName} ${testSource})
 
-    # Link to the project library and GTest main
+    # Link to the project library and testing library main
     target_link_libraries(
       ${testName}
       PRIVATE

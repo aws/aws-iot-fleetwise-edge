@@ -5,10 +5,12 @@
 #include "OBDOverCANModule.h"
 #include "EnumUtility.h"
 #include "TraceModule.h"
+#include "datatypes/ISOTPOverCANOptions.h"
 #include <algorithm>
 #include <csignal>
 #include <ctime>
 #include <iterator>
+#include <linux/can/isotp.h>
 #include <linux/can/raw.h>
 #include <net/if.h>
 #include <poll.h>
@@ -21,13 +23,13 @@ namespace IoTFleetWise
 {
 namespace DataInspection
 {
+using namespace Aws::IoTFleetWise::VehicleNetwork;
 
 constexpr int OBDOverCANModule::SLEEP_TIME_SECS;
 constexpr uint32_t OBDOverCANModule::MASKING_GET_BYTE;       // Get last byte
 constexpr uint32_t OBDOverCANModule::MASKING_SHIFT_BITS;     // Shift 8 bits
 constexpr uint32_t OBDOverCANModule::MASKING_TEMPLATE_TX_ID; // All 29-bit tx id has the same bytes
 constexpr uint32_t OBDOverCANModule::MASKING_REMOVE_BYTE;
-constexpr uint32_t OBDOverCANModule::P2_TIMEOUT_DEFAULT_MS;
 
 OBDOverCANModule::~OBDOverCANModule()
 {
@@ -42,11 +44,12 @@ bool
 OBDOverCANModule::init( SignalBufferPtr signalBufferPtr,
                         ActiveDTCBufferPtr activeDTCBufferPtr,
                         const std::string &gatewayCanInterfaceName,
-                        const uint32_t &pidRequestIntervalSeconds,
-                        const uint32_t &dtcRequestIntervalSeconds )
+                        uint32_t pidRequestIntervalSeconds,
+                        uint32_t dtcRequestIntervalSeconds,
+                        bool broadcastRequests )
 {
     // Sanity check
-    if ( pidRequestIntervalSeconds == 0 && dtcRequestIntervalSeconds == 0 )
+    if ( ( pidRequestIntervalSeconds == 0 ) && ( dtcRequestIntervalSeconds == 0 ) )
     {
         mLogger.trace( "OBDOverCANModule::init",
                        "Both PID and DTC interval seconds are set to 0. OBD module will not be initialized" );
@@ -54,7 +57,7 @@ OBDOverCANModule::init( SignalBufferPtr signalBufferPtr,
         return false;
     }
 
-    if ( signalBufferPtr.get() == nullptr || activeDTCBufferPtr.get() == nullptr )
+    if ( ( signalBufferPtr.get() == nullptr ) || ( activeDTCBufferPtr.get() == nullptr ) )
     {
         mLogger.error( "OBDOverCANModule::init", "Received Buffer nullptr" );
         return false;
@@ -70,6 +73,7 @@ OBDOverCANModule::init( SignalBufferPtr signalBufferPtr,
     mGatewayCanInterfaceName = gatewayCanInterfaceName;
     mPIDRequestIntervalSeconds = pidRequestIntervalSeconds;
     mDTCRequestIntervalSeconds = dtcRequestIntervalSeconds;
+    mBroadcastRequests = broadcastRequests;
     return true;
 }
 
@@ -88,11 +92,11 @@ OBDOverCANModule::start()
     mShouldRequestDTCs.store( false );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "OBDOverCANModule::start", " OBD Module Thread failed to start " );
+        mLogger.trace( "OBDOverCANModule::start", "Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "OBDOverCANModule::start", " OBD Module Thread started" );
+        mLogger.trace( "OBDOverCANModule::start", "Thread started" );
         mThread.setThreadName( "fwDIOBDModule" );
     }
 
@@ -102,19 +106,23 @@ OBDOverCANModule::start()
 bool
 OBDOverCANModule::stop()
 {
-    if ( !mThread.isValid() || !mThread.isActive() )
+    if ( ( !mThread.isValid() ) || ( !mThread.isActive() ) )
     {
         return true;
     }
 
     std::lock_guard<std::mutex> lock( mThreadMutex );
     mShouldStop.store( true, std::memory_order_relaxed );
-    mLogger.trace( "OBDOverCANModule::stop", " OBD Module Thread requested to stop " );
+    mLogger.trace( "OBDOverCANModule::stop", "Thread requested to stop" );
     mWait.notify();
     mDataAvailableWait.notify();
     mThread.release();
     mShouldStop.store( false, std::memory_order_relaxed );
-    mLogger.trace( "OBDOverCANModule::stop", " OBD Module Thread stopped " );
+    mLogger.trace( "OBDOverCANModule::stop", "Thread stopped" );
+    if ( ( mBroadcastSocket >= 0 ) && ( close( mBroadcastSocket ) < 0 ) )
+    {
+        mLogger.error( "OBDOverCANModule::stop", "Failed to close broadcastSocket." );
+    }
     return !mThread.isActive();
 }
 
@@ -130,13 +138,13 @@ OBDOverCANModule::doWork( void *data )
     OBDOverCANModule *obdModule = static_cast<OBDOverCANModule *>( data );
     // First we will auto detect ECUs
     bool finishECUsDetection = false;
-    while ( !finishECUsDetection && !obdModule->shouldStop() )
+    while ( ( !finishECUsDetection ) && ( !obdModule->shouldStop() ) )
     {
         std::vector<uint32_t> canIDResponses;
         // If we don't have an OBD decoder manifest and we should not request DTCs,
         // Take the thread to sleep
-        if ( !obdModule->mShouldRequestDTCs.load( std::memory_order_relaxed ) &&
-             ( !obdModule->mDecoderDictionaryPtr || obdModule->mDecoderDictionaryPtr->empty() ) )
+        if ( ( !obdModule->mShouldRequestDTCs.load( std::memory_order_relaxed ) ) &&
+             ( ( !obdModule->mDecoderDictionaryPtr ) || obdModule->mDecoderDictionaryPtr->empty() ) )
         {
             obdModule->mLogger.trace(
                 "OBDOverCANModule::doWork",
@@ -144,21 +152,34 @@ OBDOverCANModule::doWork( void *data )
             obdModule->mDataAvailableWait.wait( Platform::Linux::Signal::WaitWithPredicate );
         }
         // Now we will determine whether the ECUs are using extended IDs
-        obdModule->autoDetectECUs( false, canIDResponses );
+        bool isExtendedID = false;
+        obdModule->autoDetectECUs( isExtendedID, canIDResponses );
         if ( canIDResponses.empty() )
         {
-            obdModule->autoDetectECUs( true, canIDResponses );
+            isExtendedID = true;
+            obdModule->autoDetectECUs( isExtendedID, canIDResponses );
         }
         obdModule->mLogger.trace( "OBDOverCANModule::doWork",
                                   "Detect size of ECUs:" + std::to_string( canIDResponses.size() ) );
         if ( !canIDResponses.empty() )
         {
+            // If broadcast mode is enabled, open the broadcast socket:
+            if ( obdModule->mBroadcastRequests )
+            {
+                obdModule->mBroadcastSocket = obdModule->openISOTPBroadcastSocket( isExtendedID );
+                if ( obdModule->mBroadcastSocket < 0 )
+                {
+                    // Failure to open broadcast socket is non recoverable, hence we will send signal out to terminate
+                    std::raise( SIGUSR1 );
+                    return;
+                }
+            }
             // Initialize ECU for each CAN ID in canIDResponse
-            if ( !obdModule->initECUs( canIDResponses ) )
+            if ( !obdModule->initECUs( isExtendedID, canIDResponses, obdModule->mBroadcastSocket ) )
             {
                 // Failure from initECUs is non recoverable, hence we will send signal out to terminate program
                 obdModule->mLogger.error( "OBDOverCANModule::doWork",
-                                          "Fatal Error! OBDOverCANECU failed to init. Check CAN ISO-TP module" );
+                                          "Fatal Error. OBDOverCANECU failed to init. Check CAN ISO-TP module" );
                 std::raise( SIGUSR1 );
                 return;
             }
@@ -168,7 +189,7 @@ OBDOverCANModule::doWork( void *data )
         else
         {
             obdModule->mLogger.trace( "OBDOverCANModule::doWork",
-                                      " Waiting for :" + std::to_string( SLEEP_TIME_SECS ) + " seconds" );
+                                      "Waiting for: " + std::to_string( SLEEP_TIME_SECS ) + " seconds" );
             obdModule->mWait.wait( static_cast<uint32_t>( SLEEP_TIME_SECS * 1000 ) );
         }
     }
@@ -190,12 +211,11 @@ OBDOverCANModule::doWork( void *data )
             obdModule->mDecoderManifestAvailable.store( false, std::memory_order_relaxed );
         }
         // Request PID if decoder dictionary is valid
-        if ( obdModule->mDecoderDictionaryPtr && !obdModule->mDecoderDictionaryPtr->empty() )
+        if ( obdModule->mDecoderDictionaryPtr && ( !obdModule->mDecoderDictionaryPtr->empty() ) )
         {
             // Is it time to request PIDs ?
-            // If so, send the requests then reschedule PID requests
-            if ( obdModule->mPIDRequestIntervalSeconds > 0 &&
-                 obdModule->mPIDTimer.getElapsedSeconds() >= obdModule->mPIDRequestIntervalSeconds )
+            if ( ( obdModule->mPIDRequestIntervalSeconds > 0 ) &&
+                 ( obdModule->mPIDTimer.getElapsedSeconds() >= obdModule->mPIDRequestIntervalSeconds ) )
             {
                 // besides this thread, onChangeOfActiveDictionary can update mPIDsToRequestPerECU.
                 // Use mutex to ensure only one thread is doing the update.
@@ -203,14 +223,16 @@ OBDOverCANModule::doWork( void *data )
                 // This should execute only once
                 if ( !hasAcquiredSupportedPIDs )
                 {
-                    hasAcquiredSupportedPIDs = obdModule->assignPIDsToECUs();
-                }
-                for ( auto ecu : obdModule->mECUs )
-                {
-                    ecu->requestReceiveEmissionPIDs( SID::CURRENT_STATS );
+                    hasAcquiredSupportedPIDs = true;
+                    obdModule->assignPIDsToECUs();
                 }
                 // Reschedule
                 obdModule->mPIDTimer.reset();
+                for ( auto ecu : obdModule->mECUs )
+                {
+                    auto numRequests = ecu->requestReceiveEmissionPIDs( SID::CURRENT_STATS );
+                    obdModule->flush( numRequests, ecu );
+                }
             }
         }
         // Request DTC if specified by inspection matrix
@@ -218,14 +240,21 @@ OBDOverCANModule::doWork( void *data )
         {
             bool successfulDTCRequest = false;
             DTCInfo dtcInfo;
-            dtcInfo.receiveTime = obdModule->mClock->timeSinceEpochMs();
-            // Request then reschedule DTC requests stored DTCs from each ECU
-            if ( obdModule->mDTCRequestIntervalSeconds > 0 &&
-                 obdModule->mDTCTimer.getElapsedSeconds() >= obdModule->mDTCRequestIntervalSeconds )
+            dtcInfo.receiveTime = obdModule->mClock->systemTimeSinceEpochMs();
+            // Request stored DTCs from each ECU
+            if ( ( obdModule->mDTCRequestIntervalSeconds > 0 ) &&
+                 ( obdModule->mDTCTimer.getElapsedSeconds() >= obdModule->mDTCRequestIntervalSeconds ) )
             {
+                // Reschedule
+                obdModule->mDTCTimer.reset();
                 for ( auto ecu : obdModule->mECUs )
                 {
-                    successfulDTCRequest = ecu->getDTCData( dtcInfo );
+                    size_t numRequests = 0;
+                    if ( ecu->getDTCData( dtcInfo, numRequests ) )
+                    {
+                        successfulDTCRequest = true;
+                    }
+                    obdModule->flush( numRequests, ecu );
                 }
                 // Also DTCInfo strutcs without any DTCs must be pushed to the queue because it means
                 // there was a OBD request that did not return any SID::STORED_DTCs
@@ -235,23 +264,69 @@ OBDOverCANModule::doWork( void *data )
                     // thread to push DTC Info to the queue
                     if ( !obdModule->mActiveDTCBufferPtr->push( dtcInfo ) )
                     {
-                        obdModule->mLogger.warn( "OBDOverCANModule::doWork", "DTC Buffer full!" );
+                        obdModule->mLogger.warn( "OBDOverCANModule::doWork", "DTC Buffer full" );
                     }
                 }
-                // Reschedule
-                obdModule->mDTCTimer.reset();
             }
         }
 
         // Wait for the next cycle
-        uint32_t sleepTime =
-            obdModule->mDTCRequestIntervalSeconds > 0
-                ? std::min( obdModule->mPIDRequestIntervalSeconds, obdModule->mDTCRequestIntervalSeconds )
-                : obdModule->mPIDRequestIntervalSeconds;
+        int64_t sleepTime = INT64_MAX;
+        calcSleepTime( obdModule->mPIDRequestIntervalSeconds, obdModule->mPIDTimer, sleepTime );
+        calcSleepTime( obdModule->mDTCRequestIntervalSeconds, obdModule->mDTCTimer, sleepTime );
+        if ( sleepTime < 0 )
+        {
+            obdModule->mLogger.warn( "OBDOverCANModule::doWork",
+                                     "Request time overdue by " + std::to_string( sleepTime ) + " ms" );
+        }
+        else
+        {
+            obdModule->mLogger.trace( "OBDOverCANModule::doWork",
+                                      "Waiting for: " + std::to_string( sleepTime ) + " ms" );
+            obdModule->mWait.wait( static_cast<uint32_t>( sleepTime ) );
+        }
+    }
+}
 
-        obdModule->mLogger.trace( "OBDOverCANModule::doWork",
-                                  " Waiting for :" + std::to_string( sleepTime ) + " seconds" );
-        obdModule->mWait.wait( static_cast<uint32_t>( sleepTime * 1000 ) );
+void
+OBDOverCANModule::calcSleepTime( uint32_t requestIntervalSeconds, const Timer &timer, int64_t &outputSleepTime )
+{
+    if ( requestIntervalSeconds > 0 )
+    {
+        auto sleepTime = ( static_cast<int64_t>( requestIntervalSeconds ) * 1000 ) - timer.getElapsedMs().count();
+        if ( sleepTime < outputSleepTime )
+        {
+            outputSleepTime = sleepTime;
+        }
+    }
+}
+
+void
+OBDOverCANModule::flush( size_t count, std::shared_ptr<OBDOverCANECU> &exceptECU )
+{
+    if ( !mBroadcastRequests )
+    {
+        return;
+    }
+    uint32_t timeLeftMs = P2_TIMEOUT_DEFAULT_MS;
+    for ( auto ecu : mECUs )
+    {
+        if ( ecu == exceptECU )
+        {
+            continue;
+        }
+        for ( size_t i = 0; i < count; i++ )
+        {
+            uint32_t timeNeededMs = ecu->flush( timeLeftMs );
+            if ( timeNeededMs >= timeLeftMs )
+            {
+                timeLeftMs = 0;
+            }
+            else
+            {
+                timeLeftMs -= timeNeededMs;
+            }
+        }
     }
 }
 
@@ -264,18 +339,18 @@ OBDOverCANModule::autoDetectECUs( bool isExtendedID, std::vector<uint32_t> &canI
     // After 1 second timeout and stop ECU detection
     constexpr uint32_t MAX_WAITING_MS = 1000;
     // Open a CAN raw socket
-    int mSocket = socket( PF_CAN, SOCK_RAW, CAN_RAW );
-    if ( mSocket < 0 )
+    int rawSocket = socket( PF_CAN, SOCK_RAW, CAN_RAW );
+    if ( rawSocket < 0 )
     {
-        mLogger.error( "OBDOverCANModule::autoDetectECUs", "Failed to create socket!" );
+        mLogger.error( "OBDOverCANModule::autoDetectECUs", "Failed to create socket" );
         return false;
     }
     // Set the IF name
     strncpy( interfaceRequest.ifr_name, mGatewayCanInterfaceName.c_str(), sizeof( interfaceRequest.ifr_name ) - 1 );
-    if ( ioctl( mSocket, SIOCGIFINDEX, &interfaceRequest ) != 0 )
+    if ( ioctl( rawSocket, SIOCGIFINDEX, &interfaceRequest ) != 0 )
     {
-        close( mSocket );
-        mLogger.error( "OBDOverCANModule::autoDetectECUs", "CAN interface is not accessible." );
+        close( rawSocket );
+        mLogger.error( "OBDOverCANModule::autoDetectECUs", "CAN interface is not accessible" );
         return false;
     }
 
@@ -283,25 +358,25 @@ OBDOverCANModule::autoDetectECUs( bool isExtendedID, std::vector<uint32_t> &canI
     interfaceAddress.can_ifindex = interfaceRequest.ifr_ifindex;
 
     // Bind the socket
-    if ( bind( mSocket, reinterpret_cast<struct sockaddr *>( &interfaceAddress ), sizeof( interfaceAddress ) ) < 0 )
+    if ( bind( rawSocket, reinterpret_cast<struct sockaddr *>( &interfaceAddress ), sizeof( interfaceAddress ) ) < 0 )
     {
-        close( mSocket );
-        mLogger.error( "OBDOverCANModule::autoDetectECUs", "Failed to bind." );
+        close( rawSocket );
+        mLogger.error( "OBDOverCANModule::autoDetectECUs", "Failed to bind" );
         return false;
     }
     // Set frame can_id and flags
-    frame.can_id = ( isExtendedID ) ? ( ( uint32_t )( ECUID::BROADCAST_EXTENDED_ID ) | CAN_EFF_FLAG )
-                                    : (uint32_t)ECUID::BROADCAST_ID;
-    frame.can_dlc = 8;  // CAN DLC
-    frame.data[0] = 02; // Single frame data length
-    frame.data[1] = 01; // Service ID 01: Show current data
-    frame.data[2] = 00; // PID 00: PIDs supported [01-20]
+    frame.can_id =
+        isExtendedID ? ( (uint32_t)ECUID::BROADCAST_EXTENDED_ID | CAN_EFF_FLAG ) : (uint32_t)ECUID::BROADCAST_ID;
+    frame.can_dlc = 8; // CAN DLC
+    frame.data[0] = 2; // Single frame data length
+    frame.data[1] = 1; // Service ID 01: Show current data
+    frame.data[2] = 0; // PID 00: PIDs supported [01-20]
 
     // Send broadcast request
-    if ( write( mSocket, &frame, sizeof( struct can_frame ) ) != sizeof( struct can_frame ) )
+    if ( write( rawSocket, &frame, sizeof( struct can_frame ) ) != sizeof( struct can_frame ) )
     {
-        close( mSocket );
-        mLogger.error( "OBDOverCANModule::autoDetectECUs", "Failed to write." );
+        close( rawSocket );
+        mLogger.error( "OBDOverCANModule::autoDetectECUs", "Failed to write" );
         return false;
     }
     mLogger.trace( "OBDOverCANModule::autoDetectECUs", "Sent broadcast request" );
@@ -318,12 +393,12 @@ OBDOverCANModule::autoDetectECUs( bool isExtendedID, std::vector<uint32_t> &canI
                                ", time to stop ECUs' detection" );
             break;
         }
-        struct pollfd pfd = { mSocket, POLLIN, 0 };
-        int res = poll( &pfd, 1U, static_cast<int>( OBDOverCANModule::P2_TIMEOUT_DEFAULT_MS ) );
+        struct pollfd pfd = { rawSocket, POLLIN, 0 };
+        int res = poll( &pfd, 1U, static_cast<int>( P2_TIMEOUT_DEFAULT_MS ) );
         if ( res < 0 )
         {
-            close( mSocket );
-            mLogger.error( "OBDOverCANModule::autoDetectECUs", "Poll error." );
+            close( rawSocket );
+            mLogger.error( "OBDOverCANModule::autoDetectECUs", "Poll error" );
             return false;
         }
         if ( res == 0 ) // Time out
@@ -331,22 +406,22 @@ OBDOverCANModule::autoDetectECUs( bool isExtendedID, std::vector<uint32_t> &canI
             break;
         }
         // Get response
-        if ( recv( mSocket, &frame, sizeof( struct can_frame ), 0 ) < 0 )
+        if ( recv( rawSocket, &frame, sizeof( struct can_frame ), 0 ) < 0 )
         {
-            close( mSocket );
-            mLogger.error( "OBDOverCANModule::autoDetectECUs", "Failed to read response." );
+            close( rawSocket );
+            mLogger.error( "OBDOverCANModule::autoDetectECUs", "Failed to read response" );
             return false;
         }
 
         // 11-bit range 7E8, 7E9, 7EA ... 7EF ==> [7E8, 7EF]
         // 29-bit range: [18DAF100, 18DAF1FF]
-        auto frameCANId = ( isExtendedID ) ? ( frame.can_id & CAN_EFF_MASK ) : frame.can_id;
-        auto smallestCANId = ( isExtendedID ) ? ( uint32_t )( ECUID::LOWEST_ECU_EXTENDED_RX_ID )
-                                              : ( uint32_t )( ECUID::LOWEST_ECU_RX_ID );
-        auto biggestCANId = ( isExtendedID ) ? ( uint32_t )( ECUID::HIGHEST_ECU_EXTENDED_RX_ID )
-                                             : ( uint32_t )( ECUID::HIGHEST_ECU_RX_ID );
+        auto frameCANId = isExtendedID ? ( frame.can_id & CAN_EFF_MASK ) : frame.can_id;
+        auto smallestCANId =
+            isExtendedID ? (uint32_t)ECUID::LOWEST_ECU_EXTENDED_RX_ID : (uint32_t)ECUID::LOWEST_ECU_RX_ID;
+        auto biggestCANId =
+            isExtendedID ? (uint32_t)ECUID::HIGHEST_ECU_EXTENDED_RX_ID : (uint32_t)ECUID::HIGHEST_ECU_RX_ID;
         // Check if CAN ID is valid
-        if ( smallestCANId <= frameCANId && frameCANId <= biggestCANId )
+        if ( ( smallestCANId <= frameCANId ) && ( frameCANId <= biggestCANId ) )
         {
             canIDResponses.push_back( frameCANId );
         }
@@ -360,16 +435,64 @@ OBDOverCANModule::autoDetectECUs( bool isExtendedID, std::vector<uint32_t> &canI
         mLogger.trace( "OBDOverCANModule::autoDetectECUs", "ECU with rx_id: " + stream_rx.str() );
     }
     // Close the socket
-    if ( close( mSocket ) < 0 )
+    if ( close( rawSocket ) < 0 )
     {
-        mLogger.error( "OBDOverCANModule::autoDetectECUs", "Failed to close socket." );
+        mLogger.error( "OBDOverCANModule::autoDetectECUs", "Failed to close socket" );
         return false;
     }
     return true;
 }
 
+int
+OBDOverCANModule::openISOTPBroadcastSocket( bool isExtendedID )
+{
+    // Socket CAN parameters
+    struct sockaddr_can interfaceAddress = {};
+    struct can_isotp_options optionalFlags = {};
+
+    // Set the source
+    interfaceAddress.can_addr.tp.tx_id =
+        isExtendedID ? (uint32_t)ECUID::BROADCAST_EXTENDED_ID | CAN_EFF_FLAG : (uint32_t)ECUID::BROADCAST_ID;
+    // Set flags to stop flow control messages being used for this socket
+    optionalFlags.flags |= CAN_ISOTP_TX_PADDING | CAN_ISOTP_LISTEN_MODE | CAN_ISOTP_SF_BROADCAST;
+
+    // Open a Socket
+    int broadcastSocket = socket( PF_CAN, SOCK_DGRAM, CAN_ISOTP );
+    if ( broadcastSocket < 0 )
+    {
+        mLogger.error( "ISOTPOverCANSenderReceiver::openISOTPBroadcastSocket",
+                       "Failed to create the ISOTP broadcast socket to IF: " + mGatewayCanInterfaceName );
+        return -1;
+    }
+
+    // Set the optional Flags
+    if ( setsockopt( broadcastSocket, SOL_CAN_ISOTP, CAN_ISOTP_OPTS, &optionalFlags, sizeof( optionalFlags ) ) < 0 )
+    {
+        mLogger.error( "ISOTPOverCANSenderReceiver::openISOTPBroadcastSocket",
+                       "Failed to set ISO-TP socket option flags" );
+        close( broadcastSocket );
+        return -1;
+    }
+    // CAN PF and Interface Index
+    interfaceAddress.can_family = AF_CAN;
+    interfaceAddress.can_ifindex = static_cast<int>( if_nametoindex( mGatewayCanInterfaceName.c_str() ) );
+
+    // Bind the socket
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
+    if ( bind( broadcastSocket, (struct sockaddr *)&interfaceAddress, sizeof( interfaceAddress ) ) < 0 )
+    {
+        mLogger.error( "ISOTPOverCANSenderReceiver::openISOTPBroadcastSocket",
+                       "Failed to bind the ISOTP Socket to IF: " + mGatewayCanInterfaceName );
+        close( broadcastSocket );
+        return -1;
+    }
+    mLogger.trace( "ISOTPOverCANSenderReceiver::openISOTPBroadcastSocket",
+                   "ISOTP Socket connected to IF: " + mGatewayCanInterfaceName );
+    return broadcastSocket;
+}
+
 constexpr uint32_t
-OBDOverCANModule::getTxIDByRxID( uint32_t rxId )
+OBDOverCANModule::getTxIDByRxID( bool isExtendedID, uint32_t rxId )
 {
     // Calculate tx_id according to rx_id, operators are following:
     // If is 29-bit, e.g. rx_id = 0x18DAF159:
@@ -378,63 +501,48 @@ OBDOverCANModule::getTxIDByRxID( uint32_t rxId )
     //              0x5900 | 0x18DA00F1 = 0x18DA59F1 = tx_id
     // If is 11-bit, e.g. rx_id = 0x7E8:
     //              rx_id - 0x8 = 0x7E0 = tx_id
-    uint32_t txId = ( rxId > ( uint32_t )( ECUID::HIGHEST_ECU_RX_ID ) )
-                        ? ( ( rxId & MASKING_GET_BYTE ) << MASKING_SHIFT_BITS ) | MASKING_TEMPLATE_TX_ID
+    return isExtendedID ? ( ( rxId & MASKING_GET_BYTE ) << MASKING_SHIFT_BITS ) | MASKING_TEMPLATE_TX_ID
                         : rxId - MASKING_REMOVE_BYTE;
-    return txId;
 }
 
 bool
-OBDOverCANModule::initECUs( std::vector<uint32_t> &canIDResponses )
+OBDOverCANModule::initECUs( bool isExtendedID, std::vector<uint32_t> &canIDResponses, int broadcastSocket )
 {
-    bool initStatus = true;
     // create a set of CAN ID in case there's duplication
     auto canIDSet = std::set<uint32_t>( canIDResponses.begin(), canIDResponses.end() );
-    for ( auto canID : canIDSet )
+    for ( auto rxID : canIDSet )
     {
-        auto obdOverCANECU = std::make_shared<OBDOverCANECU>();
-
-        // Send physical request:
-        auto rxID = canID;
-        auto txID = getTxIDByRxID( rxID );
-
-        // Check if CAN ID is 11-bit or 29-bit
-        bool isExtendedId = ( (uint32_t)canID > ( uint32_t )( ECUID::HIGHEST_ECU_RX_ID ) ) ? true : false;
-        if ( obdOverCANECU->init(
-                 mGatewayCanInterfaceName, mOBDDataDecoder, rxID, txID, isExtendedId, mSignalBufferPtr ) )
+        auto ecu = std::make_shared<OBDOverCANECU>();
+        if ( !ecu->init( mGatewayCanInterfaceName,
+                         mOBDDataDecoder,
+                         rxID,
+                         getTxIDByRxID( isExtendedID, rxID ),
+                         isExtendedID,
+                         mSignalBufferPtr,
+                         broadcastSocket ) )
         {
-            mECUs.push_back( obdOverCANECU );
+            return false;
         }
-        else
-        {
-            initStatus = false;
-            mLogger.error( "OBDOverCANModule::initECUs",
-                           "Failed to initialize OBDOverCANECU module for ECU " + std::to_string( rxID ) );
-        }
+        mECUs.push_back( ecu );
     }
     mLogger.trace( "OBDOverCANModule::initialECUs", "Initialize ECUs in size of: " + std::to_string( mECUs.size() ) );
-    return initStatus;
+    return true;
 }
 
-bool
+void
 OBDOverCANModule::assignPIDsToECUs()
 {
-    bool status = false;
     // clear the PID allocation table
     mPIDAssigned.clear();
     for ( auto &ecu : mECUs )
     {
         // Get supported PIDs. Edge agent will either request it from ECU or get it from the buffer
-        if ( ecu->requestReceiveSupportedPIDs( SID::CURRENT_STATS ) )
-        {
-            // Allocate PID to each ECU to request. Note that if the PID has been already assigned, it will not be
-            // reassigned to another ECU
-            ecu->updatePIDRequestList(
-                SID::CURRENT_STATS, mPIDsRequestedByDecoderDict[SID::CURRENT_STATS], mPIDAssigned );
-            status = true;
-        }
+        auto numRequests = ecu->requestReceiveSupportedPIDs( SID::CURRENT_STATS );
+        flush( numRequests, ecu );
+        // Allocate PID to each ECU to request. Note that if the PID has been already assigned, it will not be
+        // reassigned to another ECU
+        ecu->updatePIDRequestList( SID::CURRENT_STATS, mPIDsRequestedByDecoderDict[SID::CURRENT_STATS], mPIDAssigned );
     }
-    return status;
 }
 
 bool
@@ -452,7 +560,7 @@ OBDOverCANModule::disconnect()
 bool
 OBDOverCANModule::isAlive()
 {
-    if ( !mThread.isValid() || !mThread.isActive() )
+    if ( ( !mThread.isValid() ) || ( !mThread.isActive() ) )
     {
         return false;
     }
@@ -539,12 +647,7 @@ OBDOverCANModule::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &di
 
             // If the program already know the supported PIDs from ECU, below two update will update
             // For each ecu update the PIDs requested by the Dict
-            mPIDAssigned.clear();
-            for ( auto &ecu : mECUs )
-            {
-                ecu->updatePIDRequestList(
-                    SID::CURRENT_STATS, mPIDsRequestedByDecoderDict[SID::CURRENT_STATS], mPIDAssigned );
-            }
+            assignPIDsToECUs();
 
             // Pass on the decoder manifest to the OBD Decoder and wake up the thread.
             // Before that we should interrupt the thread so that no further decoding

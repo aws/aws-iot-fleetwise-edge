@@ -7,11 +7,10 @@ set(libraryAliasName IoTFleetWise::Platform::Utility)
 
 add_library(
   ${libraryTargetName}
-  # STATIC or SHARED left out to depend on BUILD_SHARED_LIBS
-  src/EnumUtility.cpp
+  INTERFACE
 )
 
-target_include_directories(${libraryTargetName} PUBLIC include)
+target_include_directories(${libraryTargetName} INTERFACE include)
 
 add_library(${libraryAliasName} ALIAS ${libraryTargetName})
 

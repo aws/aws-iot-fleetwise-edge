@@ -1,5 +1,26 @@
 # Change Log
 
+## v1.0.3 (Jan 9, 2023)
+
+Features:
+* Added OBD broadcast support to send functional rather than physical requests to ECUs to improve compatibility with a broader range of vehicles.
+  This behavior does however increase CAN bus load. The config option `broadcastRequests` can be set to `false` to disable it.
+
+Bugfixes:
+* Fix `CollectionSchemeManager` and `CollectionInspectionEngine` to use monotonic clock
+  This now makes check-in and data collection work even when the system time jumps.
+  Please note that the timestamp present in check-in and collected data may still represent the system time, which means that newly collected data may
+  be sent with a timestamp that is earlier than the previous sent data in case the system time is changed to some time in the past.
+
+Improvements:
+* Logs now show time in ISO 8601 format and UTC.
+* Added optional config `logColor` for controlling ANSI colors in the logs. Valid values: `Auto`, `Yes`, `No`. Default value is `Auto`, which will make
+  the agent try to detect whether stdout can interpret the ANSI color escape sequences.
+* A containerized version of the edge agent is available from AWS ECR Public Gallery: https://gallery.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge.
+* Improve CERT-CPP compliance.
+* Improve quick start guide and demo script.
+* Clarify the meaning of the `startBit`.
+
 ## v1.0.2 (Nov 28, 2022)
 
 Bugfixes:

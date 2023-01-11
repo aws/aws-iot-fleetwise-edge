@@ -33,7 +33,8 @@ GeohashFunctionNode::evaluateGeohash( double latitude,
     {
         // mLogger.info( "GeohashFunctionNode::evaluateGeohash", "Geohash calculated: " + currentGeohashString );
         // First we want to make sure both geohash string has the valid format for comparison
-        if ( this->mGeohashInfo.mGeohashString.length() >= precision && currentGeohashString.length() >= precision )
+        if ( ( this->mGeohashInfo.mGeohashString.length() >= precision ) &&
+             ( currentGeohashString.length() >= precision ) )
         {
             // We compare the front part of string at given precision
             if ( currentGeohashString.substr( 0, precision ) !=

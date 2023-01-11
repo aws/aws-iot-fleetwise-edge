@@ -26,7 +26,7 @@ namespace OffboardConnectivityAwsIot
 class AwsBootstrap
 {
 public:
-    ~AwsBootstrap();
+    ~AwsBootstrap() = default;
 
     AwsBootstrap( const AwsBootstrap & ) = delete;
     AwsBootstrap &operator=( const AwsBootstrap & ) = delete;

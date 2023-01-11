@@ -34,14 +34,25 @@ using namespace Aws::IoTFleetWise::Platform::Linux;
 using SchemaListenerPtr = std::shared_ptr<SchemaListener>;
 
 /* TimeData is used in mTimeline, the second parameter in the pair is a CollectionScheme ID */
-using TimeData = std::pair<TimePointInMsec, std::string>;
+struct TimeData
+{
+    TimePoint time;
+    std::string id;
+
+    bool
+    operator>( const TimeData &other ) const
+    {
+        return ( this->time.monotonicTimeMs > other.time.monotonicTimeMs ) ||
+               ( ( this->time.monotonicTimeMs == other.time.monotonicTimeMs ) && ( this->id > other.id ) );
+    }
+};
 
 /**
  * @brief main CollectionScheme Management entity - responsible for the following:
  * 1. Listens to collectionScheme ingestion to get CollectionSchemeList and DecoderManifest
  * 2. Process CollectionSchemeList to generate timeLine in chronological order, organize CollectionSchemeList into
    Enabled and Idle lists;
- * 3. Wait for timer to elapse on TimePointInMsecond along timeLine chronologically, re-org Enabled and Idle list;
+ * 3. Wait for timer to elapse along timeLine chronologically, re-org Enabled and Idle list;
  * 4. Extract decoding dictionary and propagate to Vehicle Data Consumer;
  * 5. Extract Inspection Matrix and propagate to Inspection Engine;
  * 6. Delete expired collectionSchemes from Enabled list, or removed collectionScheme from existing list per Cloud
@@ -187,6 +198,8 @@ private:
      */
     static void doWork( void *data );
 
+    TimePoint calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs );
+
     /**
      * @brief template function for generate a message on an event for mLogger usage
      * Include Event printed in string msg, collectionScheme ID, startTime, stopTime of the collectionScheme, and
@@ -199,9 +212,9 @@ private:
      */
     static void printEventLogMsg( std::string &msg,
                                   const std::string &id,
-                                  const TimePointInMsec &startTime,
-                                  const TimePointInMsec &stopTime,
-                                  const TimePointInMsec &currTime );
+                                  const Timestamp &startTime,
+                                  const Timestamp &stopTime,
+                                  const TimePoint &currTime );
 
     /**
      * @brief supporting function for mLogger
@@ -247,11 +260,11 @@ private:
     bool isCollectionSchemeLoaded();
 
 protected:
-    bool rebuildMapsandTimeLine( const TimePointInMsec &currTime ) override;
+    bool rebuildMapsandTimeLine( const TimePoint &currTime ) override;
 
-    bool updateMapsandTimeLine( const TimePointInMsec &currTime ) override;
+    bool updateMapsandTimeLine( const TimePoint &currTime ) override;
 
-    bool checkTimeLine( const TimePointInMsec &currTime ) override;
+    bool checkTimeLine( const TimePoint &currTime ) override;
 
     /**
      * @brief This function extract the decoder dictionary from decoder manifest and polices

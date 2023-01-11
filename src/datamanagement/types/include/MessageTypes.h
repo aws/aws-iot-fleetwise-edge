@@ -34,8 +34,8 @@ public:
     bool
     operator==( const CANMessageFormat &other ) const
     {
-        return mMessageID == other.mMessageID && mSizeInBytes == other.mSizeInBytes && mSignals == other.mSignals &&
-               mIsMultiplexed == other.mIsMultiplexed;
+        return ( mMessageID == other.mMessageID ) && ( mSizeInBytes == other.mSizeInBytes ) &&
+               ( mSignals == other.mSignals ) && ( mIsMultiplexed == other.mIsMultiplexed );
     }
 
     /**

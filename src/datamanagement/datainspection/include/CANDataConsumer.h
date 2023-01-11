@@ -94,8 +94,6 @@ private:
     // Decodes the messages and puts the results in the output buffer.
     static void doWork( void *data );
 
-    bool switchCollectionSchemeIfNeeded();
-
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };
     std::atomic<bool> mShouldSleep{ false };
