@@ -92,8 +92,6 @@ AwsBootstrap::AwsBootstrap()
     mImpl = std::make_unique<Impl>();
 }
 
-AwsBootstrap::~AwsBootstrap() = default;
-
 AwsBootstrap &
 AwsBootstrap::getInstance()
 {

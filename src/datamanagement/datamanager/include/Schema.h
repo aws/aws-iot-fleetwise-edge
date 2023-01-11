@@ -106,10 +106,10 @@ public:
         onDataReceived( const uint8_t *buf, size_t size ) override
         {
             // Check for a empty input data
-            if ( buf == nullptr || size == 0 )
+            if ( ( buf == nullptr ) || ( size == 0 ) )
             {
                 mLogger.error( "DecoderManifestCb::onDataReceived",
-                               "Received empty CollectionScheme List data from Cloud." );
+                               "Received empty CollectionScheme List data from Cloud" );
                 return;
             }
 
@@ -119,7 +119,7 @@ public:
             // Try to copy the binary data into the decoderManifest object
             if ( !decoderManifestPtr->copyData( buf, size ) )
             {
-                mLogger.error( "DecoderManifestCb::onDataReceived", "DecoderManifest copyData from IoT core failed." );
+                mLogger.error( "DecoderManifestCb::onDataReceived", "DecoderManifest copyData from IoT core failed" );
                 return;
             }
 
@@ -154,10 +154,10 @@ public:
         onDataReceived( const uint8_t *buf, size_t size ) override
         {
             // Check for a empty input data
-            if ( buf == nullptr || size == 0 )
+            if ( ( buf == nullptr ) || ( size == 0 ) )
             {
                 mLogger.error( "DecoderManifestCb::onDataReceived",
-                               "Received empty CollectionScheme List data from Cloud." );
+                               "Received empty CollectionScheme List data from Cloud" );
                 return;
             }
 
@@ -168,7 +168,7 @@ public:
             if ( !collectionSchemeListPtr->copyData( buf, size ) )
             {
                 mLogger.error( "DecoderManifestCb::onDataReceived",
-                               "CollectionSchemeList copyData from IoT core failed." );
+                               "CollectionSchemeList copyData from IoT core failed" );
                 return;
             }
 

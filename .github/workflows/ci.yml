@@ -3,6 +3,10 @@
 
 name: CI
 
+permissions:
+  id-token: write
+  contents: write
+
 on:
   push:
     branches: [ '*' ]
@@ -12,8 +16,6 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-amd64:
@@ -61,15 +63,19 @@ jobs:
           find linux -name aws-iot-fleetwise-edge -exec chmod +x {} \;
       - uses: docker/setup-qemu-action@v2
       - uses: docker/setup-buildx-action@v2
-      - uses: docker/login-action@v2
+      - uses: aws-actions/configure-aws-credentials@v1
+        if: github.ref_type == 'tag'
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ env.GITHUB_TOKEN }}
+          role-to-assume: ${{ secrets.PUBLIC_ECR_PUSH_ROLE }}
+          aws-region: us-east-1
+      - uses: aws-actions/amazon-ecr-login@v1
+        if: github.ref_type == 'tag'
+        with:
+          registry-type: public
       - id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: public.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge
       - uses: docker/build-push-action@v3
         with:
           context: .

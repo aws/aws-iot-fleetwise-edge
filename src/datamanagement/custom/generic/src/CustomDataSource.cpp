@@ -33,11 +33,11 @@ CustomDataSource::start()
     mShouldSleep.store( true );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "CustomDataSource::start", " Consumer Thread failed to start " );
+        mLogger.trace( "CustomDataSource::start", "Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "CustomDataSource::start", " Consumer Thread started " );
+        mLogger.trace( "CustomDataSource::start", "Thread started" );
         mThread.setThreadName( getThreadName() );
     }
 
@@ -65,7 +65,7 @@ CustomDataSource::stop()
     mWait.notify();
     mThread.release();
     mShouldStop.store( false, std::memory_order_relaxed );
-    mLogger.trace( "CustomDataSource::stop", " CustomDataSource Thread stopped " );
+    mLogger.trace( "CustomDataSource::stop", "Thread stopped" );
     return !mThread.isActive();
 }
 
@@ -93,7 +93,7 @@ CustomDataSource::doWork( void *data )
             // We either just started or there was a decoder dictionary update that we can't use.
             // We should sleep
             customDataSource->mLogger.trace( "CustomDataSource::doWork",
-                                             "No valid decoding information available so sleep " );
+                                             "No valid decoding information available so sleep" );
             // Wait here for the decoder dictionary to come.
             customDataSource->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
             // At this point, we should be able to see events coming as the channel is also

@@ -154,7 +154,7 @@ AwsIotConnectivityModule::setupCallbacks()
                 }
                 else
                 {
-                    mLogger.info( "AwsIotConnectivityModule::connect", "Connection completed successfully." );
+                    mLogger.info( "AwsIotConnectivityModule::connect", "Connection completed successfully" );
                     mConnectionCompletedPromise.set_value( true );
                 }
             }
@@ -164,7 +164,7 @@ AwsIotConnectivityModule::setupCallbacks()
     auto onInterrupted = [&]( Mqtt::MqttConnection &mqttConnection, int error ) {
         (void)mqttConnection;
         TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_INTERRUPTED );
-        std::string errorString = " The MQTT Connection has been interrupted due to: ";
+        std::string errorString = "The MQTT Connection has been interrupted due to: ";
         auto errStr = ErrorDebugString( error );
         errorString.append( errStr != nullptr ? std::string( errStr ) : std::string( "Unknown error" ) );
         mLogger.error( "AwsIotConnectivityModule::setupCallbacks", errorString );
@@ -227,21 +227,21 @@ AwsIotConnectivityModule::renameEventLoopTask()
 bool
 AwsIotConnectivityModule::createMqttConnection( Aws::Crt::Io::ClientBootstrap *clientBootstrap )
 {
-    if ( mCertificate.len == 0 || mPrivateKey.len == 0 || mEndpointUrl.empty() || mClientId.empty() )
+    if ( ( mCertificate.len == 0 ) || ( mPrivateKey.len == 0 ) || mEndpointUrl.empty() || mClientId.empty() )
     {
         mLogger.error( "AwsIotConnectivityModule::connect",
-                       " Please provide X.509 Certificate, private Key, endpoint and client-Id" );
+                       "Please provide X.509 Certificate, private Key, endpoint and client-Id" );
         return false;
     }
     if ( clientBootstrap == nullptr )
     {
-        mLogger.error( "AwsIotConnectivityModule::connect", " ClientBootstrap failed with error " );
+        mLogger.error( "AwsIotConnectivityModule::connect", "ClientBootstrap failed with error" );
         return false;
     }
     else if ( !( *clientBootstrap ) )
     {
         auto errString = ErrorDebugString( clientBootstrap->LastError() );
-        mLogger.error( "AwsIotConnectivityModule::connect", " ClientBootstrap failed with error " );
+        mLogger.error( "AwsIotConnectivityModule::connect", "ClientBootstrap failed with error" );
         mLogger.error( "AwsIotConnectivityModule::connect",
                        errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
         return false;
@@ -298,7 +298,7 @@ AwsIotConnectivityModule::attempt()
 {
     if ( !mConnection->Connect( mClientId.c_str(), false, MQTT_CONNECT_KEEP_ALIVE_SECONDS, MQTT_PING_TIMOUT_MS ) )
     {
-        std::string error = " The MQTT Connection failed due to: ";
+        std::string error = "The MQTT Connection failed due to: ";
         auto errString = ErrorDebugString( mConnection->LastError() );
         error.append( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
         mLogger.warn( "AwsIotConnectivityModule::attempt", error );

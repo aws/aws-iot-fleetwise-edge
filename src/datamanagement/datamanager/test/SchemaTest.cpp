@@ -116,7 +116,7 @@ public:
         // Make sure the checkin time is after the time we took at the start of the test
         ASSERT_GE( sentCheckin.timestamp_ms_epoch(), timeBeforeCheckin );
         // Make sure the checkin time is before or equal to this time
-        ASSERT_LE( sentCheckin.timestamp_ms_epoch(), clock->timeSinceEpochMs() );
+        ASSERT_LE( sentCheckin.timestamp_ms_epoch(), clock->systemTimeSinceEpochMs() );
     }
 };
 
@@ -133,7 +133,7 @@ TEST( CollectionSchemeIgestionTest, Checkins )
                                       mockSender );
 
     std::shared_ptr<const Clock> clock = ClockHandler::getClock();
-    Timestamp timeBeforeCheckin = clock->timeSinceEpochMs();
+    Timestamp timeBeforeCheckin = clock->systemTimeSinceEpochMs();
 
     // Create list of Arns
     std::vector<std::string> sampleDocList;

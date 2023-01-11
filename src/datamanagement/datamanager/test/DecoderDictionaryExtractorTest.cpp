@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "CollectionSchemeManagerTest.h"
+#include "Testing.h"
+
+using namespace Aws::IoTFleetWise::TestingSupport;
 
 /** @brief
  * This test aims to test CollectionScheme Manager's Decoder Dictionary Extractor functionality
@@ -84,13 +87,13 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     test.init( 0, nullptr, canIDTranslator );
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
-    TimePointInMsec startTime1 = currTime;
-    TimePointInMsec stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
-    TimePointInMsec startTime2 = startTime1;
-    TimePointInMsec stopTime2 = startTime2 + SECOND_TO_MILLISECOND( 5 );
-    TimePointInMsec startTime3 = startTime1 + SECOND_TO_MILLISECOND( 6 );
-    TimePointInMsec stopTime3 = startTime3 + SECOND_TO_MILLISECOND( 5 );
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startTime1 = currTime.systemTimeMs;
+    Timestamp stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
+    Timestamp startTime2 = startTime1;
+    Timestamp stopTime2 = startTime2 + SECOND_TO_MILLISECOND( 5 );
+    Timestamp startTime3 = startTime1 + SECOND_TO_MILLISECOND( 6 );
+    Timestamp stopTime3 = startTime3 + SECOND_TO_MILLISECOND( 5 );
 
     // Map to be used by Decoder Manifest Mock to return getCANFrameAndNodeID( SignalID signalId )
     std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;
@@ -427,7 +430,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     ICollectionSchemeListPtr PL2 = std::make_shared<ICollectionSchemeListTest>( list2 );
     test2.setCollectionSchemeList( PL2 );
     // Both collectionScheme1 and collectionScheme2 are expected to be enabled
-    ASSERT_TRUE( test2.updateMapsandTimeLine( 1635951061244 ) );
+    ASSERT_TRUE( test2.updateMapsandTimeLine( { 1635951061244, 100 } ) );
     // Invoke Decoder Dictionary Extractor function
     std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> decoderDictionaryMap2;
     test2.decoderDictionaryExtractor( decoderDictionaryMap2 );
@@ -483,9 +486,9 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorNoSignalsTest )
     test.init( 0, nullptr, canIDTranslator );
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
-    TimePointInMsec startTime1 = currTime;
-    TimePointInMsec stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startTime1 = currTime.systemTimeMs;
+    Timestamp stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
 
     // Map to be used by Decoder Manifest Mock to return getCANFrameAndNodeID( SignalID signalId )
     std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;
@@ -542,9 +545,9 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorFirstRawFrameThenSi
     test.init( 0, nullptr, canIDTranslator );
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
-    TimePointInMsec startTime1 = currTime;
-    TimePointInMsec stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startTime1 = currTime.systemTimeMs;
+    Timestamp stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
 
     // Map to be used by Decoder Manifest Mock to return getCANFrameAndNodeID( SignalID signalId )
     std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;

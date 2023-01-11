@@ -13,6 +13,7 @@ namespace IoTFleetWise
 {
 namespace DataManagement
 {
+
 constexpr std::array<VehicleDataSourceProtocol, 2> CollectionSchemeManager::SUPPORTED_NETWORK_PROTOCOL;
 void
 CollectionSchemeManager::decoderDictionaryExtractor(
@@ -165,8 +166,9 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                     }
                     // check if we already have entry for CAN Frame. If not, it means this CAN Frame doesn't contain any
                     // Signals to decode, hence the collectType will be RAW only.
-                    if ( canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].find( canFrameInfo.frameID ) ==
-                         canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].end() )
+                    auto decoderMethod =
+                        canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].find( canFrameInfo.frameID );
+                    if ( decoderMethod == canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].end() )
                     {
                         // there's entry for CANChannelNumericID but no corresponding canFrameID
                         CANMessageDecoderMethod canMessageDecoderMethod;
@@ -176,11 +178,12 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                     }
                     else
                     {
-                        // This CAN Frame contains signal to be decoded. As we need to collect both CAN Frame and
-                        // signal, set the collectType as RAW_AND_DECODE
-                        canDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
-                            .at( canFrameInfo.frameID )
-                            .collectType = CANMessageCollectType::RAW_AND_DECODE;
+                        if ( decoderMethod->second.collectType == CANMessageCollectType::DECODE )
+                        {
+                            // This CAN Frame contains signal to be decoded. As we need to collect both CAN Frame and
+                            // signal, set the collectType as RAW_AND_DECODE
+                            decoderMethod->second.collectType = CANMessageCollectType::RAW_AND_DECODE;
+                        }
                     }
                 }
             }

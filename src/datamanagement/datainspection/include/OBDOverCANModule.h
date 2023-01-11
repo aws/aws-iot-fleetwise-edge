@@ -50,14 +50,16 @@ public:
      * is running. Typically on the Gateway ECU.
      * @param pidRequestIntervalSeconds Interval in seconds used to schedule PID requests
      * @param dtcRequestIntervalSeconds Interval in seconds used to schedule DTC requests
+     * @param broadcastRequests Broadcast requests to all ECUs - required by some vehicles
      * @return True if successful. False if both pidRequestIntervalSeconds
      * and dtcRequestIntervalSeconds are zero i.e. no collection
      */
     bool init( SignalBufferPtr signalBufferPtr,
                ActiveDTCBufferPtr activeDTCBufferPtr,
                const std::string &gatewayCanInterfaceName,
-               const uint32_t &pidRequestIntervalSeconds,
-               const uint32_t &dtcRequestIntervalSeconds = 0 );
+               uint32_t pidRequestIntervalSeconds,
+               uint32_t dtcRequestIntervalSeconds,
+               bool broadcastRequests );
     /**
      * @brief Creates an ISO-TP connection to the Engine/Transmission ECUs. Starts the
      * Keep Alive cyclic thread.
@@ -78,22 +80,13 @@ public:
      */
     bool isAlive();
 
-    /**
-     * @brief A callback function to be invoked when there's a new Decoder Dictionary. If the networkProtocol
-     * is OBD, this module will update the decoder dictionary.
-     *
-     * @param dictionary decoder dictionary
-     * @param networkProtocol network protocol which can be OBD
-     */
+    // From IActiveDecoderDictionaryListener
+    // We need this to know whether PIDs should be requested or not
     void onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
                                      VehicleDataSourceProtocol networkProtocol ) override;
 
-    /**
-     * @brief A callback function to be invoked when there's a new Inspection Matrix. The inspection
-     * matrix will specify whether or not we shall collect DTC
-     *
-     * @param activeConditions Inspection Matrix
-     */
+    // From IActiveConditionProcessor
+    // We need this to know whether DTCs should be requested or not
     void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &activeConditions ) override;
 
     /**
@@ -129,14 +122,16 @@ private:
     bool autoDetectECUs( bool isExtendedID, std::vector<uint32_t> &canIDResponses );
 
     // calculate ECU CAN Transmit ID from Receiver ID
-    static constexpr uint32_t getTxIDByRxID( uint32_t rxId );
+    static constexpr uint32_t getTxIDByRxID( bool isExtendedID, uint32_t rxId );
 
     /**
      * @brief Initialize ECUs by detected CAN IDs
+     * @param isExtendedID When true, 29-bit messages were detected, otherwise 11-bit
      * @param canIDResponse Detected CAN ID via broadcast request
+     * @param broadcastSocket Broadcast socket for sending request. Can be -1 to send using physical socket.
      * @return True if all OBDOverCANECU modules are initialized successfully for ECUs
      */
-    bool initECUs( std::vector<uint32_t> &canIDResponse );
+    bool initECUs( bool isExtendedID, std::vector<uint32_t> &canIDResponse, int broadcastSocket );
 
     // Start the  thread
     bool start();
@@ -155,7 +150,22 @@ private:
     static void doWork( void *data );
 
     // This function will assign PIDs to each ECU
-    bool assignPIDsToECUs();
+    void assignPIDsToECUs();
+    /**
+     * @brief Open an ISO-TP broadcast socket to send requests for all ECUs
+     * @param isExtendedId Whether the broadcast ID is in extended format (29-bit) or standard format (11 bit)
+     * @return Broadcast socket, or -1 on error
+     */
+    int openISOTPBroadcastSocket( bool isExtendedId );
+    /**
+     * @brief Flush ecus sockets to ignore received data from broadcast request. If mBroadcastRequests is false,
+     *        no flushing will be performed.
+     * @param count The number of responses to be flushed
+     * @param exceptECU Flush all ECUs except this one
+     */
+    void flush( size_t count, std::shared_ptr<OBDOverCANECU> &exceptECU );
+
+    static void calcSleepTime( uint32_t requestIntervalSeconds, const Timer &timer, int64_t &outputSleepTime );
 
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };
@@ -176,6 +186,8 @@ private:
     ActiveDTCBufferPtr mActiveDTCBufferPtr;
     uint32_t mPIDRequestIntervalSeconds{ 0 };
     uint32_t mDTCRequestIntervalSeconds{ 0 };
+    bool mBroadcastRequests{ false };
+    int mBroadcastSocket{ -1 };
     std::string mGatewayCanInterfaceName;
     Timer mDTCTimer;
     Timer mPIDTimer;
@@ -197,7 +209,6 @@ private:
     static constexpr uint32_t MASKING_SHIFT_BITS = 8;              // Shift 8 bits
     static constexpr uint32_t MASKING_TEMPLATE_TX_ID = 0x18DA00F1; // All 29-bit tx id has the same bytes
     static constexpr uint32_t MASKING_REMOVE_BYTE = 0x8;
-    static constexpr uint32_t P2_TIMEOUT_DEFAULT_MS = 1000; // Set 1000 milliseconds timeout for ECU auto detection
 };
 } // namespace DataInspection
 } // namespace IoTFleetWise

@@ -23,7 +23,7 @@ class ChronoClock : public Clock
 {
 public:
     Timestamp
-    timeSinceEpochMs() const override
+    systemTimeSinceEpochMs() const override
     {
         return static_cast<Timestamp>(
             std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::system_clock::now().time_since_epoch() )
@@ -31,15 +31,64 @@ public:
     }
 
     std::string
-    timestampToString() const override
+    currentTimeToIsoString() const override
     {
         std::stringstream timeAsString;
         auto timeNow = std::chrono::system_clock::now();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>( timeNow.time_since_epoch() ).count() % 1000;
         auto timeNowFormatted = std::chrono::system_clock::to_time_t( timeNow );
-        timeAsString << std::put_time( std::localtime( &timeNowFormatted ), "%Y-%m-%d %I:%M:%S %p" );
+        timeAsString << std::put_time( std::gmtime( &timeNowFormatted ), "%FT%T." ) << std::setfill( '0' )
+                     << std::setw( 3 ) << ms << "Z";
         return timeAsString.str();
     }
+
+    Timestamp
+    monotonicTimeSinceEpochMs() const override
+    {
+        return static_cast<Timestamp>(
+            std::chrono::duration_cast<std::chrono::milliseconds>( std::chrono::steady_clock::now().time_since_epoch() )
+                .count() );
+    }
+
+    TimePoint
+    timeSinceEpoch() const override
+    {
+        return TimePoint{ systemTimeSinceEpochMs(), monotonicTimeSinceEpochMs() };
+    }
 };
+
+TimePoint
+timePointFromSystemTime( const TimePoint &currTime, Timestamp systemTimeMs )
+{
+    if ( systemTimeMs >= currTime.systemTimeMs )
+    {
+        Timestamp differenceMs = systemTimeMs - currTime.systemTimeMs;
+        return TimePoint{ systemTimeMs, currTime.monotonicTimeMs + differenceMs };
+    }
+    else
+    {
+        Timestamp differenceMs = currTime.systemTimeMs - systemTimeMs;
+        if ( differenceMs <= currTime.monotonicTimeMs )
+        {
+            return TimePoint{ systemTimeMs, currTime.monotonicTimeMs - differenceMs };
+        }
+        else
+        {
+            // Not much we can do here. The system time corresponds to a time in the past before the monotonic
+            // clock started ticking, so we would need to represent it as a negative number. This could happen in the
+            // case the obtained timestamp is completely out of sync with the system time, or when the system time
+            // changes between the moment the timestamp was extracted and the moment we are checking here.
+            //
+            // For example:
+            // 1. Timestamp is extracted from the message, corresponding to 08:00:00
+            // 2. System time is changed to 2 hours into the future
+            // 3. We obtain the current system time (which is now 10:00:00) and monotonic time
+            // 4. If the monotonic time is small enough (e.g. less than 2 * 60 * 60 * 1000 = 7200000 ms), this situation
+            // will happen.
+            return TimePoint{ 0, 0 };
+        }
+    }
+}
 
 std::shared_ptr<const Clock>
 ClockHandler::getClock()

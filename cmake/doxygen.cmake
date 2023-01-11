@@ -31,6 +31,7 @@ if(DOXYGEN_FOUND)
   set(DOXYGEN_TEMPLATE_RELATIONS YES)
   set(DOXYGEN_TOC_INCLUDE_HEADINGS 5)
   set(DOXYGEN_UML_LOOK YES)
+  set(DOXYGEN_EXCLUDE_PATTERNS "*.md")
 
   doxygen_add_docs(
     doc_doxygen

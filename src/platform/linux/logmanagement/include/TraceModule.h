@@ -23,6 +23,7 @@ using namespace Aws::IoTFleetWise::Platform::Utility;
 /**
  * Different Variables defined at compile time used by all other modules
  * For verbose print to work it needs to be also added to getVariableName()
+ * Only add items at the end and do not delete items
  * */
 enum class TraceVariable
 {
@@ -85,9 +86,15 @@ enum class TraceVariable
     OBD_KEEP_ALIVE_ERROR,
     DISCARDED_FRAMES,
     CAN_POLLING_TIMESTAMP_COUNTER,
+    CE_PROCESSED_SIGNALS,
+    CE_PROCESSED_CAN_FRAMES,
+    CE_TRIGGERS,
     TRACE_VARIABLE_SIZE
 };
 
+/**
+ *  Only add items at the end and do not delete items
+ */
 enum class TraceAtomicVariable
 {
     QUEUE_CONSUMER_TO_INSPECTION_SIGNALS = 0,
@@ -105,6 +112,7 @@ enum class TraceAtomicVariable
 /**
  * Different Sections defined at compile time used by all other modules
  * For verbose print to work it needs to be also added to getSectionName()
+ * Only add items at the end and do not delete items
  * */
 enum class TraceSection
 {
@@ -114,6 +122,27 @@ enum class TraceSection
     MANAGER_DECODER_BUILD,
     MANAGER_COLLECTION_BUILD,
     MANAGER_EXTRACTION,
+    CAN_DECODER_CYCLE_0,
+    CAN_DECODER_CYCLE_1,
+    CAN_DECODER_CYCLE_2,
+    CAN_DECODER_CYCLE_3,
+    CAN_DECODER_CYCLE_4,
+    CAN_DECODER_CYCLE_5,
+    CAN_DECODER_CYCLE_6,
+    CAN_DECODER_CYCLE_7,
+    CAN_DECODER_CYCLE_8,
+    CAN_DECODER_CYCLE_9,
+    CAN_DECODER_CYCLE_10,
+    CAN_DECODER_CYCLE_11,
+    CAN_DECODER_CYCLE_12,
+    CAN_DECODER_CYCLE_13,
+    CAN_DECODER_CYCLE_14,
+    CAN_DECODER_CYCLE_15,
+    CAN_DECODER_CYCLE_16,
+    CAN_DECODER_CYCLE_17,
+    CAN_DECODER_CYCLE_18,
+    CAN_DECODER_CYCLE_19,
+    CAN_DECODER_CYCLE_MAX = CAN_DECODER_CYCLE_19,
     TRACE_SECTION_SIZE
 };
 /**
@@ -167,11 +196,11 @@ public:
     void
     setVariable( TraceVariable variable, uint64_t value )
     {
-        if ( variable < TraceVariable::TRACE_VARIABLE_SIZE )
+        auto index = toUType( variable );
+        if ( ( variable < TraceVariable::TRACE_VARIABLE_SIZE ) && ( index >= 0 ) )
         {
-            mVariableData[toUType( variable )].mCurrentValue = value;
-            mVariableData[toUType( variable )].mMaxValue =
-                std::max( value, mVariableData[toUType( variable )].mMaxValue );
+            mVariableData[index].mCurrentValue = value;
+            mVariableData[index].mMaxValue = std::max( value, mVariableData[index].mMaxValue );
         }
     }
 
@@ -188,9 +217,10 @@ public:
     void
     addToVariable( TraceVariable variable, uint64_t value )
     {
-        if ( variable < TraceVariable::TRACE_VARIABLE_SIZE )
+        auto index = toUType( variable );
+        if ( ( variable < TraceVariable::TRACE_VARIABLE_SIZE ) && ( index >= 0 ) )
         {
-            setVariable( variable, mVariableData[toUType( variable )].mCurrentValue + value );
+            setVariable( variable, mVariableData[index].mCurrentValue + value );
         }
     }
 
@@ -225,12 +255,12 @@ public:
     void
     addToAtomicVariable( TraceAtomicVariable variable, uint64_t add )
     {
-        if ( variable < TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE )
+        auto index = toUType( variable );
+        if ( ( variable < TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE ) && ( index >= 0 ) )
         {
-            uint64_t currentValue = mAtomicVariableData[toUType( variable )].mCurrentValue.fetch_add( add );
+            uint64_t currentValue = mAtomicVariableData[index].mCurrentValue.fetch_add( add );
             // If two threads add or increment in parallel the max value might be wrong
-            mAtomicVariableData[toUType( variable )].mMaxValue =
-                std::max( currentValue + add, mAtomicVariableData[toUType( variable )].mMaxValue );
+            mAtomicVariableData[index].mMaxValue = std::max( currentValue + add, mAtomicVariableData[index].mMaxValue );
         }
     }
 
@@ -268,9 +298,10 @@ public:
     void
     subtractFromAtomicVariable( TraceAtomicVariable variable, uint64_t sub )
     {
-        if ( variable < TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE )
+        auto index = toUType( variable );
+        if ( ( variable < TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE ) && ( index >= 0 ) )
         {
-            mAtomicVariableData[toUType( variable )].mCurrentValue.fetch_sub( sub );
+            mAtomicVariableData[index].mCurrentValue.fetch_sub( sub );
         }
     }
 
@@ -302,9 +333,10 @@ public:
     uint64_t
     getVariableMax( TraceVariable variable )
     {
-        if ( variable < TraceVariable::TRACE_VARIABLE_SIZE )
+        auto index = toUType( variable );
+        if ( ( variable < TraceVariable::TRACE_VARIABLE_SIZE ) && ( index >= 0 ) )
         {
-            return mVariableData[toUType( variable )].mMaxValue;
+            return mVariableData[index].mMaxValue;
         }
         return 0;
     }

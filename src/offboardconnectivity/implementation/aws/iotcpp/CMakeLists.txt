@@ -50,8 +50,6 @@ add_library(${libraryAliasName} ALIAS ${libraryTargetName})
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
 
-  find_package(GTest REQUIRED)
-
   find_library(GMOCK_LIB
       NAMES
         gmock)
@@ -75,8 +73,7 @@ if(${BUILD_TESTING})
     PRIVATE
     IoTFleetWise::OffboardConnectivityAwsBootstrap
     IoTFleetWise::OffboardConnectivity
-    GTest::Main
-    GTest::GTest
+    IoTFleetWise::TestingSupport
     ${GMOCK_MAIN_LIBRARY}
     ${GMOCK_LIB}
     ${SNAPPY_LIBRARIES}
@@ -106,12 +103,12 @@ if(${BUILD_TESTING})
     add_unit_test(${testName})
     add_valgrind_test(${testName})
 
-    # Link to the project library and GTest main
+    # Link to the project library and testing library main
     target_link_libraries(
       ${testName}
       PRIVATE
       ${libraryTargetName}
-      GTest::Main
+      IoTFleetWise::TestingSupport
       IoTFleetWise::Proto
       ${SNAPPY_LIBRARIES}
     )

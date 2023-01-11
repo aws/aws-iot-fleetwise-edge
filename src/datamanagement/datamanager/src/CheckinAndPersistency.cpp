@@ -19,8 +19,8 @@ using namespace Aws::IoTFleetWise::Platform::Utility;
 void
 CollectionSchemeManager::prepareCheckinTimer()
 {
-    TimePointInMsec currTime = mClock->timeSinceEpochMs();
-    TimeData checkinData = std::make_pair( currTime, CHECKIN );
+    auto currTime = mClock->timeSinceEpoch();
+    TimeData checkinData = TimeData{ currTime, CHECKIN };
     mTimeLine.push( checkinData );
 }
 
@@ -29,27 +29,32 @@ CollectionSchemeManager::sendCheckin()
 {
     // Create a list of active collectionSchemes and the current decoder manifest and send it to cloud
     std::vector<std::string> checkinMsg;
-    std::string checkinLogStr;
     for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); it++ )
     {
         checkinMsg.emplace_back( it->first );
-        checkinLogStr += it->first + ' ';
     }
     for ( auto it = mIdleCollectionSchemeMap.begin(); it != mIdleCollectionSchemeMap.end(); it++ )
     {
         checkinMsg.emplace_back( it->first );
-        checkinLogStr += it->first + ' ';
     }
     if ( !currentDecoderManifestID.empty() )
     {
         checkinMsg.emplace_back( currentDecoderManifestID );
-        checkinLogStr += currentDecoderManifestID;
     }
-    mLogger.trace( "CollectionSchemeManager::sendCheckin ", "CHECKIN " + checkinLogStr );
+    std::string checkinLogStr;
+    for ( size_t i = 0; i < checkinMsg.size(); i++ )
+    {
+        if ( i > 0 )
+        {
+            checkinLogStr += ", ";
+        }
+        checkinLogStr += checkinMsg[i];
+    }
+    mLogger.trace( "CollectionSchemeManager::sendCheckin", "CHECKIN: " + checkinLogStr );
 
     if ( mSchemaListenerPtr == nullptr )
     {
-        mLogger.error( "CollectionSchemeManager::sendCheckin", "Cannot set the checkin message " );
+        mLogger.error( "CollectionSchemeManager::sendCheckin", "Cannot set the checkin message" );
         return false;
     }
     else
@@ -70,29 +75,29 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
     if ( mSchemaPersistency == nullptr )
     {
         mLogger.error( "CollectionSchemeManager::retrieve",
-                       "Failed to acquire a valid handle on the scheme local persistency module " );
+                       "Failed to acquire a valid handle on the scheme local persistency module" );
         return false;
     }
     switch ( retrieveType )
     {
     case DataType::COLLECTION_SCHEME_LIST:
         infoStr = "Retrieved a CollectionSchemeList of size ";
-        errStr = "Failed to retrieve the CollectionSchemeList from the persistency module due to an error :";
+        errStr = "Failed to retrieve the CollectionSchemeList from the persistency module due to an error: ";
         break;
     case DataType::DECODER_MANIFEST:
         infoStr = "Retrieved a DecoderManifest of size ";
-        errStr = "Failed to retrieve the DecoderManifest from the persistency module due to an error :";
+        errStr = "Failed to retrieve the DecoderManifest from the persistency module due to an error: ";
         break;
     default:
         mLogger.error( "CollectionSchemeManager::retrieve",
-                       " unknown error : " + std::to_string( toUType( retrieveType ) ) );
+                       "Unknown error: " + std::to_string( toUType( retrieveType ) ) );
         return false;
     }
 
     protoSize = mSchemaPersistency->getSize( retrieveType );
     if ( protoSize <= 0 )
     {
-        mLogger.info( "CollectionSchemeManager::retrieve", infoStr + "zero." );
+        mLogger.info( "CollectionSchemeManager::retrieve", infoStr + "zero" );
         return false;
     }
     protoOutput.resize( protoSize );
@@ -104,7 +109,7 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
         mLogger.error( "CollectionSchemeManager::retrieve", errStr );
         return false;
     }
-    mLogger.info( "CollectionSchemeManager::retrieve", infoStr + std::to_string( protoSize ) + " successfully." );
+    mLogger.info( "CollectionSchemeManager::retrieve", infoStr + std::to_string( protoSize ) + " successfully" );
     if ( retrieveType == DataType::COLLECTION_SCHEME_LIST )
     {
         // updating mCollectionSchemeList
@@ -115,6 +120,9 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
         mCollectionSchemeList->copyData( protoOutput.data(), protoSize );
         mProcessCollectionScheme = true;
     }
+    // currently this if will be always true as it can be only DECODER_MANIFEST or COLLECTION_SCHEME_LIST but for
+    // readability leave it as else if instead of else
+    // coverity[autosar_cpp14_m0_1_2_violation]
     else if ( retrieveType == DataType::DECODER_MANIFEST )
     {
         // updating mDecoderManifest
@@ -141,12 +149,12 @@ CollectionSchemeManager::store( DataType storeType )
                        "Failed to acquire a valid handle on the scheme local persistency module" );
         return;
     }
-    if ( storeType == DataType::COLLECTION_SCHEME_LIST && mCollectionSchemeList == nullptr )
+    if ( ( storeType == DataType::COLLECTION_SCHEME_LIST ) && ( mCollectionSchemeList == nullptr ) )
     {
         mLogger.error( "CollectionSchemeManager::store", "Invalid CollectionSchemeList" );
         return;
     }
-    if ( storeType == DataType::DECODER_MANIFEST && mDecoderManifest == nullptr )
+    if ( ( storeType == DataType::DECODER_MANIFEST ) && ( mDecoderManifest == nullptr ) )
     {
         mLogger.error( "CollectionSchemeManager::store", "Invalid DecoderManifest" );
         return;
@@ -169,7 +177,7 @@ CollectionSchemeManager::store( DataType storeType )
 
     if ( protoInput.empty() )
     {
-        mLogger.error( "CollectionSchemeManager::store", logStr + " data size is zero." );
+        mLogger.error( "CollectionSchemeManager::store", logStr + " data size is zero" );
         return;
     }
     ret = mSchemaPersistency->write( protoInput.data(), protoInput.size(), storeType );
@@ -182,7 +190,7 @@ CollectionSchemeManager::store( DataType storeType )
     }
     else
     {
-        mLogger.trace( "CollectionSchemeManager::store", logStr + " persisted successfully." );
+        mLogger.trace( "CollectionSchemeManager::store", logStr + " persisted successfully" );
     }
 }
 } // namespace DataManagement

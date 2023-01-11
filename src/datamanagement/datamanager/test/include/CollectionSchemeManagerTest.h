@@ -392,17 +392,17 @@ public:
         CollectionSchemeManager::updateAvailable();
     }
     bool
-    rebuildMapsandTimeLine( const TimePointInMsec &currTime )
+    rebuildMapsandTimeLine( const TimePoint &currTime )
     {
         return ( CollectionSchemeManager::rebuildMapsandTimeLine( currTime ) );
     }
     bool
-    updateMapsandTimeLine( const TimePointInMsec &currTime )
+    updateMapsandTimeLine( const TimePoint &currTime )
     {
         return CollectionSchemeManager::updateMapsandTimeLine( currTime );
     }
     bool
-    checkTimeLine( const TimePointInMsec &currTime )
+    checkTimeLine( const TimePoint &currTime )
     {
         return ( CollectionSchemeManager::checkTimeLine( currTime ) );
     }

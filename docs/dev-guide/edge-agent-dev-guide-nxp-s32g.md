@@ -93,6 +93,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 && ../tools/configure-fwe.sh \
   --input-config-file ~/aws-iot-fleetwise-edge/configuration/static-config.json \
   --output-config-file config-0.json \
+  --log-color Yes \
   --vehicle-name `cat vehicle-name.txt` \
   --endpoint-url `cat endpoint.txt` \
   --can-bus0 can0 \
@@ -126,7 +127,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 1. Run the following **_on the S32G_** to view and follow the AWS IoT FleetWise Edge Agent log (press CTRL+C to exit):
 
    ```bash
-   sudo journalctl -fu fwe@0
+   sudo journalctl -fu fwe@0 --output=cat
    ```
 
 ## Collect OBD Data

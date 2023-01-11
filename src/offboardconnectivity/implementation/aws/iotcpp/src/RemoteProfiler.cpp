@@ -31,7 +31,7 @@ RemoteProfiler::RemoteProfiler( std::shared_ptr<ISender> metricsSender,
     initLogStructure();
     fLastCPURUsage.reportCPUUsageInfo();
     Aws::IoTFleetWise::Platform::Linux::CPUUsageInfo::reportPerThreadUsageData( fLastThreadUsage );
-    fLastTimeExecutionEnvironmentMetricsCollected = fClock->timeSinceEpochMs();
+    fLastTimeExecutionEnvironmentMetricsCollected = fClock->monotonicTimeSinceEpochMs();
 }
 
 void
@@ -49,11 +49,12 @@ RemoteProfiler::sendMetricsOut()
     Json::StreamWriterBuilder builder;
     builder["indentation"] = ""; // If you want whitespace-less output
     const std::string output = Json::writeString( builder, fMetricsRoot );
-    auto ret = fMetricsSender->send( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() );
-    if ( ConnectivityError::Success != ret )
+    uint32_t ret = static_cast<uint32_t>(
+        fMetricsSender->send( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() ) );
+    if ( static_cast<uint32_t>( ConnectivityError::Success ) != ret )
     {
         fLogger.error( "RemoteProfiler::sendMetricsOut",
-                       " Send error" + std::to_string( static_cast<uint32_t>( ret ) ) );
+                       "Send error " + std::to_string( static_cast<uint32_t>( ret ) ) );
     }
     fMetricsRoot.clear();
     fCurrentMetricsPending = 0;
@@ -68,17 +69,18 @@ RemoteProfiler::sendLogsOut()
         std::lock_guard<std::mutex> lock( loggingMutex );
         Json::StreamWriterBuilder builder;
         builder["indentation"] = ""; // If you want whitespace-less output
-        const std::string output = Json::writeString( builder, fLogRoot );
+        output = Json::writeString( builder, fLogRoot );
         initLogStructure();
     }
 
-    if ( fLogSender != nullptr && fCurrentUserPayloadInLogRoot > 0 )
+    if ( ( fLogSender != nullptr ) && ( fCurrentUserPayloadInLogRoot > 0 ) )
     {
-        auto ret = fLogSender->send( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() );
-        if ( ConnectivityError::Success != ret )
+        uint32_t ret = static_cast<uint32_t>(
+            fLogSender->send( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() ) );
+        if ( static_cast<uint32_t>( ConnectivityError::Success ) != ret )
         {
             fLogger.error( "RemoteProfiler::sendLogsOut",
-                           " Send error" + std::to_string( static_cast<uint32_t>( ret ) ) );
+                           "Send error " + std::to_string( static_cast<uint32_t>( ret ) ) );
         }
     }
 }
@@ -140,15 +142,15 @@ RemoteProfiler::start()
 {
     if ( fMetricsSender == nullptr )
     {
-        fLogger.error( "RemoteProfiler::start", " Trying to start without sender " );
+        fLogger.error( "RemoteProfiler::start", "Trying to start without sender" );
         return false;
     }
-    if ( ( fInitialLogMaxInterval == 0 && fLogLevelThreshold != LogLevel::Off ) ||
-         ( fInitialLogMaxInterval != 0 && fLogLevelThreshold == LogLevel::Off ) )
+    if ( ( ( fInitialLogMaxInterval == 0 ) && ( fLogLevelThreshold != LogLevel::Off ) ) ||
+         ( ( fInitialLogMaxInterval != 0 ) && ( fLogLevelThreshold == LogLevel::Off ) ) )
     {
         fLogger.warn( "RemoteProfiler::start",
-                      " Logging is turned off by putting LogLevel Threshold to Off but log max interval is not "
-                      "0, which is implausible. " );
+                      "Logging is turned off by putting LogLevel Threshold to Off but log max interval is not "
+                      "0, which is implausible" );
     }
     // Prevent concurrent stop/init
     std::lock_guard<std::mutex> lock( fThreadMutex );
@@ -157,11 +159,11 @@ RemoteProfiler::start()
     fShouldStop.store( false );
     if ( !fThread.create( doWork, this ) )
     {
-        fLogger.trace( "RemoteProfiler::start", " Remote Profiler Thread failed to start " );
+        fLogger.trace( "RemoteProfiler::start", "Remote Profiler Thread failed to start" );
     }
     else
     {
-        fLogger.trace( "RemoteProfiler::start", " Remote Profiler Thread started " );
+        fLogger.trace( "RemoteProfiler::start", "Remote Profiler Thread started" );
         fThread.setThreadName( "fwCNProfiler" );
     }
 
@@ -171,19 +173,19 @@ RemoteProfiler::start()
 bool
 RemoteProfiler::stop()
 {
-    if ( !fThread.isValid() || !fThread.isActive() )
+    if ( ( !fThread.isValid() ) || ( !fThread.isActive() ) )
     {
         return true;
     }
 
     std::lock_guard<std::mutex> lock( fThreadMutex );
     fShouldStop.store( true, std::memory_order_relaxed );
-    fLogger.trace( "RemoteProfiler::stop", " Request stop " );
+    fLogger.trace( "RemoteProfiler::stop", "Request stop" );
     fWait.notify();
     fThread.release();
     initLogStructure();
     fMetricsRoot.clear();
-    fLogger.trace( "RemoteProfiler::stop", " Stop finished " );
+    fLogger.trace( "RemoteProfiler::stop", "Stop finished" );
     fShouldStop.store( false, std::memory_order_relaxed );
     return !fThread.isActive();
 }
@@ -193,7 +195,7 @@ RemoteProfiler::collectExecutionEnvironmentMetrics()
 {
     CPUUsageInfo lastUsage = fLastCPURUsage;
     fLastCPURUsage.reportCPUUsageInfo();
-    Timestamp currentTime = fClock->timeSinceEpochMs();
+    Timestamp currentTime = fClock->monotonicTimeSinceEpochMs();
     double secondsBetweenCollection =
         static_cast<double>( currentTime - fLastTimeExecutionEnvironmentMetricsCollected ) / 1000.0;
     fLastTimeExecutionEnvironmentMetricsCollected = currentTime;
@@ -228,7 +230,7 @@ RemoteProfiler::doWork( void *data )
     RemoteProfiler *profiler = static_cast<RemoteProfiler *>( data );
     while ( !profiler->fShouldStop )
     {
-        if ( profiler->fInitialUploadInterval == 0 && profiler->fInitialLogMaxInterval == 0 )
+        if ( ( profiler->fInitialUploadInterval == 0 ) && ( profiler->fInitialLogMaxInterval == 0 ) )
         {
             profiler->fWait.wait( Signal::WaitWithPredicate );
         }
@@ -240,7 +242,7 @@ RemoteProfiler::doWork( void *data )
                           profiler->fInitialLogMaxInterval == 0 ? std::numeric_limits<uint32_t>::max()
                                                                 : profiler->fInitialLogMaxInterval ) ) );
         }
-        Timestamp currentTime = profiler->fClock->timeSinceEpochMs();
+        Timestamp currentTime = profiler->fClock->monotonicTimeSinceEpochMs();
         if ( profiler->fShouldStop ||
              ( ( profiler->fLastTimeMetricsSentOut + profiler->fInitialUploadInterval ) < currentTime ) )
         {

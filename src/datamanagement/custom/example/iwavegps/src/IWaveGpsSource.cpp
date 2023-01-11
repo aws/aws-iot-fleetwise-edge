@@ -100,7 +100,7 @@ IWaveGpsSource::pollData()
     if ( foundValid && mSignalBufferPtr != nullptr )
     {
         mValidCoordinateCounter++;
-        auto timestamp = mClock->timeSinceEpochMs();
+        auto timestamp = mClock->systemTimeSinceEpochMs();
         mSignalBufferPtr->push(
             CollectedSignal( getSignalIdFromStartBit( mLatitudeStartBit ), timestamp, lastValidLatitude ) );
         mSignalBufferPtr->push(
@@ -210,7 +210,7 @@ IWaveGpsSource::init( const std::vector<VehicleDataSourceConfig> &sourceConfigs 
 
     if ( sourceConfigs.size() > 1 || sourceConfigs.empty() )
     {
-        mLogger.error( "IWaveGpsSource::init", " Only one source config is supported " );
+        mLogger.error( "IWaveGpsSource::init", "Only one source config is supported" );
         return false;
     }
     auto settingsIterator = sourceConfigs[0].transportProperties.find( std::string( PATH_TO_NMEA ) );

@@ -251,12 +251,6 @@ DataCollectionSender::setCollectionSchemeParameters(
     mCollectionSchemeParams.priority = triggeredCollectionSchemeDataPtr->metaData.priority;
 }
 
-uint32_t
-DataCollectionSender::getCollectionEventId() const
-{
-    return mCollectionEventID;
-}
-
 } // namespace DataManagement
 } // namespace IoTFleetWise
 } // namespace Aws

@@ -45,8 +45,8 @@ public:
     bool
     shallSendData( double collectionSchemeProbability )
     {
-        return ( mDisableProbability ||
-                 ( collectionSchemeProbability > 0.0 && generateNewRandomNumber() <= collectionSchemeProbability ) );
+        return ( mDisableProbability || ( ( collectionSchemeProbability > 0.0 ) &&
+                                          ( generateNewRandomNumber() <= collectionSchemeProbability ) ) );
     }
 
 private:

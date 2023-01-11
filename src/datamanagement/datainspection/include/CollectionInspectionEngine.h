@@ -55,7 +55,7 @@ public:
      * @return at least one condition is true
      *
      */
-    bool evaluateConditions( InspectionTimestamp currentTime );
+    bool evaluateConditions( const TimePoint &currentTime );
 
     /**
      * @brief Copy for a triggered condition data out of the signal buffer
@@ -71,7 +71,7 @@ public:
      *
      * @return if dataReadyToBeSent() is false a nullptr otherwise the collected data will be returned
      */
-    std::shared_ptr<const TriggeredCollectionSchemeData> collectNextDataToSend( InspectionTimestamp currentTime,
+    std::shared_ptr<const TriggeredCollectionSchemeData> collectNextDataToSend( const TimePoint &currentTime,
                                                                                 uint32_t &waitTimeMs );
     /**
      * @brief Give a new signal to the collection engine to cached it
@@ -86,7 +86,7 @@ public:
      * @param receiveTime timestamp at which time was the signal seen on the physical bus
      * @param value the signal value as double
      */
-    void addNewSignal( InspectionSignalID id, InspectionTimestamp receiveTime, InspectionValue value );
+    void addNewSignal( InspectionSignalID id, const TimePoint &receiveTime, InspectionValue value );
 
     /**
      * @brief Add new raw CAN Frame history buffer. If frame is not needed call will be just ignored
@@ -103,7 +103,7 @@ public:
      */
     void addNewRawCanFrame( CANRawFrameID canID,
                             CANChannelNumericID channelID,
-                            InspectionTimestamp receiveTime,
+                            const TimePoint &receiveTime,
                             std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> &buffer,
                             uint8_t size );
 
@@ -277,7 +277,7 @@ private:
         uint32_t mSize{ 0 };            // minimum size needed by all conditions, buffer must be at least this big
         uint32_t mCurrentPosition{ 0 }; /**< position in ringbuffer needs to come after size as it depends on it */
         uint32_t mCounter{ 0 };         /**< over all recorded samples*/
-        InspectionTimestamp mLastSample{ 0 };
+        TimePoint mLastSample{ 0, 0 };
         std::vector<FixedTimeWindowFunctionData>
             mWindowFunctionData; /**< every signal buffer can have multiple windows over different time periods*/
         std::bitset<MAX_NUMBER_OF_ACTIVE_CONDITION>
@@ -344,7 +344,7 @@ private:
         uint32_t mSize{ 0 };
         uint32_t mCurrentPosition{ mSize - 1 }; // position in ringbuffer
         uint32_t mCounter{ 0 };
-        InspectionTimestamp mLastSample{ 0 };
+        TimePoint mLastSample{ 0, 0 };
     };
 
     /**
@@ -357,7 +357,7 @@ private:
         {
         }
         InspectionTimestamp mLastDataTimestampPublished{ 0 };
-        InspectionTimestamp mLastTrigger{ 0 };
+        TimePoint mLastTrigger{ 0, 0 };
         std::unordered_map<InspectionSignalID, SignalHistoryBuffer *>
             mEvaluationSignals; // for fast lookup signals used for evaluation
         std::unordered_map<InspectionSignalID, FixedTimeWindowFunctionData *>

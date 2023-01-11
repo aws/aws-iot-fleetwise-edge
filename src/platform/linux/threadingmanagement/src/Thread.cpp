@@ -7,7 +7,6 @@
 #include "Thread.h"
 #include <string>
 #include <sys/prctl.h>
-#include <unistd.h>
 
 namespace Aws
 {
@@ -17,6 +16,15 @@ namespace Platform
 {
 namespace Linux
 {
+
+extern "C"
+{
+    static void *
+    workerFunctionWrapperC( void *params )
+    {
+        return Thread::workerFunctionWrapper( params );
+    }
+}
 
 bool
 Thread::create( WorkerFunction workerFunction, void *execParam )
@@ -28,7 +36,7 @@ Thread::create( WorkerFunction workerFunction, void *execParam )
     mDone.store( false );
     mTerminateSignal = std::make_unique<Signal>();
 
-    if ( pthread_create( &mThread, nullptr, Thread::workerFunctionWrapper, &mExecParams ) != 0 )
+    if ( pthread_create( &mThread, nullptr, workerFunctionWrapperC, &mExecParams ) != 0 )
     {
 
         mThreadId = 0;
@@ -54,7 +62,7 @@ Thread::release()
     // Wait till the Predicate
     mTerminateSignal->wait( Signal::WaitWithPredicate );
 
-    if ( mThread != 0u && pthread_join( mThread, nullptr ) != 0 )
+    if ( ( mThread != 0u ) && ( pthread_join( mThread, nullptr ) != 0 ) )
     {
         return false;
     }

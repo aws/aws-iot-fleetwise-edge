@@ -21,7 +21,6 @@ namespace VehicleNetwork
 // on the DDS implementation we use e.g. fast dds.
 // For now, keeping them as basic C++ types.
 using DDSDomainID = uint32_t;
-using DDSDomainParticipantQoS = std::string;
 using DDSTopicQoS = std::string;
 using DDSTopicName = std::string;
 using DDSReaderName = std::string;

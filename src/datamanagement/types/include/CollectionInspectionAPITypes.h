@@ -99,7 +99,7 @@ struct ConditionWithCollectedData
     const ExpressionNode *condition; /**< points into InspectionMatrix.expressionNodes;
                                       * Raw pointer is used as needed for efficient AST and ConditionWithCollectedData
                                       * never exists without the relevant InspectionMatrix */
-    uint32_t minimumPublishInterval;
+    uint32_t minimumPublishIntervalMs;
     uint32_t afterDuration;
     std::vector<InspectionMatrixSignalCollectionInfo> signals;
     std::vector<InspectionMatrixCanFrameCollectionInfo> canFrames;

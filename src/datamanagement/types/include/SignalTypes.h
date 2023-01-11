@@ -28,7 +28,7 @@ using CANChannelNumericID = uint32_t;
 static constexpr CANChannelNumericID INVALID_CAN_SOURCE_NUMERIC_ID = 0xFFFFFFFF;
 
 using CANInterfaceID = std::string;
-const CANInterfaceID INVALID_CAN_INTERFACE_ID{};
+static const CANInterfaceID INVALID_CAN_INTERFACE_ID{};
 
 /**
  * @brief Signal ID is an ID provided by Cloud that is unique across all signals found in the vehicle regardless of
@@ -105,10 +105,11 @@ struct CANSignalFormat
     bool
     operator==( const CANSignalFormat &other ) const
     {
-        return mSignalID == other.mSignalID && mIsBigEndian == other.mIsBigEndian && mIsSigned == other.mIsSigned &&
-               mFirstBitPosition == other.mFirstBitPosition && mSizeInBits == other.mSizeInBits &&
-               mOffset == other.mOffset && mFactor == other.mFactor &&
-               mIsMultiplexorSignal == other.mIsMultiplexorSignal && mMultiplexorValue == other.mMultiplexorValue;
+        return ( mSignalID == other.mSignalID ) && ( mIsBigEndian == other.mIsBigEndian ) &&
+               ( mIsSigned == other.mIsSigned ) && ( mFirstBitPosition == other.mFirstBitPosition ) &&
+               ( mSizeInBits == other.mSizeInBits ) && ( mOffset == other.mOffset ) && ( mFactor == other.mFactor ) &&
+               ( mIsMultiplexorSignal == other.mIsMultiplexorSignal ) &&
+               ( mMultiplexorValue == other.mMultiplexorValue );
     }
 
     /**

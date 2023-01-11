@@ -35,17 +35,17 @@ CollectionSchemeIngestionList::copyData( const std::uint8_t *inputBuffer, const 
     mReady = false;
 
     // check for a null input buffer or size set to 0
-    if ( inputBuffer == nullptr || size == 0 )
+    if ( ( inputBuffer == nullptr ) || ( size == 0 ) )
     {
         // Error, input buffer empty or invalid
-        mLogger.error( "CollectionSchemeIngestionList::copyData()", "Input buffer empty" );
+        mLogger.error( "CollectionSchemeIngestionList::copyData", "Input buffer empty" );
         return false;
     }
 
     // We have to guard against document sizes that are too large
     if ( size > COLLECTION_SCHEME_LIST_BYTE_SIZE_LIMIT )
     {
-        mLogger.error( "CollectionSchemeIngestionList::copyData()", "Collection Schema document is too big. Ignoring" );
+        mLogger.error( "CollectionSchemeIngestionList::copyData", "Collection Schema document is too big, ignoring" );
         return false;
     }
 
@@ -55,11 +55,11 @@ CollectionSchemeIngestionList::copyData( const std::uint8_t *inputBuffer, const 
     // Check to make sure the vector size is the same as our input size
     if ( mProtoBinaryData.size() != size )
     {
-        mLogger.error( "CollectionSchemeIngestionList::copyData()", "Copied data size doesn't match." );
+        mLogger.error( "CollectionSchemeIngestionList::copyData", "Copied data size doesn't match" );
         return false;
     }
 
-    mLogger.trace( "CollectionSchemeIngestionList::copyData()", "Collection Scheme Data copied successfully." );
+    mLogger.trace( "CollectionSchemeIngestionList::copyData", "Collection Scheme Data copied successfully" );
 
     return true;
 }
@@ -80,12 +80,12 @@ CollectionSchemeIngestionList::build()
     // version of the headers we compiled with.
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    mLogger.trace( "CollectionSchemeIngestionList::build()", "Building CollectionScheme List" );
+    mLogger.trace( "CollectionSchemeIngestionList::build", "Building CollectionScheme list" );
 
     // Ensure that we have data to parse
-    if ( mProtoBinaryData.empty() || mProtoBinaryData.data() == nullptr )
+    if ( mProtoBinaryData.empty() || ( mProtoBinaryData.data() == nullptr ) )
     {
-        mLogger.error( "CollectionSchemeIngestionList::build()", "Input buffer empty" );
+        mLogger.error( "CollectionSchemeIngestionList::build", "Input buffer empty" );
         // Error, input buffer empty or invalid
         return false;
     }
@@ -95,7 +95,7 @@ CollectionSchemeIngestionList::build()
                                                    static_cast<int>( mProtoBinaryData.size() ) ) )
     {
         // Error parsing proto binary
-        mLogger.error( "CollectionSchemeIngestionList::build()", "Error parsing collectionSchemes.proto binary" );
+        mLogger.error( "CollectionSchemeIngestionList::build", "Error parsing collectionSchemes.proto binary" );
         return false;
     }
 
@@ -115,7 +115,7 @@ CollectionSchemeIngestionList::build()
         // Check to see if it successfully builds
         if ( pICPPtr->build() )
         {
-            mLogger.trace( "CollectionSchemeIngestionList::build()",
+            mLogger.trace( "CollectionSchemeIngestionList::build",
                            "Adding CollectionScheme index: " + std::to_string( i ) + " of " +
                                std::to_string( mCollectionSchemeListMsg.collection_schemes_size() ) );
 
@@ -125,12 +125,12 @@ CollectionSchemeIngestionList::build()
         }
         else
         {
-            mLogger.error( "CollectionSchemeIngestionList::build()",
-                           "CollectionScheme index: " + std::to_string( i ) + " failed to build. Dropping it. " );
+            mLogger.error( "CollectionSchemeIngestionList::build",
+                           "CollectionScheme index: " + std::to_string( i ) + " failed to build, dropping it" );
         }
     }
 
-    mLogger.trace( "CollectionSchemeIngestionList::build()", "Building CollectionScheme List complete." );
+    mLogger.trace( "CollectionSchemeIngestionList::build", "Building CollectionScheme List complete" );
 
     // Set the ready flag to true, as the collection collectionSchemes are ready to read
     mReady = true;

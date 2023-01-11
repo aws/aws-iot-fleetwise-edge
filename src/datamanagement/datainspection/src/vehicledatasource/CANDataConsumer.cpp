@@ -5,7 +5,6 @@
 #include "CANDataConsumer.h"
 #include "TraceModule.h"
 #include <boost/lockfree/spsc_queue.hpp>
-#include <cstring>
 #include <linux/can.h>
 #include <sstream>
 
@@ -32,7 +31,7 @@ CANDataConsumer::init( VehicleDataSourceID canChannelID, SignalBufferPtr signalB
     mCANDecoder = std::make_unique<CANDecoder>();
     if ( signalBufferPtr.get() == nullptr )
     {
-        mLogger.trace( "CANDataConsumer::init", " Init Failed due to bufferPtr as nullptr " );
+        mLogger.trace( "CANDataConsumer::init", "Init Failed due to bufferPtr as nullptr" );
         return false;
     }
     else
@@ -54,7 +53,7 @@ CANDataConsumer::suspendDataConsumption()
 {
     // Go back to sleep
     mLogger.trace( "CANDataConsumer::suspendDataConsumption",
-                   "Going to sleep until a the resume signal. Consumer : " + std::to_string( mDataSourceID ) );
+                   "Going to sleep until a the resume signal. Consumer: " + std::to_string( mDataSourceID ) );
     mShouldSleep.store( true, std::memory_order_relaxed );
 }
 
@@ -91,7 +90,7 @@ CANDataConsumer::resumeDataConsumption( ConstDecoderDictionaryConstPtr &dictiona
                 }
             }
             mLogger.trace( "CANDataConsumer::resumeDataConsumption",
-                           " Changing Decoder Dictionary on Consumer :" + std::to_string( mID ) +
+                           "Changing Decoder Dictionary on Consumer: " + std::to_string( mID ) +
                                " with decoding rules for CAN-IDs: " + canIds );
             // Make sure the thread does not sleep anymore
             mShouldSleep.store( false );
@@ -101,7 +100,7 @@ CANDataConsumer::resumeDataConsumption( ConstDecoderDictionaryConstPtr &dictiona
         else
         {
             mLogger.error( "CANDataConsumer::resumeDataConsumption",
-                           " Received invalid decoder dictionary :" + std::to_string( mID ) );
+                           "Received invalid decoder dictionary: " + std::to_string( mID ) );
         }
     }
 }
@@ -119,11 +118,11 @@ CANDataConsumer::start()
     mShouldSleep.store( true );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "CANDataConsumer::start", " Consumer Thread failed to start " );
+        mLogger.trace( "CANDataConsumer::start", "Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "CANDataConsumer::start", " Consumer Thread started " );
+        mLogger.trace( "CANDataConsumer::start", "Thread started" );
         mThread.setThreadName( "fwDIConsumer" + std::to_string( mID ) );
     }
 
@@ -138,7 +137,7 @@ CANDataConsumer::stop()
     mWait.notify();
     mThread.release();
     mShouldStop.store( false, std::memory_order_relaxed );
-    mLogger.trace( "CANDataConsumer::stop", " Consumer Thread stopped " );
+    mLogger.trace( "CANDataConsumer::stop", "Thread stopped" );
     return !mThread.isActive();
 }
 
@@ -196,6 +195,12 @@ CANDataConsumer::doWork( void *data )
     std::array<std::pair<uint32_t, uint32_t>, 8> lastFrameIds{}; // .first=can id, .second=counter
     uint8_t lastFrameIdPos = 0;
     uint32_t processedFramesCounter = 0;
+
+    TraceSection traceSection =
+        ( ( consumer->mDataSourceID + toUType( TraceSection::CAN_DECODER_CYCLE_0 ) <
+            toUType( TraceSection::CAN_DECODER_CYCLE_MAX ) )
+              ? static_cast<TraceSection>( consumer->mDataSourceID + toUType( TraceSection::CAN_DECODER_CYCLE_0 ) )
+              : TraceSection::CAN_DECODER_CYCLE_MAX );
     do
     {
         activations++;
@@ -204,11 +209,12 @@ CANDataConsumer::doWork( void *data )
             // We either just started or there was a decoder manifest update that we can't use.
             // We should sleep
             consumer->mLogger.trace( "CANDataConsumer::doWork",
-                                     "No valid decoding dictionary available, Consumer going to sleep " );
+                                     "No valid decoding dictionary available, consumer going to sleep" );
             // Wait here for the decoder Manifest to come.
             consumer->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
             // At this point, we should be able to see events coming as the channel is also
             // woken up.
+            TraceModule::get().sectionBegin( traceSection );
         }
         // Below section utilize decoder dictionary to perform CAN message decoding and collection.
         // Use a Mutex to prevent updating decoder dictionary in the middle of CAN Frame processing.
@@ -267,9 +273,9 @@ CANDataConsumer::doWork( void *data )
                 const auto &collectType = currentMessageDecoderMethod.collectType;
 
                 // Only used for TRACE log level logging
-                if ( collectType == CANMessageCollectType::RAW ||
-                     collectType == CANMessageCollectType::RAW_AND_DECODE ||
-                     collectType == CANMessageCollectType::DECODE )
+                if ( ( collectType == CANMessageCollectType::RAW ) ||
+                     ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ||
+                     ( collectType == CANMessageCollectType::DECODE ) )
                 {
                     bool found = false;
                     for ( auto &p : lastFrameIds )
@@ -294,9 +300,9 @@ CANDataConsumer::doWork( void *data )
                 }
 
                 // Check if we want to collect RAW CAN Frame; If so we also need to ensure Buffer is valid
-                if ( consumer->mCANBufferPtr.get() != nullptr &&
-                     ( collectType == CANMessageCollectType::RAW ||
-                       collectType == CANMessageCollectType::RAW_AND_DECODE ) )
+                if ( ( consumer->mCANBufferPtr.get() != nullptr ) &&
+                     ( ( collectType == CANMessageCollectType::RAW ) ||
+                       ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ) )
                 {
                     // prepare the raw CAN Frame
                     struct CollectedCanRawFrame canRawFrame;
@@ -317,7 +323,7 @@ CANDataConsumer::doWork( void *data )
                     {
                         TraceModule::get().decrementAtomicVariable(
                             TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
-                        consumer->mLogger.warn( "CANDataConsumer::doWork", "RAW CAN Frame Buffer Full! " );
+                        consumer->mLogger.warn( "CANDataConsumer::doWork", "RAW CAN Frame Buffer Full" );
                     }
                     else
                     {
@@ -329,9 +335,9 @@ CANDataConsumer::doWork( void *data )
                     }
                 }
                 // check if we want to decode can frame into signals and collect signals
-                if ( consumer->mSignalBufferPtr.get() != nullptr &&
-                     ( collectType == CANMessageCollectType::DECODE ||
-                       collectType == CANMessageCollectType::RAW_AND_DECODE ) )
+                if ( ( consumer->mSignalBufferPtr.get() != nullptr ) &&
+                     ( ( collectType == CANMessageCollectType::DECODE ) ||
+                       ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ) )
                 {
                     if ( format.isValid() )
                     {
@@ -353,7 +359,7 @@ CANDataConsumer::doWork( void *data )
                                 {
                                     TraceModule::get().decrementAtomicVariable(
                                         TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-                                    consumer->mLogger.warn( "CANDataConsumer::doWork", "Signal Buffer Full! " );
+                                    consumer->mLogger.warn( "CANDataConsumer::doWork", "Signal Buffer Full" );
                                 }
                                 else
                                 {
@@ -369,7 +375,7 @@ CANDataConsumer::doWork( void *data )
                         {
                             // The decoding was not fully successful
                             consumer->mLogger.warn( "CANDataConsumer::doWork",
-                                                    "CAN Frame " + std::to_string( messageId ) + " decoding failed! " );
+                                                    "CAN Frame " + std::to_string( messageId ) + " decoding failed" );
                         }
                     }
                     else
@@ -404,7 +410,9 @@ CANDataConsumer::doWork( void *data )
                 activations = 0;
                 logTimer.reset();
             }
+            TraceModule::get().sectionEnd( traceSection );
             consumer->mWait.wait( consumer->mIdleTime );
+            TraceModule::get().sectionBegin( traceSection );
         }
     } while ( !consumer->shouldStop() );
 }
@@ -412,8 +420,8 @@ CANDataConsumer::doWork( void *data )
 bool
 CANDataConsumer::connect()
 {
-    if ( mInputBufferPtr.get() != nullptr && mSignalBufferPtr.get() != nullptr && mCANBufferPtr.get() != nullptr &&
-         start() )
+    if ( ( mInputBufferPtr.get() != nullptr ) && ( mSignalBufferPtr.get() != nullptr ) &&
+         ( mCANBufferPtr.get() != nullptr ) && start() )
     {
         return true;
     }

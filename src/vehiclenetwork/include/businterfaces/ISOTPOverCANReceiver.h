@@ -68,6 +68,16 @@ public:
      */
     bool receivePDU( std::vector<uint8_t> &pduData );
 
+    /**
+     * @brief Returns the socket
+     * @return Socket
+     */
+    int
+    getSocket() const
+    {
+        return mSocket;
+    }
+
 private:
     ISOTPOverCANReceiverOptions mReceiverOptions;
     Timer mTimer;

@@ -14,8 +14,8 @@ namespace IoTFleetWise
 namespace VehicleNetwork
 {
 // According to J1979 6.2.2.7, we should wait at least P2CAN Max ( 50 ms )
-// We relax that a bit e.g. up to 100 ms for network latency.
-const uint32_t P2_TIMEOUT_DEFAULT_MS = 5000; // P2*CAN Max is 5 seconds. To be tuned
+// We relax that a bit e.g. up to 1000 ms for network latency.
+const uint32_t P2_TIMEOUT_DEFAULT_MS = 1000; // P2*CAN Max is 1 second
 const uint32_t P2_TIMEOUT_INFINITE = 0;
 /**
  * @brief Set of Options a Sender of a PDU must provide to the ISO-TP Stack

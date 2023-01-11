@@ -22,9 +22,6 @@ using namespace Aws::IoTFleetWise::Platform::Linux;
 // Single Producer/Consumer buffer. Used for data processing between the source and the consumer.
 using VehicleMessageCircularBuffer = boost::lockfree::spsc_queue<VehicleDataMessage>;
 using VehicleMessageCircularBufferPtr = std::shared_ptr<VehicleMessageCircularBuffer>;
-// Multi Producer/Single Consumer buffer. Used for raw data propagation.
-using VehicleRawMessageCircularBuffer = boost::lockfree::queue<VehicleDataMessage>;
-using VehicleRawMessageCircularBufferPtr = std::shared_ptr<VehicleRawMessageCircularBuffer>;
 /**
  * @brief Abstract Interface for a Vehicle Data Source. A data source maps to exactly one Transport
  * Connector implementation. The Transport protocol details are abstracted away so that users of

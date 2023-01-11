@@ -83,18 +83,8 @@ operator<( const SignalMetaData &lhs, const SignalMetaData &rhs )
 inline bool
 operator==( const SignalMetaData &lhs, const SignalMetaData &rhs )
 {
-    return lhs.signalId == rhs.signalId && lhs.dataType == rhs.dataType;
+    return ( lhs.signalId == rhs.signalId ) && ( lhs.dataType == rhs.dataType );
 }
-
-/**
- * @brief Synthetic Data decoder dictionary to be used to decode messages based on signal data type.
- *
- * The key of dictionary is the Message Identifier. The value is a list of signal data primitive types.
- */
-struct SyntheticDecoderDictionary : DecoderDictionary
-{
-    std::unordered_map<uint64_t, std::vector<SignalMetaData>> genericMessageDecoderMethod;
-};
 
 /**
  * @brief CAN decoder dictionary to be used to decode CAN Frame message to signals. This dictionary comes from

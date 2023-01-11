@@ -52,7 +52,7 @@ Schema::sendCheckin( const std::vector<std::string> &documentARNs )
     }
 
     // Add the timestamp
-    mProtoCheckinMsg.set_timestamp_ms_epoch( mClock->timeSinceEpochMs() );
+    mProtoCheckinMsg.set_timestamp_ms_epoch( mClock->systemTimeSinceEpochMs() );
 
     if ( !mProtoCheckinMsg.SerializeToString( &mProtoCheckinMsgOutput ) )
     {
@@ -90,9 +90,13 @@ Schema::transmitCheckin()
 
         for ( int i = 0; i < mProtoCheckinMsg.document_arns_size(); i++ )
         {
-            checkinDebugString += " " + mProtoCheckinMsg.document_arns( i );
+            if ( i > 0 )
+            {
+                checkinDebugString += ", ";
+            }
+            checkinDebugString += mProtoCheckinMsg.document_arns( i );
         }
-        checkinDebugString += " ]. ";
+        checkinDebugString += "]";
 
         mLogger.trace( "Schema::transmitCheckin", checkinDebugString );
         return true;

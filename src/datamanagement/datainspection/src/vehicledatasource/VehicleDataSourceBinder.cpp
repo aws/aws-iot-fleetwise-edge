@@ -27,7 +27,7 @@ bool
 VehicleDataSourceBinder::addVehicleDataSource( VehicleDataSourcePtr source )
 {
     // Check if the data source is valid
-    if ( source.get() == nullptr || source->getVehicleDataSourceID() == INVALID_DATA_SOURCE_ID )
+    if ( ( source.get() == nullptr ) || ( source->getVehicleDataSourceID() == INVALID_DATA_SOURCE_ID ) )
     {
         mLogger.error( "VehicleDataSourceBinder::attachVehicleDataSource", "Invalid vehicle data source" );
         return false;
@@ -56,7 +56,7 @@ VehicleDataSourceBinder::addVehicleDataSource( VehicleDataSourcePtr source )
     else
     {
         mLogger.error( "VehicleDataSourceBinder::attachVehicleDataSource",
-                       "Could not connect the  vehicle data source with ID: " +
+                       "Could not connect the vehicle data source with ID: " +
                            std::to_string( source->getVehicleDataSourceID() ) );
         return false;
     }
@@ -79,7 +79,7 @@ VehicleDataSourceBinder::removeVehicleDataSource( const VehicleDataSourceID &id 
         if ( sourceIterator == mIdsToDataSources.end() )
         {
             mLogger.error( "VehicleDataSourceBinder::removeVehicleDataSource",
-                           "Attempting to remove a vehicle data source that was not added." );
+                           "Attempting to remove a vehicle data source that was not added" );
             return false;
         }
         backupSource = sourceIterator->second;
@@ -111,10 +111,10 @@ VehicleDataSourceBinder::bindConsumerToVehicleDataSource( VehicleDataConsumerPtr
                                                           const VehicleDataSourceID &id )
 {
     // Check if the channelID and the consumer are valid
-    if ( consumer.get() == nullptr || id == INVALID_DATA_SOURCE_ID )
+    if ( ( consumer.get() == nullptr ) || ( id == INVALID_DATA_SOURCE_ID ) )
     {
         mLogger.error( "VehicleDataSourceBinder::bindConsumerToVehicleDataSource",
-                       "Invalid consumer instance  or data source" );
+                       "Invalid consumer instance or data source" );
         return false;
     }
     // First lookup the data source and check if it's registered
@@ -151,7 +151,7 @@ VehicleDataSourceBinder::unBindConsumerFromVehicleDataSource( const VehicleDataS
     if ( id == INVALID_DATA_SOURCE_ID )
     {
         mLogger.error( "VehicleDataSourceBinder::unBindConsumerFromVehicleDataSource",
-                       "Invalid consumer instance  or data source" );
+                       "Invalid consumer instance or data source" );
         return false;
     }
 
@@ -226,7 +226,7 @@ VehicleDataSourceBinder::reConnectConsumer( const VehicleDataSourceID &id )
         backupConsumer = consumerIterator->second;
     }
     // reConnect the consumer. Make sure that the consumer is not alive already
-    if ( backupConsumer != nullptr && !backupConsumer->isAlive() )
+    if ( ( backupConsumer != nullptr ) && ( !backupConsumer->isAlive() ) )
     {
         return backupConsumer->connect();
     }
@@ -246,11 +246,11 @@ VehicleDataSourceBinder::start()
     mShouldStop.store( false );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "VehicleDataSourceBinder::start", " Binder Thread failed to start " );
+        mLogger.trace( "VehicleDataSourceBinder::start", "Binder Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "VehicleDataSourceBinder::start", " Binder Thread started " );
+        mLogger.trace( "VehicleDataSourceBinder::start", "Binder Thread started" );
         mThread.setThreadName( "fwDIBinder" );
     }
 
@@ -297,7 +297,7 @@ VehicleDataSourceBinder::doWork( void *data )
         binder->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
         elapsedTimeUs += static_cast<uint32_t>( binder->mTimer.getElapsedMs().count() );
         binder->mLogger.trace( "VehicleDataSourceBinder::doWork",
-                               "Time Elapsed waiting for the interrupt : " + std::to_string( elapsedTimeUs ) );
+                               "Time Elapsed waiting for the interrupt: " + std::to_string( elapsedTimeUs ) );
 
         // Some Channels have been either connected or disconnected.
         // Copy the updates and release the lock so that other channels can
@@ -320,7 +320,7 @@ VehicleDataSourceBinder::doWork( void *data )
                 if ( binder->reConnectConsumer( sourceID.first ) )
                 {
                     binder->mLogger.trace( "VehicleDataSourceBinder::doWork",
-                                           "Reconnected Source ID : " + std::to_string( sourceID.first ) );
+                                           "Reconnected Source ID: " + std::to_string( sourceID.first ) );
                 }
             }
             else if ( sourceID.second == VehicleDataSourceState::DISCONNECTED )
@@ -329,7 +329,7 @@ VehicleDataSourceBinder::doWork( void *data )
                 if ( binder->disconnectConsumer( sourceID.first ) )
                 {
                     binder->mLogger.trace( "VehicleDataSourceBinder::doWork",
-                                           "Disconnected Source ID : " + std::to_string( sourceID.first ) );
+                                           "Disconnected Source ID: " + std::to_string( sourceID.first ) );
                 }
             }
         }
@@ -406,7 +406,7 @@ VehicleDataSourceBinder::disconnect()
             }
             else
             {
-                mLogger.trace( "VehicleDataSourceBinder::disconnect", " Consumer disconnected" );
+                mLogger.trace( "VehicleDataSourceBinder::disconnect", "Consumer disconnected" );
             }
         }
     }
@@ -423,13 +423,13 @@ VehicleDataSourceBinder::disconnect()
             if ( !source.second->disconnect() )
             {
                 mLogger.error( "VehicleDataSourceBinder::disconnect",
-                               "Failed to disconnect Data source ID : " + std::to_string( source.first ) );
+                               "Failed to disconnect Data source ID: " + std::to_string( source.first ) );
                 return false;
             }
             else
             {
                 mLogger.trace( "VehicleDataSourceBinder::disconnect",
-                               "Data source ID : " + std::to_string( source.first ) + " disconnected" );
+                               "Data source ID: " + std::to_string( source.first ) + " disconnected" );
             }
         }
     }
@@ -446,7 +446,7 @@ VehicleDataSourceBinder::onChangeOfActiveDictionary( ConstDecoderDictionaryConst
     // the channels and consumers must go to sleep.
     // 2- If we receive a new manifest, we should wake up the data source and the consumer for the given
     // Vehicle Data Consumer type
-    mLogger.trace( "VehicleDataSourceBinder::onChangeOfActiveDictionary", "Decoder Manifest received " );
+    mLogger.trace( "VehicleDataSourceBinder::onChangeOfActiveDictionary", "Decoder Manifest received" );
     // Start with the consumers, make sure that wake up first so that they pick up
     // the data for decoding immediately
 
@@ -465,7 +465,7 @@ VehicleDataSourceBinder::onChangeOfActiveDictionary( ConstDecoderDictionaryConst
                            {
                                consumer.second->resumeDataConsumption( dictionary );
                                mLogger.trace( "VehicleDataSourceBinder::onChangeOfActiveDictionary",
-                                              "Resuming Consumption on Consumer :" +
+                                              "Resuming Consumption on Consumer: " +
                                                   std::to_string( consumer.second->getConsumerID() ) );
                            }
                        } );
@@ -477,7 +477,7 @@ VehicleDataSourceBinder::onChangeOfActiveDictionary( ConstDecoderDictionaryConst
                            {
                                source.second->resumeDataAcquisition();
                                mLogger.trace( "VehicleDataSourceBinder::onChangeOfActiveDictionary",
-                                              "Resuming Consumption on Data source : " +
+                                              "Resuming Consumption on Data source: " +
                                                   std::to_string( source.second->getVehicleDataSourceID() ) );
                            }
                        } );
@@ -492,7 +492,7 @@ VehicleDataSourceBinder::onChangeOfActiveDictionary( ConstDecoderDictionaryConst
                            {
                                consumer.second->suspendDataConsumption();
                                mLogger.trace( "VehicleDataSourceBinder::onChangeOfActiveDictionary",
-                                              "Interrupting Consumption on Consumer :" +
+                                              "Interrupting Consumption on Consumer: " +
                                                   std::to_string( consumer.second->getConsumerID() ) );
                            }
                        } );
@@ -504,7 +504,7 @@ VehicleDataSourceBinder::onChangeOfActiveDictionary( ConstDecoderDictionaryConst
                            {
                                source.second->suspendDataAcquisition();
                                mLogger.trace( "VehicleDataSourceBinder::onChangeOfActiveDictionary",
-                                              "Interrupting Consumption on Data source : " +
+                                              "Interrupting Consumption on Data source: " +
                                                   std::to_string( source.second->getVehicleDataSourceID() ) );
                            }
                        } );

@@ -69,6 +69,9 @@ public:
      */
     static void SetCurrentThreadName( const std::string &name );
 
+    // callback called from thread implementation library like pthread
+    static void *workerFunctionWrapper( void *params );
+
 private:
     struct ThreadSettings
     {
@@ -76,7 +79,6 @@ private:
         WorkerFunction mWorkerFunction{ nullptr };
         void *mParams{ nullptr };
     };
-    static void *workerFunctionWrapper( void *params );
 
     unsigned long getThreadID() const;
 

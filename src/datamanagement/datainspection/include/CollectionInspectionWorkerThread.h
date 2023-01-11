@@ -111,6 +111,8 @@ private:
 
     static void doWork( void *data );
 
+    TimePoint calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs );
+
     CollectionInspectionEngine fCollectionInspectionEngine;
 
     std::shared_ptr<SignalBuffer> fInputSignalBuffer;

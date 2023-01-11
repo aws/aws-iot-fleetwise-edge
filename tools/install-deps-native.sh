@@ -52,6 +52,7 @@ if [ ! -d jsoncpp ]; then
     cd jsoncpp
     mkdir build && cd build
     cmake \
+        -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=OFF \
         -DCMAKE_POSITION_INDEPENDENT_CODE=On \
         -DJSONCPP_WITH_TESTS=Off \
@@ -61,15 +62,15 @@ if [ ! -d jsoncpp ]; then
 fi
 make install -j`nproc` -C jsoncpp/build
 
-if [ ! -d protobuf-21.7 ]; then
-    wget -q https://github.com/protocolbuffers/protobuf/releases/download/v21.7/protobuf-all-21.7.tar.gz
-    tar -zxf protobuf-all-21.7.tar.gz
-    cd protobuf-21.7
+if [ ! -d protobuf-3.21.7 ]; then
+    wget -q https://github.com/protocolbuffers/protobuf/releases/download/v21.7/protobuf-cpp-3.21.7.tar.gz
+    tar -zxf protobuf-cpp-3.21.7.tar.gz
+    cd protobuf-3.21.7
     mkdir build && cd build
     ../configure
     cd ../..
 fi
-make install -j`nproc` -C protobuf-21.7/build
+make install -j`nproc` -C protobuf-3.21.7/build
 
 if [ ! -d can-isotp ]; then
     git clone https://github.com/hartkopp/can-isotp.git
@@ -111,7 +112,9 @@ if [ ! -d googletest ]; then
     git clone -b release-1.10.0 https://github.com/google/googletest.git
     cd googletest
     mkdir build && cd build
-    cmake ..
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        ..
     cd ../.. 
 fi
 make install -j`nproc` -C googletest/build
@@ -120,7 +123,10 @@ if [ ! -d benchmark ]; then
     git clone -b v1.6.1 https://github.com/google/benchmark.git
     cd benchmark
     mkdir build && cd build
-    cmake -DBENCHMARK_DOWNLOAD_DEPENDENCIES=on -DCMAKE_BUILD_TYPE=Release ..
+    cmake \
+        -DBENCHMARK_DOWNLOAD_DEPENDENCIES=on \
+        -DCMAKE_BUILD_TYPE=Release \
+        ..
     cd ../.. 
 fi
 make install -j`nproc` -C benchmark/build
@@ -136,6 +142,7 @@ if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
         cd tinyxml2
         mkdir build && cd build
         cmake \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DBUILD_STATIC_LIBS=ON \
             -DBUILD_TESTING=OFF \
@@ -150,6 +157,7 @@ if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
         cd foonathan_memory_vendor
         mkdir build && cd build
         cmake \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             ..
         cd ../..
@@ -161,6 +169,7 @@ if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
         cd Fast-CDR
         mkdir build && cd build
         cmake \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             ..
         cd ../..
@@ -172,6 +181,7 @@ if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
         cd Fast-DDS
         mkdir build && cd build
         cmake \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DCOMPILE_TOOLS=OFF \
             -DCMAKE_CXX_FLAGS="-DUSE_FOONATHAN_NODE_SIZES=1" \

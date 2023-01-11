@@ -111,7 +111,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectBurstWithoutSubsampling )
     collectionSchemes->conditions[0].signals.push_back( s1 );
     collectionSchemes->conditions[0].condition = getSignalsBiggerCondition( s1.signalID, 1 ).get();
     worker.onChangeInspectionMatrix( consCollectionSchemes );
-    Timestamp timestamp = fClock->timeSinceEpochMs();
+    Timestamp timestamp = fClock->systemTimeSinceEpochMs();
     signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.1 ) );
     signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.2 ) );
     signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 1.5 ) );
@@ -171,7 +171,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectionQueueFull )
     collectionSchemes->conditions[3].signals.push_back( s1 );
     collectionSchemes->conditions[3].condition = getAlwaysTrueCondition().get();
     worker.onChangeInspectionMatrix( consCollectionSchemes );
-    Timestamp timestamp = fClock->timeSinceEpochMs();
+    Timestamp timestamp = fClock->systemTimeSinceEpochMs();
     signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 1 ) );
     worker.onNewDataAvailable();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
@@ -200,7 +200,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeDataWithoutNotify )
     collectionSchemes->conditions[0].signals.push_back( s1 );
     collectionSchemes->conditions[0].condition = getSignalsBiggerCondition( s1.signalID, 1 ).get();
     worker.onChangeInspectionMatrix( consCollectionSchemes );
-    Timestamp timestamp = fClock->timeSinceEpochMs();
+    Timestamp timestamp = fClock->systemTimeSinceEpochMs();
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 
@@ -244,7 +244,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     dtcInfo.mDTCCodes.emplace_back( "P0143" );
     dtcInfo.mDTCCodes.emplace_back( "C0196" );
     dtcInfo.mSID = SID::STORED_DTC;
-    dtcInfo.receiveTime = fClock->timeSinceEpochMs();
+    dtcInfo.receiveTime = fClock->systemTimeSinceEpochMs();
     ASSERT_TRUE( dtcInfo.hasItems() );
     // Push the DTCs to the buffer
     ASSERT_TRUE( activeDTCBufferPtr->push( dtcInfo ) );
@@ -260,7 +260,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     // Make sure that DTCs should be collected
     collectionSchemes->conditions[0].includeActiveDtcs = true;
     inspectionWorker.onChangeInspectionMatrix( consCollectionSchemes );
-    Timestamp timestamp = fClock->timeSinceEpochMs();
+    Timestamp timestamp = fClock->systemTimeSinceEpochMs();
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
     // Push the signals so that the condition is met
@@ -283,10 +283,10 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     dtcInfo.mDTCCodes.emplace_back( "B0148" );
     dtcInfo.mDTCCodes.emplace_back( "U0148" );
     dtcInfo.mSID = SID::STORED_DTC;
-    dtcInfo.receiveTime = fClock->timeSinceEpochMs();
+    dtcInfo.receiveTime = fClock->systemTimeSinceEpochMs();
     // Push the DTCs to the buffer
     ASSERT_TRUE( activeDTCBufferPtr->push( dtcInfo ) );
-    timestamp = fClock->timeSinceEpochMs();
+    timestamp = fClock->systemTimeSinceEpochMs();
     std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
     // Push the signals so that the condition is met
     signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.1 ) );
@@ -318,7 +318,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     dtcInfo.mDTCCodes.emplace_back( "P0143" );
     dtcInfo.mDTCCodes.emplace_back( "C0196" );
     dtcInfo.mSID = SID::STORED_DTC;
-    dtcInfo.receiveTime = fClock->timeSinceEpochMs();
+    dtcInfo.receiveTime = fClock->systemTimeSinceEpochMs();
     ASSERT_TRUE( dtcInfo.hasItems() );
     // Push the DTCs to the buffer
     ASSERT_TRUE( activeDTCBufferPtr->push( dtcInfo ) );
@@ -334,7 +334,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     // Make sure that DTCs should NOT be collected
     collectionSchemes->conditions[0].includeActiveDtcs = false;
     inspectionWorker.onChangeInspectionMatrix( consCollectionSchemes );
-    Timestamp timestamp = fClock->timeSinceEpochMs();
+    Timestamp timestamp = fClock->systemTimeSinceEpochMs();
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
     // Push the signals so that the condition is met

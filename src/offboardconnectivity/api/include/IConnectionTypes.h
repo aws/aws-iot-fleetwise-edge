@@ -18,7 +18,7 @@ namespace OffboardConnectivity
  */
 enum class ConnectivityError
 {
-    Success,        /**< everything OK, still no guarantee that data was transmitted correctly */
+    Success = 0,    /**< everything OK, still no guarantee that data was transmitted correctly */
     NoConnection,   /**< currently no connection, the Connectivity module will try to reestablish it automatically */
     QuotaReached,   /**< quota reached for example outgoing queue full so please try again after few milliseconds */
     NotConfigured,  /**< the object used was not  configured correctly */

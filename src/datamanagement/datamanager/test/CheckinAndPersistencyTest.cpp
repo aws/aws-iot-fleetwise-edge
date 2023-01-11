@@ -33,10 +33,10 @@ TEST( CollectionSchemeManagerTest2, checkInScheduleLogicTest )
     // setup maps
     NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1, mapEnable, mapEmpty );
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
+    TimePoint currTime = testClock->timeSinceEpoch();
     // create mTimeLine
     std::priority_queue<TimeData, std::vector<TimeData>, std::greater<TimeData>> testTimeLine;
-    TimeData dataPair = std::make_pair( currTime, "Checkin" );
+    TimeData dataPair = { currTime, "Checkin" };
     testTimeLine.push( dataPair );
     // test code
     CANInterfaceIDTranslator canIDTranslator;
@@ -45,8 +45,8 @@ TEST( CollectionSchemeManagerTest2, checkInScheduleLogicTest )
     gmocktest.checkTimeLine( currTime );
     // We should have popped one item from the TimeLine, but also scheduled another one for the next cycle.
     TimeData topPair = gmocktest.getTimeLine().top();
-    ASSERT_EQ( topPair.first, currTime + 200 );
-    ASSERT_EQ( topPair.second, "Checkin" );
+    ASSERT_EQ( topPair.time.monotonicTimeMs, currTime.monotonicTimeMs + 200 );
+    ASSERT_EQ( topPair.id, "Checkin" );
 }
 
 /** @brief

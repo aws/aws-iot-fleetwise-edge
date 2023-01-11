@@ -42,19 +42,19 @@ CollectionInspectionEngine::isSignalPartOfEval( const struct ExpressionNode *exp
                                                 InspectionSignalID signalID,
                                                 int remainingStackDepth )
 {
-    if ( remainingStackDepth <= 0 || expression == nullptr )
+    if ( ( remainingStackDepth <= 0 ) || ( expression == nullptr ) )
     {
         return false;
     }
-    if ( expression->nodeType == ExpressionNodeType::SIGNAL ||
-         expression->nodeType == ExpressionNodeType::WINDOWFUNCTION )
+    if ( ( expression->nodeType == ExpressionNodeType::SIGNAL ) ||
+         ( expression->nodeType == ExpressionNodeType::WINDOWFUNCTION ) )
     {
         return expression->signalID == signalID;
     }
     else if ( expression->nodeType == ExpressionNodeType::GEOHASHFUNCTION )
     {
-        return expression->function.geohashFunction.latitudeSignalID == signalID ||
-               expression->function.geohashFunction.longitudeSignalID == signalID;
+        return ( expression->function.geohashFunction.latitudeSignalID == signalID ) ||
+               ( expression->function.geohashFunction.longitudeSignalID == signalID );
     }
     // Recursion limited depth through last parameter
     bool leftRet = isSignalPartOfEval( expression->left, signalID, remainingStackDepth - 1 );
@@ -115,8 +115,8 @@ CollectionInspectionEngine::onChangeInspectionMatrix(
             bool found = false;
             for ( auto &buf : mCanFrameBuffers )
             {
-                if ( buf.mFrameID == c.frameID && buf.mChannelID == c.channelID &&
-                     buf.mMinimumSampleIntervalMs == c.minimumSampleIntervalMs )
+                if ( ( buf.mFrameID == c.frameID ) && ( buf.mChannelID == c.channelID ) &&
+                     ( buf.mMinimumSampleIntervalMs == c.minimumSampleIntervalMs ) )
                 {
                     found = true;
                     buf.mSize = std::max( buf.mSize, c.sampleBufferSize );
@@ -145,7 +145,7 @@ CollectionInspectionEngine::onChangeInspectionMatrix(
                     break;
                 }
             }
-            if ( buf != nullptr && isSignalPartOfEval( ac.mCondition.condition, s.signalID, MAX_EQUATION_DEPTH ) )
+            if ( ( buf != nullptr ) && isSignalPartOfEval( ac.mCondition.condition, s.signalID, MAX_EQUATION_DEPTH ) )
             {
                 buf->mConditionsThatEvaluateOnThisSignal.set( conditionIndex );
                 ac.mEvaluationSignals[s.signalID] = buf;
@@ -247,13 +247,13 @@ CollectionInspectionEngine::updateAllFixedWindowFunctions( InspectionTimestamp t
 }
 
 bool
-CollectionInspectionEngine::evaluateConditions( InspectionTimestamp currentTime )
+CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
 {
     bool oneConditionIsTrue = false;
     // if any sampling window times out there is a new value available to be processed by a condition
-    if ( currentTime >= mNextWindowFunctionTimesOut )
+    if ( currentTime.monotonicTimeMs >= mNextWindowFunctionTimesOut )
     {
-        updateAllFixedWindowFunctions( currentTime );
+        updateAllFixedWindowFunctions( currentTime.monotonicTimeMs );
     }
     auto conditionsToEvaluate = ( mConditionsWithConditionCurrentlyTrue | mConditionsWithInputSignalChanged ) &
                                 mConditionsNotTriggeredWaitingPublished;
@@ -269,17 +269,19 @@ CollectionInspectionEngine::evaluateConditions( InspectionTimestamp currentTime 
         if ( conditionsToEvaluate.test( i ) )
         {
             ActiveCondition &condition = mConditions[i];
-            if ( ( currentTime >= condition.mLastTrigger + condition.mCondition.minimumPublishInterval ) )
+            if ( ( ( condition.mLastTrigger.systemTimeMs == 0 ) && ( condition.mLastTrigger.monotonicTimeMs == 0 ) ) ||
+                 ( currentTime.monotonicTimeMs >=
+                   condition.mLastTrigger.monotonicTimeMs + condition.mCondition.minimumPublishIntervalMs ) )
             {
                 InspectionValue result = 0;
                 bool resultBool = false;
                 mConditionsWithInputSignalChanged.reset( i );
                 ExpressionErrorCode ret =
                     eval( condition.mCondition.condition, condition, result, resultBool, MAX_EQUATION_DEPTH );
-                if ( ret == ExpressionErrorCode::SUCCESSFUL && resultBool )
+                if ( ( ret == ExpressionErrorCode::SUCCESSFUL ) && resultBool )
                 {
-                    if ( !condition.mCondition.triggerOnlyOnRisingEdge ||
-                         !mConditionsWithConditionCurrentlyTrue.test( i ) )
+                    if ( ( !condition.mCondition.triggerOnlyOnRisingEdge ) ||
+                         ( !mConditionsWithConditionCurrentlyTrue.test( i ) ) )
                     {
                         mConditionsNotTriggeredWaitingPublished.reset( i );
                         condition.mLastTrigger = currentTime;
@@ -313,7 +315,7 @@ CollectionInspectionEngine::collectLastSignals( InspectionSignalID id,
     // Iterate through all sampling intervals of the signal
     for ( auto &buf : mSignalBuffers[id] )
     {
-        if ( buf.mMinimumSampleIntervalMs == minimumSamplingInterval && buf.mSize > 0 )
+        if ( ( buf.mMinimumSampleIntervalMs == minimumSamplingInterval ) && ( buf.mSize > 0 ) )
         {
             int pos = static_cast<int>( buf.mCurrentPosition );
             for ( uint32_t i = 0; i < std::min( maxNumberOfSignalsToCollect, buf.mCounter ); i++ )
@@ -328,7 +330,7 @@ CollectionInspectionEngine::collectLastSignals( InspectionSignalID id,
                     pos = 0;
                 }
                 auto &sample = buf.mBuffer[static_cast<uint32_t>( pos )];
-                if ( !sample.isAlreadyConsumed( conditionId ) || !mSendDataOnlyOncePerCondition )
+                if ( ( !sample.isAlreadyConsumed( conditionId ) ) || ( !mSendDataOnlyOncePerCondition ) )
                 {
                     output.emplace_back( id, sample.mTimestamp, sample.mValue );
                     sample.setAlreadyConsumed( conditionId, true );
@@ -352,8 +354,8 @@ CollectionInspectionEngine::collectLastCanFrames( CANRawFrameID canID,
 {
     for ( auto &buf : mCanFrameBuffers )
     {
-        if ( buf.mFrameID == canID && buf.mChannelID == channelID &&
-             buf.mMinimumSampleIntervalMs == minimumSamplingInterval )
+        if ( ( buf.mFrameID == canID ) && ( buf.mChannelID == channelID ) &&
+             ( buf.mMinimumSampleIntervalMs == minimumSamplingInterval ) )
         {
             int pos = static_cast<int>( buf.mCurrentPosition );
             for ( uint32_t i = 0; i < std::min( maxNumberOfSignalsToCollect, buf.mCounter ); i++ )
@@ -368,7 +370,7 @@ CollectionInspectionEngine::collectLastCanFrames( CANRawFrameID canID,
                     pos = 0;
                 }
                 auto &sample = buf.mBuffer[static_cast<uint32_t>( pos )];
-                if ( !sample.isAlreadyConsumed( conditionId ) || !mSendDataOnlyOncePerCondition )
+                if ( ( !sample.isAlreadyConsumed( conditionId ) ) || ( !mSendDataOnlyOncePerCondition ) )
                 {
                     output.emplace_back( canID, channelID, sample.mTimestamp, sample.mBuffer, sample.mSize );
                     sample.setAlreadyConsumed( conditionId, true );
@@ -388,7 +390,7 @@ CollectionInspectionEngine::collectData( ActiveCondition &condition,
 {
     std::shared_ptr<TriggeredCollectionSchemeData> collectedData = std::make_shared<TriggeredCollectionSchemeData>();
     collectedData->metaData = condition.mCondition.metaData;
-    collectedData->triggerTime = condition.mLastTrigger;
+    collectedData->triggerTime = condition.mLastTrigger.systemTimeMs;
     // Pack signals
     for ( auto &s : condition.mCondition.signals )
     {
@@ -416,7 +418,7 @@ CollectionInspectionEngine::collectData( ActiveCondition &condition,
     }
     // Pack active DTCs if any
     if ( condition.mCondition.includeActiveDtcs &&
-         ( !isActiveDTCsConsumed( conditionId ) || mSendDataOnlyOncePerCondition ) )
+         ( ( !isActiveDTCsConsumed( conditionId ) ) || mSendDataOnlyOncePerCondition ) )
     {
         collectedData->mDTCInfo = mActiveDTCs;
         setActiveDTCsConsumed( conditionId, true );
@@ -433,7 +435,7 @@ CollectionInspectionEngine::collectData( ActiveCondition &condition,
 }
 
 std::shared_ptr<const TriggeredCollectionSchemeData>
-CollectionInspectionEngine::collectNextDataToSend( InspectionTimestamp currentTime, uint32_t &waitTimeMs )
+CollectionInspectionEngine::collectNextDataToSend( const TimePoint &currentTime, uint32_t &waitTimeMs )
 {
     uint32_t minimumWaitTimeMs = std::numeric_limits<uint32_t>::max();
     if ( mConditionsNotTriggeredWaitingPublished.all() )
@@ -450,7 +452,9 @@ CollectionInspectionEngine::collectNextDataToSend( InspectionTimestamp currentTi
         if ( !mConditionsNotTriggeredWaitingPublished.test( mNextConditionToCollectedIndex ) )
         {
             auto &condition = mConditions[mNextConditionToCollectedIndex];
-            if ( currentTime >= condition.mLastTrigger + condition.mCondition.afterDuration )
+            if ( ( ( condition.mLastTrigger.systemTimeMs == 0 ) && ( condition.mLastTrigger.monotonicTimeMs == 0 ) ) ||
+                 ( currentTime.monotonicTimeMs >=
+                   condition.mLastTrigger.monotonicTimeMs + condition.mCondition.afterDuration ) )
             {
                 mConditionsNotTriggeredWaitingPublished.set( mNextConditionToCollectedIndex );
                 // Send message out only with a certain probability. If probabilityToSend==0
@@ -458,7 +462,7 @@ CollectionInspectionEngine::collectNextDataToSend( InspectionTimestamp currentTi
                 if ( mDataReduction.shallSendData( condition.mCondition.probabilityToSend ) )
                 {
                     // Generate the Event ID and pack  it into the active Condition
-                    condition.mEventID = generateEventID( currentTime );
+                    condition.mEventID = generateEventID( currentTime.systemTimeMs );
                     // Check if we need more data from other sensors
                     evaluateAndTriggerRichSensorCapture( condition );
                     // Return the collected data
@@ -466,16 +470,18 @@ CollectionInspectionEngine::collectNextDataToSend( InspectionTimestamp currentTi
                     auto cd = collectData( condition, mNextConditionToCollectedIndex, newestSignalTimeStamp );
                     // After collecting the data set the newest timestamp from any data that was
                     // collected
-                    condition.mLastDataTimestampPublished = std::min( newestSignalTimeStamp, currentTime );
+                    condition.mLastDataTimestampPublished =
+                        std::min( newestSignalTimeStamp, currentTime.monotonicTimeMs );
                     return cd;
                 }
             }
             else
             {
-                minimumWaitTimeMs = std::min<uint32_t>(
-                    minimumWaitTimeMs,
-                    static_cast<uint32_t>( ( condition.mLastTrigger + condition.mCondition.afterDuration ) -
-                                           currentTime ) );
+                minimumWaitTimeMs =
+                    std::min<uint32_t>( minimumWaitTimeMs,
+                                        static_cast<uint32_t>( ( condition.mLastTrigger.monotonicTimeMs +
+                                                                 condition.mCondition.afterDuration ) -
+                                                               currentTime.monotonicTimeMs ) );
             }
         }
         mNextConditionToCollectedIndex++;
@@ -515,9 +521,7 @@ CollectionInspectionEngine::evaluateAndTriggerRichSensorCapture( const ActiveCon
 }
 
 void
-CollectionInspectionEngine::addNewSignal( InspectionSignalID id,
-                                          InspectionTimestamp receiveTime,
-                                          InspectionValue value )
+CollectionInspectionEngine::addNewSignal( InspectionSignalID id, const TimePoint &receiveTime, InspectionValue value )
 {
     if ( mSignalBuffers.find( id ) == mSignalBuffers.end() || mSignalBuffers[id].empty() )
     {
@@ -527,9 +531,10 @@ CollectionInspectionEngine::addNewSignal( InspectionSignalID id,
     // Iterate through all sampling intervals of the signal
     for ( auto &buf : mSignalBuffers[id] )
     {
-        if ( buf.mSize > 0 && buf.mSize <= buf.mBuffer.size() &&
-             ( buf.mMinimumSampleIntervalMs == 0 ||
-               ( receiveTime >= buf.mLastSample + buf.mMinimumSampleIntervalMs ) ) )
+        if ( ( buf.mSize > 0 ) && ( buf.mSize <= buf.mBuffer.size() ) &&
+             ( ( buf.mMinimumSampleIntervalMs == 0 ) ||
+               ( ( buf.mLastSample.systemTimeMs == 0 ) && ( buf.mLastSample.monotonicTimeMs == 0 ) ) ||
+               ( receiveTime.monotonicTimeMs >= buf.mLastSample.monotonicTimeMs + buf.mMinimumSampleIntervalMs ) ) )
         {
             buf.mCurrentPosition++;
             if ( buf.mCurrentPosition >= buf.mSize )
@@ -537,13 +542,13 @@ CollectionInspectionEngine::addNewSignal( InspectionSignalID id,
                 buf.mCurrentPosition = 0;
             }
             buf.mBuffer[buf.mCurrentPosition].mValue = value;
-            buf.mBuffer[buf.mCurrentPosition].mTimestamp = receiveTime;
+            buf.mBuffer[buf.mCurrentPosition].mTimestamp = receiveTime.systemTimeMs;
             buf.mBuffer[buf.mCurrentPosition].setAlreadyConsumed( ALL_CONDITIONS, false );
             buf.mCounter++;
             buf.mLastSample = receiveTime;
             for ( auto &window : buf.mWindowFunctionData )
             {
-                window.addValue( value, receiveTime, mNextWindowFunctionTimesOut );
+                window.addValue( value, receiveTime.monotonicTimeMs, mNextWindowFunctionTimesOut );
             }
             mConditionsWithInputSignalChanged |= buf.mConditionsThatEvaluateOnThisSignal;
         }
@@ -553,17 +558,18 @@ CollectionInspectionEngine::addNewSignal( InspectionSignalID id,
 void
 CollectionInspectionEngine::addNewRawCanFrame( CANRawFrameID canID,
                                                CANChannelNumericID channelID,
-                                               InspectionTimestamp receiveTime,
+                                               const TimePoint &receiveTime,
                                                std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> &buffer,
                                                uint8_t size )
 {
     for ( auto &buf : mCanFrameBuffers )
     {
-        if ( buf.mFrameID == canID && buf.mChannelID == channelID )
+        if ( ( buf.mFrameID == canID ) && ( buf.mChannelID == channelID ) )
         {
-            if ( buf.mSize > 0 && buf.mSize <= buf.mBuffer.size() &&
-                 ( buf.mMinimumSampleIntervalMs == 0 ||
-                   ( receiveTime >= buf.mLastSample + buf.mMinimumSampleIntervalMs ) ) )
+            if ( ( buf.mSize > 0 ) && ( buf.mSize <= buf.mBuffer.size() ) &&
+                 ( ( buf.mMinimumSampleIntervalMs == 0 ) ||
+                   ( ( buf.mLastSample.systemTimeMs == 0 ) && ( buf.mLastSample.monotonicTimeMs == 0 ) ) ||
+                   ( receiveTime.monotonicTimeMs >= buf.mLastSample.monotonicTimeMs + buf.mMinimumSampleIntervalMs ) ) )
             {
                 buf.mCurrentPosition++;
                 if ( buf.mCurrentPosition >= buf.mSize )
@@ -576,7 +582,7 @@ CollectionInspectionEngine::addNewRawCanFrame( CANRawFrameID canID,
                 {
                     buf.mBuffer[buf.mCurrentPosition].mBuffer[i] = buffer[i];
                 }
-                buf.mBuffer[buf.mCurrentPosition].mTimestamp = receiveTime;
+                buf.mBuffer[buf.mCurrentPosition].mTimestamp = receiveTime.systemTimeMs;
                 buf.mBuffer[buf.mCurrentPosition].setAlreadyConsumed( ALL_CONDITIONS, false );
                 buf.mCounter++;
                 buf.mLastSample = receiveTime;
@@ -598,7 +604,7 @@ CollectionInspectionEngine::getLatestSignalValue( InspectionSignalID id,
                                                   InspectionValue &result )
 {
     auto mapLookup = condition.mEvaluationSignals.find( id );
-    if ( mapLookup == condition.mEvaluationSignals.end() || mapLookup->second == nullptr )
+    if ( ( mapLookup == condition.mEvaluationSignals.end() ) || ( mapLookup->second == nullptr ) )
     {
         mLogger.warn( "CollectionInspectionEngine::getLatestSignalValue", "SIGNAL_NOT_FOUND" );
         // Signal not collected by any active condition
@@ -621,7 +627,7 @@ CollectionInspectionEngine::getSampleWindowFunction( WindowFunction function,
                                                      InspectionValue &result )
 {
     auto mapLookup = condition.mEvaluationFunctions.find( signalID );
-    if ( mapLookup == condition.mEvaluationFunctions.end() || mapLookup->second == nullptr )
+    if ( ( mapLookup == condition.mEvaluationFunctions.end() ) || ( mapLookup->second == nullptr ) )
     {
         // Signal not collected by any active condition
         return ExpressionErrorCode::SIGNAL_NOT_FOUND;
@@ -668,7 +674,7 @@ CollectionInspectionEngine::getGeohashFunctionNode( const struct ExpressionNode 
     if ( status != ExpressionErrorCode::SUCCESSFUL )
     {
         mLogger.warn( "CollectionInspectionEngine::getGeohashFunctionNode",
-                      "Unable to evaluate Geohash due to missing latitude signal!" );
+                      "Unable to evaluate Geohash due to missing latitude signal" );
         return status;
     }
     InspectionValue longitude = 0;
@@ -676,7 +682,7 @@ CollectionInspectionEngine::getGeohashFunctionNode( const struct ExpressionNode 
     if ( status != ExpressionErrorCode::SUCCESSFUL )
     {
         mLogger.warn( "CollectionInspectionEngine::getGeohashFunctionNode",
-                      "Unable to evaluate Geohash due to missing longitude signal!" );
+                      "Unable to evaluate Geohash due to missing longitude signal" );
         return status;
     }
     resultValueBool = mGeohashFunctionNode.evaluateGeohash( latitude,
@@ -693,7 +699,7 @@ CollectionInspectionEngine::eval( const struct ExpressionNode *expression,
                                   bool &resultValueBool,
                                   int remainingStackDepth )
 {
-    if ( remainingStackDepth <= 0 || expression == nullptr )
+    if ( ( remainingStackDepth <= 0 ) || ( expression == nullptr ) )
     {
         mLogger.warn( "CollectionInspectionEngine::eval", "STACK_DEPTH_REACHED or nullptr" );
         return ExpressionErrorCode::STACK_DEPTH_REACHED;

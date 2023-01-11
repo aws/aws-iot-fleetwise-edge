@@ -3,9 +3,7 @@
 
 // Includes
 #include "OBDOverCANECU.h"
-// #include "EnumUtility.h"
 #include "TraceModule.h"
-// #include <poll.h>
 #include <sstream>
 #include <string>
 
@@ -24,13 +22,15 @@ OBDOverCANECU::init( const std::string &gatewayCanInterfaceName,
                      const uint32_t rxId,
                      const uint32_t txId,
                      bool isExtendedId,
-                     SignalBufferPtr &signalBufferPtr )
+                     SignalBufferPtr &signalBufferPtr,
+                     int broadcastSocket )
 {
     ISOTPOverCANSenderReceiverOptions optionsECU;
     optionsECU.mSocketCanIFName = gatewayCanInterfaceName;
     optionsECU.mSourceCANId = txId;
     optionsECU.mDestinationCANId = rxId;
     optionsECU.mIsExtendedId = isExtendedId;
+    optionsECU.mBroadcastSocket = broadcastSocket;
     mOBDDataDecoder = obdDataDecoder;
     mSignalBufferPtr = signalBufferPtr;
 
@@ -50,11 +50,17 @@ OBDOverCANECU::init( const std::string &gatewayCanInterfaceName,
     return true;
 }
 
-bool
+uint32_t
+OBDOverCANECU::flush( uint32_t timeout )
+{
+    mLogger.trace( "OBDOverCANECU::flushSocket", "Flushed socket for ECU with ecu id: " + mStreamRxID );
+    return mISOTPSenderReceiver.flush( timeout );
+}
+
+size_t
 OBDOverCANECU::requestReceiveSupportedPIDs( const SID sid )
 {
-    // Function will return true if it receive supported PIDs from the ECU
-    bool requestStatus = false;
+    size_t numRequests = 0;
     static_assert( supportedPIDRange.size() <= 8,
                    "Array length for supported PID range shall be less or equal than 8" );
     if ( mISOTPSenderReceiver.isAlive() )
@@ -70,14 +76,11 @@ OBDOverCANECU::requestReceiveSupportedPIDs( const SID sid )
             auto pidList =
                 std::vector<PID>( supportedPIDRange.begin(),
                                   supportedPIDRange.begin() + std::min( MAX_PID_RANGE, supportedPIDRange.size() ) );
+            numRequests++;
             if ( requestPIDs( sid, pidList ) )
             {
                 // Wait and process the response
-                if ( receiveSupportedPIDs( sid, allSupportedPIDs ) )
-                {
-                    requestStatus = true;
-                }
-                else
+                if ( !receiveSupportedPIDs( sid, allSupportedPIDs ) )
                 {
                     TraceModule::get().incrementVariable( TraceVariable::OBD_ENG_PID_REQ_ERROR );
                     // log warning as all emissions-related OBD ECUs which support at least one of the
@@ -90,29 +93,24 @@ OBDOverCANECU::requestReceiveSupportedPIDs( const SID sid )
             if ( MAX_PID_RANGE < supportedPIDRange.size() )
             {
                 pidList = std::vector<PID>( supportedPIDRange.begin() + MAX_PID_RANGE, supportedPIDRange.end() );
+                numRequests++;
                 if ( requestPIDs( sid, pidList ) )
                 {
                     // Wait and process the response
-                    if ( receiveSupportedPIDs( sid, allSupportedPIDs ) )
-                    {
-                        requestStatus = true;
-                    }
+                    receiveSupportedPIDs( sid, allSupportedPIDs );
                 }
             }
-            if ( requestStatus )
-            {
-                mSupportedPIDs.emplace( sid, allSupportedPIDs );
-                mLogger.traceBytesInVector( "OBDOverCANECU::requestReceiveSupportedPIDs",
-                                            "ECU " + mStreamRxID + " supports PIDs for SID " +
-                                                std::to_string( toUType( sid ) ),
-                                            allSupportedPIDs );
-            }
+            mSupportedPIDs.emplace( sid, allSupportedPIDs );
+            mLogger.traceBytesInVector( "OBDOverCANECU::requestReceiveSupportedPIDs",
+                                        "ECU " + mStreamRxID + " supports PIDs for SID " +
+                                            std::to_string( toUType( sid ) ),
+                                        allSupportedPIDs );
         }
     }
-    return requestStatus;
+    return numRequests;
 }
 
-bool
+size_t
 OBDOverCANECU::requestReceiveEmissionPIDs( const SID sid )
 {
     EmissionInfo info;
@@ -120,7 +118,8 @@ OBDOverCANECU::requestReceiveEmissionPIDs( const SID sid )
     // Request the PIDs ( up to 6 at a time )
     // To not overwhelm the bus, we split the PIDs into group of 6
     // and wait for the response.
-    if ( getRequestedPIDs( sid, pids ) && !pids.empty() )
+    size_t numRequests = 0;
+    if ( getRequestedPIDs( sid, pids ) && ( !pids.empty() ) )
     {
         SupportedPIDs::iterator pidItr = pids.begin();
         while ( pidItr != pids.end() )
@@ -130,7 +129,7 @@ OBDOverCANECU::requestReceiveEmissionPIDs( const SID sid )
 
         if ( !info.mPIDsToValues.empty() )
         {
-            auto receptionTime = mClock->timeSinceEpochMs();
+            auto receptionTime = mClock->systemTimeSinceEpochMs();
             for ( auto const &signals : info.mPIDsToValues )
             {
                 // Note Signal buffer is a multi producer single consumer queue. Besides current thread,
@@ -144,18 +143,19 @@ OBDOverCANECU::requestReceiveEmissionPIDs( const SID sid )
                                   "Signal Buffer full with ECU " + mStreamRxID );
                 }
                 mLogger.trace( "OBDOverCANECU::requestReceiveEmissionPIDs",
-                               "Received Signal " + std::to_string( signals.first ) + " : " +
+                               "Received Signal " + std::to_string( signals.first ) + ": " +
                                    std::to_string( signals.second ) + " for ECU: " + mStreamRxID );
             }
         }
     }
-    return !info.mPIDsToValues.empty();
+    return numRequests;
 }
 
 bool
-OBDOverCANECU::getDTCData( DTCInfo &dtcInfo )
+OBDOverCANECU::getDTCData( DTCInfo &dtcInfo, size_t &numRequests )
 {
     bool successfulDTCRequest = false;
+    numRequests = 1;
     if ( requestReceiveDTCs( SID::STORED_DTC, dtcInfo ) )
     {
         successfulDTCRequest = true;
@@ -176,7 +176,7 @@ OBDOverCANECU::requestReceivePIDs( SupportedPIDs::iterator &pidItr,
                                    EmissionInfo &info )
 {
     std::vector<PID> currPIDs;
-    while ( currPIDs.size() < MAX_PID_RANGE && pidItr != pids.end() )
+    while ( ( currPIDs.size() < MAX_PID_RANGE ) && ( pidItr != pids.end() ) )
     {
         currPIDs.push_back( *pidItr++ );
     }
@@ -200,23 +200,6 @@ OBDOverCANECU::requestReceivePIDs( SupportedPIDs::iterator &pidItr,
 }
 
 bool
-OBDOverCANECU::requestSupportedPIDs( const SID sid )
-{
-    mLogger.trace( "OBDOverCANECU::requestSupportedPIDs",
-                   "Start to request supported PID data for SID: " + std::to_string( toUType( sid ) ) +
-                       " with ECU: " + mStreamRxID );
-
-    mTxPDU.clear();
-    // Every ECU should support such kind of request.
-    // J1979 8.1
-    // First insert the SID
-    mTxPDU.emplace_back( static_cast<uint8_t>( sid ) );
-    // Then insert the PID ranges
-    mTxPDU.insert( mTxPDU.end(), std::begin( supportedPIDRange ), std::end( supportedPIDRange ) );
-    return mISOTPSenderReceiver.sendPDU( mTxPDU );
-}
-
-bool
 OBDOverCANECU::receiveSupportedPIDs( const SID sid, SupportedPIDs &supportedPIDs )
 {
     std::vector<uint8_t> ecuResponse;
@@ -224,10 +207,9 @@ OBDOverCANECU::receiveSupportedPIDs( const SID sid, SupportedPIDs &supportedPIDs
     // decoded according to J1979 8.1.2.2
     if ( !mISOTPSenderReceiver.receivePDU( ecuResponse ) )
     {
-        mLogger.warn( "OBDOverCANECU::receiveSupportedPIDs", "Failed to receive PIDs for ECU " + mStreamRxID );
         return false;
     }
-    if ( !ecuResponse.empty() && mOBDDataDecoder->decodeSupportedPIDs( sid, ecuResponse, supportedPIDs ) )
+    if ( ( !ecuResponse.empty() ) && mOBDDataDecoder->decodeSupportedPIDs( sid, ecuResponse, supportedPIDs ) )
     {
         return true;
     }
@@ -302,7 +284,7 @@ OBDOverCANECU::receiveDTCs( const SID sid, DTCInfo &info )
         return false;
     }
     // The info structure will be appended with the new decoded DTCs
-    if ( !ecuResponse.empty() && mOBDDataDecoder->decodeDTCs( sid, ecuResponse, info ) )
+    if ( ( !ecuResponse.empty() ) && mOBDDataDecoder->decodeDTCs( sid, ecuResponse, info ) )
     {
         return true;
     }

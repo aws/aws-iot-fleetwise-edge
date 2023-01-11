@@ -35,11 +35,11 @@ CollectionInspectionWorkerThread::init( const std::shared_ptr<SignalBuffer> &inp
 bool
 CollectionInspectionWorkerThread::start()
 {
-    if ( fInputCANBuffer == nullptr || fInputCANBuffer == nullptr || fInputActiveDTCBuffer == nullptr ||
-         fOutputCollectedData == nullptr )
+    if ( ( fInputCANBuffer == nullptr ) || ( fInputCANBuffer == nullptr ) || ( fInputActiveDTCBuffer == nullptr ) ||
+         ( fOutputCollectedData == nullptr ) )
     {
         fLogger.error( "CollectionInspectionWorkerThread::start",
-                       " Collection Engine cannot be started without correct configurations " );
+                       "Collection Engine cannot be started without correct configurations" );
         return false;
     }
     // Prevent concurrent stop/init
@@ -49,11 +49,11 @@ CollectionInspectionWorkerThread::start()
     fShouldStop.store( false );
     if ( !fThread.create( doWork, this ) )
     {
-        fLogger.trace( "CollectionInspectionWorkerThread::start", " Inspection Thread failed to start " );
+        fLogger.trace( "CollectionInspectionWorkerThread::start", "Inspection Thread failed to start" );
     }
     else
     {
-        fLogger.trace( "CollectionInspectionWorkerThread::start", " Inspection Thread started " );
+        fLogger.trace( "CollectionInspectionWorkerThread::start", "Inspection Thread started" );
         fThread.setThreadName( "fwDICollInsEng" );
     }
 
@@ -63,16 +63,16 @@ CollectionInspectionWorkerThread::start()
 bool
 CollectionInspectionWorkerThread::stop()
 {
-    if ( !fThread.isValid() || !fThread.isActive() )
+    if ( ( !fThread.isValid() ) || ( !fThread.isActive() ) )
     {
         return true;
     }
     std::lock_guard<std::mutex> lock( fThreadMutex );
     fShouldStop.store( true, std::memory_order_relaxed );
-    fLogger.trace( "CollectionInspectionWorkerThread::stop", " Request stop " );
+    fLogger.trace( "CollectionInspectionWorkerThread::stop", "Request stop" );
     fWait.notify();
     fThread.release();
-    fLogger.trace( "CollectionInspectionWorkerThread::stop", " Stop finished " );
+    fLogger.trace( "CollectionInspectionWorkerThread::stop", "Stop finished" );
     fShouldStop.store( false, std::memory_order_relaxed );
     return !fThread.isActive();
 }
@@ -92,7 +92,7 @@ CollectionInspectionWorkerThread::onChangeInspectionMatrix(
         fUpdatedInspectionMatrix = activeConditions;
         fUpdatedInspectionMatrixAvailable = true;
         fLogger.trace( "CollectionInspectionWorkerThread::onChangeInspectionMatrix",
-                       " new inspection matrix handed over " );
+                       "New inspection matrix handed over" );
         // Wake up the thread.
         fWait.notify();
     }
@@ -110,7 +110,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
 
     CollectionInspectionWorkerThread *consumer = static_cast<CollectionInspectionWorkerThread *>( data );
     Timestamp lastInputTimeEvaluated = 0;
-    Timestamp lastTimeEvaluated = 0;
+    TimePoint lastTimeEvaluated = { 0, 0 };
     Timestamp lastTraceOutput = 0;
     uint64_t inputCounterSinceLastEvaluate = 0;
     uint32_t statisticInputMessagesProcessed = 0;
@@ -138,13 +138,17 @@ CollectionInspectionWorkerThread::doWork( void *data )
             CollectedSignal inputSignal( 0, 0, 0.0 );
             std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = {};
             CollectedCanRawFrame inputCANFrame( 0, 0, 0, buf, 0 );
+            TimePoint currentTime = consumer->fClock->timeSinceEpoch();
             // Consume any new signals and pass them over to the inspection Engine
             if ( consumer->fInputSignalBuffer->pop( inputSignal ) )
             {
                 TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+                TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_SIGNALS );
                 readyToSleep = false;
                 consumer->fCollectionInspectionEngine.addNewSignal(
-                    inputSignal.signalID, inputSignal.receiveTime, inputSignal.value );
+                    inputSignal.signalID,
+                    consumer->calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                    inputSignal.value );
                 latestSignalTime = std::max( latestSignalTime, inputSignal.receiveTime );
                 inputCounterSinceLastEvaluate++;
                 statisticInputMessagesProcessed++;
@@ -153,12 +157,14 @@ CollectionInspectionWorkerThread::doWork( void *data )
             if ( consumer->fInputCANBuffer->pop( inputCANFrame ) )
             {
                 TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
+                TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_CAN_FRAMES );
                 readyToSleep = false;
-                consumer->fCollectionInspectionEngine.addNewRawCanFrame( inputCANFrame.frameID,
-                                                                         inputCANFrame.channelId,
-                                                                         inputCANFrame.receiveTime,
-                                                                         inputCANFrame.data,
-                                                                         inputCANFrame.size );
+                consumer->fCollectionInspectionEngine.addNewRawCanFrame(
+                    inputCANFrame.frameID,
+                    inputCANFrame.channelId,
+                    consumer->calculateMonotonicTime( currentTime, inputCANFrame.receiveTime ),
+                    inputCANFrame.data,
+                    inputCANFrame.size );
                 latestSignalTime = std::max( latestSignalTime, inputCANFrame.receiveTime );
                 inputCounterSinceLastEvaluate++;
                 statisticInputMessagesProcessed++;
@@ -182,26 +188,27 @@ CollectionInspectionWorkerThread::doWork( void *data )
                  ( inputCounterSinceLastEvaluate >= 256 ) )
             {
                 lastInputTimeEvaluated = latestSignalTime;
-                lastTimeEvaluated = consumer->fClock->timeSinceEpochMs();
+                lastTimeEvaluated = consumer->fClock->timeSinceEpoch();
                 consumer->fCollectionInspectionEngine.evaluateConditions( lastTimeEvaluated );
                 inputCounterSinceLastEvaluate = 0;
             }
 
             // before going to sleep do another evaluation if last evaluation is more than EVALUATE_INTERVAL_MS ago
-            if ( readyToSleep &&
-                 ( ( consumer->fClock->timeSinceEpochMs() - lastTimeEvaluated ) >= EVALUATE_INTERVAL_MS ) )
+            if ( readyToSleep && ( ( consumer->fClock->monotonicTimeSinceEpochMs() -
+                                     lastTimeEvaluated.monotonicTimeMs ) >= EVALUATE_INTERVAL_MS ) )
             {
                 lastInputTimeEvaluated = latestSignalTime;
-                lastTimeEvaluated = consumer->fClock->timeSinceEpochMs();
+                lastTimeEvaluated = consumer->fClock->timeSinceEpoch();
                 consumer->fCollectionInspectionEngine.evaluateConditions( lastTimeEvaluated );
                 inputCounterSinceLastEvaluate = 0;
             }
             uint32_t waitTimeMs = consumer->fIdleTimeMs;
             std::shared_ptr<const TriggeredCollectionSchemeData> collectedData =
-                consumer->fCollectionInspectionEngine.collectNextDataToSend( consumer->fClock->timeSinceEpochMs(),
+                consumer->fCollectionInspectionEngine.collectNextDataToSend( consumer->fClock->timeSinceEpoch(),
                                                                              waitTimeMs );
-            while ( collectedData != nullptr && !consumer->shouldStop() )
+            while ( ( collectedData != nullptr ) && ( !consumer->shouldStop() ) )
             {
+                TraceModule::get().incrementVariable( TraceVariable::CE_TRIGGERS );
                 if ( !consumer->fOutputCollectedData->push( collectedData ) )
                 {
                     consumer->fLogger.warn( "CollectionInspectionWorkerThread::doWork",
@@ -213,7 +220,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                     consumer->notifyListeners<>( &IDataReadyToPublishListener::onDataReadyToPublish );
                 }
                 collectedData = consumer->fCollectionInspectionEngine.collectNextDataToSend(
-                    consumer->fClock->timeSinceEpochMs(), waitTimeMs );
+                    consumer->fClock->timeSinceEpoch(), waitTimeMs );
             }
 
             if ( readyToSleep )
@@ -221,7 +228,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                 // Nothing is in the ring buffer to consume. Go to idle mode for some time.
                 uint32_t timeToWait = std::min( waitTimeMs, consumer->fIdleTimeMs );
                 // Print only every THREAD_IDLE_TIME_MS to avoid console spam
-                if ( consumer->fClock->timeSinceEpochMs() >
+                if ( consumer->fClock->monotonicTimeSinceEpochMs() >
                      ( lastTraceOutput + LoggingModule::LOG_AGGREGATION_TIME_MS ) )
                 {
                     consumer->fLogger.trace(
@@ -235,7 +242,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                     activations = 0;
                     statisticInputMessagesProcessed = 0;
                     statisticDataSentOut = 0;
-                    lastTraceOutput = consumer->fClock->timeSinceEpochMs();
+                    lastTraceOutput = consumer->fClock->monotonicTimeSinceEpochMs();
                 }
                 consumer->fWait.wait( timeToWait );
             }
@@ -246,6 +253,22 @@ CollectionInspectionWorkerThread::doWork( void *data )
             consumer->fWait.wait( Platform::Linux::Signal::WaitWithPredicate );
         }
     } while ( !consumer->shouldStop() );
+}
+
+TimePoint
+CollectionInspectionWorkerThread::calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs )
+{
+    TimePoint convertedTime = timePointFromSystemTime( currTime, systemTimeMs );
+    if ( ( convertedTime.systemTimeMs == 0 ) && ( convertedTime.monotonicTimeMs == 0 ) )
+    {
+        fLogger.error( "CollectionInspectionWorkerThread::timePointFromSystemTime",
+                       "The system time " + std::to_string( systemTimeMs ) +
+                           " corresponds to a time in the past before the monotonic" +
+                           " clock started ticking. Current system time: " + std::to_string( currTime.systemTimeMs ) +
+                           ". Current monotonic time: " + std::to_string( currTime.monotonicTimeMs ) );
+        return TimePoint{ systemTimeMs, 0 };
+    }
+    return convertedTime;
 }
 
 bool

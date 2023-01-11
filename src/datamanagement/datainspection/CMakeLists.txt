@@ -86,8 +86,6 @@ endif()
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
 
-  find_package(GTest REQUIRED)
-
   # Copy the json file required for the test application
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/di-collection-scheme-example.json
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
@@ -101,12 +99,12 @@ if(${BUILD_TESTING})
 
     add_executable(${testName} ${testSource})
 
-    # Link to the project library and GTest main
+    # Link to the project library and testing library main
     target_link_libraries(
       ${testName}
       PRIVATE
       ${libraryTargetName}
-      GTest::Main
+      IoTFleetWise::TestingSupport
     )
     add_unit_test(${testName})
     add_valgrind_test(${testName})

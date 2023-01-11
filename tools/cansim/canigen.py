@@ -123,6 +123,7 @@ class canigen:
             time.sleep(cycle_time / 1000.0)
 
     def __get_supported_pids(self, num_range, ecu):
+        supported = False
         out = [0, 0, 0, 0]
         for name, data in ecu['pids'].items():
             pid_num = int(data['num'], 0)
@@ -130,7 +131,8 @@ class canigen:
                 i = int((pid_num - num_range - 1) / 8)
                 j = (pid_num - num_range - 1) % 8
                 out[i] |= 1 << (7 - j)
-        return out
+                supported = True
+        return supported, out
 
     def __encode_pid_data(self, num, ecu):
         for name, data in ecu['pids'].items():
@@ -180,14 +182,18 @@ class canigen:
             #print(ecu['name']+' rx: '+str(rx))
             sid = rx.pop(0)
             tx = [sid | 0x40]
-            if sid == 0x01: # PID
+            if ecu.get('require_broadcast_requests', False) and res[0][0] != isotp_socket_func:
+                tx = [0x7F, sid, 0x11] # NRC Service not supported
+            elif sid == 0x01: # PID
                 while len(rx) > 0:
                     pid_num = rx.pop(0)
                     if (pid_num % 0x20) == 0: # Supported PIDs
-                        tx += [pid_num] + self.__get_supported_pids(pid_num, ecu)
+                        supported, data = self.__get_supported_pids(pid_num, ecu)
+                        if pid_num == 0 or supported or not ecu.get('ignore_unsupported_pid_requests', False):
+                            tx += [pid_num] + data
                     else:
                         data = self.__encode_pid_data(pid_num, ecu)
-                        if not data is None:
+                        if data is not None:
                             tx += [pid_num] + data
             elif sid == 0x03: # DTCs
                 num_dtcs = 0
@@ -202,7 +208,8 @@ class canigen:
             else:
                 tx = [0x7F, sid, 0x11] # NRC Service not supported
             #print(ecu['name']+' tx: '+str(tx))
-            isotp_socket_phys.send(bytearray(tx))
+            if len(tx) > 1:
+                isotp_socket_phys.send(bytearray(tx))
 
     def get_sig_names(self):
         return self.__sig_names

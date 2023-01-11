@@ -40,6 +40,7 @@ public:
      * @param txId CAN Transmit ID
      * @param isExtendedId CAN ID is standard(11-bit) or extended(29-bit)
      * @param signalBufferPtr Signal Buffer shared pointer
+     * @param broadcastSocket Sending broadcast requests by using broadcast socket
      * @return True if initialization of ISO-TP is successful
      */
     bool init( const std::string &gatewayCanInterfaceName,
@@ -47,7 +48,8 @@ public:
                const uint32_t rxId,
                const uint32_t txId,
                bool isExtendedId,
-               SignalBufferPtr &signalBufferPtr );
+               SignalBufferPtr &signalBufferPtr,
+               int broadcastSocket );
 
     /**
      * @brief Returns the health state of the ISO-TP Connection.
@@ -59,27 +61,35 @@ public:
      * @brief Get the supported PIDs from ECU
      *
      * @param sid Service Mode
-     * @return true if successfully get the supported PID list from ECU
+     * @return Number of requests made to ECU
      */
-    bool requestReceiveSupportedPIDs( const SID sid );
+    size_t requestReceiveSupportedPIDs( const SID sid );
 
     /**
      * @brief request PIDs from ECU
      *
      * @param sid Service Mode. e.g: 1
      * @return true if software received the PID response correctly from ECU
-     * @return false if software didn't receive the PID response correctly from ECU
+     * @return Number of requests made to ECU
      */
-    bool requestReceiveEmissionPIDs( const SID sid );
+    size_t requestReceiveEmissionPIDs( const SID sid );
 
     /**
      * @brief get DTC from ECU
      *
      * @param dtcInfo DTCInfo is a structure contains a list of DTC codes
+     * @param numRequests Number of requests sent to ECU
      * @return true if software received the DTC response correctly from ECU
      * @return false if software didn't receive the DTC response correctly from ECU
      */
-    bool getDTCData( DTCInfo &dtcInfo );
+    bool getDTCData( DTCInfo &dtcInfo, size_t &numRequests );
+
+    /**
+     * @brief Flush socket to ignore the received data
+     * @param timeout poll timeout
+     * @return Time(Ms) needed for poll
+     */
+    uint32_t flush( uint32_t timeout );
 
     /**
      * @brief Get the CAN Receiver ID
@@ -116,8 +126,6 @@ private:
      */
     bool getRequestedPIDs( const SID sid, std::vector<PID> &requestedPIDs ) const;
 
-    // Issues a supported PID request to the specific ECU and SID
-    bool requestSupportedPIDs( const SID sid );
     // Receives the supported PID request to the specific ECU and SID
     bool receiveSupportedPIDs( const SID sid, SupportedPIDs &supportedPIDs );
 

@@ -100,14 +100,6 @@ private:
     void setCollectionSchemeParameters( const TriggeredCollectionSchemeDataPtr &triggeredCollectionSchemeDataPtr );
 
     /**
-     * @brief Get the collection event ID for the data to be serialized
-     *
-     * @return collection event ID
-     */
-
-    uint32_t getCollectionEventId() const;
-
-    /**
      * @brief Serialize and send the protobuf data to the cloud
      */
     void serializeAndTransmit();

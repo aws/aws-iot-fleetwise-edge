@@ -33,7 +33,7 @@ CollectionSchemeJSONParser::parse()
         bool success = parseFromStream( builder, collectionSchemeFile, &root, &errs );
         if ( !success )
         {
-            mLogger.error( "CollectionSchemeJSONParser::parse", " Failed to parse the collectionScheme file:" + mPath );
+            mLogger.error( "CollectionSchemeJSONParser::parse", "Failed to parse the collectionScheme file: " + mPath );
             return false;
         }
         mCollectionScheme->setVersion( root["version"].asString() );
@@ -125,7 +125,7 @@ CollectionSchemeJSONParser::parse()
     }
     else
     {
-        mLogger.error( "CollectionSchemeJSONParser::parse", " Failed to open the collectionScheme file:" + mPath );
+        mLogger.error( "CollectionSchemeJSONParser::parse", "Failed to open the collectionScheme file: " + mPath );
         return false;
     }
 }

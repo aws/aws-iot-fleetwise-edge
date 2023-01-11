@@ -104,15 +104,15 @@ AwsIotChannel::subscribe()
         }
         else
         {
-            if ( packetId == 0u || QoS == Mqtt::QOS::AWS_MQTT_QOS_FAILURE )
+            if ( ( packetId == 0u ) || ( QoS == Mqtt::QOS::AWS_MQTT_QOS_FAILURE ) )
             {
                 TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_REJECT );
-                mLogger.error( "AwsIotChannel::subscribeTopic", "Subscribe rejected by the Remote broker." );
+                mLogger.error( "AwsIotChannel::subscribeTopic", "Subscribe rejected by the Remote broker" );
             }
             else
             {
                 std::ostringstream os;
-                os << "Subscribe on topic  " << topic << " on packetId " << packetId << " succeeded" << std::endl;
+                os << "Subscribe on topic  " << topic << " on packetId " << packetId << " succeeded";
                 mLogger.trace( "AwsIotChannel::subscribeTopic", os.str() );
                 mSubscribed = true;
             }
@@ -120,7 +120,7 @@ AwsIotChannel::subscribe()
         }
     };
 
-    mLogger.trace( "AwsIotChannel::subscribeTopic", "Subscribing.." );
+    mLogger.trace( "AwsIotChannel::subscribeTopic", "Subscribing..." );
     connection->Subscribe( mTopicName.c_str(), Mqtt::QOS::AWS_MQTT_QOS_AT_LEAST_ONCE, onMessage, onSubAck );
 
     // Blocked call until subscribe finished this call should quickly either fail or succeed but
@@ -151,7 +151,7 @@ AwsIotChannel::send( const std::uint8_t *buf, size_t size, struct CollectionSche
         return ConnectivityError::NotConfigured;
     }
 
-    if ( buf == nullptr || size == 0 )
+    if ( ( buf == nullptr ) || ( size == 0 ) )
     {
         mLogger.warn( "AwsIotChannel::send", "No valid data provided" );
         return ConnectivityError::WrongInputData;
@@ -182,7 +182,7 @@ AwsIotChannel::send( const std::uint8_t *buf, size_t size, struct CollectionSche
     }
 
     uint64_t currentMemoryUsage = mConnectivityModule->reserveMemoryUsage( size );
-    if ( mMaximumIotSDKHeapMemoryBytes != 0 && currentMemoryUsage > mMaximumIotSDKHeapMemoryBytes )
+    if ( ( mMaximumIotSDKHeapMemoryBytes != 0 ) && ( currentMemoryUsage > mMaximumIotSDKHeapMemoryBytes ) )
     {
         mConnectivityModule->releaseMemoryUsage( size );
         mLogger.error( "AwsIotChannel::send",
@@ -210,11 +210,11 @@ AwsIotChannel::send( const std::uint8_t *buf, size_t size, struct CollectionSche
     auto payload = ByteBufNewCopy( DefaultAllocator(), (const uint8_t *)buf, size );
 
     auto onPublishComplete =
-        [payload, size, this]( Mqtt::MqttConnection &mqttConnection, uint16_t packetId, int errorCode ) {
+        [payload, size, this]( Mqtt::MqttConnection &mqttConnection, uint16_t packetId, int errorCode ) mutable {
             /* This call means that the data was handed over to some lower level in the stack but not
                 that the data is actually sent on the bus or removed from RAM*/
             (void)mqttConnection;
-            aws_byte_buf_clean_up( (Aws::Crt::ByteBuf *)&payload ); // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+            aws_byte_buf_clean_up( &payload );
             {
                 std::lock_guard<std::mutex> connectivityLambdaLock( mConnectivityLambdaMutex );
                 if ( mConnectivityModule != nullptr )
@@ -222,7 +222,7 @@ AwsIotChannel::send( const std::uint8_t *buf, size_t size, struct CollectionSche
                     mConnectivityModule->releaseMemoryUsage( size );
                 }
             }
-            if ( packetId != 0U && errorCode == 0 )
+            if ( ( packetId != 0U ) && ( errorCode == 0 ) )
             {
                 mLogger.trace( "AwsIotChannel::send",
                                "Operation on packetId  " + std::to_string( packetId ) + " Succeeded" );
@@ -247,7 +247,7 @@ AwsIotChannel::unsubscribe()
         auto connection = mConnectivityModule->getConnection();
 
         std::promise<void> unsubscribeFinishedPromise;
-        mLogger.trace( "AwsIotChannel::unsubscribe", "Unsubscribing ..." );
+        mLogger.trace( "AwsIotChannel::unsubscribe", "Unsubscribing..." );
         connection->Unsubscribe( mTopicName.c_str(),
                                  [&]( Mqtt::MqttConnection &mqttConnection, uint16_t packetId, int errorCode ) {
                                      (void)mqttConnection;

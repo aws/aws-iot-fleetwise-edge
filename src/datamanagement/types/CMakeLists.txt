@@ -5,11 +5,7 @@ set(libraryTargetName iotfleetwise.datamanagement.types)
 set(libraryAliasName IoTFleetWise::DataManagementTypes)
 
 set(SRCS
-    src/CollectionInspectionAPITypes.cpp
-    src/CANDataTypes.cpp
-    src/Geohash.cpp 
-    src/GeohashInfo.cpp 
-    src/OBDDataTypes.cpp
+    src/Geohash.cpp
 )
 
 add_library(
@@ -55,7 +51,6 @@ if(${BUILD_TESTING})
     testSources
     test/GeohashTest.cpp
   )
-  find_package(GTest REQUIRED)
 
   # Add the executable targets
   foreach(testSource ${testSources})
@@ -63,12 +58,12 @@ if(${BUILD_TESTING})
     get_filename_component(testName ${testSource} NAME_WE)
 
     add_executable(${testName} ${testSource})
-    # Link to the project library and GTest main
+    # Link to the project library and testing library main
     target_link_libraries(
       ${testName}
       PRIVATE
       ${libraryTargetName}
-      GTest::Main
+      IoTFleetWise::TestingSupport
     )
     add_test(NAME ${testName} COMMAND ${testName} --gtest_output=xml:report-${testName}.xml)
     add_valgrind_test(${testName})

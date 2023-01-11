@@ -4,6 +4,7 @@
 // Includes
 #include "CollectionSchemeManager.h"
 #include "TraceModule.h"
+#include <chrono>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -14,6 +15,7 @@ namespace IoTFleetWise
 {
 namespace DataManagement
 {
+
 const std::string CollectionSchemeManager::CHECKIN = "Checkin";
 CollectionSchemeManager::CollectionSchemeManager( std::string dm_id )
     : currentDecoderManifestID( std::move( dm_id ) )
@@ -51,11 +53,11 @@ CollectionSchemeManager::start()
     mShouldStop.store( false );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.error( "CollectionSchemeManager::start", " Collection Scheme Thread failed to start " );
+        mLogger.error( "CollectionSchemeManager::start", "Thread failed to start" );
     }
     else
     {
-        mLogger.info( "CollectionSchemeManager::start", " Collection Scheme Thread started " );
+        mLogger.info( "CollectionSchemeManager::start", "Thread started" );
         mThread.setThreadName( "fwDMColSchMngr" );
     }
     return mThread.isValid();
@@ -75,7 +77,7 @@ CollectionSchemeManager::stop()
     mWait.notify();
     mThread.release();
     mShouldStop.store( false, std::memory_order_relaxed );
-    mLogger.info( "CollectionSchemeManager::stop", " Collection Scheme Thread stopped " );
+    mLogger.info( "CollectionSchemeManager::stop", "Thread stopped" );
     return true;
 }
 
@@ -89,14 +91,15 @@ CollectionSchemeManager::shouldStop() const
 void
 CollectionSchemeManager::printEventLogMsg( std::string &msg,
                                            const std::string &id,
-                                           const TimePointInMsec &startTime,
-                                           const TimePointInMsec &stopTime,
-                                           const TimePointInMsec &currTime )
+                                           const Timestamp &startTime,
+                                           const Timestamp &stopTime,
+                                           const TimePoint &currTime )
 {
     msg += "ID( " + id + " )";
     msg += "Start( " + std::to_string( startTime ) + " milliseconds )";
     msg += "Stop( " + std::to_string( stopTime ) + " milliseconds )";
-    msg += "at Current( " + std::to_string( currTime ) + " milliseconds ).";
+    msg += "at Current System Time ( " + std::to_string( currTime.systemTimeMs ) + " milliseconds ).";
+    msg += "at Current Monotonic Time ( " + std::to_string( currTime.monotonicTimeMs ) + " milliseconds ).";
 }
 
 void
@@ -119,10 +122,10 @@ CollectionSchemeManager::printExistingCollectionSchemes( std::string &enableStr,
 void
 CollectionSchemeManager::printWakeupStatus( std::string &wakeupStr ) const
 {
-    wakeupStr = " Waking up to update the CollectionScheme: ";
-    wakeupStr += mProcessCollectionScheme ? "Yes." : "No.";
+    wakeupStr = "Waking up to update the CollectionScheme: ";
+    wakeupStr += mProcessCollectionScheme ? "Yes" : "No";
     wakeupStr += " and the DecoderManifest: ";
-    wakeupStr += mProcessDecoderManifest ? "Yes." : "No.";
+    wakeupStr += mProcessDecoderManifest ? "Yes" : "No";
 }
 
 // Clears both enabled collectionScheme map and idle collectionScheme map
@@ -139,16 +142,16 @@ CollectionSchemeManager::cleanupCollectionSchemes()
     mIdleCollectionSchemeMap.clear();
 
     // when cleaning up mTimeLine checkIn event needs to be preserved
-    TimeData saveTimeData = { 0, "" };
+    TimeData saveTimeData = { { 0, 0 }, "" };
     while ( !mTimeLine.empty() )
     {
-        if ( mTimeLine.top().second == CHECKIN )
+        if ( mTimeLine.top().id == CHECKIN )
         {
             saveTimeData = mTimeLine.top();
         }
         mTimeLine.pop();
     }
-    if ( saveTimeData.first != 0 )
+    if ( saveTimeData.time.monotonicTimeMs != 0 )
     {
         mTimeLine.push( saveTimeData );
     }
@@ -191,15 +194,15 @@ CollectionSchemeManager::doWork( void *data )
             enabledCollectionSchemeMapChanged |= collectionSchemeManager->processCollectionScheme();
             TraceModule::get().sectionEnd( TraceSection::MANAGER_COLLECTION_BUILD );
         }
-        auto checkTime = collectionSchemeManager->mClock->timeSinceEpochMs();
+        auto checkTime = collectionSchemeManager->mClock->timeSinceEpoch();
         enabledCollectionSchemeMapChanged |= collectionSchemeManager->checkTimeLine( checkTime );
         if ( enabledCollectionSchemeMapChanged )
         {
             TraceModule::get().sectionBegin( TraceSection::MANAGER_EXTRACTION );
             collectionSchemeManager->mLogger.trace(
                 "CollectionSchemeManager::doWork",
-                "Start extraction because of changed active collection schemes at time " +
-                    std::to_string( checkTime ) );
+                "Start extraction because of changed active collection schemes at system time " +
+                    std::to_string( checkTime.systemTimeMs ) );
             /*
              * Extract InspectionMatrix from mEnabledCollectionSchemeMap
              *
@@ -233,9 +236,9 @@ CollectionSchemeManager::doWork( void *data )
                         ? decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET]->canMessageDecoderMethod.size()
                         : 0 );
                 std::string obdPids = std::to_string(
-                    ( decoderDictionaryMap.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap.end() &&
-                      decoderDictionaryMap[VehicleDataSourceProtocol::OBD] != nullptr &&
-                      !decoderDictionaryMap[VehicleDataSourceProtocol::OBD]->canMessageDecoderMethod.empty() )
+                    ( ( decoderDictionaryMap.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap.end() ) &&
+                      ( decoderDictionaryMap[VehicleDataSourceProtocol::OBD] != nullptr ) &&
+                      ( !decoderDictionaryMap[VehicleDataSourceProtocol::OBD]->canMessageDecoderMethod.empty() ) )
                         ? decoderDictionaryMap[VehicleDataSourceProtocol::OBD]
                               ->canMessageDecoderMethod.cbegin()
                               ->second.size()
@@ -264,19 +267,22 @@ CollectionSchemeManager::doWork( void *data )
          * check if it is a valid timePoint, it can be obsoleted if start Time or stop Time gets updated
          * It should be always valid because Checkin is default to be running all the time
          */
-        auto currentTime = collectionSchemeManager->mClock->timeSinceEpochMs();
+        auto currentMonotonicTime = collectionSchemeManager->mClock->monotonicTimeSinceEpochMs();
         if ( collectionSchemeManager->mTimeLine.empty() )
         {
             collectionSchemeManager->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
         }
-        else if ( currentTime >= collectionSchemeManager->mTimeLine.top().first )
+        else if ( currentMonotonicTime >= collectionSchemeManager->mTimeLine.top().time.monotonicTimeMs )
         {
             // Next checkin time has already expired
         }
         else
         {
-            uint32_t waitTime = static_cast<uint32_t>( collectionSchemeManager->mTimeLine.top().first - currentTime );
-            collectionSchemeManager->mWait.wait( waitTime );
+            uint32_t waitTimeMs = static_cast<uint32_t>( collectionSchemeManager->mTimeLine.top().time.monotonicTimeMs -
+                                                         currentMonotonicTime );
+            collectionSchemeManager->mLogger.trace( "CollectionSchemeManager::doWork",
+                                                    "Going to wait for " + std::to_string( waitTimeMs ) + " ms" );
+            collectionSchemeManager->mWait.wait( waitTimeMs );
         }
         /* now it is either timer expires, an update arrives from PI, or stop() is called */
         collectionSchemeManager->updateAvailable();
@@ -334,8 +340,8 @@ CollectionSchemeManager::init( uint32_t checkinIntervalMsec,
 {
     mCANIDTranslator = canIDTranslator;
     mLogger.trace( "CollectionSchemeManager::init",
-                   "CollectionSchemeManager initialised with a checkin interval of : " +
-                       std::to_string( checkinIntervalMsec ) + " ms." );
+                   "CollectionSchemeManager initialised with a checkin interval of: " +
+                       std::to_string( checkinIntervalMsec ) + " ms" );
     if ( checkinIntervalMsec > 0 )
     {
         mCheckinIntervalInMsec = checkinIntervalMsec;
@@ -370,7 +376,7 @@ CollectionSchemeManager::isAlive()
 bool
 CollectionSchemeManager::isCollectionSchemeLoaded()
 {
-    return ( !mEnabledCollectionSchemeMap.empty() || !mIdleCollectionSchemeMap.empty() );
+    return ( ( !mEnabledCollectionSchemeMap.empty() ) || ( !mIdleCollectionSchemeMap.empty() ) );
 }
 
 /*
@@ -385,7 +391,7 @@ CollectionSchemeManager::isCollectionSchemeLoaded()
 bool
 CollectionSchemeManager::processDecoderManifest()
 {
-    if ( mDecoderManifest == nullptr || !mDecoderManifest->build() )
+    if ( ( mDecoderManifest == nullptr ) || ( !mDecoderManifest->build() ) )
     {
         mLogger.error( "CollectionSchemeManager::processDecoderManifest",
                        " Failed to process the upcoming DecoderManifest." );
@@ -416,7 +422,7 @@ CollectionSchemeManager::processDecoderManifest()
     else
     {
         // collectionScheme maps are empty
-        return rebuildMapsandTimeLine( mClock->timeSinceEpochMs() );
+        return rebuildMapsandTimeLine( mClock->timeSinceEpoch() );
     }
 }
 
@@ -431,7 +437,7 @@ CollectionSchemeManager::processDecoderManifest()
 bool
 CollectionSchemeManager::processCollectionScheme()
 {
-    if ( mCollectionSchemeList == nullptr || !mCollectionSchemeList->build() )
+    if ( ( mCollectionSchemeList == nullptr ) || ( !mCollectionSchemeList->build() ) )
     {
         mLogger.error( "CollectionSchemeManager::processCollectionScheme",
                        "Incoming CollectionScheme does not exist or fails to build!" );
@@ -442,13 +448,29 @@ CollectionSchemeManager::processCollectionScheme()
     if ( isCollectionSchemeLoaded() )
     {
         // there are existing collectionSchemes, try to update the existing one
-        return updateMapsandTimeLine( mClock->timeSinceEpochMs() );
+        return updateMapsandTimeLine( mClock->timeSinceEpoch() );
     }
     else
     {
         // collectionScheme maps are empty
-        return rebuildMapsandTimeLine( mClock->timeSinceEpochMs() );
+        return rebuildMapsandTimeLine( mClock->timeSinceEpoch() );
     }
+}
+
+TimePoint
+CollectionSchemeManager::calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs )
+{
+    TimePoint convertedTime = timePointFromSystemTime( currTime, systemTimeMs );
+    if ( ( convertedTime.systemTimeMs == 0 ) && ( convertedTime.monotonicTimeMs == 0 ) )
+    {
+        mLogger.error( "CollectionSchemeManager::timePointFromSystemTime",
+                       "The system time " + std::to_string( systemTimeMs ) +
+                           " corresponds to a time in the past before the monotonic" +
+                           " clock started ticking. Current system time: " + std::to_string( currTime.systemTimeMs ) +
+                           ". Current monotonic time: " + std::to_string( currTime.monotonicTimeMs ) );
+        return TimePoint{ systemTimeMs, 0 };
+    }
+    return convertedTime;
 }
 
 /*
@@ -457,7 +479,7 @@ CollectionSchemeManager::processCollectionScheme()
  * true. Otherwise, it returns false.
  */
 bool
-CollectionSchemeManager::rebuildMapsandTimeLine( const TimePointInMsec &currTime )
+CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
 {
     bool ret = false;
     std::vector<ICollectionSchemePtr> collectionSchemeList;
@@ -483,20 +505,21 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePointInMsec &currTime
             return false;
         }
         // collectionScheme does not have matching DM, can't rebuild. Exit
-        TimePointInMsec startTime = collectionScheme->getStartTime();
-        TimePointInMsec stopTime = collectionScheme->getExpiryTime();
+        Timestamp startTime = collectionScheme->getStartTime();
+        Timestamp stopTime = collectionScheme->getExpiryTime();
         std::string id = collectionScheme->getCollectionSchemeID();
-        if ( startTime > currTime )
+        if ( startTime > currTime.systemTimeMs )
         {
             /* for idleCollectionSchemes, push both startTime and stopTime to timeLine */
             mIdleCollectionSchemeMap[id] = collectionScheme;
-            mTimeLine.push( std::make_pair( startTime, id ) );
-            mTimeLine.push( std::make_pair( stopTime, id ) );
+            mTimeLine.push( { calculateMonotonicTime( currTime, startTime ), id } );
+            mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
         }
-        else if ( stopTime > currTime )
-        { /* At rebuild, if a collectionScheme's startTime has already passed, enable collectionScheme immediately */
+        else if ( stopTime > currTime.systemTimeMs )
+        { /* At rebuild, if a collectionScheme's startTime has already passed, enable collectionScheme immediately
+           */
             mEnabledCollectionSchemeMap[id] = collectionScheme;
-            mTimeLine.push( std::make_pair( stopTime, id ) );
+            mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
             ret = true;
         }
     }
@@ -518,7 +541,7 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePointInMsec &currTime
  * Returns true when mEnabledCollectionSchemeMap changes.
  */
 bool
-CollectionSchemeManager::updateMapsandTimeLine( const TimePointInMsec &currTime )
+CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
 {
     bool ret = false;
     std::unordered_set<std::string> newCollectionSchemeIDs;
@@ -556,8 +579,8 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePointInMsec &currTime 
          *  and also check if it is to be enabled immediately.
          *
          */
-        TimePointInMsec startTime = collectionScheme->getStartTime();
-        TimePointInMsec stopTime = collectionScheme->getExpiryTime();
+        Timestamp startTime = collectionScheme->getStartTime();
+        Timestamp stopTime = collectionScheme->getExpiryTime();
 
         std::string id = collectionScheme->getCollectionSchemeID();
         newCollectionSchemeIDs.insert( id );
@@ -567,7 +590,7 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePointInMsec &currTime 
         {
             /* found collectionScheme in Enabled map. this collectionScheme is running, check for StopTime only */
             ICollectionSchemePtr currCollectionScheme = itEnabled->second;
-            if ( stopTime <= currTime )
+            if ( stopTime <= currTime.systemTimeMs )
             {
                 /* This collectionScheme needs to stop immediately */
                 mEnabledCollectionSchemeMap.erase( id );
@@ -575,39 +598,40 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePointInMsec &currTime 
                 std::string completedStr;
                 completedStr = "Stopping enabled CollectionScheme: ";
                 printEventLogMsg( completedStr, id, startTime, stopTime, currTime );
-                mLogger.trace( "collectionSchemeManager::updateMapsandTimeLine ", completedStr );
+                mLogger.trace( "CollectionSchemeManager::updateMapsandTimeLine", completedStr );
             }
             else if ( stopTime != currCollectionScheme->getExpiryTime() )
             {
                 /* StopTime changes on that collectionScheme, update with new CollectionScheme */
                 mEnabledCollectionSchemeMap[id] = collectionScheme;
-                mTimeLine.push( std::make_pair( stopTime, id ) );
+                mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
             }
         }
         else if ( itIdle != mIdleCollectionSchemeMap.end() )
         {
             /* found in Idle map, need to check both StartTime and StopTime */
             ICollectionSchemePtr currCollectionScheme = itIdle->second;
-            if ( startTime <= currTime && stopTime > currTime )
+            if ( ( startTime <= currTime.systemTimeMs ) && ( stopTime > currTime.systemTimeMs ) )
             {
                 /* this collectionScheme needs to start immediately */
                 mIdleCollectionSchemeMap.erase( id );
                 mEnabledCollectionSchemeMap[id] = collectionScheme;
                 ret = true;
-                mTimeLine.push( std::make_pair( stopTime, id ) );
+                mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
                 std::string startStr;
                 startStr = "Starting idle collectionScheme now: ";
                 printEventLogMsg( startStr, id, startTime, stopTime, currTime );
-                mLogger.trace( "collectionSchemeManager::updateMapsandTimeLine ", startStr );
+                mLogger.trace( "CollectionSchemeManager::updateMapsandTimeLine", startStr );
             }
-            else if ( startTime > currTime && ( ( startTime != currCollectionScheme->getStartTime() ) ||
-                                                ( stopTime != currCollectionScheme->getExpiryTime() ) ) )
+            else if ( ( startTime > currTime.systemTimeMs ) &&
+                      ( ( startTime != currCollectionScheme->getStartTime() ) ||
+                        ( stopTime != currCollectionScheme->getExpiryTime() ) ) )
             {
                 // this collectionScheme is an idle collectionScheme, and its startTime or ExpiryTime
                 // or both need updated
                 mIdleCollectionSchemeMap[id] = collectionScheme;
-                mTimeLine.push( make_pair( startTime, id ) );
-                mTimeLine.push( make_pair( stopTime, id ) );
+                mTimeLine.push( { calculateMonotonicTime( currTime, startTime ), id } );
+                mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
             }
         }
         else
@@ -619,18 +643,18 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePointInMsec &currTime 
             std::string addStr;
             addStr = "Adding new collectionScheme: ";
             printEventLogMsg( addStr, id, startTime, stopTime, currTime );
-            mLogger.trace( "collectionSchemeManager::updateMapsandTimeLine ", addStr );
-            if ( startTime <= currTime && stopTime > currTime )
+            mLogger.trace( "CollectionSchemeManager::updateMapsandTimeLine", addStr );
+            if ( ( startTime <= currTime.systemTimeMs ) && ( stopTime > currTime.systemTimeMs ) )
             {
                 mEnabledCollectionSchemeMap[id] = collectionScheme;
-                mTimeLine.push( std::make_pair( stopTime, id ) );
+                mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
                 ret = true;
             }
-            else if ( startTime > currTime )
+            else if ( startTime > currTime.systemTimeMs )
             {
                 mIdleCollectionSchemeMap[id] = collectionScheme;
-                mTimeLine.push( std::make_pair( startTime, id ) );
-                mTimeLine.push( std::make_pair( stopTime, id ) );
+                mTimeLine.push( { calculateMonotonicTime( currTime, startTime ), id } );
+                mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
             }
         }
     }
@@ -695,10 +719,10 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePointInMsec &currTime 
  * returns true when enabled map changes;
  */
 bool
-CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
+CollectionSchemeManager::checkTimeLine( const TimePoint &currTime )
 {
     bool ret = false;
-    if ( mTimeLine.empty() || currTime < mTimeLine.top().first )
+    if ( ( mTimeLine.empty() ) || ( currTime.monotonicTimeMs < mTimeLine.top().time.monotonicTimeMs ) )
     {
         // Timer has not expired, do nothing
         return ret;
@@ -706,14 +730,14 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
     while ( !mTimeLine.empty() )
     {
         const auto &topPair = mTimeLine.top();
-        const std::string &topCollectionSchemeID = topPair.second;
-        const TimePointInMsec &topTime = topPair.first;
+        const std::string &topCollectionSchemeID = topPair.id;
+        const TimePoint &topTime = topPair.time;
         if ( topCollectionSchemeID == CHECKIN )
         {
             // for checkin, we are about to
             // either serve current checkin event, and move on to search for next timePoint to set up timer;
             // or we find current checkin for setting up next timer, then we are done here;
-            if ( currTime < topTime )
+            if ( currTime.monotonicTimeMs < topTime.monotonicTimeMs )
             {
                 // Successfully locate next checkin as timePoint to set up timer
                 // time to exit
@@ -728,9 +752,9 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
             {
                 if ( mCheckinIntervalInMsec > 0 )
                 {
-                    TimePointInMsec nextCheckinTime = currTime + mCheckinIntervalInMsec;
-                    TimeData newPair = std::make_pair( nextCheckinTime, CHECKIN );
-                    mTimeLine.push( newPair );
+                    TimePoint nextCheckinTime = { currTime.systemTimeMs + mCheckinIntervalInMsec,
+                                                  currTime.monotonicTimeMs + mCheckinIntervalInMsec };
+                    mTimeLine.push( { nextCheckinTime, CHECKIN } );
                 }
                 // else, no checkin message is scheduled.
             }
@@ -740,9 +764,9 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
                 // Calculate the minimum retry interval
                 uint64_t minimumCheckinInterval =
                     std::min( static_cast<uint64_t>( RETRY_CHECKIN_INTERVAL_IN_MILLISECOND ), mCheckinIntervalInMsec );
-                TimePointInMsec nextCheckinTime = currTime + minimumCheckinInterval;
-                TimeData newPair = std::make_pair( nextCheckinTime, CHECKIN );
-                mTimeLine.push( newPair );
+                TimePoint nextCheckinTime = { currTime.systemTimeMs + minimumCheckinInterval,
+                                              currTime.monotonicTimeMs + minimumCheckinInterval };
+                mTimeLine.push( { nextCheckinTime, CHECKIN } );
             }
 
             // after sending checkin, the work on this dataPair is done, move to next dataPair
@@ -767,7 +791,7 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
                 // client request, this dataPair is obsolete, just drop it
                 // keep searching for next valid TimePoint
                 // to set up timer
-                mLogger.trace( "CollectionSchemeManager::checkTimeLine ",
+                mLogger.trace( "CollectionSchemeManager::checkTimeLine",
                                "CollectionScheme not found: " + topCollectionSchemeID );
                 mTimeLine.pop();
                 continue;
@@ -776,7 +800,7 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
         }
         // found it, continue examining topTime
         ICollectionSchemePtr currCollectionScheme;
-        TimePointInMsec timeOfInterest = 0ULL;
+        Timestamp timeOfInterest = 0ULL;
         if ( foundInEnabled )
         {
             // This collectionScheme is found in mEnabledCollectionSchemeMap
@@ -791,16 +815,16 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
             currCollectionScheme = mIdleCollectionSchemeMap[topCollectionSchemeID];
             timeOfInterest = currCollectionScheme->getStartTime();
         }
-        if ( timeOfInterest != topTime )
+        if ( timeOfInterest != topTime.systemTimeMs )
         {
             // this dataPair has a valid collectionScheme ID, but the start time or stop time is already updated
             // not equal to topTime any more; This is an obsolete dataPair. Simply drop it and move on
             // to next pair
-            mLogger.trace( "CollectionSchemeManager::checkTimeLine ",
-                           "found collectionScheme: " + topCollectionSchemeID +
+            mLogger.trace( "CollectionSchemeManager::checkTimeLine",
+                           "Found collectionScheme: " + topCollectionSchemeID +
                                " but time does not match: "
                                "topTime " +
-                               std::to_string( topTime ) + " timeFromCollectionScheme " +
+                               std::to_string( topTime.systemTimeMs ) + " timeFromCollectionScheme " +
                                std::to_string( timeOfInterest ) );
             mTimeLine.pop();
             continue;
@@ -808,7 +832,7 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
         // now we have a dataPair with valid collectionScheme ID, and valid start/stop time
         // Check if it is time to enable/disable this collectionScheme, or else
         // topTime is far down the timeline, it is a timePoint to set up next timer.
-        if ( topTime <= currTime )
+        if ( topTime.monotonicTimeMs <= currTime.monotonicTimeMs )
         {
             ret = true;
             // it is time to enable or disable this collectionScheme
@@ -824,7 +848,7 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
                                   currCollectionScheme->getStartTime(),
                                   currCollectionScheme->getExpiryTime(),
                                   topTime );
-                mLogger.info( "CollectionSchemeManager::checkTimeLine ", enableStr );
+                mLogger.info( "CollectionSchemeManager::checkTimeLine", enableStr );
             }
             else
             {
@@ -836,7 +860,7 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
                                   currCollectionScheme->getStartTime(),
                                   currCollectionScheme->getExpiryTime(),
                                   topTime );
-                mLogger.info( "CollectionSchemeManager::checkTimeLine ", disableStr );
+                mLogger.info( "CollectionSchemeManager::checkTimeLine", disableStr );
                 mEnabledCollectionSchemeMap.erase( topCollectionSchemeID );
             }
         }
@@ -851,9 +875,9 @@ CollectionSchemeManager::checkTimeLine( const TimePointInMsec &currTime )
     }
     if ( !mTimeLine.empty() )
     {
-        mLogger.trace( "CollectionSchemeManager::checkTimeLine ",
-                       "top pair: " + std::to_string( mTimeLine.top().first ) + " " + mTimeLine.top().second +
-                           " currTime: " + std::to_string( currTime ) );
+        mLogger.trace( "CollectionSchemeManager::checkTimeLine",
+                       "Top pair: " + std::to_string( mTimeLine.top().time.monotonicTimeMs ) + " " +
+                           mTimeLine.top().id + " currTime: " + std::to_string( currTime.monotonicTimeMs ) );
     }
     return ret;
 }

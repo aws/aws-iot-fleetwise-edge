@@ -50,7 +50,6 @@ install(
   include/CollectionSchemeIngestion.h
   include/CollectionSchemeIngestionList.h
   include/CollectionSchemeJSONParser.h
-  include/CollectionSchemeListener.h
   include/DataCollectionJSONWriter.h
   include/DataCollectionProtoWriter.h
   include/DataCollectionSender.h
@@ -61,8 +60,6 @@ install(
 
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
-
-  find_package(GTest REQUIRED)
 
   find_library(GMOCK_LIB
   NAMES
@@ -90,14 +87,13 @@ if(${BUILD_TESTING})
 
     add_executable(${testName} ${testSource})
 
-    # Link to the project library and GTest main
+    # Link to the project library and testing library main
     target_link_libraries(
       ${testName}
       PRIVATE
       ${libraryTargetName}
       Boost::filesystem
-      GTest::Main
-      GTest::GTest
+      IoTFleetWise::TestingSupport
       ${GMOCK_LIB}
     )
 

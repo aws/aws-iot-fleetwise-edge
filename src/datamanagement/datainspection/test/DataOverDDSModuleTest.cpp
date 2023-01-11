@@ -4,6 +4,7 @@
 
 #include "DataOverDDSModule.h"
 #include "CollectionInspectionEngine.h"
+#include "Testing.h"
 #include "dds/CameraDataPublisher.h"
 #include "dds/CameraDataSubscriber.h"
 #include "dds/DDSDataTypes.h"
@@ -15,6 +16,8 @@
 #include <thread>
 
 using namespace Aws::IoTFleetWise::DataInspection;
+using namespace Aws::IoTFleetWise::TestingSupport;
+
 class TestDDSModule : public DataOverDDSModule
 {
 
@@ -595,7 +598,7 @@ TEST( DataOverDDSModuleTest, DataOverDDSModuleReceiveNotificationFromInspectionE
     matrixCollectInfo.isConditionOnlySignal = true;
     condition.signals.push_back( matrixCollectInfo );
     condition.afterDuration = 3;
-    condition.minimumPublishInterval = 0;
+    condition.minimumPublishIntervalMs = 0;
     condition.includeImageCapture = true;
     // Create the Image data capture setting with 1 device
     InspectionMatrixImageCollectionInfo imageCollectionInfoItem = {
@@ -618,7 +621,7 @@ TEST( DataOverDDSModuleTest, DataOverDDSModuleReceiveNotificationFromInspectionE
     // Set the matrix
     engine.onChangeInspectionMatrix( std::make_shared<InspectionMatrix>( matrix ) );
     // Start the inspection
-    uint64_t timestamp = 160000000;
+    TimePoint timestamp = { 160000000, 100 };
     uint32_t waitTimeMs = 0;
     ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
     // Wait for the afterDuration before checking

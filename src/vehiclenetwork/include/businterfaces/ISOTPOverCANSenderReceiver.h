@@ -76,6 +76,23 @@ public:
      */
     bool sendPDU( const std::vector<uint8_t> &pduData );
 
+    /**
+     * @brief Flush socket to ignore the received data
+     * @param timeout poll timeout in ms
+     * @return Time in ms needed for poll
+     */
+    uint32_t flush( uint32_t timeout );
+
+    /**
+     * @brief Returns the socket
+     * @return Socket
+     */
+    int
+    getSocket() const
+    {
+        return mSocket;
+    }
+
 private:
     ISOTPOverCANSenderReceiverOptions mSenderReceiverOptions;
     Timer mTimer;

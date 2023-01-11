@@ -40,7 +40,7 @@ TEST_F( DataCollectionProtoWriterTest, TestVehicleData )
     triggeredCollectionSchemeDataPtr->metaData.decoderID = "456";
     // Set the trigger time to current time
     auto testClock = ClockHandler::getClock();
-    Timestamp testTriggerTime = testClock->timeSinceEpochMs();
+    Timestamp testTriggerTime = testClock->systemTimeSinceEpochMs();
     triggeredCollectionSchemeDataPtr->triggerTime = testTriggerTime;
 
     uint32_t collectionEventID = std::rand();
@@ -87,7 +87,7 @@ TEST_F( DataCollectionProtoWriterTest, TestDTCData )
     triggeredCollectionSchemeDataPtr->metaData.decoderID = "456";
     // Set the trigger time to current time
     auto testClock = ClockHandler::getClock();
-    Timestamp testTriggerTime = testClock->timeSinceEpochMs();
+    Timestamp testTriggerTime = testClock->systemTimeSinceEpochMs();
     triggeredCollectionSchemeDataPtr->triggerTime = testTriggerTime;
 
     uint32_t collectionEventID = std::rand();
@@ -144,7 +144,7 @@ TEST_F( DataCollectionProtoWriterTest, TestGeohash )
     triggeredCollectionSchemeDataPtr->metaData.decoderID = "456";
     // Set the trigger time to current time
     auto testClock = ClockHandler::getClock();
-    Timestamp testTriggerTime = testClock->timeSinceEpochMs();
+    Timestamp testTriggerTime = testClock->systemTimeSinceEpochMs();
     triggeredCollectionSchemeDataPtr->triggerTime = testTriggerTime;
 
     uint32_t collectionEventID = std::rand();

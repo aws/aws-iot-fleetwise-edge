@@ -10,7 +10,6 @@
 #include "ClockHandler.h"
 #include "CollectionInspectionWorkerThread.h"
 #include "CollectionScheme.h"
-#include "CollectionSchemeListener.h"
 #include "CollectionSchemeManager.h"
 #include "DataCollectionSender.h"
 #ifdef FWE_FEATURE_CAMERA

@@ -102,7 +102,7 @@ PayloadManager::storeData( const std::uint8_t *buf,
             // set the ErrorCode::SUCCESSful storage flag to true
             isDataPersisted = true;
             mLogger.trace( "PayloadManager::storeData",
-                           "Payload of size : " + std::to_string( totalWriteSize ) +
+                           "Payload of size: " + std::to_string( totalWriteSize ) +
                                " Bytes (header: " + std::to_string( sizeof( PayloadHeader ) ) +
                                ") has been ErrorCode::SUCCESSfully persisted" );
         }
@@ -157,7 +157,7 @@ PayloadManager::retrieveData( std::vector<std::string> &data )
 
             // Clear the data string before parsing new payload
             dataString.clear();
-            for ( j = 0; j < size && ( ( pos + j ) < readSize ); ++j )
+            for ( j = 0; ( j < size ) && ( ( pos + j ) < readSize ); ++j )
             {
                 dataString += ( readBuffer.get()[pos + j] ); // NOLINT(clang-diagnostic-sign-conversion)
             }
@@ -190,7 +190,7 @@ PayloadManager::retrieveData( std::vector<std::string> &data )
         }
     }
     mLogger.info( "PayloadManager::retrieveData",
-                  "Payload of Size : " + std::to_string( readSize ) + " Bytes has been loaded from disk" );
+                  "Payload of Size: " + std::to_string( readSize ) + " Bytes has been loaded from disk" );
 
     return ErrorCode::SUCCESS;
 }

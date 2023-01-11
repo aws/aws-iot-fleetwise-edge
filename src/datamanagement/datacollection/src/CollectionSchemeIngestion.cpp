@@ -40,7 +40,7 @@ CollectionSchemeIngestion::build()
     if ( mProtoCollectionSchemeMessagePtr->campaign_arn().empty() ||
          mProtoCollectionSchemeMessagePtr->decoder_manifest_arn().empty() )
     {
-        mLogger.error( "CollectionSchemeIngestion::build()", "CollectionScheme does not have ID or DM ID." );
+        mLogger.error( "CollectionSchemeIngestion::build", "CollectionScheme does not have ID or DM ID" );
         return false;
     }
 
@@ -48,11 +48,11 @@ CollectionSchemeIngestion::build()
     if ( mProtoCollectionSchemeMessagePtr->expiry_time_ms_epoch() <
          mProtoCollectionSchemeMessagePtr->start_time_ms_epoch() )
     {
-        mLogger.error( "CollectionSchemeIngestion::build()", "CollectionScheme end time comes before start time." );
+        mLogger.error( "CollectionSchemeIngestion::build", "CollectionScheme end time comes before start time" );
         return false;
     }
 
-    mLogger.trace( "CollectionSchemeIngestion::build()",
+    mLogger.trace( "CollectionSchemeIngestion::build",
                    "Building CollectionScheme with ID: " + mProtoCollectionSchemeMessagePtr->campaign_arn() );
 
     // Build Collected Signals
@@ -71,9 +71,8 @@ CollectionSchemeIngestion::build()
         signalInfo.fixedWindowPeriod = signalInformation.fixed_window_period_ms();
         signalInfo.isConditionOnlySignal = signalInformation.condition_only_signal();
 
-        mLogger.trace( "CollectionSchemeIngestion::build()",
-                       "Adding signalID: " + std::to_string( signalInfo.signalID ) +
-                           " to list of signals to collect." );
+        mLogger.trace( "CollectionSchemeIngestion::build",
+                       "Adding signalID: " + std::to_string( signalInfo.signalID ) + " to list of signals to collect" );
         mCollectedSignals.emplace_back( signalInfo );
     }
 
@@ -92,7 +91,7 @@ CollectionSchemeIngestion::build()
         rawCAN.sampleBufferSize = rawCanFrame.sample_buffer_size();
         rawCAN.minimumSampleIntervalMs = rawCanFrame.minimum_sample_period_ms();
 
-        mLogger.trace( "CollectionSchemeIngestion::build()",
+        mLogger.trace( "CollectionSchemeIngestion::build",
                        "Adding rawCAN frame to collect ID: " + std::to_string( rawCAN.frameID ) +
                            " node ID: " + rawCAN.interfaceID );
         mCollectedRawCAN.emplace_back( rawCAN );
@@ -106,7 +105,7 @@ CollectionSchemeIngestion::build()
             getNumberOfNodes( mProtoCollectionSchemeMessagePtr->condition_based_collection_scheme().condition_tree(),
                               Aws::IoTFleetWise::DataInspection::MAX_EQUATION_DEPTH );
 
-        mLogger.info( "CollectionSchemeIngestion::build()",
+        mLogger.info( "CollectionSchemeIngestion::build",
                       "CollectionScheme is Condition Based. Building AST with " + std::to_string( numNodes ) +
                           " nodes" );
 
@@ -118,18 +117,18 @@ CollectionSchemeIngestion::build()
             serializeNode( mProtoCollectionSchemeMessagePtr->condition_based_collection_scheme().condition_tree(),
                            currentIndex,
                            Aws::IoTFleetWise::DataInspection::MAX_EQUATION_DEPTH );
-        mLogger.info( "CollectionSchemeIngestion::build()", "AST complete." );
+        mLogger.info( "CollectionSchemeIngestion::build", "AST complete" );
     }
     // time based node
     // For time based node the condition is always set to true hence: currentNode.booleanValue=true
     else if ( mProtoCollectionSchemeMessagePtr->collection_scheme_type_case() ==
               CollectionSchemesMsg::CollectionScheme::kTimeBasedCollectionScheme )
     {
-        mLogger.info( "CollectionSchemeIngestion::build()",
+        mLogger.info( "CollectionSchemeIngestion::build",
                       "CollectionScheme is Time based with interval of: " +
                           std::to_string( mProtoCollectionSchemeMessagePtr->time_based_collection_scheme()
                                               .time_based_collection_scheme_period_ms() ) +
-                          " ms." );
+                          " ms" );
 
         mExpressionNodes.emplace_back();
         ExpressionNode &currentNode = mExpressionNodes.back();
@@ -139,7 +138,7 @@ CollectionSchemeIngestion::build()
     }
     else
     {
-        mLogger.error( "CollectionSchemeIngestion::build()", "COLLECTION_SCHEME_TYPE_NOT_SET" );
+        mLogger.error( "CollectionSchemeIngestion::build", "COLLECTION_SCHEME_TYPE_NOT_SET" );
     }
 
     // Build Image capture collection info
@@ -162,7 +161,7 @@ CollectionSchemeIngestion::build()
             imageCaptureData.beforeDurationMs = imageData.time_based_image_data().before_duration_ms();
             // Image format
             imageCaptureData.imageFormat = static_cast<uint32_t>( imageData.image_type() );
-            mLogger.info( "CollectionSchemeIngestion::build()",
+            mLogger.info( "CollectionSchemeIngestion::build",
                           "Adding Image capture settings for DeviceID: " +
                               std::to_string( imageCaptureData.deviceID ) );
 
@@ -170,12 +169,11 @@ CollectionSchemeIngestion::build()
         }
         else
         {
-            mLogger.warn( "CollectionSchemeIngestion::build()",
-                          "Unsupported Image capture settings provided, skipping" );
+            mLogger.warn( "CollectionSchemeIngestion::build", "Unsupported Image capture settings provided, skipping" );
         }
     }
 
-    mLogger.info( "CollectionSchemeIngestion::build()",
+    mLogger.info( "CollectionSchemeIngestion::build",
                   "Successfully built CollectionScheme ID: " + mProtoCollectionSchemeMessagePtr->campaign_arn() );
 
     // Set ready flag to true
@@ -404,7 +402,7 @@ CollectionSchemeIngestion::serializeNode( const CollectionSchemesMsg::ConditionN
             ExpressionNode *left = serializeNode( node.node_operator().left_child(), nextIndex, remainingDepth - 1 );
             currentNode->left = left;
             // Not operator is unary and has only left child
-            if ( currentNode->nodeType != ExpressionNodeType::OPERATOR_LOGICAL_NOT &&
+            if ( ( currentNode->nodeType != ExpressionNodeType::OPERATOR_LOGICAL_NOT ) &&
                  node.node_operator().has_right_child() )
             {
                 mLogger.trace( "CollectionSchemeIngestion::serializeNode", "Processing right child" );

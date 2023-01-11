@@ -16,8 +16,6 @@ namespace DataManagement
 {
 using namespace Aws::IoTFleetWise::Platform::Linux::PersistencyManagement;
 using namespace Aws::IoTFleetWise::DataInspection;
-/* when TimePointInMsec is used, it should refer to milliseconds since Epoch */
-using TimePointInMsec = uint64_t;
 
 class ICollectionSchemeManager
 {
@@ -44,7 +42,7 @@ protected:
      * @param currTime time in seconds when main thread wakes up;
      * @return true when enabled collectionScheme map is updated.
      */
-    virtual bool rebuildMapsandTimeLine( const TimePointInMsec &currTime ) = 0;
+    virtual bool rebuildMapsandTimeLine( const TimePoint &currTime ) = 0;
 
     /**
      * @brief Updates existing enabled collectionScheme map, idle collectionScheme map, and time line;
@@ -55,7 +53,7 @@ protected:
      * @param currTime time in seconds when main thread wakes up;
      * @return true when enabled collectionScheme map is updated.
      */
-    virtual bool updateMapsandTimeLine( const TimePointInMsec &currTime ) = 0;
+    virtual bool updateMapsandTimeLine( const TimePoint &currTime ) = 0;
 
     /**
      * @brief works on TimeData popped from mTimeLine to decide whether to disable/enable a collectionScheme
@@ -63,7 +61,7 @@ protected:
      * @param currTime time in seconds when main thread wakes up;
      * @return true when enabled collectionScheme map is updated.
      */
-    virtual bool checkTimeLine( const TimePointInMsec &currTime ) = 0;
+    virtual bool checkTimeLine( const TimePoint &currTime ) = 0;
 
     /**
      * @brief Extract from enabled collectionSchemes and aggregate into inspectMatrix

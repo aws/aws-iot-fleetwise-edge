@@ -3,12 +3,14 @@
 
 #include "CollectionSchemeManagerMock.h"
 #include "CollectionSchemeManagerTest.h"
+#include "Testing.h"
 #include <utility>
 
 using ::testing::_;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnRef;
+using namespace Aws::IoTFleetWise::TestingSupport;
 
 /** @brief
  * This test validates the life cycle of the Collection Schemes as they get
@@ -23,13 +25,13 @@ TEST( CollectionSchemeManagerGtest, RebuildUpdateAndTimeLineTest )
     std::string strDecoderManifestIDCollectionScheme1 = "DM1";
     std::string strDecoderManifestIDCollectionScheme2 = "DM2";
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
-    TimePointInMsec startIdleTime = currTime + 10;
-    TimePointInMsec stopIdleTime = currTime + 50;
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startIdleTime = currTime.systemTimeMs + 10;
+    Timestamp stopIdleTime = currTime.systemTimeMs + 50;
 
-    TimePointInMsec startEnableTime = currTime - 50;
-    TimePointInMsec stopEnableTime = currTime + 10;
-    TimePointInMsec stopDisableTime = currTime - 10;
+    Timestamp startEnableTime = currTime.systemTimeMs - 50;
+    Timestamp stopEnableTime = currTime.systemTimeMs + 10;
+    Timestamp stopDisableTime = currTime.systemTimeMs - 10;
     // build decodermanifest, collectionScheme, collectionSchemeList
     std::shared_ptr<mockDecoderManifest> testDM1 = std::make_shared<mockDecoderManifest>();
     std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
@@ -108,15 +110,15 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_ADD_DELETE )
     std::string strDecoderManifestIDCollectionScheme1 = "DM1";
     std::string strDecoderManifestIDCollectionScheme2 = "DM2";
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
-    TimePointInMsec startIdleTime = currTime + 10;
-    TimePointInMsec stopIdleTime = currTime + 50;
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startIdleTime = currTime.systemTimeMs + 10;
+    Timestamp stopIdleTime = currTime.systemTimeMs + 50;
 
-    TimePointInMsec startEnableTime = currTime - 50;
-    TimePointInMsec stopEnableTime = currTime + 10;
+    Timestamp startEnableTime = currTime.systemTimeMs - 50;
+    Timestamp stopEnableTime = currTime.systemTimeMs + 10;
 
-    TimePointInMsec startBadTime = currTime - 50;
-    TimePointInMsec stopBadTime = currTime - 10;
+    Timestamp startBadTime = currTime.systemTimeMs - 50;
+    Timestamp stopBadTime = currTime.systemTimeMs - 10;
     // build decodermanifest, collectionScheme, collectionSchemeList
     std::shared_ptr<mockDecoderManifest> testDM1 = std::make_shared<mockDecoderManifest>();
     std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
@@ -211,18 +213,18 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_IDLE_BRANCHES )
 
     std::string strDecoderManifestIDCollectionScheme1 = "DM1";
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
-    TimePointInMsec startIdleTime = currTime + 10;
-    TimePointInMsec stopIdleTime = currTime + 50;
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startIdleTime = currTime.systemTimeMs + 10;
+    Timestamp stopIdleTime = currTime.systemTimeMs + 50;
 
-    TimePointInMsec startEnableTime = currTime - 20;
-    TimePointInMsec stopEnableTime = currTime + 10;
+    Timestamp startEnableTime = currTime.systemTimeMs - 20;
+    Timestamp stopEnableTime = currTime.systemTimeMs + 10;
 
-    TimePointInMsec start1Time = currTime + 50;
-    TimePointInMsec stop1Time = currTime - 10;
+    Timestamp start1Time = currTime.systemTimeMs + 50;
+    Timestamp stop1Time = currTime.systemTimeMs - 10;
 
-    TimePointInMsec start2Time = currTime - 50;
-    TimePointInMsec stop2Time = currTime - 10;
+    Timestamp start2Time = currTime.systemTimeMs - 50;
+    Timestamp stop2Time = currTime.systemTimeMs - 10;
 
     // build decodermanifest, collectionScheme, collectionSchemeList
     std::shared_ptr<mockDecoderManifest> testDM1 = std::make_shared<mockDecoderManifest>();
@@ -328,18 +330,18 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_ENABLED_BRANCHES )
 
     std::string strDecoderManifestIDCollectionScheme1 = "DM1";
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
-    TimePointInMsec startExpTime = currTime + 10;
-    TimePointInMsec stopExpTime = currTime;
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startExpTime = currTime.systemTimeMs + 10;
+    Timestamp stopExpTime = currTime.systemTimeMs;
 
-    TimePointInMsec startEnableTime = currTime - 20;
-    TimePointInMsec stopEnableTime = currTime + 50;
+    Timestamp startEnableTime = currTime.systemTimeMs - 20;
+    Timestamp stopEnableTime = currTime.systemTimeMs + 50;
 
-    TimePointInMsec start1Time = currTime;
-    TimePointInMsec stop1Time = currTime + 50;
+    Timestamp start1Time = currTime.systemTimeMs;
+    Timestamp stop1Time = currTime.systemTimeMs + 50;
 
-    TimePointInMsec start2Time = currTime - 50;
-    TimePointInMsec stop2Time = currTime + 100;
+    Timestamp start2Time = currTime.systemTimeMs - 50;
+    Timestamp stop2Time = currTime.systemTimeMs + 100;
 
     // build decodermanifest, collectionScheme, collectionSchemeList
     std::shared_ptr<mockDecoderManifest> testDM1 = std::make_shared<mockDecoderManifest>();
@@ -428,7 +430,7 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_CHECKIN_UNFOUNDCOLLECTIONS
     std::string strCollectionSchemeIDCollectionScheme2 = "COLLECTIONSCHEME2";
 
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
+    TimePoint currTime = testClock->timeSinceEpoch();
 
     // create empty collectionScheme map
     std::map<std::string, ICollectionSchemePtr> mapEmpty;
@@ -438,15 +440,15 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_CHECKIN_UNFOUNDCOLLECTIONS
 
     // setup maps
     NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1, mapEmpty, mapIdle );
-    EXPECT_CALL( *collectionScheme2, getStartTime() ).WillOnce( Return( currTime + 20 ) );
+    EXPECT_CALL( *collectionScheme2, getStartTime() ).WillOnce( Return( currTime.systemTimeMs + 20 ) );
 
     // create mTimeLine
     std::priority_queue<TimeData, std::vector<TimeData>, std::greater<TimeData>> testTimeLine;
-    TimeData dataPair = std::make_pair( currTime, "Checkin" );
+    TimeData dataPair = { currTime, "Checkin" };
     testTimeLine.push( dataPair );
-    dataPair = std::make_pair( currTime, strCollectionSchemeIDCollectionScheme1 );
+    dataPair = { currTime, strCollectionSchemeIDCollectionScheme1 };
     testTimeLine.push( dataPair );
-    dataPair = std::make_pair( currTime, strCollectionSchemeIDCollectionScheme2 );
+    dataPair = { currTime, strCollectionSchemeIDCollectionScheme2 };
     testTimeLine.push( dataPair );
 
     // test code
@@ -473,7 +475,7 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_IDLE_BRANCHES )
     std::string strCollectionSchemeIDCollectionScheme2 = "COLLECTIONSCHEME2";
 
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
+    TimePoint currTime = testClock->timeSinceEpoch();
 
     // create empty collectionScheme map
     std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
@@ -485,25 +487,27 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_IDLE_BRANCHES )
 
     // setup maps
     NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1, mapEmpty, mapIdle );
-    EXPECT_CALL( *collectionScheme1, getStartTime() ).WillOnce( Return( currTime ) ).WillOnce( Return( currTime ) );
-    EXPECT_CALL( *collectionScheme1, getExpiryTime() ).WillOnce( Return( currTime + 100 ) );
+    EXPECT_CALL( *collectionScheme1, getStartTime() )
+        .WillOnce( Return( currTime.systemTimeMs ) )
+        .WillOnce( Return( currTime.systemTimeMs ) );
+    EXPECT_CALL( *collectionScheme1, getExpiryTime() ).WillOnce( Return( currTime.systemTimeMs + 100 ) );
 
     EXPECT_CALL( *collectionScheme2, getStartTime() )
-        .WillOnce( Return( currTime + 20 ) )
-        .WillOnce( Return( currTime + 20 ) )
-        .WillOnce( Return( currTime + 20 ) )
-        .WillOnce( Return( currTime + 20 ) );
-    EXPECT_CALL( *collectionScheme2, getExpiryTime() ).WillOnce( Return( currTime + 200 ) );
+        .WillOnce( Return( currTime.systemTimeMs + 20 ) )
+        .WillOnce( Return( currTime.systemTimeMs + 20 ) )
+        .WillOnce( Return( currTime.systemTimeMs + 20 ) )
+        .WillOnce( Return( currTime.systemTimeMs + 20 ) );
+    EXPECT_CALL( *collectionScheme2, getExpiryTime() ).WillOnce( Return( currTime.systemTimeMs + 200 ) );
 
     // create mTimeLine
     std::priority_queue<TimeData, std::vector<TimeData>, std::greater<TimeData>> testTimeLine;
-    TimeData dataPair = std::make_pair( currTime, "Checkin" );
+    TimeData dataPair = { currTime, "Checkin" };
     testTimeLine.push( dataPair );
-    dataPair = std::make_pair( currTime, strCollectionSchemeIDCollectionScheme1 );
+    dataPair = { currTime, strCollectionSchemeIDCollectionScheme1 };
     testTimeLine.push( dataPair );
-    dataPair = std::make_pair( currTime + 10, strCollectionSchemeIDCollectionScheme2 );
+    dataPair = { currTime + 10, strCollectionSchemeIDCollectionScheme2 };
     testTimeLine.push( dataPair );
-    dataPair = std::make_pair( currTime + 20, strCollectionSchemeIDCollectionScheme2 );
+    dataPair = { currTime + 20, strCollectionSchemeIDCollectionScheme2 };
     testTimeLine.push( dataPair );
 
     // test code
@@ -528,7 +532,7 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_ENABLED_BRANCHES )
     std::string strCollectionSchemeIDCollectionScheme2 = "COLLECTIONSCHEME2";
 
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePointInMsec currTime = testClock->timeSinceEpochMs();
+    TimePoint currTime = testClock->timeSinceEpoch();
 
     // create empty collectionScheme map
     std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
@@ -540,25 +544,27 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_ENABLED_BRANCHES )
 
     // setup maps
     NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1, mapEnable, mapEmpty );
-    EXPECT_CALL( *collectionScheme1, getExpiryTime() ).WillOnce( Return( currTime ) ).WillOnce( Return( currTime ) );
-    EXPECT_CALL( *collectionScheme1, getStartTime() ).WillOnce( Return( currTime - 100 ) );
+    EXPECT_CALL( *collectionScheme1, getExpiryTime() )
+        .WillOnce( Return( currTime.systemTimeMs ) )
+        .WillOnce( Return( currTime.systemTimeMs ) );
+    EXPECT_CALL( *collectionScheme1, getStartTime() ).WillOnce( Return( currTime.systemTimeMs - 100 ) );
 
     EXPECT_CALL( *collectionScheme2, getExpiryTime() )
-        .WillOnce( Return( currTime + 20 ) )
-        .WillOnce( Return( currTime + 20 ) )
-        .WillOnce( Return( currTime + 20 ) )
-        .WillOnce( Return( currTime + 20 ) );
-    EXPECT_CALL( *collectionScheme2, getStartTime() ).WillOnce( Return( currTime - 200 ) );
+        .WillOnce( Return( currTime.systemTimeMs + 20 ) )
+        .WillOnce( Return( currTime.systemTimeMs + 20 ) )
+        .WillOnce( Return( currTime.systemTimeMs + 20 ) )
+        .WillOnce( Return( currTime.systemTimeMs + 20 ) );
+    EXPECT_CALL( *collectionScheme2, getStartTime() ).WillOnce( Return( currTime.systemTimeMs - 200 ) );
 
     // create mTimeLine
     std::priority_queue<TimeData, std::vector<TimeData>, std::greater<TimeData>> testTimeLine;
-    TimeData dataPair = std::make_pair( currTime, "Checkin" );
+    TimeData dataPair = { currTime, "Checkin" };
     testTimeLine.push( dataPair );
-    dataPair = std::make_pair( currTime, strCollectionSchemeIDCollectionScheme1 );
+    dataPair = { currTime, strCollectionSchemeIDCollectionScheme1 };
     testTimeLine.push( dataPair );
-    dataPair = std::make_pair( currTime + 10, strCollectionSchemeIDCollectionScheme2 );
+    dataPair = { currTime + 10, strCollectionSchemeIDCollectionScheme2 };
     testTimeLine.push( dataPair );
-    dataPair = std::make_pair( currTime + 20, strCollectionSchemeIDCollectionScheme2 );
+    dataPair = { currTime + 20, strCollectionSchemeIDCollectionScheme2 };
     testTimeLine.push( dataPair );
 
     // test code

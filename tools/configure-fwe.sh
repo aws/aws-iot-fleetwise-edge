@@ -28,6 +28,9 @@ fi
 if [ -z "${LOG_LEVEL+x}" ]; then
     LOG_LEVEL="Info"
 fi
+if [ -z "${LOG_COLOR+x}" ]; then
+    LOG_COLOR="Auto"
+fi
 if [ -z "${PERSISTENCY_PATH+x}" ]; then
     PERSISTENCY_PATH="/var/aws-iot-fleetwise/"
 fi
@@ -80,6 +83,7 @@ parse_args() {
             echo "  --persistency-path <PATH>    Persistency path, default: ${PERSISTENCY_PATH}"
             echo "  --topic-prefix <PREFIX>      IoT MQTT topic prefix, default: ${TOPIC_PREFIX}"
             echo "  --log-level <LEVEL>          Log level. Either: Off, Error, Warning, Info, Trace. Default: ${LOG_LEVEL}"
+            echo "  --log-color <COLOR_OPTION>   Whether logs should be colored. Either: Auto, Yes, No. Default: ${LOG_COLOR}"
             exit 0
             ;;
         esac
@@ -122,6 +126,7 @@ jq ".staticConfig.mqttConnection.endpointUrl=\"${ENDPOINT_URL}\"" ${INPUT_CONFIG
     | jq ".staticConfig.mqttConnection.certificateFilename=\"${CERTIFICATE_FILE}\"" \
     | jq ".staticConfig.mqttConnection.privateKeyFilename=\"${PRIVATE_KEY_FILE}\"" \
     | jq ".staticConfig.internalParameters.systemWideLogLevel=\"${LOG_LEVEL}\"" \
+    | jq ".staticConfig.internalParameters.logColor=\"${LOG_COLOR}\"" \
     | jq ".staticConfig.persistency.persistencyPath=\"${PERSISTENCY_PATH}\"" \
     | jq ".networkInterfaces[0].canInterface.interfaceName=\"${CAN_BUS0}\"" \
     | jq ".networkInterfaces[1].obdInterface.interfaceName=\"${CAN_BUS0}\"" \
