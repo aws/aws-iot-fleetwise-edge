@@ -22,3 +22,15 @@ repos:
     rev: v10.0.1
     hooks:
       - id: clang-format
+  - repo: local
+    hooks:
+      - id: validate-static-config
+        name: validate-static-config
+        # pre-commit intentionally pass all files as args to the command.
+        # Since the json command only takes one file at once we need some shell script to split the args.
+        entry: bash -c 'for x in "$@"; do echo "Validating file $x"; json validate --schema-file interfaces/protobuf/schemas/edgeConfiguration/staticConfiguration.json --document-file "$x"; done' --
+        language: python
+        files: 'configuration/static-config.json'
+        types: [json]
+        additional_dependencies: ['json-spec==0.10.1']
+        verbose: true
