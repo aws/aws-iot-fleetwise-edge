@@ -2,17 +2,15 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import sys
-import cantools
 import json
+import sys
 
-FQN_KEY = 'fullyQualifiedName'
+import cantools
+
+FQN_KEY = "fullyQualifiedName"
 
 if len(sys.argv) < 2:
-    print(
-        "Usage: python3 " +
-        sys.argv[0] +
-        " <INPUT_DBC_FILE> [<OUTPUT_JSON_FILE>]")
+    print("Usage: python3 " + sys.argv[0] + " <INPUT_DBC_FILE> [<OUTPUT_JSON_FILE>]")
     exit(-1)
 
 db = cantools.database.load_file(sys.argv[1])
@@ -30,12 +28,18 @@ for message in db.messages:
             signals[message_text] = set()
         if signal.name in signals[message_text]:
             print(
-                f"Signal {signal.name} occurs multiple times in the message {message_text}, only the first occurrence will be used")
+                f"Signal {signal.name} occurs multiple times in the message {message_text}, only the first occurrence will be used"
+            )
             continue
         signals[message_text].add(signal.name)
-        if signal.choices and len(signal.choices) <= 2 \
-            and ((0 in signal.choices and str(signal.choices[0]).lower() == "false")
-                 or (1 in signal.choices and str(signal.choices[1]).lower() == "true")):
+        if (
+            signal.choices
+            and len(signal.choices) <= 2
+            and (
+                (0 in signal.choices and str(signal.choices[0]).lower() == "false")
+                or (1 in signal.choices and str(signal.choices[1]).lower() == "true")
+            )
+        ):
             datatype = "BOOLEAN"
         elif signal.scale != 1 or signal.offset != 0 or signal.length > 64 or signal.is_float:
             datatype = "DOUBLE"

@@ -23,4 +23,3 @@ add_library(${libraryAliasName} ALIAS ${libraryTargetName})
 if(${BUILD_TESTING})
 # None so far
 endif()
-

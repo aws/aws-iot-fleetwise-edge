@@ -20,7 +20,9 @@ Parameters:
   Ec2KeyPair:
     Description: Name of SSH key pair (required)
     Type: String
-    ConstraintDescription: "Must be the 'Name' of an SSH key pair from here https://console.aws.amazon.com/ec2/v2/home#KeyPairs:"
+    ConstraintDescription:
+      "Must be the 'Name' of an SSH key pair from here
+      https://console.aws.amazon.com/ec2/v2/home#KeyPairs:"
     AllowedPattern: ".+"
   Ec2VolumeSize:
     Description: Size of storage space in GB
@@ -39,7 +41,7 @@ Resources:
       IpProtocol: tcp
       FromPort: 22
       ToPort: 22
-      CidrIp: '0.0.0.0/0'
+      CidrIp: "0.0.0.0/0"
   Ec2SecurityGroupSelfIngress:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
@@ -51,7 +53,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -60,7 +62,7 @@ Resources:
       Policies:
         - PolicyName: !Sub ${AWS::StackName}-EC2-ServicePolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action: "*"
@@ -68,7 +70,7 @@ Resources:
   Ec2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      Roles: 
+      Roles:
         - !Ref Ec2ServiceRole
   Ec2Instance:
     Type: AWS::EC2::Instance
@@ -77,7 +79,7 @@ Resources:
         Count: 1
         Timeout: PT15M
     Properties:
-      ImageId: !FindInMap [AMIRegionMap, !Ref 'AWS::Region', AMIID]
+      ImageId: !FindInMap [AMIRegionMap, !Ref "AWS::Region", AMIID]
       KeyName: !Ref Ec2KeyPair
       InstanceType: !Ref Ec2InstanceType
       IamInstanceProfile: !Ref Ec2InstanceProfile
@@ -141,8 +143,8 @@ Resources:
         - DeviceName: /dev/sda1
           Ebs:
             VolumeSize: !Ref Ec2VolumeSize
-            DeleteOnTermination: 'true'
-            Encrypted: 'true'
+            DeleteOnTermination: "true"
+            Encrypted: "true"
 Mappings:
   # Ubuntu 18.04 arm64 AMIs
   AMIRegionMap:
@@ -182,8 +184,8 @@ Mappings:
       AMIID: ami-0327006c87b23e535
 Outputs:
   Ec2InstanceId:
-    Description: 'EC2 instance ID'
+    Description: "EC2 instance ID"
     Value: !Ref Ec2Instance
   Ec2InstancePublicIp:
-    Description: 'EC2 instance public IP address'
+    Description: "EC2 instance public IP address"
     Value: !GetAtt Ec2Instance.PublicIp

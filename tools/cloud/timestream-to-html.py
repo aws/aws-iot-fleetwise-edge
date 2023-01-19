@@ -2,42 +2,48 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import sys
 import json
-import plotly.graph_objects as go
+import sys
+
 import pandas as pd
+import plotly.graph_objects as go
 
 if len(sys.argv) < 2:
-    print("Usage: python3 "+sys.argv[0]+" <TIMESTREAM_RESULT_JSON_FILE> [<OUTPUT_HTML_FILE>]")
+    print("Usage: python3 " + sys.argv[0] + " <TIMESTREAM_RESULT_JSON_FILE> [<OUTPUT_HTML_FILE>]")
     exit(-1)
 
-with open(sys.argv[1], 'r') as fp:
+with open(sys.argv[1], "r") as fp:
     data = json.load(fp)
 
-columns={}
-i=0
-for column in data['ColumnInfo']:
-    columns[column['Name']]=i
-    i+=1
+columns = {}
+i = 0
+for column in data["ColumnInfo"]:
+    columns[column["Name"]] = i
+    i += 1
+
 
 def get_val(row, column):
-    return None if not column in columns or not 'ScalarValue' in row['Data'][columns[column]] \
-        else row['Data'][columns[column]]['ScalarValue']
+    return (
+        None
+        if not column in columns or not "ScalarValue" in row["Data"][columns[column]]
+        else row["Data"][columns[column]]["ScalarValue"]
+    )
+
 
 df = pd.DataFrame()
-for row in data['Rows']:
-    ts=get_val(row, 'time')
-    signal_name=get_val(row, 'measure_name')
-    val=get_val(row, 'measure_value::double')
+for row in data["Rows"]:
+    ts = get_val(row, "time")
+    signal_name = get_val(row, "measure_name")
+    val = get_val(row, "measure_value::double")
     if val == None:
-        val=get_val(row, 'measure_value::bigint')
+        val = get_val(row, "measure_value::bigint")
     if val == None:
-        val=get_val(row, 'measure_value::boolean') != 'false'
+        val = get_val(row, "measure_value::boolean") != "false"
     df.at[ts, signal_name] = float(val)
 
 fig = go.Figure()
 for column in df.columns:
-    fig.add_trace(go.Scatter(x=df.index, y=df[column], mode='markers', name=column))
+    fig.add_trace(go.Scatter(x=df.index, y=df[column], mode="markers", name=column))
 
 if len(sys.argv) < 3:
     fig.show()

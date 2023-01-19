@@ -1,18 +1,24 @@
-IWave GPS setup
-===============
-Setup the iWave device like described in the [iwave-g26-tutorial](../../../../../docs/iwave-g26-tutorial/iwave-g26-tutorial.md)
-To enable the GPS open the file `/etc/ppp/chat/gprs` and add the following (for example above the AT+CPIN line):
+# IWave GPS setup
+
+Setup the iWave device like described in the
+[iwave-g26-tutorial](../../../../../docs/iwave-g26-tutorial/iwave-g26-tutorial.md) To enable the GPS
+open the file `/etc/ppp/chat/gprs` and add the following (for example above the AT+CPIN line):
+
 ```
 # Enable GPS
 OK AT+QGPS=1
 ```
-to apply the changes you can use `systemctl restart lte`.
-After that you should see NMEA formatted ASCII data if you do `cat < /dev/ttyUSB1`
+
+to apply the changes you can use `systemctl restart lte`. After that you should see NMEA formatted
+ASCII data if you do `cat < /dev/ttyUSB1`
 
 The decoder manifest changes are explained in the README in the parent folder
 
 # Configuration
-If you provide in the `staticConfig` section of the config.json file the following section you can change the parameters without recompiling AWS IoT FleetWise Edge:
+
+If you provide in the `staticConfig` section of the config.json file the following section you can
+change the parameters without recompiling AWS IoT FleetWise Edge:
+
 ```
 "iWaveGpsExample": {
     "nmeaFilePath": "/dev/ttyUSB1",
@@ -22,17 +28,27 @@ If you provide in the `staticConfig` section of the config.json file the followi
     "latitudeStartBit" : "0"
 }
 ```
-When configure AWS IoT FleetWise use the `cmake` with the flag `-DFWE_EXAMPLE_IWAVEGPS=On` and then compile using `make` as usual.
+
+When configure AWS IoT FleetWise use the `cmake` with the flag `-DFWE_EXAMPLE_IWAVEGPS=On` and then
+compile using `make` as usual.
+
 # Debug
+
 Like CAN if data is sent to cloud you should see this:
+
 ```
-[Thread : 565] [2022-10-27 02:39:12 PM] [INFO] [IoTFleetWiseEngine::doWork]: [FWE data ready to send with eventID 1644139266 from arn:aws:iotfleetwise:us-east-1:748151249882:campaign/IWaveGpsCampaign Signals:70 [2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196, ...] first signal timestamp: 1666881551998 raw CAN frames:0 DTCs:0 Geohash:] 
+[Thread : 565] [2022-10-27 02:39:12 PM] [INFO] [IoTFleetWiseEngine::doWork]: [FWE data ready to send with eventID 1644139266 from arn:aws:iotfleetwise:us-east-1:748151249882:campaign/IWaveGpsCampaign Signals:70 [2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196, ...] first signal timestamp: 1666881551998 raw CAN frames:0 DTCs:0 Geohash:]
 ```
-If the GPS NMEA output it working but gps fix is available you should move to an area with a open sight to the sky. As long as no GPS fix is available you will see every 10 seconds:
+
+If the GPS NMEA output it working but gps fix is available you should move to an area with a open
+sight to the sky. As long as no GPS fix is available you will see every 10 seconds:
+
 ```
-[Thread : 618] [2022-10-27 03:11:00 PM] [TRACE] [IWaveGpsSource::pollData]: [In the last 10000 millisecond found 10 lines with $GPGGA and extracted 0 valid coordinates from it] 
+[Thread : 618] [2022-10-27 03:11:00 PM] [TRACE] [IWaveGpsSource::pollData]: [In the last 10000 millisecond found 10 lines with $GPGGA and extracted 0 valid coordinates from it]
 ```
+
 As soon as data is available you should see this:
+
 ```
-[Thread : 618] [2022-10-27 03:12:54 PM] [TRACE] [IWaveGpsSource::pollData]: [In the last 10000 millisecond found 11 lines with $GPGGA and extracted 11 valid coordinates from it] 
+[Thread : 618] [2022-10-27 03:12:54 PM] [TRACE] [IWaveGpsSource::pollData]: [In the last 10000 millisecond found 11 lines with $GPGGA and extracted 11 valid coordinates from it]
 ```

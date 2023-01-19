@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.10.2)
 
 project(iotfleetwise VERSION 1.0.3)
 
-# AWS IoT FleetWise Edge uses C++14 for compatibility reasons with 
+# AWS IoT FleetWise Edge uses C++14 for compatibility reasons with
 # Automotive middlewares ( Adaptive AUTOSAR, ROS2)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)

@@ -60,13 +60,13 @@ message CollectionScheme {
         ConditionBasedCollectionScheme condition_based_collection_scheme = 6;
     }
 
-    /* 
+    /*
      * This specifies how much time to spend collecting data after a condition evaluates to true. When after_duration_ms
      * elapses whatever data collected up to that point ( if any was present on the vehicle ) is sent to the cloud.
      */
     uint32 after_duration_ms = 7;
 
-    /* 
+    /*
      * All active DTCs including the time they were first seen active will be sent when the collectionScheme triggers.
      */
     bool include_active_dtcs = 8;
@@ -202,7 +202,7 @@ message SignalInformation {
      */
     uint32 fixed_window_period_ms = 4;
 
-    /* 
+    /*
      * When true, this signal will not be collected and sent to cloud. It will only be used in the condition logic with
      * its associated fixed_window_period_ms. Default is false.
      */
@@ -225,7 +225,7 @@ message ConditionNode {
         NodeOperator node_operator = 1;
 
         /*
-         * Function node is a self-contained module that accomplish a specific task. 
+         * Function node is a self-contained module that accomplish a specific task.
          */
         NodeFunction node_function = 2;
 
@@ -267,15 +267,15 @@ message ConditionNode {
         Operator operator = 3;
 
         /*
-         * Enum of an operator which can be an binary or unary operator 
+         * Enum of an operator which can be an binary or unary operator
          */
         enum Operator {
 
             /*
              * COMPARE operators return a bool and their children must return a double
              */
-            COMPARE_SMALLER = 0; 
-            COMPARE_BIGGER = 1; 
+            COMPARE_SMALLER = 0;
+            COMPARE_BIGGER = 1;
             COMPARE_SMALLER_EQUAL = 2;
             COMPARE_BIGGER_EQUAL = 3;
             COMPARE_EQUAL = 4;
@@ -300,12 +300,12 @@ message ConditionNode {
 
     /*
      * Function node is a self-contained module that accomplish a specific task.  It takes inputs provided here and
-     * output based on specific logic 
+     * output based on specific logic
      */
     message NodeFunction{
 
         /*
-         * The function node could be one of the following function types. 
+         * The function node could be one of the following function types.
          */
         oneof functionType {
 
@@ -374,7 +374,7 @@ message ConditionNode {
              * be used.
              */
             uint32 signal_id = 1;
-            
+
             /*
              * Function used over fixed window to evaluate value of physical value of signal_id
              */
@@ -423,7 +423,7 @@ message RawCanFrame {
      * Ring buffer size used to store these sampled CAN frames. One CAN Frame is a sample.
      */
     uint32 sample_buffer_size = 3;
-    
+
     /*
      * Minimum time period in milliseconds that must elapse between collecting samples. Samples arriving faster than
      * this period will be dropped. A value of 0 will collect samples as fast as they arrive.
@@ -439,8 +439,8 @@ message ImageData{
      */
     uint32 image_source_node_id = 1;
 
-    /* 
-     * Each image source may have a list of supported image types. 
+    /*
+     * Each image source may have a list of supported image types.
      */
     ImageType image_type = 2;
 
@@ -469,7 +469,7 @@ message ImageData{
         uint32 before_duration_ms = 1;
     }
 
-    /* 
+    /*
      * Image sources may have one or more supported image types - this field lets the customer specify which image type
      * they would like to collect.
      */

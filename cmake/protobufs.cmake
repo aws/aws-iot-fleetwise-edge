@@ -74,7 +74,7 @@ add_library(
   ${outputSourcesList}
 )
 
-# This links the protobuf library we are creating with 
+# This links the protobuf library we are creating with
 add_dependencies(${libraryTargetName} protoGenTarget)
 
 target_link_libraries(

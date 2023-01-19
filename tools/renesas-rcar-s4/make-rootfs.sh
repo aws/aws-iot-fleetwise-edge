@@ -220,4 +220,3 @@ losetup -d ${LOOP_DEV}
 # Prepare to release
 mv -f image.img ${SDCARD_IMAGE_NAME}
 gzip -k ${SDCARD_IMAGE_NAME}
-

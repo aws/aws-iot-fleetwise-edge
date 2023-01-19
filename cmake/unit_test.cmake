@@ -1,10 +1,10 @@
 include(GoogleTest)
 function(add_unit_test TEST_NAME)
-    gtest_discover_tests(${TEST_NAME} 
+    gtest_discover_tests(${TEST_NAME}
         # XML_OUTPUT_DIR supported from 3.18 only and should replace EXTRA_ARGS when available
-        # XML_OUTPUT_DIR report-${TEST_NAME}.xml 
+        # XML_OUTPUT_DIR report-${TEST_NAME}.xml
         # DISCOVERY_MODE supported from 3.18 only and is preferred in cross-compilation cases
-        # DISCOVERY_MODE PRE_TEST 
+        # DISCOVERY_MODE PRE_TEST
         EXTRA_ARGS "--gtest_output=xml:report-${TEST_NAME}.xml"
         ${ARGN}
     )
@@ -23,7 +23,7 @@ function(add_unit_test_with_faketime TEST_NAME)
         message(FATAL_ERROR "faketime library not found. Either install it or disable the tests that depend on it.")
     endif ()
 
-    add_unit_test(${TEST_NAME} 
+    add_unit_test(${TEST_NAME}
         PROPERTIES ${properties}
             # If the build env is different than the env where the test will run, the path might be different than
             # what we found. So we will tell the test to try preloading it with a path under /usr/lib too.

@@ -1,9 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-# Generate C++ code from the DDS IDLs, required to interact with 
+# Generate C++ code from the DDS IDLs, required to interact with
 # devices connected to FWE via a DDS backbone.
 # The IDLs are part of a git submodule and this cmake file
-# invokes the fastDDS Gen tool to generate the sources locally. 
+# invokes the fastDDS Gen tool to generate the sources locally.
 # These are the library names and aliases
 
 # FastDDS dependencies
@@ -22,7 +22,7 @@ message(STATUS "IDLs root is: ${idlsRoot}")
 # Make a list of all the idl files
 file(GLOB_RECURSE idlFilesExternal FOLLOW_SYMLINKS ${idlsRoot}/*.idl)
 
-# Copy the idl files to the build tree. 
+# Copy the idl files to the build tree.
 file(COPY ${idlFilesExternal} DESTINATION ${idlsDir})
 
 foreach(idlFileName ${idlFilesExternal})

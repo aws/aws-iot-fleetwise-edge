@@ -1,22 +1,22 @@
 {
-    "compression": "SNAPPY",
-    "diagnosticsMode": "OFF",
-    "spoolingMode": "TO_DISK",
-    "collectionScheme": {
-        "conditionBasedCollectionScheme": {
-            "conditionLanguageVersion": 1,
-            "expression": "$variable.`Vehicle.ABS.DemoBrakePedalPressure` > 7000",
-            "minimumTriggerIntervalMs": 1000,
-            "triggerMode": "ALWAYS"
-        }
+  "compression": "SNAPPY",
+  "diagnosticsMode": "OFF",
+  "spoolingMode": "TO_DISK",
+  "collectionScheme": {
+    "conditionBasedCollectionScheme": {
+      "conditionLanguageVersion": 1,
+      "expression": "$variable.`Vehicle.ABS.DemoBrakePedalPressure` > 7000",
+      "minimumTriggerIntervalMs": 1000,
+      "triggerMode": "ALWAYS"
+    }
+  },
+  "postTriggerCollectionDuration": 1000,
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.ECM.DemoEngineTorque"
     },
-    "postTriggerCollectionDuration": 1000,
-    "signalsToCollect": [
-        {
-            "name": "Vehicle.ECM.DemoEngineTorque"
-        },
-        {
-            "name": "Vehicle.ABS.DemoBrakePedalPressure"
-        }
-    ]
+    {
+      "name": "Vehicle.ABS.DemoBrakePedalPressure"
+    }
+  ]
 }

@@ -76,7 +76,7 @@ install(
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
 
-  
+
 
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/em-example-config.json
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
@@ -111,4 +111,3 @@ if(${BUILD_TESTING})
   endforeach()
 
 endif()
-
