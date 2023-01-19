@@ -1,5 +1,5 @@
 DESCRIPTION = "Setup SocketCAN at Startup"
-LICENSE = "CLOSED" 
+LICENSE = "CLOSED"
 
 SRC_URI = "file://setup-socketcan.sh \
            file://setup-socketcan.service"

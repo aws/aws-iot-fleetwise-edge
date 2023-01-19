@@ -14,4 +14,3 @@ PV = "0.0+gitr${SRCPV}"
 S = "${WORKDIR}/git"
 
 inherit autotools pkgconfig
-

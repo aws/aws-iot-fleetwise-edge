@@ -1,313 +1,295 @@
 {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "id": "http://aws-iot-automotive.com/edgeConfiguration",
-    "type": "object",
-    "additionalProperties": false,
-    "title": "IoTFleetWise Static Configuration Attributes",
-    "description": "The root schema for FWE Static Configuration JSON",
-    "properties": {
-        "version": {
-            "type": "string",
-            "description": "Schema Version"
-        },
-        "networkInterfaces": {
-            "description": "HW network interface information for decoding signals",
-            "type": "array",
-            "anyOf": [
-                {
-                    "required": [
-                        "canInterface"
-                    ]
-                },
-                {
-                    "required": [
-                        "obdInterface"
-                    ]
-                }
-            ],
-            "properties": {
-                "canInterface": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "description": "CAN Signal network interface information",
-                    "items": {
-                        "$ref": "#/definitions/canInterface"
-                    }
-                },
-                "obdInterface": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "description": "OBD Signal network interface information",
-                    "items": {
-                        "$ref": "#/definitions/obdInterface"
-                    }
-                },
-                "interfaceId": {
-                    "type": "string",
-                    "description": "Every CAN/OBD signal decoder is associated with a signal/OBD network interface using a unique Id"
-                },
-                "type": {
-                    "type": "string",
-                    "description": "Specifies the interface type- CAN, OBD, etc"
-                }
-            },
-            "definitions": {
-                "canInterface": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                        "interfaceName": {
-                            "type": "string",
-                            "description": "Interface name for CAN channel"
-                        },
-                        "protocolName": {
-                            "type": "string",
-                            "description": "Protocol used- CAN or CAN FD"
-                        },
-                        "protocolVersion": {
-                            "type": "string",
-                            "description": "Protocol version used- CAN 2.0A, 2.0B"
-                        },
-                        "timestampType": {
-                            "type": "string",
-                            "description": "Defines which timestamp type should be used: Software, Hardware or Polling. Default is Software"
-                        }
-                    },
-                    "required": [
-                        "interfaceName",
-                        "protocolName",
-                        "protocolVersion"
-                    ]
-                },
-                "obdInterface": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                        "interfaceName": {
-                            "type": "string",
-                            "description": "CAN Interface Name where the OBD stack on the ECU is running"
-                        },
-                        "obdStandard": {
-                            "type": "string",
-                            "description": "OBD Standard (eg. J1979 or Enhanced (for advanced standards))"
-                        },
-                        "pidRequestIntervalSeconds": {
-                            "type": "integer",
-                            "description": "Interval used to schedule PID requests (in seconds)"
-                        },
-                        "dtcRequestIntervalSeconds": {
-                            "type": "integer",
-                            "description": "Interval  used to schedule DTC requests (in seconds)"
-                        },
-                        "broadcastRequests": {
-                            "type": "boolean",
-                            "description": "Specifies whether OBD requests should be sent in broadcast (functional) mode, rather than the unicast (physical) mode"
-                        }
-                    },
-                    "required": [
-                        "interfaceName",
-                        "obdStandard",
-                        "pidRequestIntervalSeconds",
-                        "dtcRequestIntervalSeconds",
-                        "broadcastRequests"
-                    ]
-                }
-            }
-        },
-        "staticConfig": {
-            "description": "Static Configuration Attributes",
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "bufferSizes": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                        "dtcBufferSize": {
-                            "type": "integer",
-                            "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer. This is a single producer single consumer buffer."
-                        },
-                        "socketCANBufferSize": {
-                            "type": "integer",
-                            "description": "Max size of the circular buffer associated with a network channel (CAN Bus) for data consumption from that channel. This is a single producer-single consumer buffer."
-                        },
-                        "decodedSignalsBufferSize": {
-                            "type": "integer",
-                            "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer for OBD and CAN signals.This is a multiple producer single consumer buffer."
-                        },
-                        "rawCANFrameBufferSize": {
-                            "type": "integer",
-                            "description": "Max size of the buffer shared between Network Channel Consumer and data collection module ( Collection Engine). This buffer stores raw CAN frames coming in from the CAN Bus. This is a lock-free multi-producer single consumer buffer. "
-                        }
-                    },
-                    "required": [
-                        "dtcBufferSize",
-                        "socketCANBufferSize",
-                        "decodedSignalsBufferSize",
-                        "rawCANFrameBufferSize"
-                    ]
-                },
-                "threadIdleTimes": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                        "inspectionThreadIdleTimeMs": {
-                            "type": "integer",
-                            "description": "Sleep time for inspection engine thread if no new data is available (in milliseconds)"
-                        },
-                        "socketCANThreadIdleTimeMs": {
-                            "type": "integer",
-                            "description": "Sleep time for CAN interface if no new data is available (in milliseconds)"
-                        },
-                        "canDecoderThreadIdleTimeMs": {
-                            "type": "integer",
-                            "description": "Sleep time for CAN decoder thread if no new data is available (in milliseconds)"
-                        }
-                    },
-                    "required": [
-                        "inspectionThreadIdleTimeMs",
-                        "socketCANThreadIdleTimeMs",
-                        "canDecoderThreadIdleTimeMs"
-                    ]
-                },
-                "persistency": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                        "persistencyPath": {
-                            "type": "string",
-                            "description": "Local storage path to persist collectionScheme, decoder manifest and data snapshot"
-                        },
-                        "persistencyPartitionMaxSize": {
-                            "type": "integer",
-                            "description": "Maximum size allocated for persistency (Bytes)"
-                        },
-                        "persistencyUploadRetryIntervalMs": {
-                            "type": "integer",
-                            "description": "Interval to wait before retrying to upload persisted signal data (in milliseconds). After successfully uploading, the persisted signal data will be cleared. Only signal data that could not be uploaded will be persisted. Defaults to 10 seconds."
-                        }
-                    },
-                    "required": [
-                        "persistencyPath",
-                        "persistencyPartitionMaxSize"
-                    ]
-                },
-                "internalParameters": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                        "readyToPublishDataBufferSize": {
-                            "type": "integer",
-                            "description": "Size of the buffer used for storing ready to publish, filtered data"
-                        },
-                        "systemWideLogLevel": {
-                            "type": "string",
-                            "description": "Set log level severity- Trace, Info, Warning, Error"
-                        },
-                        "logColor": {
-                            "type": "string",
-                            "enum": ["Auto", "Yes", "No"],
-                            "description": "Whether the logs should be colored. Default to auto."
-                        },
-                        "dataReductionProbabilityDisabled": {
-                            "type": "boolean",
-                            "description": "Disables the whole probability-based DDC,can be used for debugging"
-                        },
-                        "metricsCyclicPrintIntervalMs": {
-                            "type": "string",
-                            "description": "Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never"
-                        },
-                        "useJsonBasedCollection": {
-                            "type": "boolean",
-                            "description": "Enables debug JSON output of the collected data"
-                        }
-                    },
-                    "required": [
-                        "readyToPublishDataBufferSize",
-                        "systemWideLogLevel",
-                        "dataReductionProbabilityDisabled"
-                    ]
-                },
-                "publishToCloudParameters": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                        "maxPublishMessageCount": {
-                            "type": "integer",
-                            "description": "Maximum messages that can be published to the cloud as one payload"
-                        },
-                        "collectionSchemeManagementCheckinIntervalMs": {
-                            "type": "integer",
-                            "description": "Time interval between collectionScheme checkins( in milliseconds )"
-                        }
-                    },
-                    "required": [
-                        "maxPublishMessageCount",
-                        "collectionSchemeManagementCheckinIntervalMs"
-                    ]
-                },
-                "mqttConnection": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                        "endpointUrl": {
-                            "type": "string",
-                            "description": "AWS account’s IoT device endpoint"
-                        },
-                        "clientId": {
-                            "type": "string",
-                            "description": "The ID that uniquely identifies this device in the AWS Region"
-                        },
-                        "collectionSchemeListTopic": {
-                            "type": "string",
-                            "description": "Control Plane publishes to this Collection Scheme, vehicle subscribes"
-                        },
-                        "decoderManifestTopic": {
-                            "type": "string",
-                            "description": "Control Plane publishes to this Decoder Manifest CollectionScheme, vehicle subscribes"
-                        },
-                        "canDataTopic": {
-                            "type": "string",
-                            "description": "Topic for sending collected data to cloud"
-                        },
-                        "checkinTopic": {
-                            "type": "string",
-                            "description": "Topic for sending checkins to cloud"
-                        },
-                        "certificateFilename": {
-                            "type": "string",
-                            "description": "The path to the device’s certificate file"
-                        },
-                        "privateKeyFilename": {
-                            "type": "string",
-                            "description": "The path to the device’s private key file that was created with its certificate file"
-                        }
-                    },
-                    "required": [
-                        "endpointUrl",
-                        "clientId",
-                        "collectionSchemeListTopic",
-                        "decoderManifestTopic",
-                        "canDataTopic",
-                        "checkinTopic",
-                        "certificateFilename",
-                        "privateKeyFilename"
-                    ]
-                }
-            },
-            "required": [
-                "bufferSizes",
-                "threadIdleTimes",
-                "persistency",
-                "internalParameters",
-                "publishToCloudParameters",
-                "mqttConnection"
-            ]
-        }
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "http://aws-iot-automotive.com/edgeConfiguration",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "IoTFleetWise Static Configuration Attributes",
+  "description": "The root schema for FWE Static Configuration JSON",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema Version"
     },
-    "required": [
-        "version",
-        "networkInterfaces",
-        "staticConfig"
-    ]
+    "networkInterfaces": {
+      "description": "HW network interface information for decoding signals",
+      "type": "array",
+      "anyOf": [
+        {
+          "required": ["canInterface"]
+        },
+        {
+          "required": ["obdInterface"]
+        }
+      ],
+      "properties": {
+        "canInterface": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "CAN Signal network interface information",
+          "items": {
+            "$ref": "#/definitions/canInterface"
+          }
+        },
+        "obdInterface": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "OBD Signal network interface information",
+          "items": {
+            "$ref": "#/definitions/obdInterface"
+          }
+        },
+        "interfaceId": {
+          "type": "string",
+          "description": "Every CAN/OBD signal decoder is associated with a signal/OBD network interface using a unique Id"
+        },
+        "type": {
+          "type": "string",
+          "description": "Specifies the interface type- CAN, OBD, etc"
+        }
+      },
+      "definitions": {
+        "canInterface": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "interfaceName": {
+              "type": "string",
+              "description": "Interface name for CAN channel"
+            },
+            "protocolName": {
+              "type": "string",
+              "description": "Protocol used- CAN or CAN FD"
+            },
+            "protocolVersion": {
+              "type": "string",
+              "description": "Protocol version used- CAN 2.0A, 2.0B"
+            },
+            "timestampType": {
+              "type": "string",
+              "description": "Defines which timestamp type should be used: Software, Hardware or Polling. Default is Software"
+            }
+          },
+          "required": ["interfaceName", "protocolName", "protocolVersion"]
+        },
+        "obdInterface": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "interfaceName": {
+              "type": "string",
+              "description": "CAN Interface Name where the OBD stack on the ECU is running"
+            },
+            "obdStandard": {
+              "type": "string",
+              "description": "OBD Standard (eg. J1979 or Enhanced (for advanced standards))"
+            },
+            "pidRequestIntervalSeconds": {
+              "type": "integer",
+              "description": "Interval used to schedule PID requests (in seconds)"
+            },
+            "dtcRequestIntervalSeconds": {
+              "type": "integer",
+              "description": "Interval  used to schedule DTC requests (in seconds)"
+            },
+            "broadcastRequests": {
+              "type": "boolean",
+              "description": "Specifies whether OBD requests should be sent in broadcast (functional) mode, rather than the unicast (physical) mode"
+            }
+          },
+          "required": [
+            "interfaceName",
+            "obdStandard",
+            "pidRequestIntervalSeconds",
+            "dtcRequestIntervalSeconds",
+            "broadcastRequests"
+          ]
+        }
+      }
+    },
+    "staticConfig": {
+      "description": "Static Configuration Attributes",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bufferSizes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "dtcBufferSize": {
+              "type": "integer",
+              "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer. This is a single producer single consumer buffer."
+            },
+            "socketCANBufferSize": {
+              "type": "integer",
+              "description": "Max size of the circular buffer associated with a network channel (CAN Bus) for data consumption from that channel. This is a single producer-single consumer buffer."
+            },
+            "decodedSignalsBufferSize": {
+              "type": "integer",
+              "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer for OBD and CAN signals.This is a multiple producer single consumer buffer."
+            },
+            "rawCANFrameBufferSize": {
+              "type": "integer",
+              "description": "Max size of the buffer shared between Network Channel Consumer and data collection module ( Collection Engine). This buffer stores raw CAN frames coming in from the CAN Bus. This is a lock-free multi-producer single consumer buffer. "
+            }
+          },
+          "required": [
+            "dtcBufferSize",
+            "socketCANBufferSize",
+            "decodedSignalsBufferSize",
+            "rawCANFrameBufferSize"
+          ]
+        },
+        "threadIdleTimes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "inspectionThreadIdleTimeMs": {
+              "type": "integer",
+              "description": "Sleep time for inspection engine thread if no new data is available (in milliseconds)"
+            },
+            "socketCANThreadIdleTimeMs": {
+              "type": "integer",
+              "description": "Sleep time for CAN interface if no new data is available (in milliseconds)"
+            },
+            "canDecoderThreadIdleTimeMs": {
+              "type": "integer",
+              "description": "Sleep time for CAN decoder thread if no new data is available (in milliseconds)"
+            }
+          },
+          "required": [
+            "inspectionThreadIdleTimeMs",
+            "socketCANThreadIdleTimeMs",
+            "canDecoderThreadIdleTimeMs"
+          ]
+        },
+        "persistency": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "persistencyPath": {
+              "type": "string",
+              "description": "Local storage path to persist collectionScheme, decoder manifest and data snapshot"
+            },
+            "persistencyPartitionMaxSize": {
+              "type": "integer",
+              "description": "Maximum size allocated for persistency (Bytes)"
+            },
+            "persistencyUploadRetryIntervalMs": {
+              "type": "integer",
+              "description": "Interval to wait before retrying to upload persisted signal data (in milliseconds). After successfully uploading, the persisted signal data will be cleared. Only signal data that could not be uploaded will be persisted. Defaults to 10 seconds."
+            }
+          },
+          "required": ["persistencyPath", "persistencyPartitionMaxSize"]
+        },
+        "internalParameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "readyToPublishDataBufferSize": {
+              "type": "integer",
+              "description": "Size of the buffer used for storing ready to publish, filtered data"
+            },
+            "systemWideLogLevel": {
+              "type": "string",
+              "description": "Set log level severity- Trace, Info, Warning, Error"
+            },
+            "logColor": {
+              "type": "string",
+              "enum": ["Auto", "Yes", "No"],
+              "description": "Whether the logs should be colored. Default to auto."
+            },
+            "dataReductionProbabilityDisabled": {
+              "type": "boolean",
+              "description": "Disables the whole probability-based DDC,can be used for debugging"
+            },
+            "metricsCyclicPrintIntervalMs": {
+              "type": "string",
+              "description": "Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never"
+            },
+            "useJsonBasedCollection": {
+              "type": "boolean",
+              "description": "Enables debug JSON output of the collected data"
+            }
+          },
+          "required": [
+            "readyToPublishDataBufferSize",
+            "systemWideLogLevel",
+            "dataReductionProbabilityDisabled"
+          ]
+        },
+        "publishToCloudParameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxPublishMessageCount": {
+              "type": "integer",
+              "description": "Maximum messages that can be published to the cloud as one payload"
+            },
+            "collectionSchemeManagementCheckinIntervalMs": {
+              "type": "integer",
+              "description": "Time interval between collectionScheme checkins( in milliseconds )"
+            }
+          },
+          "required": ["maxPublishMessageCount", "collectionSchemeManagementCheckinIntervalMs"]
+        },
+        "mqttConnection": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "endpointUrl": {
+              "type": "string",
+              "description": "AWS account’s IoT device endpoint"
+            },
+            "clientId": {
+              "type": "string",
+              "description": "The ID that uniquely identifies this device in the AWS Region"
+            },
+            "collectionSchemeListTopic": {
+              "type": "string",
+              "description": "Control Plane publishes to this Collection Scheme, vehicle subscribes"
+            },
+            "decoderManifestTopic": {
+              "type": "string",
+              "description": "Control Plane publishes to this Decoder Manifest CollectionScheme, vehicle subscribes"
+            },
+            "canDataTopic": {
+              "type": "string",
+              "description": "Topic for sending collected data to cloud"
+            },
+            "checkinTopic": {
+              "type": "string",
+              "description": "Topic for sending checkins to cloud"
+            },
+            "certificateFilename": {
+              "type": "string",
+              "description": "The path to the device’s certificate file"
+            },
+            "privateKeyFilename": {
+              "type": "string",
+              "description": "The path to the device’s private key file that was created with its certificate file"
+            }
+          },
+          "required": [
+            "endpointUrl",
+            "clientId",
+            "collectionSchemeListTopic",
+            "decoderManifestTopic",
+            "canDataTopic",
+            "checkinTopic",
+            "certificateFilename",
+            "privateKeyFilename"
+          ]
+        }
+      },
+      "required": [
+        "bufferSizes",
+        "threadIdleTimes",
+        "persistency",
+        "internalParameters",
+        "publishToCloudParameters",
+        "mqttConnection"
+      ]
+    }
+  },
+  "required": ["version", "networkInterfaces", "staticConfig"]
 }

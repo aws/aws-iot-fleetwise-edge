@@ -1,8 +1,8 @@
 [
-    {
-        "branch": {
-            "fullyQualifiedName": "Vehicle",
-            "description": "Vehicle"
-        }
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle",
+      "description": "Vehicle"
     }
+  }
 ]

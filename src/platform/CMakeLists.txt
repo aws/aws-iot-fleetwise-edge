@@ -16,7 +16,7 @@ set(
 # Because CMake only supports boolean options, PLATFORM_TYPE is set as CACHE STRING
 set(
   PLATFORM_TYPE Linux
-  CACHE STRING 
+  CACHE STRING
   "The type of platform selected for the build. Currently only Linux is support."
 )
 

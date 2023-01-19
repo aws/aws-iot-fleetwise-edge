@@ -1,4 +1,4 @@
-// Maximum size of a frame e.g. 1024 * 1024 
+// Maximum size of a frame e.g. 1024 * 1024
 const long MAX_FRAME_SIZE = 1048576;
 const long MAX_FRAME_COUNT = 50;
 
@@ -30,12 +30,12 @@ struct CameraDataItem {
 struct CameraDataRequest {
 
     // Unique Identifier of the request. Should be kept during response.
-    unsigned long dataItemId;  
+    unsigned long dataItemId;
     // Options: Should include settings around compression or cropping if needed. Else default is raw.
     map<octet, octet> options;
 
     // Set of offsets building up a time interval.
-    // The frame service should return all frames that were captured by the camera sensor 
+    // The frame service should return all frames that were captured by the camera sensor
     // between sample info source timestamp - negativeOffsetMs and + positiveOffsetMs
     // Negative offset representing the number of milliseconds before the Sample Info source timestamp
     unsigned long negativeOffsetMs;

@@ -1,2 +1,2 @@
-# Enable only one dummy check 
-Checks: '-*,llvm-twine-local'
+# Enable only one dummy check
+Checks: "-*,llvm-twine-local"

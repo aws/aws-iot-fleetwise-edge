@@ -35,7 +35,7 @@ if(DOXYGEN_FOUND)
 
   doxygen_add_docs(
     doc_doxygen
-    ${PROJECT_SOURCE_DIR}/src 
+    ${PROJECT_SOURCE_DIR}/src
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Generating API documentation with Doxygen"
   )

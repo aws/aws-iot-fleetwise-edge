@@ -67,4 +67,3 @@ if(${BUILD_TESTING} AND FWE_TEST_FAKETIME)
   endforeach()
 
 endif()
-

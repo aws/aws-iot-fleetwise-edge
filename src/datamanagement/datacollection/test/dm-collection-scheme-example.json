@@ -1,133 +1,130 @@
 {
-    "version":"1.0",
-    "collectionSchemeID":"arn::testCollectionScheme",
-    "eventType":"heartbeat",
+  "version": "1.0",
+  "collectionSchemeID": "arn::testCollectionScheme",
+  "eventType": "heartbeat",
 
-    "eventTriggers":[
+  "eventTriggers": [
+    {
+      "triggerType": "timepoint",
+      "valuePredicate": {
+        "condition": "every",
+        "value": 10
+      }
+    },
+    {
+      "triggerType": "signalvalue",
+      "valuePredicate": {
+        "condition": "less",
+        "value": 1,
+        "signalID": 10,
+        "messageID": 123
+      }
+    },
+    {
+      "triggerType": "signalvalue",
+      "valuePredicate": {
+        "condition": "bigger",
+        "value": 1,
+        "signalID": 30,
+        "messageID": 456
+      }
+    }
+  ],
+  "eventMessages": [
+    {
+      "messageID": 123,
+      "sizeInBytes": 8,
+      "signals": [
         {
-        "triggerType":"timepoint",
-        "valuePredicate": 
-            {
-                "condition":"every",
-                "value": 10
-            }
+          "signalID": 10,
+          "isBigEndian": false,
+          "isSigned": true,
+          "firstBitPosition": 8,
+          "sizeInBits": 16,
+          "offset": 0.0,
+          "factor": 0.0078125
         },
         {
-        "triggerType":"signalvalue",
-        "valuePredicate": 
-            {
-                "condition":"less",
-                "value": 1,
-                "signalID":10,
-                "messageID":123
-            }
-        }, 
-        {
-        "triggerType":"signalvalue",
-        "valuePredicate": 
-            {
-                "condition":"bigger",
-                "value": 1,
-                "signalID":30,
-                "messageID":456
-            }
-        }  
-    ],
-    "eventMessages":[
-        {
-        "messageID" : 123,
-        "sizeInBytes" : 8,
-        "signals":[
-            {
-                "signalID": 10,
-                "isBigEndian":false,
-                "isSigned": true,
-                "firstBitPosition": 8,
-                "sizeInBits": 16,
-                "offset" : 0.0,
-                "factor" : 0.0078125
-            },
-            {
-                "signalID": 20,
-                "isBigEndian":true,
-                "isSigned":false,
-                "firstBitPosition": 24,
-                "sizeInBits": 16,
-                "offset" : 0.0,
-                "factor" : 0.00390625
-            }
-        ]
-        },
-        {
-            "messageID" : 456,
-            "sizeInBytes" : 4,
-            "signals":[
-                {
-                    "signalID": 30,
-                    "isBigEndian":true,
-                    "isSigned": true,
-                    "firstBitPosition": 8,
-                    "sizeInBits": 16,
-                    "offset" : 0.0,
-                    "factor" : 100
-                },
-                {
-                    "signalID": 40,
-                    "isBigEndian":true,
-                    "isSigned":true,
-                    "firstBitPosition": 24,
-                    "sizeInBits": 16,
-                    "offset" : 0.0,
-                    "factor" : 200
-                }
-            ]
-        },
-        {
-            "messageID" : 678,
-            "sizeInBytes" : 4,
-            "isMultiplexed" : true,
-            "signals":[
-                {
-                    "signalID": 30,
-                    "isBigEndian":true,
-                    "isSigned": false,
-                    "firstBitPosition": 8,
-                    "sizeInBits": 24,
-                    "offset" : 0.0,
-                    "factor" : 1.0,
-                    "multiplexerValue" : 30
-                },
-                {
-                    "signalID": 40,
-                    "isBigEndian":true,
-                    "isSigned":false,
-                    "firstBitPosition": 8,
-                    "sizeInBits": 16,
-                    "offset" : 0.0,
-                    "factor" : 1.0,
-                    "multiplexerValue" : 40
-                },
-                {
-                    "signalID": 50,
-                    "isBigEndian":true,
-                    "isSigned":false,
-                    "firstBitPosition": 24,
-                    "sizeInBits": 8,
-                    "offset" : 0.0,
-                    "factor" : 1.0,
-                    "multiplexerValue" : 40
-                },
-                {
-                    "signalID": 60,
-                    "isBigEndian":true,
-                    "isSigned":false,
-                    "firstBitPosition": 0,
-                    "sizeInBits": 8,
-                    "offset" : 0.0,
-                    "factor" : 1.0,
-                    "isMultiplexer" : true
-                }
-            ]
+          "signalID": 20,
+          "isBigEndian": true,
+          "isSigned": false,
+          "firstBitPosition": 24,
+          "sizeInBits": 16,
+          "offset": 0.0,
+          "factor": 0.00390625
         }
-    ]
+      ]
+    },
+    {
+      "messageID": 456,
+      "sizeInBytes": 4,
+      "signals": [
+        {
+          "signalID": 30,
+          "isBigEndian": true,
+          "isSigned": true,
+          "firstBitPosition": 8,
+          "sizeInBits": 16,
+          "offset": 0.0,
+          "factor": 100
+        },
+        {
+          "signalID": 40,
+          "isBigEndian": true,
+          "isSigned": true,
+          "firstBitPosition": 24,
+          "sizeInBits": 16,
+          "offset": 0.0,
+          "factor": 200
+        }
+      ]
+    },
+    {
+      "messageID": 678,
+      "sizeInBytes": 4,
+      "isMultiplexed": true,
+      "signals": [
+        {
+          "signalID": 30,
+          "isBigEndian": true,
+          "isSigned": false,
+          "firstBitPosition": 8,
+          "sizeInBits": 24,
+          "offset": 0.0,
+          "factor": 1.0,
+          "multiplexerValue": 30
+        },
+        {
+          "signalID": 40,
+          "isBigEndian": true,
+          "isSigned": false,
+          "firstBitPosition": 8,
+          "sizeInBits": 16,
+          "offset": 0.0,
+          "factor": 1.0,
+          "multiplexerValue": 40
+        },
+        {
+          "signalID": 50,
+          "isBigEndian": true,
+          "isSigned": false,
+          "firstBitPosition": 24,
+          "sizeInBits": 8,
+          "offset": 0.0,
+          "factor": 1.0,
+          "multiplexerValue": 40
+        },
+        {
+          "signalID": 60,
+          "isBigEndian": true,
+          "isSigned": false,
+          "firstBitPosition": 0,
+          "sizeInBits": 8,
+          "offset": 0.0,
+          "factor": 1.0,
+          "isMultiplexer": true
+        }
+      ]
+    }
+  ]
 }

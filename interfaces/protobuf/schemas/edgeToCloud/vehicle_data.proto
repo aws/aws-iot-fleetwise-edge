@@ -3,7 +3,7 @@
 
 syntax = "proto3";
 
-option java_package = "com.amazonaws.iot.autobahn.schemas"; 
+option java_package = "com.amazonaws.iot.autobahn.schemas";
 package Aws.IoTFleetWise.Schemas.VehicleDataMsg;
 
 /*
@@ -16,7 +16,7 @@ message VehicleData {
      * Amazon Resource Name of the campaign that triggered the collection of the data in this message
      */
     string campaign_arn = 1;
-    
+
     /*
      * Amazon Resource Name of the decoder manifest used to decode the signals in this message
      */
@@ -31,21 +31,21 @@ message VehicleData {
      * The absolute timestamp in milliseconds since Unix Epoch of when the event was triggered.
      */
     uint64 collection_event_time_ms_epoch = 4;
-    
+
     /*
      * Captured signals, which includes both OBD PIDs and signals decoded from normal CAN traffic
      */
     repeated CapturedSignal captured_signals = 5;
-    
+
     /*
      * Captured DTC Information if specified by the  collection scheme
      */
     DtcData dtc_data = 6;
-    
+
     /*
      * Captured raw CAN frames if specified by the collectionScheme
      */
-    repeated CanFrame can_frames = 7; 
+    repeated CanFrame can_frames = 7;
 
     /*
      * Captured Geohash which reflect which geohash tile the vehicle is currently located.
@@ -79,8 +79,8 @@ message CapturedSignal {
          * A double value of a decoded physical value. For Alpha, PID data will be calculated using
          * a PID formula and directly cast to a double.
          */
-        double double_value = 3; 
-    } 
+        double double_value = 3;
+    }
 }
 
 /*
@@ -92,21 +92,21 @@ message CanFrame {
     * Milliseconds relative to the event_time_ms_epoch. Can be negative or positive.
     */
    sint64 relative_time_ms = 1;
-   
+
    /*
     * CAN Message Arbitration ID
     */
    uint32 message_id = 2;
-   
+
    /*
     * The CAN interface on which the CAN Frame was received
     */
    string interface_id = 3;
-   
+
    /*
     * Array of bytes from the CAN Frame
     */
-   bytes byte_values = 4; 
+   bytes byte_values = 4;
 }
 
 message DtcData {
@@ -115,11 +115,11 @@ message DtcData {
     * Milliseconds relative to the event_time_ms_epoch. Can be negative or positive.
     */
    sint64 relative_time_ms = 1;
-   
+
    /*
     * Strings of active DTC codes
     */
-   repeated string active_dtc_codes = 2; 
+   repeated string active_dtc_codes = 2;
 }
 
 message Geohash {
@@ -131,7 +131,7 @@ message Geohash {
 
     /*
      * Previous Geohash in string format encoded in base 32 format. The maximum resolution of geohash is used and the
-     * string is always 9 characters long.     
+     * string is always 9 characters long.
      */
     string prev_reported_geohash_string = 2;
 }

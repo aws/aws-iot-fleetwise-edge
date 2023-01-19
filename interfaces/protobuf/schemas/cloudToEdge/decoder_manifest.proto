@@ -118,7 +118,7 @@ message OBDPIDSignal {
   double offset = 7;
 
   /*
-   * the start byte order (starting from 0th) for this signal in its PID query response 
+   * the start byte order (starting from 0th) for this signal in its PID query response
    * e.g. PID 0x14 contains two signals, with Signal B located in the 2nd byte startByte is 1
    */
   uint32 start_byte = 8;

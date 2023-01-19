@@ -115,7 +115,7 @@ if [ ! -d googletest ]; then
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
         ..
-    cd ../.. 
+    cd ../..
 fi
 make install -j`nproc` -C googletest/build
 
@@ -127,7 +127,7 @@ if [ ! -d benchmark ]; then
         -DBENCHMARK_DOWNLOAD_DEPENDENCIES=on \
         -DCMAKE_BUILD_TYPE=Release \
         ..
-    cd ../.. 
+    cd ../..
 fi
 make install -j`nproc` -C benchmark/build
 

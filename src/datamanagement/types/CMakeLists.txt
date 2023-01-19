@@ -28,14 +28,14 @@ add_library(${libraryAliasName} ALIAS ${libraryTargetName})
 
 install(TARGETS ${libraryTargetName} DESTINATION lib)
 install(
-  FILES 
+  FILES
   include/CollectionInspectionAPITypes.h
-  include/CANDataTypes.h 
+  include/CANDataTypes.h
   include/EventTypes.h
-  include/Geohash.h 
-  include/GeohashInfo.h 
+  include/Geohash.h
+  include/GeohashInfo.h
   include/MessageTypes.h
-  include/OBDDataTypes.h 
+  include/OBDDataTypes.h
   include/SensorTypes.h
   include/SignalTypes.h
   DESTINATION

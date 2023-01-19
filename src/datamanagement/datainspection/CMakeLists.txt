@@ -69,7 +69,7 @@ install(
 set(
   testSources
   test/GeohashFunctionNodeTest.cpp
-  test/OBDOverCANModuleTest.cpp 
+  test/OBDOverCANModuleTest.cpp
   test/CollectionInspectionEngineTest.cpp
   test/CollectionInspectionWorkerThreadTest.cpp
   test/VehicleDataSourceBinderTest.cpp

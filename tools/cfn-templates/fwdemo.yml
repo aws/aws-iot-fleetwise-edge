@@ -11,31 +11,35 @@ Parameters:
   Ec2KeyPair:
     Description: Name of SSH key pair (leave blank for none)
     Type: String
-    Default: ''
+    Default: ""
   FleetSize:
-    Description: 'Number of vehicles to create. The EC2 instance type is chosen accordingly: 1-10: m6g.xlarge, 100: m6g.2xlarge, 1000: m6g.16xlarge'
+    Description:
+      "Number of vehicles to create. The EC2 instance type is chosen accordingly: 1-10: m6g.xlarge,
+      100: m6g.2xlarge, 1000: m6g.16xlarge"
     Type: String
     Default: 1
     AllowedValues:
-      - '1'
-      - '2'
+      - "1"
+      - "2"
   IoTCoreRegion:
-    Description: 'Region in which to create IoT Things. This must be the same region used to create IoT FleetWise Vehicles.'
+    Description:
+      "Region in which to create IoT Things. This must be the same region used to create IoT
+      FleetWise Vehicles."
     Type: String
-    Default: 'us-east-1'
+    Default: "us-east-1"
     AllowedValues:
-      - 'us-east-1'
-      - 'eu-central-1'
+      - "us-east-1"
+      - "eu-central-1"
   IoTCoreEndpointUrl:
-    Description: 'Endpoint URL for IoT Core (leave blank for automatic)'
+    Description: "Endpoint URL for IoT Core (leave blank for automatic)"
     Type: String
-    Default: ''
+    Default: ""
   IoTMqttTopicPrefix:
-    Description: 'IoT MQTT Topic prefix (leave as default)'
+    Description: "IoT MQTT Topic prefix (leave as default)"
     Type: String
-    Default: '$aws/iotfleetwise/'
+    Default: "$aws/iotfleetwise/"
 Conditions:
-  KeyPairSpecifiedCondition: !Not [!Equals [!Ref Ec2KeyPair, '']]
+  KeyPairSpecifiedCondition: !Not [!Equals [!Ref Ec2KeyPair, ""]]
 Resources:
   Ec2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -49,7 +53,7 @@ Resources:
       IpProtocol: tcp
       FromPort: 22
       ToPort: 22
-      CidrIp: '0.0.0.0/0'
+      CidrIp: "0.0.0.0/0"
   Ec2SecurityGroupSelfIngress:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
@@ -61,7 +65,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -70,7 +74,7 @@ Resources:
       Policies:
         - PolicyName: !Sub ${AWS::StackName}-EC2-ServicePolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -81,7 +85,7 @@ Resources:
   Ec2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      Roles: 
+      Roles:
         - !Ref Ec2ServiceRole
   Ec2Instance:
     Type: AWS::EC2::Instance
@@ -90,9 +94,9 @@ Resources:
         Count: 1
         Timeout: PT30M
     Properties:
-      ImageId: !FindInMap [AMIRegionMap, !Ref 'AWS::Region', AMIID]
-      KeyName: !If [KeyPairSpecifiedCondition, !Ref Ec2KeyPair, !Ref 'AWS::NoValue']
-      InstanceType: !FindInMap [FleetSizeEc2InstanceTypeMap, !Ref 'FleetSize', InstanceType]
+      ImageId: !FindInMap [AMIRegionMap, !Ref "AWS::Region", AMIID]
+      KeyName: !If [KeyPairSpecifiedCondition, !Ref Ec2KeyPair, !Ref "AWS::NoValue"]
+      InstanceType: !FindInMap [FleetSizeEc2InstanceTypeMap, !Ref "FleetSize", InstanceType]
       IamInstanceProfile: !Ref Ec2InstanceProfile
       SecurityGroupIds: !Split [",", !GetAtt Ec2SecurityGroup.GroupId]
       Tags:
@@ -166,13 +170,13 @@ Resources:
           sudo -u ubuntu tar -zxf ../aws-iot-fleetwise-edge.tar.gz
           sudo -u ubuntu mkdir -p build/src/executionmanagement
           sudo -u ubuntu mv aws-iot-fleetwise-edge build/src/executionmanagement
-          
+
           # Install SocketCAN modules:
           ./tools/install-socketcan.sh --bus-count ${FleetSize}
-          
+
           # Install CAN Simulator
           ./tools/install-cansim.sh --bus-count ${FleetSize}
-          
+
           # Install FWE credentials and config file
           mkdir /etc/aws-iot-fleetwise
           mkdir /var/aws-iot-fleetwise
@@ -213,7 +217,7 @@ Resources:
 
           # Install FWE
           ./tools/install-fwe.sh
-          
+
           # Signal init complete:
           /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
   IoTThing:
@@ -354,7 +358,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -363,7 +367,7 @@ Resources:
       Policies:
         - PolicyName: !Sub ${AWS::StackName}-Lambda-ExecutionPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -377,22 +381,22 @@ Resources:
                 Resource: "*"
               - Effect: Allow
                 Action:
-                  - 'iot:CreateKeysAndCertificate'
-                  - 'iot:DescribeEndpoint'
-                  - 'iot:AttachThingPrincipal'
-                  - 'iot:DetachThingPrincipal'
+                  - "iot:CreateKeysAndCertificate"
+                  - "iot:DescribeEndpoint"
+                  - "iot:AttachThingPrincipal"
+                  - "iot:DetachThingPrincipal"
                 Resource: "*"
               - Effect: Allow
                 Action:
-                  - 'iot:CreateThing'
-                  - 'iot:CreatePolicy'
-                  - 'iot:AttachPolicy'
-                  - 'iot:ListThingPrincipals'
-                  - 'iot:DetachPolicy'
-                  - 'iot:UpdateCertificate'
-                  - 'iot:DeleteCertificate'
-                  - 'iot:DeletePolicy'
-                  - 'iot:DeleteThing'
+                  - "iot:CreateThing"
+                  - "iot:CreatePolicy"
+                  - "iot:AttachPolicy"
+                  - "iot:ListThingPrincipals"
+                  - "iot:DetachPolicy"
+                  - "iot:UpdateCertificate"
+                  - "iot:DeleteCertificate"
+                  - "iot:DeletePolicy"
+                  - "iot:DeleteThing"
                 Resource:
                   - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:thing/${AWS::StackName}*
                   - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:cert/*
@@ -435,18 +439,18 @@ Mappings:
     us-west-2:
       AMIID: ami-0327006c87b23e535
   FleetSizeEc2InstanceTypeMap:
-    '1':
+    "1":
       InstanceType: m6g.xlarge
-    '2':
+    "2":
       InstanceType: m6g.xlarge
-    '10':
+    "10":
       InstanceType: m6g.xlarge
-    '100':
+    "100":
       InstanceType: m6g.2xlarge
-    '1000':
+    "1000":
       InstanceType: m6g.16xlarge
 Outputs:
   Ec2InstancePublicIp:
     Condition: KeyPairSpecifiedCondition
-    Description: 'EC2 instance public IP address'
+    Description: "EC2 instance public IP address"
     Value: !GetAtt Ec2Instance.PublicIp
