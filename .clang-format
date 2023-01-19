@@ -1,12 +1,12 @@
 ---
 BasedOnStyle: Microsoft
-IndentWidth: '4'
+IndentWidth: 4
 AccessModifierOffset: -4
 AlwaysBreakAfterReturnType: AllDefinitions
-AlwaysBreakTemplateDeclarations: 'Yes'
+AlwaysBreakTemplateDeclarations: Yes
 BreakConstructorInitializers: BeforeComma
-BinPackArguments: 'false'
-BinPackParameters: 'false'
+BinPackArguments: false
+BinPackParameters: false
 NamespaceIndentation: None
 SpaceAfterCStyleCast: false
 SpaceAfterLogicalNot: false
