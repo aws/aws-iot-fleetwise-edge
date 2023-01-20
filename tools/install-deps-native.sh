@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR=`dirname "$0"`
+source ${SCRIPT_DIR}/install-deps-versions.sh
+
 WITH_CAMERA_SUPPORT="false"
 
 parse_args() {
@@ -64,7 +67,7 @@ if [ ! -d ${PREFIX} ]; then
     mkdir ${PREFIX}
     mkdir deps-native && cd deps-native
 
-    git clone -b 1.7.4 https://github.com/open-source-parsers/jsoncpp.git
+    git clone -b ${VERSION_JSON_CPP} https://github.com/open-source-parsers/jsoncpp.git
     cd jsoncpp
     mkdir build && cd build
     cmake \
@@ -78,24 +81,24 @@ if [ ! -d ${PREFIX} ]; then
     make install -j`nproc`
     cd ../..
 
-    wget -q https://github.com/protocolbuffers/protobuf/releases/download/v21.7/protobuf-cpp-3.21.7.tar.gz
-    tar -zxf protobuf-cpp-3.21.7.tar.gz
-    cd protobuf-3.21.7
+    wget -q https://github.com/protocolbuffers/protobuf/releases/download/v21.7/protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
+    tar -zxf protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
+    cd protobuf-${VERSION_PROTOBUF}
     mkdir build && cd build
     ../configure --prefix=${PREFIX}
     make install -j`nproc`
     cd ../..
 
-    wget -q https://github.com/curl/curl/releases/download/curl-7_86_0/curl-7.86.0.tar.gz
-    tar -zxf curl-7.86.0.tar.gz
-    cd curl-7.86.0
+    wget -q https://github.com/curl/curl/releases/download/curl-7_86_0/curl-${VERSION_CURL}.tar.gz
+    tar -zxf curl-${VERSION_CURL}.tar.gz
+    cd curl-${VERSION_CURL}
     mkdir build && cd build
     LDFLAGS="-static" PKG_CONFIG="pkg-config --static" ../configure --disable-shared --enable-static \
         --disable-ldap --enable-ipv6 --with-ssl --disable-unix-sockets --disable-rtsp --prefix=${PREFIX}
     make install -j`nproc` V=1 LDFLAGS="-static"
     cd ../..
 
-    git clone -b 1.9.253 --recursive https://github.com/aws/aws-sdk-cpp.git
+    git clone -b ${VERSION_AWS_SDK_CPP} --recursive https://github.com/aws/aws-sdk-cpp.git
     cd aws-sdk-cpp
     mkdir build && cd build
     cmake \
@@ -111,7 +114,7 @@ if [ ! -d ${PREFIX} ]; then
     make install -j`nproc`
     cd ../..
 
-    git clone -b release-1.10.0 https://github.com/google/googletest.git
+    git clone -b ${VERSION_GOOGLE_TEST} https://github.com/google/googletest.git
     cd googletest
     mkdir build && cd build
     cmake \
@@ -121,7 +124,7 @@ if [ ! -d ${PREFIX} ]; then
     make install -j`nproc`
     cd ../.. 
 
-    git clone -b v1.6.1 https://github.com/google/benchmark.git
+    git clone -b ${VERSION_GOOGLE_BENCHMARK} https://github.com/google/benchmark.git
     cd benchmark
     mkdir build && cd build
     cmake \
@@ -134,21 +137,21 @@ if [ ! -d ${PREFIX} ]; then
 
     # AWS IoT FleetWise Edge camera support requires Fast-DDS and its dependencies:
     if [ "${WITH_CAMERA_SUPPORT}" == "true" ]; then
-        git clone -b 6.0.0 https://github.com/leethomason/tinyxml2.git
+        git clone -b ${VERSION_TINYXML2} https://github.com/leethomason/tinyxml2.git
         cd tinyxml2
         mkdir build && cd build
         cmake \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DBUILD_STATIC_LIBS=ON \
-            -DBUILD_TESTING=OFF \
+            -DBUILD_TESTS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=On \
             -DCMAKE_INSTALL_PREFIX=${PREFIX} \
             ..
         make install -j`nproc`
         cd ../..
 
-        git clone -b v1.1.0 https://github.com/eProsima/foonathan_memory_vendor.git
+        git clone -b ${VERSION_FOONATHAN_MEMORY_VENDOR} https://github.com/eProsima/foonathan_memory_vendor.git
         cd foonathan_memory_vendor
         mkdir build && cd build
         cmake \
@@ -159,7 +162,7 @@ if [ ! -d ${PREFIX} ]; then
         make install -j`nproc`
         cd ../..
 
-        git clone -b v1.0.21 https://github.com/eProsima/Fast-CDR.git
+        git clone -b ${VERSION_FAST_CDR} https://github.com/eProsima/Fast-CDR.git
         cd Fast-CDR
         mkdir build && cd build
         cmake \
@@ -170,7 +173,7 @@ if [ ! -d ${PREFIX} ]; then
         make install -j`nproc`
         cd ../..
 
-        git clone -b v2.3.4 https://github.com/eProsima/Fast-DDS.git
+        git clone -b ${VERSION_FAST_DDS} https://github.com/eProsima/Fast-DDS.git
         cd Fast-DDS
         mkdir build && cd build
         cmake \
@@ -183,7 +186,7 @@ if [ ! -d ${PREFIX} ]; then
         make install -j`nproc`
         cd ../..
 
-        git clone -b v2.0.1 --recursive https://github.com/eProsima/Fast-DDS-Gen.git
+        git clone -b ${VERSION_FAST_DDS_GEN} --recursive https://github.com/eProsima/Fast-DDS-Gen.git
         cd Fast-DDS-Gen
         ./gradlew assemble
         mkdir -p ${PREFIX}/share/fastddsgen/java

@@ -19,7 +19,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: cache
-        key: deps-${{ inputs.build-arch }}
+        key: deps-${{ inputs.build-arch }}-${{ hashFiles('tools/install-deps-*.sh') }}
 
     - name: install-deps
       shell: bash
