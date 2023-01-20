@@ -412,7 +412,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    AWS IoT Core:
 
    ```
-   [INFO ] [AwsIotConnectivityModule::connect] [Connection completed successfully]
+   [INFO ] [AwsIotConnectivityModule.cpp:161] [connect()] [Connection completed successfully]
    ```
 
 ## Step 6: Connect the TCU to the vehicle

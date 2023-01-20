@@ -1579,12 +1579,14 @@ Customers can set the System level logging severity externally via the software 
 described below in the configuration section. Each log entry includes the following attributes:
 
 ```
-[Thread: ID] [Time] [Level] [function]: [Message]
+[Thread: ID] [Time] [Level] [Filename:LineNumber] [Function()]: [Message]
 ```
 
 - Thread — the thread ID triggering the log entry.
 - Time — the timestamp in milliseconds since Epoch.
 - Level — the severity of the log entry.
+- Filename - the file name that invoked the log entry.
+- LineNumber - the line in the file that invoked the log entry.
 - Function — the function name that invoked the log entry.
 - Message — the actual log message.
 

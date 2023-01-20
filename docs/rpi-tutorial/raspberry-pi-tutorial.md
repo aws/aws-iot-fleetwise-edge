@@ -219,7 +219,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    ```
    - Look for this message to verify:
      ```
-     [INFO ] [AwsIotConnectivityModule::connect] [Connection completed successfully]
+     [INFO ] [AwsIotConnectivityModule.cpp:161] [connect()] [Connection completed successfully]
      ```
    - Use the
      [troubleshooting information and solutions](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/troubleshooting.html)
