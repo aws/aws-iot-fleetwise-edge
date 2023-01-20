@@ -5,3 +5,6 @@
 
 # manually formatted json to visually align the properties
 obd_config*.json
+
+# prettier thinks it is a markdown file
+.git-blame-ignore-revs
