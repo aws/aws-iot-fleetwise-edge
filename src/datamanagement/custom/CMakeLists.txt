@@ -36,11 +36,8 @@ install(TARGETS ${libraryTargetName} DESTINATION lib)
 
 install(
   FILES
-  include/ICollectionSchemeManager.h
-  include/CollectionSchemeManagementListener.h
-  include/CollectionSchemeManager.h
-  include/Schema.h
-  include/SchemaListener.h
+  generic/include/CustomDataSource.h
+  example/iwavegps/include/IWaveGpsSource.h
   DESTINATION include
 )
 

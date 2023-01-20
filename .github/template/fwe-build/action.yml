@@ -8,6 +8,8 @@ inputs:
     required: true
   upload-arch:
     required: true
+  cache-paths:
+    required: true
 
 runs:
   using: "composite"
@@ -16,14 +18,23 @@ runs:
       id: cache-deps
       uses: actions/cache@v3
       with:
-        path: deps-${{ inputs.build-arch }}
+        path: cache
         key: deps-${{ inputs.build-arch }}
 
     - name: install-deps
       shell: bash
       run: |
+        if [ -d cache ]; then
+          sudo cp -r cache/* /usr/local
+        fi
         sudo ./tools/install-deps-${{ inputs.build-arch }}.sh
-        sudo chown -R $(id -u):$(id -g) deps-${{ inputs.build-arch }}
+        if [ ! -d cache ]; then
+          mkdir cache
+          IFS=":"
+          for P in ${{ inputs.cache-paths }}; do
+            cp -r ${P} cache
+          done
+        fi
 
     - name: build
       shell: bash

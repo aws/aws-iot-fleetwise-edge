@@ -10,6 +10,7 @@
 #include "PayloadManager.h"
 #include <atomic>
 #include <aws/crt/Api.h>
+#include <cstddef>
 #include <memory>
 #include <mutex>
 #include <string>

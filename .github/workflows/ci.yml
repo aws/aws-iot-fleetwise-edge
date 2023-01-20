@@ -36,6 +36,7 @@ jobs:
         with:
           build-arch: "native"
           upload-arch: "amd64"
+          cache-paths: /usr/local/x86_64-linux-gnu
 
   build-arm64:
     runs-on: ubuntu-18.04
@@ -45,6 +46,7 @@ jobs:
         with:
           build-arch: "cross-arm64"
           upload-arch: "arm64"
+          cache-paths: /usr/local/aarch64-linux-gnu:/usr/local/x86_64-linux-gnu
 
   build-armhf:
     runs-on: ubuntu-18.04
@@ -54,6 +56,7 @@ jobs:
         with:
           build-arch: "cross-armhf"
           upload-arch: "armhf"
+          cache-paths: /usr/local/arm-linux-gnueabihf:/usr/local/x86_64-linux-gnu
 
   build-docker:
     runs-on: ubuntu-18.04

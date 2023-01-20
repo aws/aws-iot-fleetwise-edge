@@ -5,6 +5,7 @@
 
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
+#include <cstddef>
 #include <cstdint>
 
 namespace Aws

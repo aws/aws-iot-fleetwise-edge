@@ -9,6 +9,7 @@
 #include "LoggingModule.h"
 #include "RetryThread.h"
 #include <atomic>
+#include <cstddef>
 #include <future>
 #include <string>
 
