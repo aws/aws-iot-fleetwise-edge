@@ -1,5 +1,13 @@
 # Change Log
 
+## future release (TBD)
+
+Bugfixes:
+
+- Fix OBD timers not being reset. If the decoder manifest is empty or DTCs are not collected the OBD
+  PID or DTC timers were not reset, causing a 100% CPU and log spam with the following message
+  `[WARN ] [OBDOverCANModule::doWork]: [Request time overdue by -X ms]`.
+
 ## v1.0.3 (Jan 9, 2023)
 
 Features:

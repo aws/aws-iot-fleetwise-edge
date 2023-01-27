@@ -210,12 +210,14 @@ OBDOverCANModule::doWork( void *data )
             // Reset the atomic state
             obdModule->mDecoderManifestAvailable.store( false, std::memory_order_relaxed );
         }
-        // Request PID if decoder dictionary is valid
-        if ( obdModule->mDecoderDictionaryPtr && ( !obdModule->mDecoderDictionaryPtr->empty() ) )
+        // Is it time to request PIDs ?
+        if ( ( obdModule->mPIDRequestIntervalSeconds > 0 ) &&
+             ( obdModule->mPIDTimer.getElapsedSeconds() >= obdModule->mPIDRequestIntervalSeconds ) )
         {
-            // Is it time to request PIDs ?
-            if ( ( obdModule->mPIDRequestIntervalSeconds > 0 ) &&
-                 ( obdModule->mPIDTimer.getElapsedSeconds() >= obdModule->mPIDRequestIntervalSeconds ) )
+            // Reschedule
+            obdModule->mPIDTimer.reset();
+            // Request PID if decoder dictionary is valid and it is time to do so
+            if ( obdModule->mDecoderDictionaryPtr && ( !obdModule->mDecoderDictionaryPtr->empty() ) )
             {
                 // besides this thread, onChangeOfActiveDictionary can update mPIDsToRequestPerECU.
                 // Use mutex to ensure only one thread is doing the update.
@@ -225,9 +227,9 @@ OBDOverCANModule::doWork( void *data )
                 {
                     hasAcquiredSupportedPIDs = true;
                     obdModule->assignPIDsToECUs();
+                    // Reschedule
+                    obdModule->mPIDTimer.reset();
                 }
-                // Reschedule
-                obdModule->mPIDTimer.reset();
                 for ( auto ecu : obdModule->mECUs )
                 {
                     auto numRequests = ecu->requestReceiveEmissionPIDs( SID::CURRENT_STATS );
@@ -235,18 +237,17 @@ OBDOverCANModule::doWork( void *data )
                 }
             }
         }
-        // Request DTC if specified by inspection matrix
-        if ( obdModule->mShouldRequestDTCs.load( std::memory_order_relaxed ) )
+        if ( ( obdModule->mDTCRequestIntervalSeconds > 0 ) &&
+             ( obdModule->mDTCTimer.getElapsedSeconds() >= obdModule->mDTCRequestIntervalSeconds ) )
         {
-            bool successfulDTCRequest = false;
-            DTCInfo dtcInfo;
-            dtcInfo.receiveTime = obdModule->mClock->systemTimeSinceEpochMs();
-            // Request stored DTCs from each ECU
-            if ( ( obdModule->mDTCRequestIntervalSeconds > 0 ) &&
-                 ( obdModule->mDTCTimer.getElapsedSeconds() >= obdModule->mDTCRequestIntervalSeconds ) )
+            // Reschedule
+            obdModule->mDTCTimer.reset();
+            // Request DTC if specified by inspection matrix and it is time to do so
+            if ( obdModule->mShouldRequestDTCs.load( std::memory_order_relaxed ) )
             {
-                // Reschedule
-                obdModule->mDTCTimer.reset();
+                bool successfulDTCRequest = false;
+                DTCInfo dtcInfo;
+                dtcInfo.receiveTime = obdModule->mClock->systemTimeSinceEpochMs();
                 for ( auto ecu : obdModule->mECUs )
                 {
                     size_t numRequests = 0;
@@ -256,7 +257,7 @@ OBDOverCANModule::doWork( void *data )
                     }
                     obdModule->flush( numRequests, ecu );
                 }
-                // Also DTCInfo strutcs without any DTCs must be pushed to the queue because it means
+                // Also DTCInfo structs without any DTCs must be pushed to the queue because it means
                 // there was a OBD request that did not return any SID::STORED_DTCs
                 if ( successfulDTCRequest )
                 {
@@ -277,7 +278,7 @@ OBDOverCANModule::doWork( void *data )
         if ( sleepTime < 0 )
         {
             obdModule->mLogger.warn( "OBDOverCANModule::doWork",
-                                     "Request time overdue by " + std::to_string( sleepTime ) + " ms" );
+                                     "Request time overdue by " + std::to_string( -sleepTime ) + " ms" );
         }
         else
         {
