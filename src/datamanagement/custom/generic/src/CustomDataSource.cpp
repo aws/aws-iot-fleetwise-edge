@@ -4,6 +4,7 @@
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
 #include "CustomDataSource.h"
+#include "LoggingModule.h"
 #include "Timer.h"
 
 namespace Aws
@@ -33,12 +34,16 @@ CustomDataSource::start()
     mShouldSleep.store( true );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "CustomDataSource::start", "Thread failed to start" );
+        FWE_LOG_TRACE( "Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "CustomDataSource::start", "Thread started" );
-        mThread.setThreadName( getThreadName() );
+        FWE_LOG_TRACE( "Thread started" );
+        const auto name = getThreadName();
+        if ( name != nullptr )
+        {
+            mThread.setThreadName( name );
+        }
     }
 
     return mThread.isActive() && mThread.isValid();
@@ -65,7 +70,7 @@ CustomDataSource::stop()
     mWait.notify();
     mThread.release();
     mShouldStop.store( false, std::memory_order_relaxed );
-    mLogger.trace( "CustomDataSource::stop", "Thread stopped" );
+    FWE_LOG_TRACE( "Thread stopped" );
     return !mThread.isActive();
 }
 
@@ -92,8 +97,7 @@ CustomDataSource::doWork( void *data )
         {
             // We either just started or there was a decoder dictionary update that we can't use.
             // We should sleep
-            customDataSource->mLogger.trace( "CustomDataSource::doWork",
-                                             "No valid decoding information available so sleep" );
+            FWE_LOG_TRACE( "No valid decoding information available so sleep" );
             // Wait here for the decoder dictionary to come.
             customDataSource->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
             // At this point, we should be able to see events coming as the channel is also
@@ -105,8 +109,8 @@ CustomDataSource::doWork( void *data )
             customDataSource->mUsedMessageFormat = customDataSource->mExtractedMessageFormat;
             customDataSource->mNewMessageFormatExtracted = false;
         }
-        if ( !customDataSource->shouldSleep() && !customDataSource->mUsedMessageFormat.mSignals.empty() &&
-             pollTimer.getElapsedMs().count() >= static_cast<int64_t>( customDataSource->mPollIntervalMs ) )
+        if ( ( !customDataSource->shouldSleep() ) && ( !customDataSource->mUsedMessageFormat.mSignals.empty() ) &&
+             ( pollTimer.getElapsedMs().count() >= static_cast<int64_t>( customDataSource->mPollIntervalMs ) ) )
         {
             customDataSource->pollData();
             pollTimer.reset();
@@ -138,7 +142,7 @@ CustomDataSource::matchDictionaryToFilter( const CANDecoderDictionary &dictionar
 {
     if ( mCanChannel == INVALID_CAN_SOURCE_NUMERIC_ID )
     {
-        mLogger.trace( "CustomDataSource::matchDictionaryToFilter", "No Valid CAN so requesting sleep" );
+        FWE_LOG_TRACE( "No Valid CAN so requesting sleep" );
         mShouldSleep = true; // Nothing found
         return;
     }
@@ -156,8 +160,7 @@ CustomDataSource::matchDictionaryToFilter( const CANDecoderDictionary &dictionar
                         mNewMessageFormatExtracted = true;
                         mShouldSleep = false;
                     }
-                    mLogger.trace( "CustomDataSource::matchDictionaryToFilter",
-                                   "Dictionary with relevant information for CustomDataSource so waking up" );
+                    FWE_LOG_TRACE( "Dictionary with relevant information for CustomDataSource so waking up" );
                     mWait.notify();
                     return;
                 }
@@ -165,8 +168,7 @@ CustomDataSource::matchDictionaryToFilter( const CANDecoderDictionary &dictionar
             break;
         }
     }
-    mLogger.trace( "CustomDataSource::matchDictionaryToFilter",
-                   "Dictionary has no relevant information for CustomDataSource" );
+    FWE_LOG_TRACE( "Dictionary has no relevant information for CustomDataSource" );
     mShouldSleep = true; // Nothing found
 }
 

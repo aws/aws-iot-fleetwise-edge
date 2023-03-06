@@ -1,7 +1,9 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 default_language_version:
-  node: "16.19.0" # More recent versions are built against GLIBC_2.28. We can upgrade once we move to Ubuntu 20.04
+  # More recent versions are built against GLIBC_2.28+. We want to keep it compatible with
+  # Amazon Linux 2 (GLIBC_2.26)
+  node: "16.19.0"
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
@@ -28,6 +30,23 @@ repos:
     rev: v10.0.1
     hooks:
       - id: clang-format
+  - repo: https://github.com/PyCQA/autoflake
+    rev: v2.0.0
+    hooks:
+      - id: autoflake
+        name: autoflake
+        args:
+          [
+            "--in-place",
+            "--remove-unused-variables",
+            "--remove-all-unused-imports",
+            "--expand-star-imports",
+          ]
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.3.1
+    hooks:
+      - id: pyupgrade
+        args: [--py37-plus]
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:
@@ -42,6 +61,18 @@ repos:
     hooks:
       - id: blacken-docs
         additional_dependencies: [black==22.12.0]
+  - repo: https://github.com/PyCQA/flake8
+    rev: 5.0.4 # Some plugins still require <6
+    hooks:
+      - id: flake8
+        additional_dependencies:
+          - flake8-implicit-str-concat==0.3.0
+          - pep8-naming==0.13.3
+          - flake8-bugbear==22.12.6
+          - flake8-broken-line==0.6.0
+          - flake8-comprehensions==3.10.1
+          - flake8-builtins==2.1.0
+          - flake8-pytest-style==1.6.0
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v2.7.1
     hooks:

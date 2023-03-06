@@ -205,10 +205,6 @@
             "metricsCyclicPrintIntervalMs": {
               "type": "string",
               "description": "Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never"
-            },
-            "useJsonBasedCollection": {
-              "type": "boolean",
-              "description": "Enables debug JSON output of the collected data"
             }
           },
           "required": [

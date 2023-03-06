@@ -10,7 +10,6 @@
 #include "CollectionSchemeManager.h"
 #include "DecoderManifestIngestion.h"
 #include "Listener.h"
-#include "LoggingModule.h"
 #include <algorithm>
 #include <atomic>
 #include <gmock/gmock.h>

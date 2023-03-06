@@ -16,36 +16,20 @@ namespace Platform
 {
 namespace Linux
 {
-LoggingModule::LoggingModule() = default;
 
 void
-LoggingModule::error( const std::string &function, const std::string &logEntry )
+LoggingModule::log( LogLevel level,
+                    const std::string &filename,
+                    const uint32_t lineNumber,
+                    const std::string &function,
+                    const std::string &logEntry )
 {
-    mLogger.logMessage( LogLevel::Error, function, logEntry );
+    static ConsoleLogger logger;
+    logger.logMessage( level, filename, lineNumber, function, logEntry );
 }
 
-void
-LoggingModule::warn( const std::string &function, const std::string &logEntry )
-{
-    mLogger.logMessage( LogLevel::Warning, function, logEntry );
-}
-
-void
-LoggingModule::info( const std::string &function, const std::string &logEntry )
-{
-    mLogger.logMessage( LogLevel::Info, function, logEntry );
-}
-
-void
-LoggingModule::trace( const std::string &function, const std::string &logEntry )
-{
-    mLogger.logMessage( LogLevel::Trace, function, logEntry );
-}
-
-void
-LoggingModule::traceBytesInVector( const std::string &function,
-                                   const std::string &logEntry,
-                                   const std::vector<uint8_t> &inputBytes )
+std::string
+getStringFromBytes( const std::vector<uint8_t> &inputBytes )
 {
     std::stringstream stream_bytes;
 
@@ -62,8 +46,7 @@ LoggingModule::traceBytesInVector( const std::string &function,
         stream_bytes << std::hex << std::uppercase << std::setfill( '0' ) << std::setw( 2 * sizeof( uint8_t ) )
                      << static_cast<unsigned>( inputBytes[i] ) << " ";
     }
-    const std::string logMsg = logEntry + ": " + stream_bytes.str();
-    mLogger.logMessage( LogLevel::Trace, function, logMsg );
+    return stream_bytes.str();
 }
 
 } // namespace Linux

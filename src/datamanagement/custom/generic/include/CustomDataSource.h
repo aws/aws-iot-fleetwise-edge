@@ -3,7 +3,6 @@
 #pragma once
 
 #include "IActiveDecoderDictionaryListener.h"
-#include "LoggingModule.h"
 #include "Thread.h"
 
 namespace Aws
@@ -88,7 +87,6 @@ private:
 
     bool shouldSleep() const;
 
-    LoggingModule mLogger;
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };
     std::atomic<bool> mShouldSleep{ false };

@@ -37,7 +37,6 @@ target_link_libraries(
   aws-iot-fleetwise-edge
   ${libraryTargetName}
   IoTFleetWise::Platform::Linux
-  pthread
   -Xlinker
   -Map=aws-iot-fleetwise-edge.map
 )
@@ -75,7 +74,6 @@ install(
 
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
-
 
 
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/em-example-config.json

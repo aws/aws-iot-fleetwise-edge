@@ -3,6 +3,7 @@
 
 // Includes
 #include "CollectionSchemeManager.h"
+#include "LoggingModule.h"
 #include "TraceModule.h"
 #include <string>
 #include <utility>
@@ -14,7 +15,8 @@ namespace IoTFleetWise
 namespace DataManagement
 {
 
-constexpr std::array<VehicleDataSourceProtocol, 2> CollectionSchemeManager::SUPPORTED_NETWORK_PROTOCOL;
+// NOLINT below due to C++17 warning of redundant declarations that are required to maintain C++14 compatibility
+constexpr std::array<VehicleDataSourceProtocol, 2> CollectionSchemeManager::SUPPORTED_NETWORK_PROTOCOL; // NOLINT
 void
 CollectionSchemeManager::decoderDictionaryExtractor(
     std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> &decoderDictionaryMap )
@@ -30,8 +32,7 @@ CollectionSchemeManager::decoderDictionaryExtractor(
             auto networkType = mDecoderManifest->getNetworkProtocol( signalInfo.signalID );
             if ( networkType == VehicleDataSourceProtocol::INVALID_PROTOCOL )
             {
-                mLogger.warn( "CollectionSchemeManager::decoderDictionaryExtractor",
-                              "Invalid protocol provided for signal : " + std::to_string( signalInfo.signalID ) );
+                FWE_LOG_WARN( "Invalid protocol provided for signal : " + std::to_string( signalInfo.signalID ) );
                 // This signal contains invalid network protocol, cannot include it onto decoder dictionary
                 continue;
             }
@@ -50,8 +51,7 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                 auto canChannelID = mCANIDTranslator.getChannelNumericID( interfaceId );
                 if ( canChannelID == INVALID_CAN_SOURCE_NUMERIC_ID )
                 {
-                    mLogger.warn( "CollectionSchemeManager::decoderDictionaryExtractor",
-                                  "Invalid Interface ID provided: " + interfaceId );
+                    FWE_LOG_WARN( "Invalid Interface ID provided: " + interfaceId );
                 }
                 else
                 {
@@ -152,8 +152,7 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                 auto canChannelID = mCANIDTranslator.getChannelNumericID( canFrameInfo.interfaceID );
                 if ( canChannelID == INVALID_CAN_SOURCE_NUMERIC_ID )
                 {
-                    mLogger.warn( "CollectionSchemeManager::decoderDictionaryExtractor",
-                                  "Invalid Interface ID provided:" + canFrameInfo.interfaceID );
+                    FWE_LOG_WARN( "Invalid Interface ID provided:" + canFrameInfo.interfaceID );
                 }
                 else
                 {

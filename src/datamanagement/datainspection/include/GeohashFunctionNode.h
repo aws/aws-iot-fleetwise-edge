@@ -6,7 +6,6 @@
 #include "Geohash.h"
 #include "GeohashInfo.h"
 #include "ICollectionScheme.h"
-#include "LoggingModule.h"
 #include <string>
 
 namespace Aws
@@ -81,11 +80,6 @@ private:
      * @brief If this flag is true, it indicates a Geohash has been generated but not read yet.
      */
     bool mIsGeohashNew{ false };
-
-    /**
-     * @brief Logging module used to output to logs
-     */
-    LoggingModule mLogger;
 };
 } // namespace DataInspection
 } // namespace IoTFleetWise

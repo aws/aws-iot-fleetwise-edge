@@ -5,6 +5,7 @@
 #include "DataOverDDSModule.h"
 #include "CollectionInspectionEngine.h"
 #include "Testing.h"
+#include "WaitUntil.h"
 #include "dds/CameraDataPublisher.h"
 #include "dds/CameraDataSubscriber.h"
 #include "dds/DDSDataTypes.h"
@@ -413,8 +414,8 @@ TEST( DataOverDDSModuleTest, DataOverDDSModuleInitAndConnectSuccessAndIsAliveSHM
     ASSERT_TRUE( testModule.init( configList ) );
     ASSERT_TRUE( testModule.connect() );
     // Give some time till the threads are warmed up
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-    ASSERT_TRUE( testModule.isAlive() );
+
+    WAIT_ASSERT_TRUE( testModule.isAlive() );
     ASSERT_TRUE( testModule.disconnect() );
 }
 
@@ -449,9 +450,9 @@ TEST( DataOverDDSModuleTest, DataOverDDSModuleInitAndConnectSuccessAndIsAliveUDP
     ASSERT_TRUE( testModule.init( configList ) );
     ASSERT_TRUE( testModule.connect() );
     // Give some time till the threads are warmed up
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+
     // The  module should be now alive
-    ASSERT_TRUE( testModule.isAlive() );
+    WAIT_ASSERT_TRUE( testModule.isAlive() );
     ASSERT_TRUE( testModule.disconnect() );
 }
 
@@ -487,8 +488,8 @@ TEST( DataOverDDSModuleTest, DataOverDDSModuleSendaRequest )
     ASSERT_TRUE( testModule.init( configList ) );
     ASSERT_TRUE( testModule.connect() );
     // Give some time till the threads are warmed up
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-    ASSERT_TRUE( testModule.isAlive() );
+
+    WAIT_ASSERT_TRUE( testModule.isAlive() );
     // Create a notification about an event.
     // An event of ID 123 on sourceID 1, with 1 ms as positive and negative offsets
     std::vector<EventMetadata> mockedEvent;
@@ -496,9 +497,9 @@ TEST( DataOverDDSModuleTest, DataOverDDSModuleSendaRequest )
     // Notify the Module about this event
     testModule.onEventOfInterestDetected( mockedEvent );
     // Wait a bit till the thread wakes up and sends the request over DDS to the Subscriber
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+
     // Check that the same event has been propagated to the peer DDS Node
-    ASSERT_EQ( testSub.dataItem.dataItemId(), 123 );
+    WAIT_ASSERT_EQ( testSub.dataItem.dataItemId(), 123U );
     ASSERT_EQ( testSub.dataItem.negativeOffsetMs(), 1 );
     ASSERT_EQ( testSub.dataItem.positiveOffsetMs(), 1 );
     ASSERT_TRUE( testModule.disconnect() );
@@ -536,9 +537,9 @@ TEST( DataOverDDSModuleTest, DataOverDDSModuleSendaRequestReceiveResponse )
     ASSERT_TRUE( testModule.init( configList ) );
     ASSERT_TRUE( testModule.connect() );
     // Give some time till the threads are warmed up
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+
     // The  module should be now alive
-    ASSERT_TRUE( testModule.isAlive() );
+    WAIT_ASSERT_TRUE( testModule.isAlive() );
     // Create a notification about an event.
     // An event of ID 123 on sourceID 1, with 1 ms as positive and negative offsets
     std::vector<EventMetadata> mockedEvent;
@@ -546,17 +547,17 @@ TEST( DataOverDDSModuleTest, DataOverDDSModuleSendaRequestReceiveResponse )
     // Notify the Module about this event
     testModule.onEventOfInterestDetected( mockedEvent );
     // Wait a bit till the thread wakes up and sends the request over DDS to the Subscriber
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+
     // Check that the same event has been propagated to the peer DDS Node
-    ASSERT_EQ( testSub.dataItem.dataItemId(), 123 );
+    WAIT_ASSERT_EQ( testSub.dataItem.dataItemId(), 123U );
     ASSERT_EQ( testSub.dataItem.negativeOffsetMs(), 1 );
     ASSERT_EQ( testSub.dataItem.positiveOffsetMs(), 1 );
     // Send a response from the DDS Node back.
     testPub.publishTestData( "123" );
     // Give it some time till the artifact is received
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-    ASSERT_TRUE( testModule.receivedArtifact );
-    ASSERT_EQ( testModule.artifact.sourceID, config.sourceID );
+
+    WAIT_ASSERT_TRUE( testModule.receivedArtifact );
+    WAIT_ASSERT_EQ( testModule.artifact.sourceID, config.sourceID );
     ASSERT_EQ( testModule.artifact.path, config.temporaryCacheLocation + "123" );
     ASSERT_TRUE( testModule.disconnect() );
 }
@@ -631,7 +632,7 @@ TEST( DataOverDDSModuleTest, DataOverDDSModuleReceiveNotificationFromInspectionE
     // we must have received a notification
     ASSERT_TRUE( testModule.receivedEvent );
     // One event of size one should have been received
-    ASSERT_EQ( testModule.event.size(), 1 );
+    WAIT_ASSERT_EQ( testModule.event.size(), 1U );
     ASSERT_EQ( testModule.event[0].sourceID, config.sourceID );
     // we need a total of condition.afterDuration + condition.imageCollectionInfo.beforeDurationMs
     // from the camera module. As we have yet to consolidate the Inspection Engine evaluate and

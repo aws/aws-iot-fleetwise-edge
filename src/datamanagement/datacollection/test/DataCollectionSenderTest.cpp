@@ -28,10 +28,10 @@ public:
     }
 
     ConnectivityError
-    send( const std::uint8_t *buf,
-          size_t size,
-          struct Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams collectionSchemeParams =
-              CollectionSchemeParams() )
+    sendBuffer( const std::uint8_t *buf,
+                size_t size,
+                struct Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams collectionSchemeParams =
+                    CollectionSchemeParams() ) override
     {
         static_cast<void>( collectionSchemeParams ); // Currently not implemented, hence unused
 
@@ -138,7 +138,7 @@ TEST_F( DataCollectionSenderTest, TestMaxMessageCountNotHit )
 {
     auto mockSender = std::make_shared<MockSender>();
     CANInterfaceIDTranslator canIDTranslator;
-    DataCollectionSender dataCollectionSender( mockSender, true, 10, canIDTranslator, mTmpDir.generic_string() );
+    DataCollectionSender dataCollectionSender( mockSender, 10, canIDTranslator );
 
     mockSender->mCallback = [&]( const std::uint8_t *buf, size_t size ) -> ConnectivityError {
         // deserialize the proto
@@ -153,7 +153,7 @@ TEST_F( DataCollectionSenderTest, TestMaxMessageCountHit )
 {
     auto mockSender = std::make_shared<MockSender>();
     CANInterfaceIDTranslator canIDTranslator;
-    DataCollectionSender dataCollectionSender( mockSender, true, 2, canIDTranslator, mTmpDir.generic_string() );
+    DataCollectionSender dataCollectionSender( mockSender, 2, canIDTranslator );
 
     uint32_t maxMessageCount = 2;
     mockSender->mCallback = [&]( const std::uint8_t *buf, size_t size ) -> ConnectivityError {
@@ -168,7 +168,7 @@ TEST_F( DataCollectionSenderTest, TestTransmitPayload )
 {
     auto mockSender = std::make_shared<MockSender>();
     CANInterfaceIDTranslator canIDTranslator;
-    DataCollectionSender dataCollectionSender( mockSender, true, 10, canIDTranslator, mTmpDir.generic_string() );
+    DataCollectionSender dataCollectionSender( mockSender, 10, canIDTranslator );
 
     std::string testProto = "abcdefjh!24$iklmnop!24$3@qrstuvwxyz";
 

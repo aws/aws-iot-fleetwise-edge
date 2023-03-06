@@ -7,7 +7,6 @@
 // Includes
 #include "AbstractVehicleDataSource.h"
 #include "ClockHandler.h"
-#include "LoggingModule.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "Timer.h"
@@ -58,6 +57,8 @@ stringToCanTimestampType( std::string const &timestampType, CAN_TIMESTAMP_TYPE &
  * @brief Linux CAN Bus implementation. Uses Raw Sockets to listen to CAN
  * data on 1 single CAN IF.
  */
+// coverity[cert_dcl60_cpp_violation] false positive - class only defined once
+// coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
 class CANDataSource : public AbstractVehicleDataSource
 {
 public:
@@ -110,7 +111,6 @@ private:
     std::atomic<bool> mShouldSleep{ false };
     mutable std::mutex mThreadMutex;
     Timer mTimer;
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     int mSocket{ -1 };
     Platform::Linux::Signal mWait;

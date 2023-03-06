@@ -87,8 +87,7 @@ if(mIWaveGpsSource->init(
     if ( !mCollectionSchemeManagerPtr->subscribeListener(
                         static_cast<IActiveDecoderDictionaryListener *>( mIWaveGpsSource.get() ) ) )
     {
-        mLogger.error( "IoTFleetWiseEngine::connect",
-                        " Failed to register the IWaveGps to the CollectionScheme Manager" );
+        FWE_LOG_ERROR(" Failed to register the IWaveGps to the CollectionScheme Manager");
         return false;
     }
     mIWaveGpsSource->start();
@@ -134,5 +133,5 @@ configured using `setFilter(canChannel,canRawFrameId);`. If that is the case you
 following line in the log
 
 ```
-[Thread : 563] [2022-10-27 02:39:02 PM] [TRACE] [CustomDataSource::matchDictionaryToFilter]: [Dictionary with relevant information for CustomDataSource so waking up]
+[TRACE] [CustomDataSource.cpp:159] [matchDictionaryToFilter()]: [Dictionary with relevant information for CustomDataSource so waking up]
 ```

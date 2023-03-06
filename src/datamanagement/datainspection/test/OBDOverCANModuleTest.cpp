@@ -3,6 +3,8 @@
 
 #include "OBDOverCANModule.h"
 #include "OBDDataTypes.h"
+#include "Testing.h"
+#include "WaitUntil.h"
 #include "businterfaces/ISOTPOverCANReceiver.h"
 #include "datatypes/OBDDataTypesUnitTestOnly.h"
 #include <gtest/gtest.h>
@@ -15,9 +17,11 @@
 #include <thread>
 
 using namespace Aws::IoTFleetWise::DataInspection;
+using namespace Aws::IoTFleetWise::TestingSupport;
 
 namespace
 {
+using SignalDoubleValue = double;
 
 // ECU ID mocked for unit test
 enum class ECU_ID_MOCK
@@ -80,7 +84,7 @@ initInspectionMatrix( OBDOverCANModule &module )
 // Note In actual product, decoder dictionary comes from decoder manifest. For this unit test,
 // The decoder dictionary is initialized based on a local table mode1PIDs in OBDDataDecoder Module.
 std::shared_ptr<CANDecoderDictionary>
-initDecoderDictionary()
+initDecoderDictionary( SignalType signalType = SignalType::DOUBLE )
 {
     auto decoderDictPtr = std::make_shared<CANDecoderDictionary>();
     decoderDictPtr->canMessageDecoderMethod.emplace( 0, std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>() );
@@ -103,6 +107,7 @@ initDecoderDictionary()
                 ( pidInfo.formulas[idx].numOfBytes - 1 ) * BYTE_SIZE + pidInfo.formulas[idx].bitMaskLen );
             format.mSignals[idx].mFactor = pidInfo.formulas[idx].scaling;
             format.mSignals[idx].mOffset = pidInfo.formulas[idx].offset;
+            format.mSignals[idx].mSignalType = signalType;
             decoderDictPtr->signalIDsToCollect.insert( pid | ( idx << 8 ) );
         }
         decoderDictPtr->canMessageDecoderMethod[0].emplace( pid, CANMessageDecoderMethod() );
@@ -241,6 +246,51 @@ protected:
     std::shared_ptr<SignalBuffer> signalBufferPtr;
     std::shared_ptr<ActiveDTCBuffer> activeDTCBufferPtr;
     std::vector<ECUMock> ecus;
+
+    void
+    assertSignalValue( const SignalValueWrapper &signalValueWrapper,
+                       double expectedSignalValue,
+                       SignalType expectedSignalType )
+    {
+        switch ( expectedSignalType )
+        {
+        case SignalType::UINT8:
+            ASSERT_EQ( signalValueWrapper.value.uint8Val, static_cast<uint8_t>( expectedSignalValue ) );
+            break;
+        case SignalType::INT8:
+            ASSERT_EQ( signalValueWrapper.value.int8Val, static_cast<int8_t>( expectedSignalValue ) );
+            break;
+        case SignalType::UINT16:
+            ASSERT_EQ( signalValueWrapper.value.uint16Val, static_cast<uint16_t>( expectedSignalValue ) );
+            break;
+        case SignalType::INT16:
+            ASSERT_EQ( signalValueWrapper.value.int16Val, static_cast<int16_t>( expectedSignalValue ) );
+            break;
+        case SignalType::UINT32:
+            ASSERT_EQ( signalValueWrapper.value.uint32Val, static_cast<uint32_t>( expectedSignalValue ) );
+            break;
+        case SignalType::INT32:
+            ASSERT_EQ( signalValueWrapper.value.int32Val, static_cast<int32_t>( expectedSignalValue ) );
+            break;
+        case SignalType::UINT64:
+            ASSERT_EQ( signalValueWrapper.value.uint64Val, static_cast<uint64_t>( expectedSignalValue ) );
+            break;
+        case SignalType::INT64:
+            ASSERT_EQ( signalValueWrapper.value.int64Val, static_cast<int64_t>( expectedSignalValue ) );
+            break;
+        case SignalType::FLOAT:
+            ASSERT_FLOAT_EQ( signalValueWrapper.value.floatVal, static_cast<float>( expectedSignalValue ) );
+            break;
+        case SignalType::DOUBLE:
+            ASSERT_DOUBLE_EQ( signalValueWrapper.value.doubleVal, static_cast<double>( expectedSignalValue ) );
+            break;
+        case SignalType::BOOLEAN:
+            ASSERT_EQ( signalValueWrapper.value.boolVal, static_cast<bool>( expectedSignalValue ) );
+            break;
+        default:
+            FAIL() << "Unsupported signal type";
+        }
+    }
 };
 
 TEST_F( OBDOverCANModuleTest, OBDOverCANModuleInitFailure )
@@ -253,8 +303,8 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleInitFailure )
 
 TEST_F( OBDOverCANModuleTest, OBDOverCANModuleInitTestSuccess )
 {
-    constexpr uint32_t obdPIDRequestInterval = 2; // 2 seconds
-    constexpr uint32_t obdDTCRequestInterval = 2; // 2 seconds
+    constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
+    constexpr uint32_t obdDTCRequestInterval = 1; // 1 seconds
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
@@ -278,7 +328,7 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleAndDecoderManifestLifecycle )
     // Then later we activate a decoder manifest and we should see the module sending
     // requests on the bus
     std::vector<uint8_t> ecmRxPDUData;
-    constexpr uint32_t obdPIDRequestInterval = 2; // 2 seconds
+    constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 2; // 2 seconds
 
     ISOTPOverCANSenderReceiver engineECU;
@@ -300,8 +350,16 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleAndDecoderManifestLifecycle )
     ASSERT_TRUE( obdModule.disconnect() );
 }
 
-TEST_F( OBDOverCANModuleTest, RequestPIDFromNotExtendedIDECUTest )
+class OBDOverCANModuleTestWithAllSignalTypes : public OBDOverCANModuleTest,
+                                               public testing::WithParamInterface<SignalType>
 {
+};
+
+INSTANTIATE_TEST_SUITE_P( MultipleSignals, OBDOverCANModuleTestWithAllSignalTypes, allSignalTypes, signalTypeToString );
+
+TEST_P( OBDOverCANModuleTestWithAllSignalTypes, RequestPIDFromNotExtendedIDECUTest )
+{
+    SignalType signalType = GetParam();
     // Setup ECU Mock
     ecus = std::vector<ECUMock>( 2 );
 
@@ -309,7 +367,7 @@ TEST_F( OBDOverCANModuleTest, RequestPIDFromNotExtendedIDECUTest )
     ecus[0].mSupportedPIDResponse1 = { 0x41, 0x00, 0x18, 0x00, 0x00, 0x00 };
     ecus[0].mSupportedPIDResponse2 = { 0x41, 0xC0, 0x00, 0x00, 0x00, 0x00 };
     ecus[0].mRequestPID1 = { 0x01, 0x04, 0x05 };
-    ecus[0].mPIDResponse1 = { 0x41, 0x04, 0x99, 0x05, 0x6E };
+    ecus[0].mPIDResponse1 = { 0x41, 0x04, 0x90, 0x05, 0x6E };
     ecus[0].mDTCResponse = { 0x43, 0x02, 0x01, 0x43, 0x41, 0x96 };
     ecus[0].mThread.create( ecuResponse, &ecus[0] );
 
@@ -322,30 +380,29 @@ TEST_F( OBDOverCANModuleTest, RequestPIDFromNotExtendedIDECUTest )
     ecus[1].mThread.create( ecuResponse, &ecus[1] );
 
     // Request PIDs every 2 seconds and no DTC request
-    constexpr uint32_t obdPIDRequestInterval = 2; // 2 seconds
+    constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
     // Create decoder dictionary
-    auto decoderDictPtr = initDecoderDictionary();
+    auto decoderDictPtr = initDecoderDictionary( signalType );
     // publish decoder dictionary to OBD module
     obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
-    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval + 4 ) );
 
     // Expected value for PID signals
-    std::map<SignalID, SignalValue> expectedPIDSignalValue = {
-        { toUType( EmissionPIDs::ENGINE_LOAD ), 60 },
+    std::map<SignalID, SignalDoubleValue> expectedPIDSignalValue = {
+        { toUType( EmissionPIDs::ENGINE_LOAD ), 56.470588235294116 },
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 } };
     // Verify all PID Signals are correctly decoded
     CollectedSignal signal;
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    assertSignalValue( signal.value, expectedPIDSignalValue[signal.signalID], signalType );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    assertSignalValue( signal.value, expectedPIDSignalValue[signal.signalID], signalType );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    assertSignalValue( signal.value, expectedPIDSignalValue[signal.signalID], signalType );
 }
 
 // This test is to validate that OBDOverCANModule will only request PID that are specified in Decoder Dictionary
@@ -375,7 +432,7 @@ TEST_F( OBDOverCANModuleTest, RequestPartialPIDFromNotExtendedIDECUTest )
     ecus[1].mThread.create( ecuResponse, &ecus[1] );
 
     // Request PIDs every 2 seconds and no DTC request
-    constexpr uint32_t obdPIDRequestInterval = 2; // 2 seconds
+    constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
@@ -394,10 +451,9 @@ TEST_F( OBDOverCANModuleTest, RequestPartialPIDFromNotExtendedIDECUTest )
     decoderDictPtr->signalIDsToCollect.insert( 0xC1 );
     // publish decoder dictionary to OBD module
     obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
-    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval + 2 ) );
 
     // Expected value for PID signals
-    std::map<SignalID, SignalValue> expectedPIDSignalValue = {
+    std::map<SignalID, SignalDoubleValue> expectedPIDSignalValue = {
         { toUType( EmissionPIDs::ENGINE_LOAD ), 60 },
         { toUType( EmissionPIDs::OXYGEN_SENSOR1_1 ) | 0 << 8, (double)0x10 / 200 },
         { toUType( EmissionPIDs::OXYGEN_SENSOR1_1 ) | 1 << 8, (double)0x20 * 100 / 128 - 100 },
@@ -407,8 +463,8 @@ TEST_F( OBDOverCANModuleTest, RequestPartialPIDFromNotExtendedIDECUTest )
     CollectedSignal signal;
     for ( size_t idx = 0; idx < expectedPIDSignalValue.size(); ++idx )
     {
-        ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-        ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
+        WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
     }
     ASSERT_TRUE( obdModule.getSignalBufferPtr()->empty() );
 }
@@ -445,7 +501,7 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
     ecus[1].mThread.create( ecuResponse, &ecus[1] );
 
     // Request PIDs every 2 seconds and no DTC request
-    constexpr uint32_t obdPIDRequestInterval = 2; // 2 seconds
+    constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
@@ -464,10 +520,9 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
     decoderDictPtr->signalIDsToCollect.insert( 0xC1 );
     // publish decoder dictionary to OBD module
     obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
-    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval + 4 ) );
 
     // Expected value for PID signals
-    std::map<SignalID, SignalValue> expectedPIDSignalValue = {
+    std::map<SignalID, SignalDoubleValue> expectedPIDSignalValue = {
         { toUType( EmissionPIDs::ENGINE_LOAD ), 60 },
         { toUType( EmissionPIDs::OXYGEN_SENSOR1_1 ) | 0 << 8, (double)0x10 / 200 },
         { toUType( EmissionPIDs::OXYGEN_SENSOR1_1 ) | 1 << 8, (double)0x20 * 100 / 128 - 100 },
@@ -477,8 +532,8 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
     CollectedSignal signal;
     for ( size_t idx = 0; idx < expectedPIDSignalValue.size(); ++idx )
     {
-        ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-        ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
+        WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
     }
     ASSERT_TRUE( obdModule.getSignalBufferPtr()->empty() );
 
@@ -490,7 +545,6 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
     decoderDictPtr->signalIDsToCollect.insert( 0x0E );
     // publish the new decoder dictionary to OBD module
     obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
-    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
 
     expectedPIDSignalValue = { { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 36 },
                                { toUType( EmissionPIDs::OXYGEN_SENSOR1_1 ) | 0 << 8, (double)0x10 / 200 },
@@ -500,8 +554,8 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
     // Verify all PID Signals are correctly decoded
     for ( size_t idx = 0; idx < expectedPIDSignalValue.size(); ++idx )
     {
-        ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-        ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
+        WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
     }
     ASSERT_TRUE( obdModule.getSignalBufferPtr()->empty() );
 
@@ -545,9 +599,8 @@ TEST_F( OBDOverCANModuleTest, RequestEmissionPIDAndDTCFromExtendedIDECUTest )
     ecus[1].mThread.create( ecuResponse, &ecus[1] );
 
     // Request PIDs every 2 seconds, and DTCs every 2 seconds
-    constexpr uint32_t startupTime = 4;           // 4 seconds
-    constexpr uint32_t obdPIDRequestInterval = 2; // 2 seconds
-    constexpr uint32_t obdDTCRequestInterval = 2; // Request DTC every 2 seconds
+    constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
+    constexpr uint32_t obdDTCRequestInterval = 1; // Request DTC every 1 seconds
 
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
@@ -557,28 +610,27 @@ TEST_F( OBDOverCANModuleTest, RequestEmissionPIDAndDTCFromExtendedIDECUTest )
     // publish decoder dictionary to OBD module
     obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
     initInspectionMatrix( obdModule );
-    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval + startupTime ) );
 
     // This is the expected value for PID signals.
-    std::map<SignalID, SignalValue> expectedPIDSignalValue = {
+    std::map<SignalID, SignalDoubleValue> expectedPIDSignalValue = {
         { toUType( EmissionPIDs::ENGINE_LOAD ), 60 },
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 },
         { 0xC1, 0xAA } };
     // Verify produced PID signals are correctly decoded
     CollectedSignal signal;
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
 
     // Verify produced DTC Buffer is correct. 4 codes for ECM , 0 codes for TCM
     DTCInfo dtcInfo;
-    ASSERT_TRUE( obdModule.getActiveDTCBufferPtr()->pop( dtcInfo ) );
+    WAIT_ASSERT_TRUE( obdModule.getActiveDTCBufferPtr()->pop( dtcInfo ) );
     ASSERT_EQ( dtcInfo.mDTCCodes.size(), 4 );
     ASSERT_EQ( dtcInfo.mSID, SID::STORED_DTC );
     ASSERT_EQ( dtcInfo.mDTCCodes[0], "P0143" );
@@ -609,9 +661,8 @@ TEST_F( OBDOverCANModuleTest, RequestPIDAndDTCFromNonExtendedIDECUTest )
     ecus[1].mThread.create( ecuResponse, &ecus[1] );
 
     // Request PIDs every 2 seconds, and DTCs every 2 seconds
-    constexpr uint32_t startupTime = 4;           // 4 seconds
-    constexpr uint32_t obdPIDRequestInterval = 2; // 2 seconds
-    constexpr uint32_t obdDTCRequestInterval = 2; // Request DTC every 2 seconds
+    constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
+    constexpr uint32_t obdDTCRequestInterval = 1; // Request DTC every 1 seconds
 
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
@@ -620,28 +671,27 @@ TEST_F( OBDOverCANModuleTest, RequestPIDAndDTCFromNonExtendedIDECUTest )
     // publish decoder dictionary to OBD module
     obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
     initInspectionMatrix( obdModule );
-    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval + startupTime ) );
 
     // This is the expected value for PID signals.
-    std::map<SignalID, SignalValue> expectedPIDSignalValue = {
+    std::map<SignalID, SignalDoubleValue> expectedPIDSignalValue = {
         { toUType( EmissionPIDs::ENGINE_LOAD ), 60 },
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 },
         { 0xC1, 0xAA } };
     // Verify produced PID signals are correctly decoded
     CollectedSignal signal;
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
 
     // Verify produced DTC Buffer is correct. 4 codes for ECM , 0 codes for TCM
     DTCInfo dtcInfo;
-    ASSERT_TRUE( obdModule.getActiveDTCBufferPtr()->pop( dtcInfo ) );
+    WAIT_ASSERT_TRUE( obdModule.getActiveDTCBufferPtr()->pop( dtcInfo ) );
     ASSERT_EQ( dtcInfo.mDTCCodes.size(), 4 );
     ASSERT_EQ( dtcInfo.mSID, SID::STORED_DTC );
     ASSERT_EQ( dtcInfo.mDTCCodes[0], "P0143" );
@@ -672,7 +722,7 @@ TEST_F( OBDOverCANModuleTest, BroadcastRequestsStandardIDs )
     ecus[1].mThread.create( ecuResponse, &ecus[1] );
 
     // Request PIDs every 2 seconds and no DTC request
-    constexpr uint32_t obdPIDRequestInterval = 2; // 2 seconds
+    constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, true ) );
@@ -681,21 +731,20 @@ TEST_F( OBDOverCANModuleTest, BroadcastRequestsStandardIDs )
     auto decoderDictPtr = initDecoderDictionary();
     // publish decoder dictionary to OBD module
     obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
-    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval + 4 ) );
 
     // Expected value for PID signals
-    std::map<SignalID, SignalValue> expectedPIDSignalValue = {
+    std::map<SignalID, SignalDoubleValue> expectedPIDSignalValue = {
         { toUType( EmissionPIDs::ENGINE_LOAD ), 60 },
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 } };
     // Verify all PID Signals are correctly decoded
     CollectedSignal signal;
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
 }
 
 TEST_F( OBDOverCANModuleTest, BroadcastRequestsExtendedIDs )
@@ -723,7 +772,7 @@ TEST_F( OBDOverCANModuleTest, BroadcastRequestsExtendedIDs )
     ecus[1].mThread.create( ecuResponse, &ecus[1] );
 
     // Request PIDs every 2 seconds and no DTC request
-    constexpr uint32_t obdPIDRequestInterval = 2; // 2 seconds
+    constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
     ASSERT_TRUE( obdModule.init(
         signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, true ) );
@@ -732,19 +781,18 @@ TEST_F( OBDOverCANModuleTest, BroadcastRequestsExtendedIDs )
     auto decoderDictPtr = initDecoderDictionary();
     // publish decoder dictionary to OBD module
     obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
-    std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval + 4 ) );
 
     // Expected value for PID signals
-    std::map<SignalID, SignalValue> expectedPIDSignalValue = {
+    std::map<SignalID, SignalDoubleValue> expectedPIDSignalValue = {
         { toUType( EmissionPIDs::ENGINE_LOAD ), 60 },
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 } };
     // Verify all PID Signals are correctly decoded
     CollectedSignal signal;
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
 }

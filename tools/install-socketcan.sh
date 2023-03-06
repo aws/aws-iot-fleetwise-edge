@@ -11,6 +11,7 @@ parse_args() {
         case $1 in
         --bus-count)
             BUS_COUNT=$2
+            shift
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
@@ -24,12 +25,14 @@ parse_args() {
 
 parse_args "$@"
 
-# Install packages
-apt update && apt install -y can-utils
+if ! command -v cansend > /dev/null; then
+    # Install packages
+    apt update && apt install -y can-utils
+fi
 
 # For EC2, the SocketCAN modules vcan and can-gw are included in a separate package:
 if uname -r | grep -q aws; then
-    apt install -y linux-modules-extra-aws
+    apt update && apt install -y linux-modules-extra-aws
 fi
 
 # Install can-isotp kernel module if not installed

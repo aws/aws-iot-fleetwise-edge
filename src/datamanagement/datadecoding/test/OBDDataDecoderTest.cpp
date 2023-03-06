@@ -4,11 +4,13 @@
 
 #include "OBDDataDecoder.h"
 #include "EnumUtility.h"
+#include "Testing.h"
 #include "datatypes/OBDDataTypesUnitTestOnly.h"
 #include <gtest/gtest.h>
 #include <unistd.h>
 
 using namespace Aws::IoTFleetWise::DataManagement;
+using namespace Aws::IoTFleetWise::TestingSupport;
 
 // For testing purpose, Signal ID is defined as PID | (signal_order << PID_SIGNAL_BITS_LEFT_SHIFT)
 #define PID_SIGNAL_BITS_LEFT_SHIFT 8
@@ -50,10 +52,306 @@ protected:
     }
 
     void
-    TearDown() override
+    assertSignalValue( const OBDSignal &obdSignal, double expectedSignalValue, SignalType expectedSignalType )
     {
+        switch ( expectedSignalType )
+        {
+        case SignalType::UINT8:
+            ASSERT_EQ( static_cast<uint8_t>( obdSignal.signalValue.doubleVal ),
+                       static_cast<uint8_t>( expectedSignalValue ) );
+            break;
+        case SignalType::INT8:
+            ASSERT_EQ( static_cast<int8_t>( obdSignal.signalValue.doubleVal ),
+                       static_cast<int8_t>( expectedSignalValue ) );
+            break;
+        case SignalType::UINT16:
+            ASSERT_EQ( static_cast<uint16_t>( obdSignal.signalValue.doubleVal ),
+                       static_cast<uint16_t>( expectedSignalValue ) );
+            break;
+        case SignalType::INT16:
+            ASSERT_EQ( static_cast<int16_t>( obdSignal.signalValue.doubleVal ),
+                       static_cast<int16_t>( expectedSignalValue ) );
+            break;
+        case SignalType::UINT32:
+            ASSERT_EQ( static_cast<uint32_t>( obdSignal.signalValue.doubleVal ),
+                       static_cast<uint32_t>( expectedSignalValue ) );
+            break;
+        case SignalType::INT32:
+            ASSERT_EQ( static_cast<int32_t>( obdSignal.signalValue.doubleVal ),
+                       static_cast<int32_t>( expectedSignalValue ) );
+            break;
+        case SignalType::UINT64:
+            ASSERT_EQ( obdSignal.signalValue.uint64Val, static_cast<uint64_t>( expectedSignalValue ) );
+            break;
+        case SignalType::INT64:
+            ASSERT_EQ( obdSignal.signalValue.int64Val, static_cast<int64_t>( expectedSignalValue ) );
+            break;
+        case SignalType::FLOAT:
+            ASSERT_FLOAT_EQ( static_cast<float>( obdSignal.signalValue.doubleVal ),
+                             static_cast<float>( expectedSignalValue ) );
+            break;
+        case SignalType::DOUBLE:
+            ASSERT_DOUBLE_EQ( obdSignal.signalValue.doubleVal, static_cast<double>( expectedSignalValue ) );
+            break;
+        case SignalType::BOOLEAN:
+            ASSERT_EQ( static_cast<bool>( obdSignal.signalValue.doubleVal ), static_cast<bool>( expectedSignalValue ) );
+            break;
+        default:
+            FAIL() << "Unsupported signal type";
+        };
     }
 };
+
+class OBDDataDecoderTestWithAllSignalTypes : public OBDDataDecoderTest, public testing::WithParamInterface<SignalType>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P( AllSignals, OBDDataDecoderTestWithAllSignalTypes, allSignalTypes, signalTypeToString );
+
+class OBDDataDecoderTestWithSignedSignalTypes : public OBDDataDecoderTest,
+                                                public testing::WithParamInterface<SignalType>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P( SignedSignals,
+                          OBDDataDecoderTestWithSignedSignalTypes,
+                          signedSignalTypes,
+                          signalTypeToString );
+
+TEST_P( OBDDataDecoderTestWithAllSignalTypes, FullSingleByte )
+{
+    SignalType signalType = GetParam();
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 1;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 8;
+    signalFormat.mFactor = (double)100 / 255;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = signalType;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDictPtr->emplace( pid, format );
+
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0x99 };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), 60, signalType );
+}
+
+TEST_P( OBDDataDecoderTestWithAllSignalTypes, FullSingleByteNegativeOffset )
+{
+    SignalType signalType = GetParam();
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 1;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 8;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = -10;
+    signalFormat.mSignalType = signalType;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDictPtr->emplace( pid, format );
+
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0x99 };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), 143, signalType );
+}
+
+TEST_P( OBDDataDecoderTestWithAllSignalTypes, FullMultipleBytes )
+{
+    SignalType signalType = GetParam();
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 2;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 16;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = signalType;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDictPtr->emplace( pid, format );
+
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0x00, 0x0A };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), 10, signalType );
+}
+
+TEST_P( OBDDataDecoderTestWithAllSignalTypes, PartialByte )
+{
+    SignalType signalType = GetParam();
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 1;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 2;
+    signalFormat.mSizeInBits = 2;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = signalType;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDictPtr->emplace( pid, format );
+
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0xFB };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), 2, signalType );
+}
+
+TEST_P( OBDDataDecoderTestWithSignedSignalTypes, FullSingleByteWithUnsignedRawValue )
+{
+    SignalType signalType = GetParam();
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 1;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 8;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = signalType;
+    signalFormat.mIsSigned = false;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDictPtr->emplace( pid, format );
+
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0xC4 };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    // Even though the signal type is a signed type, the raw OBD value is not signed.
+    // So the raw value 0xC4 should be interpreted as a positive integer instead of negative (-60).
+    assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), 196, signalType );
+}
+
+TEST_P( OBDDataDecoderTestWithSignedSignalTypes, FullMultipleBytesWithUnsignedRawValue )
+{
+    SignalType signalType = GetParam();
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 2;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 16;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = signalType;
+    signalFormat.mIsSigned = false;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDictPtr->emplace( pid, format );
+
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0xC4, 0x0A };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    // Even though the signal type is a signed type, the raw OBD value is not signed.
+    // So the raw value 0xC40A should be interpreted as a positive integer instead of negative (-15350).
+    assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), 50186, signalType );
+}
+
+TEST_P( OBDDataDecoderTestWithSignedSignalTypes, PartialByteWithUnsignedRawValue )
+{
+    SignalType signalType = GetParam();
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 1;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 2;
+    signalFormat.mSizeInBits = 5;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = signalType;
+    signalFormat.mIsSigned = false;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDictPtr->emplace( pid, format );
+
+    // 0x4C shifted 2 bits to the right (without extending the sign) = 0x13 = 19
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0x4C };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), 19, signalType );
+}
+
+TEST_F( OBDDataDecoderTest, KeepPrecisionForUInt64 )
+{
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 8;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 64;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = -100000;
+    signalFormat.mSignalType = SignalType::UINT64;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDictPtr->emplace( pid, format );
+
+    // 2305843009213693951, which when represented as a double loses precision
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0x1F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    // Ensure that we are not casting to double anywhere
+    ASSERT_EQ( info.mPIDsToValues.at( signalFormat.mSignalID ).signalValue.uint64Val, 2305843009213593951UL );
+}
+
+TEST_F( OBDDataDecoderTest, KeepPrecisionForInt64 )
+{
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 8;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 64;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = -100000;
+    signalFormat.mSignalType = SignalType::INT64;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDictPtr->emplace( pid, format );
+
+    // -6917529027641081857, which when represented as a double loses precision
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0x9F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    // Ensure that we are not casting to double anywhere
+    ASSERT_EQ( info.mPIDsToValues.at( signalFormat.mSignalID ).signalValue.int64Val, -6917529027641181857L );
+}
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedSupportedPIDs )
 {
@@ -83,7 +381,7 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineLoad )
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x04 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
 
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_LOAD )], 60 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_LOAD ) ).signalValue.doubleVal, 60 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineTemperature )
@@ -94,7 +392,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineTemperature )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x05 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE )], 70 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ) ).signalValue.doubleVal, 70 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedFuelTrim )
@@ -106,10 +405,14 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedFuelTrim )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x06, 0x07, 0x08, 0x09 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::SHORT_TERM_FUEL_TRIM_BANK_1 )], 50 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::SHORT_TERM_FUEL_TRIM_BANK_2 )], 50 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::LONG_TERM_FUEL_TRIM_BANK_1 )], 50 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::LONG_TERM_FUEL_TRIM_BANK_2 )], 50 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::SHORT_TERM_FUEL_TRIM_BANK_1 ) ).signalValue.doubleVal, 50 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::SHORT_TERM_FUEL_TRIM_BANK_2 ) ).signalValue.doubleVal, 50 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::LONG_TERM_FUEL_TRIM_BANK_1 ) ).signalValue.doubleVal, 50 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::LONG_TERM_FUEL_TRIM_BANK_2 ) ).signalValue.doubleVal, 50 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedIntakeManifoldPressure )
@@ -120,7 +423,9 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedIntakeManifoldPressure )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x0B }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::INTAKE_MANIFOLD_ABSOLUTE_PRESSURE )], 200 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::INTAKE_MANIFOLD_ABSOLUTE_PRESSURE ) ).signalValue.doubleVal,
+        200 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedIntakeAirFLowTemperature )
@@ -131,7 +436,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedIntakeAirFLowTemperature )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x0F }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::INTAKE_AIR_FLOW_TEMPERATURE )], 30 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::INTAKE_AIR_FLOW_TEMPERATURE ) ).signalValue.doubleVal, 30 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedMAFRate )
@@ -142,7 +448,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedMAFRate )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x10 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::MAF_RATE )], ( 256.0 * 0x0A + 0x0A ) / 100 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::MAF_RATE ) ).signalValue.doubleVal,
+                      ( 256.0 * 0x0A + 0x0A ) / 100 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedThrottlePosition )
@@ -153,7 +460,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedThrottlePosition )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x11 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::THROTTLE_POSITION )], (double)0x80 * 100 / 255 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::THROTTLE_POSITION ) ).signalValue.doubleVal,
+                      (double)0x80 * 100 / 255 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedOxygenSensorX_1 )
@@ -166,8 +474,9 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedOxygenSensorX_1 )
         txPDUData[1] = pid;
         ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
         ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-        ASSERT_DOUBLE_EQ( info.mPIDsToValues[pid | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT )], (double)0x10 / 200 );
-        ASSERT_DOUBLE_EQ( info.mPIDsToValues[pid | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( pid | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT ) ).signalValue.doubleVal,
+                          (double)0x10 / 200 );
+        ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( pid | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT ) ).signalValue.doubleVal,
                           (double)0x20 * 100 / 128 - 100 );
     }
 }
@@ -180,7 +489,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedRuntimeSinceEngineStart )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x1F }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::RUNTIME_SINCE_ENGINE_START )], 500 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::RUNTIME_SINCE_ENGINE_START ) ).signalValue.doubleVal, 500 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedDistanceTraveledWithMIL )
@@ -191,7 +501,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedDistanceTraveledWithMIL )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x21 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::DISTANCE_TRAVELED_WITH_MIL )], 10 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::DISTANCE_TRAVELED_WITH_MIL ) ).signalValue.doubleVal, 10 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedOxygenSensorX_2 )
@@ -204,9 +515,9 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedOxygenSensorX_2 )
         txPDUData[1] = pid;
         ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
         ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-        ASSERT_DOUBLE_EQ( info.mPIDsToValues[pid | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( pid | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT ) ).signalValue.doubleVal,
                           ( 256 * 0x10 + 0x20 ) * 0.0000305 );
-        ASSERT_DOUBLE_EQ( info.mPIDsToValues[pid | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( pid | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT ) ).signalValue.doubleVal,
                           ( 256 * 0x30 + 0x40 ) * 0.000122 );
     }
 }
@@ -219,7 +530,7 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedFuelTankLevel )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x2F }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::FUEL_TANK_LEVEL )], 100 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::FUEL_TANK_LEVEL ) ).signalValue.doubleVal, 100 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedDistanceTraveledSinceClearedDTC )
@@ -230,7 +541,9 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedDistanceTraveledSinceClearedDTC
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x31 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::DISTANCE_TRAVELED_SINCE_CLEARED_DTC )], 10 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::DISTANCE_TRAVELED_SINCE_CLEARED_DTC ) ).signalValue.doubleVal,
+        10 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedControlModuleVoltage )
@@ -241,7 +554,7 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedControlModuleVoltage )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x42 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::CONTROL_MODULE_VOLTAGE )],
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::CONTROL_MODULE_VOLTAGE ) ).signalValue.doubleVal,
                       ( 256.0 * 100 + 100 ) / 1000 );
 }
 
@@ -253,8 +566,9 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedRelativeThrottlePosition )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x45 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::RELATIVE_THROTTLE_POSITION )],
-                      (double)0x80 * 100 / 255 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::RELATIVE_THROTTLE_POSITION ) ).signalValue.doubleVal,
+        (double)0x80 * 100 / 255 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedAmbientAireTemperature )
@@ -265,7 +579,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedAmbientAireTemperature )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x46 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::AMBIENT_AIR_TEMPERATURE )], 30 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::AMBIENT_AIR_TEMPERATURE ) ).signalValue.doubleVal,
+                      30 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedRelativePedalPosition )
@@ -276,7 +591,9 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedRelativePedalPosition )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x5A }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::RELATIVE_ACCELERATOR_PEDAL_POSITION )], 100 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::RELATIVE_ACCELERATOR_PEDAL_POSITION ) ).signalValue.doubleVal,
+        100 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedBatteryRemainingLife )
@@ -287,7 +604,9 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedBatteryRemainingLife )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x5B }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::HYBRID_BATTERY_PACK_REMAINING_LIFE )], 100 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::HYBRID_BATTERY_PACK_REMAINING_LIFE ) ).signalValue.doubleVal,
+        100 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineOilTemperature )
@@ -298,7 +617,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineOilTemperature )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x5C }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_OIL_TEMPERATURE )], 30 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_OIL_TEMPERATURE ) ).signalValue.doubleVal,
+                      30 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedDriverDemandTorque )
@@ -309,7 +629,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedDriverDemandTorque )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x61 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::DRIVER_DEMAND_PERCENT_TORQUE )], 100 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::DRIVER_DEMAND_PERCENT_TORQUE ) ).signalValue.doubleVal, 100 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedActualEngineTorque )
@@ -320,7 +641,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedActualEngineTorque )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x62 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::ACTUAL_PERCENT_TORQUE )], 100 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::ACTUAL_PERCENT_TORQUE ) ).signalValue.doubleVal,
+                      100 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedReferenceEngineTorque )
@@ -331,7 +653,9 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedReferenceEngineTorque )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x63 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_REFERENCE_PERCENT_TORQUE )], 25700 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_REFERENCE_PERCENT_TORQUE ) ).signalValue.doubleVal,
+        25700 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedBoostPressureControl )
@@ -342,28 +666,36 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedBoostPressureControl )
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x70 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0x3F );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         803.125 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         803.125 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         803.125 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 4 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 4 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         803.125 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 5 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 5 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0x03 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 6 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 6 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0x03 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 7 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 7 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0x00 );
 }
 
@@ -374,30 +706,46 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedVariableGeometryTurboControl )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x71 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x3F );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      (double)100 / 255 * 0x10 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      (double)100 / 255 * 0x20 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      (double)100 / 255 * 0x30 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 4 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      (double)100 / 255 * 0x40 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 5 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x03 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 6 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x03 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 7 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x00 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x3F );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        (double)100 / 255 * 0x10 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        (double)100 / 255 * 0x20 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        (double)100 / 255 * 0x30 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 4 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        (double)100 / 255 * 0x40 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 5 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x03 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 6 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x03 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 7 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x00 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedBoostPressureControlAndVariableGeometryTurboControl )
@@ -426,53 +774,77 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedBoostPressureControlAndVariable
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x70, 0x71 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0x3F );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         803.125 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         803.125 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         803.125 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 4 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 4 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         803.125 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 5 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 5 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0x03 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 6 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 6 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0x03 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 7 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::BOOST_PRESSURE_CONTROL ) | ( 7 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0x00 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x3F );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      (double)100 / 255 * 0x10 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      (double)100 / 255 * 0x20 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      (double)100 / 255 * 0x30 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 4 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      (double)100 / 255 * 0x40 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 5 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x03 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 6 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x03 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) |
-                                         ( 7 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x00 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x3F );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        (double)100 / 255 * 0x10 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        (double)100 / 255 * 0x20 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        (double)100 / 255 * 0x30 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 4 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        (double)100 / 255 * 0x40 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 5 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x03 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 6 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x03 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::VARIABLE_GEOMETRY_TURBO_CONTROL ) | ( 7 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x00 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineRunTime )
@@ -484,13 +856,21 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineRunTime )
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x7F }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_RUN_TIME ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT )], 0x08 );
+        info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_RUN_TIME ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x08 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_RUN_TIME ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT )], 16909060 );
+        info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_RUN_TIME ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        16909060 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_RUN_TIME ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT )], 16909060 );
+        info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_RUN_TIME ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        16909060 );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_RUN_TIME ) | ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT )], 16909060 );
+        info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_RUN_TIME ) | ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        16909060 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderExhaustGasTemperatureSensor )
@@ -500,21 +880,31 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderExhaustGasTemperatureSensor )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x98 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::EXHAUST_GAS_TEMPERATURE_SENSORA ) |
-                                         ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0xFF );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::EXHAUST_GAS_TEMPERATURE_SENSORA ) |
-                                         ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x1020 * 0.1 - 40 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::EXHAUST_GAS_TEMPERATURE_SENSORA ) |
-                                         ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x3040 * 0.1 - 40 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::EXHAUST_GAS_TEMPERATURE_SENSORA ) |
-                                         ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x5060 * 0.1 - 40 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::EXHAUST_GAS_TEMPERATURE_SENSORA ) |
-                                         ( 4 << PID_SIGNAL_BITS_LEFT_SHIFT )],
-                      0x7080 * 0.1 - 40 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::EXHAUST_GAS_TEMPERATURE_SENSORA ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0xFF );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::EXHAUST_GAS_TEMPERATURE_SENSORA ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x1020 * 0.1 - 40 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::EXHAUST_GAS_TEMPERATURE_SENSORA ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x3040 * 0.1 - 40 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::EXHAUST_GAS_TEMPERATURE_SENSORA ) | ( 3 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x5060 * 0.1 - 40 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues
+            .at( toUType( EmissionPIDs::EXHAUST_GAS_TEMPERATURE_SENSORA ) | ( 4 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
+        0x7080 * 0.1 - 40 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedTransmissionActualGear )
@@ -525,13 +915,16 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedTransmissionActualGear )
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0xA4 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::TRANSMISSION_ACTUAL_GEAR ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::TRANSMISSION_ACTUAL_GEAR ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0xFF );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::TRANSMISSION_ACTUAL_GEAR ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::TRANSMISSION_ACTUAL_GEAR ) | ( 1 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0x0F );
     ASSERT_DOUBLE_EQ(
-        info.mPIDsToValues[toUType( EmissionPIDs::TRANSMISSION_ACTUAL_GEAR ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+        info.mPIDsToValues.at( toUType( EmissionPIDs::TRANSMISSION_ACTUAL_GEAR ) | ( 2 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+            .signalValue.doubleVal,
         0xAA55 * 0.001 );
 }
 
@@ -542,7 +935,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedOdometer )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0xA6 }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::ODOMETER ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT )],
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::ODOMETER ) | ( 0 << PID_SIGNAL_BITS_LEFT_SHIFT ) )
+                          .signalValue.doubleVal,
                       0x0110AA55 * 0.1 );
 }
 
@@ -554,7 +948,7 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedFuelPressure )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x0A }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::FUEL_PRESSURE )], 450 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::FUEL_PRESSURE ) ).signalValue.doubleVal, 450 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineSpeed )
@@ -565,7 +959,8 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineSpeed )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x0C }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_SPEED )], ( 256.0 * 0x0A + 0x6B ) / 4 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_SPEED ) ).signalValue.doubleVal,
+                      ( 256.0 * 0x0A + 0x6B ) / 4 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedVehicleSpeed )
@@ -576,7 +971,7 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedVehicleSpeed )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x0D }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VEHICLE_SPEED )], 35 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::VEHICLE_SPEED ) ).signalValue.doubleVal, 35 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedMultiplePIDs )
@@ -586,11 +981,29 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedMultiplePIDs )
 
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x04, 0x05, 0x0A, 0x0C, 0x0D }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_LOAD )], 60 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE )], 70 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::FUEL_PRESSURE )], 450 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::ENGINE_SPEED )], ( 256.0 * 0x0A + 0x6B ) / 4 );
-    ASSERT_DOUBLE_EQ( info.mPIDsToValues[toUType( EmissionPIDs::VEHICLE_SPEED )], 35 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_LOAD ) ).signalValue.doubleVal, 60 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ) ).signalValue.doubleVal, 70 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::FUEL_PRESSURE ) ).signalValue.doubleVal, 450 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_SPEED ) ).signalValue.doubleVal,
+                      ( 256.0 * 0x0A + 0x6B ) / 4 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::VEHICLE_SPEED ) ).signalValue.doubleVal, 35 );
+}
+
+TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedMultiplePIDsWhereResponseOrderDifferentThanRequestOrder )
+{
+    std::vector<uint8_t> txPDUData = { 0x41, 0x04, 0x99, 0x05, 0x6E, 0x0A, 0x96, 0x0C, 0x0A, 0x6B, 0x0D, 0x23 };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { 0x0D, 0x04, 0x0A, 0x0C, 0x05 }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_LOAD ) ).signalValue.doubleVal, 60 );
+    ASSERT_DOUBLE_EQ(
+        info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ) ).signalValue.doubleVal, 70 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::FUEL_PRESSURE ) ).signalValue.doubleVal, 450 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::ENGINE_SPEED ) ).signalValue.doubleVal,
+                      ( 256.0 * 0x0A + 0x6B ) / 4 );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( toUType( EmissionPIDs::VEHICLE_SPEED ) ).signalValue.doubleVal, 35 );
 }
 
 TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedMultiplePIDsWrongPDU )

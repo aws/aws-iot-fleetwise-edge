@@ -43,33 +43,47 @@ parse_args() {
         case $1 in
         --input-config-file)
             INPUT_CONFIG_FILE=$2
+            shift
             ;;
         --output-config-file)
             OUTPUT_CONFIG_FILE=$2
+            shift
             ;;
         --vehicle-name)
             VEHICLE_NAME=$2
+            shift
             ;;
         --endpoint-url)
             ENDPOINT_URL=$2
+            shift
             ;;
         --certificate-file)
             CERTIFICATE_FILE=$2
+            shift
             ;;
         --private-key-file)
             PRIVATE_KEY_FILE=$2
+            shift
             ;;
         --can-bus0)
             CAN_BUS0=$2
+            shift
             ;;
         --persistency-path)
             PERSISTENCY_PATH=$2
+            shift
             ;;
         --topic-prefix)
             TOPIC_PREFIX=$2
+            shift
             ;;
         --log-level)
             LOG_LEVEL=$2
+            shift
+            ;;
+        --log-color)
+            LOG_COLOR=$2
+            shift
             ;;
         --help)
             echo "Usage: $0 [OPTION]"

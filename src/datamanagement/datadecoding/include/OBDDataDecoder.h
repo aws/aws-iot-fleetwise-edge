@@ -6,7 +6,6 @@
 // Includes
 #include "ClockHandler.h"
 #include "IDecoderDictionary.h"
-#include "LoggingModule.h"
 #include "OBDDataTypes.h"
 #include "Timer.h"
 #include <memory>
@@ -56,7 +55,9 @@ public:
      * @return True if we received a positive response and extracted the PIDs.
      * needed.
      */
-    bool decodeSupportedPIDs( const SID &sid, const std::vector<uint8_t> &inputData, SupportedPIDs &supportedPIDs );
+    static bool decodeSupportedPIDs( const SID &sid,
+                                     const std::vector<uint8_t> &inputData,
+                                     SupportedPIDs &supportedPIDs );
 
     /**
      * @brief Decodes an ECU response to a list of Emission related PIDs.
@@ -105,17 +106,32 @@ public:
 
 private:
     Timer mTimer;
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     // shared pointer to decoder dictionary
     std::shared_ptr<const OBDDecoderDictionary> mDecoderDictionaryConstPtr;
+
+    /**
+     * @brief Uses the given formula to transform the raw data and add the results to info
+     * @param pid The PID this formula is related to
+     * @param formula The formula that will be used to calculate the final value
+     * @param inputData Raw response from the ECU
+     * @param byteCounter The index of inputData where this value starts
+     * @param info Output vector of PID physical values
+     */
+    void calculateValueFromFormula( PID pid,
+                                    const CANSignalFormat &formula,
+                                    const std::vector<uint8_t> &inputData,
+                                    size_t byteCounter,
+                                    EmissionInfo &info );
+
     /**
      * @brief Validate signal formula
      * @param pid
      * @param formula
      * @return True if formula is valid.
      */
-    bool isFormulaValid( PID pid, CANSignalFormat formula );
+    bool isFormulaValid( PID pid, const CANSignalFormat &formula );
+
     /**
      * @brief Check if PIDs response length is valid. When the response consists of multiple PIDs,
      * this function will check whether each PID exists in response and whether each PID's response

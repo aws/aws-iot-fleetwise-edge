@@ -3,6 +3,7 @@
 
 // Includes
 #include "CANDecoder.h"
+#include "LoggingModule.h"
 #include <algorithm>
 #include <cmath>
 #define MASK64( nbits ) ( ( 0xFFFFFFFFFFFFFFFFULL ) >> ( 64 - ( nbits ) ) )
@@ -30,14 +31,13 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
     {
         // Lookup the multiplexor signal
         // complexity. Try to fix in the scheme not in the code.
-        auto it = std::find_if( format.mSignals.begin(), format.mSignals.end(), []( CANSignalFormat signal ) {
+        auto it = std::find_if( format.mSignals.begin(), format.mSignals.end(), []( CANSignalFormat signal ) -> bool {
             return signal.isMultiplexor();
         } );
         if ( it == format.mSignals.end() )
         {
-            mLogger.error( "CANDecoder::decodeCANMessage",
-                           "Message ID " + std::to_string( format.mMessageID ) +
-                               " is multiplexed but no Multiplexor signal has been found" );
+            FWE_LOG_ERROR( "Message ID" + std::to_string( format.mMessageID ) +
+                           " is multiplexed but no Multiplexor signal has been found" );
             return false;
         }
         if ( signalIDsToCollect.find( it->mSignalID ) != signalIDsToCollect.end() )
@@ -45,8 +45,39 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
             // Decode the multiplexor Value
             int64_t rawValue = extractSignalFromFrame( frameData, *it );
             multiplexorValue = static_cast<uint8_t>( static_cast<uint8_t>( rawValue ) * it->mFactor + it->mOffset );
-            decodedMessage.mFrameInfo.mSignals.emplace_back(
-                CANDecodedSignal( it->mSignalID, rawValue, static_cast<double>( multiplexorValue ) ) );
+
+            const auto CANsignalType = it->mSignalType;
+            switch ( CANsignalType )
+            {
+            case ( SignalType::UINT64 ): {
+                if ( typeid( it->mFactor ) == typeid( double ) )
+                {
+                    FWE_LOG_WARN( "Scaling Factor is double for signal ID " + std::to_string( it->mSignalID ) +
+                                  " and type as uint64" );
+                }
+                auto physicalRawValue = static_cast<uint64_t>( multiplexorValue );
+                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
+                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                    CANDecodedSignal( it->mSignalID, rawValue, physicalValue, CANsignalType ) );
+                break;
+            }
+            case ( SignalType::INT64 ): {
+
+                auto physicalRawValue = static_cast<int64_t>( multiplexorValue );
+                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
+                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                    CANDecodedSignal( it->mSignalID, rawValue, physicalValue, CANsignalType ) );
+                break;
+            }
+            default: {
+
+                auto physicalRawValue = static_cast<double>( multiplexorValue );
+                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
+                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                    CANDecodedSignal( it->mSignalID, rawValue, physicalValue, CANsignalType ) );
+                break;
+            }
+            }
         }
     }
 
@@ -64,7 +95,7 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
                  ( ( format.mSignals[i].mSizeInBits < 1 ) || ( format.mSignals[i].mSizeInBits > frameSizeInBits ) ) )
             {
                 // Wrongly coded Signal, skip it
-                mLogger.error( "CANDecoder::decodeCANMessage", "Signal Out of Range" );
+                FWE_LOG_ERROR( "Signal Out of Range" );
                 errorCounter++;
                 continue;
             }
@@ -73,17 +104,47 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
                  ( format.mSignals[i].mFirstBitPosition + format.mSignals[i].mSizeInBits > frameSizeInBits ) )
             {
                 // Wrongly coded Signal, skip it
-                mLogger.error( "CANDecoder::decodeCANMessage", "Little endian signal Out of Range" );
+                FWE_LOG_ERROR( "Little endian signal Out of Range" );
                 errorCounter++;
                 continue;
             }
 
             // Start decoding the signal, extract the value before scaling from the Frame.
             int64_t rawValue = extractSignalFromFrame( frameData, format.mSignals[i] );
-            double physicalValue =
-                static_cast<double>( rawValue ) * format.mSignals[i].mFactor + format.mSignals[i].mOffset;
-            decodedMessage.mFrameInfo.mSignals.emplace_back(
-                CANDecodedSignal( format.mSignals[i].mSignalID, rawValue, physicalValue ) );
+            const auto CANsignalType = format.mSignals[i].mSignalType;
+            switch ( CANsignalType )
+            {
+            case ( SignalType::UINT64 ): {
+                if ( typeid( format.mSignals[i].mFactor ) == typeid( double ) )
+                {
+                    FWE_LOG_WARN( "Scaling Factor is double for signal ID " +
+                                  std::to_string( format.mSignals[i].mSignalID ) + " and type as uint64" );
+                }
+                uint64_t physicalRawValue =
+                    static_cast<uint64_t>( rawValue ) * static_cast<uint64_t>( format.mSignals[i].mFactor ) +
+                    static_cast<uint64_t>( format.mSignals[i].mOffset );
+                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
+                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                    CANDecodedSignal( format.mSignals[i].mSignalID, rawValue, physicalValue, CANsignalType ) );
+                break;
+            }
+            case ( SignalType::INT64 ): {
+                auto physicalRawValue =
+                    static_cast<int64_t>( rawValue ) * static_cast<int64_t>( format.mSignals[i].mFactor ) +
+                    static_cast<int64_t>( format.mSignals[i].mOffset );
+                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
+                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                    CANDecodedSignal( format.mSignals[i].mSignalID, rawValue, physicalValue, CANsignalType ) );
+                break;
+            }
+            default: {
+                auto physicalRawValue =
+                    static_cast<double>( rawValue ) * format.mSignals[i].mFactor + format.mSignals[i].mOffset;
+                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
+                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                    CANDecodedSignal( format.mSignals[i].mSignalID, rawValue, physicalValue, CANsignalType ) );
+            }
+            }
         }
     }
 
@@ -138,7 +199,7 @@ CANDecoder::extractSignalFromFrame( const uint8_t *frameData, const CANSignalFor
     // perform sign extension
     if ( signalDescription.mIsSigned )
     {
-        uint64_t msbSignMask = static_cast<uint64_t>( 1ULL << ( signalDescription.mSizeInBits - 1 ) );
+        uint64_t msbSignMask = static_cast<uint64_t>( 1U ) << ( signalDescription.mSizeInBits - 1 );
         result = ( ( result ^ msbSignMask ) - msbSignMask );
     }
     return static_cast<int64_t>( result );

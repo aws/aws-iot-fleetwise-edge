@@ -5,11 +5,8 @@ set(libraryTargetName iotfleetwise.datacollection)
 set(libraryAliasName IoTFleetWise::DataCollection)
 
 set(SRCS
-  src/CollectionScheme.cpp
   src/CollectionSchemeIngestion.cpp
   src/CollectionSchemeIngestionList.cpp
-  src/CollectionSchemeJSONParser.cpp
-  src/DataCollectionJSONWriter.cpp
   src/DataCollectionProtoWriter.cpp
   src/DataCollectionSender.cpp
 )
@@ -46,11 +43,8 @@ install(TARGETS ${libraryTargetName} DESTINATION lib)
 install(
   FILES
   include/CANInterfaceIDTranslator.h
-  include/CollectionScheme.h
   include/CollectionSchemeIngestion.h
   include/CollectionSchemeIngestionList.h
-  include/CollectionSchemeJSONParser.h
-  include/DataCollectionJSONWriter.h
   include/DataCollectionProtoWriter.h
   include/DataCollectionSender.h
   include/ICollectionScheme.h
@@ -75,8 +69,6 @@ if(${BUILD_TESTING})
 
   set(
       testSources
-      test/CollectionSchemeJSONParserTest.cpp
-      test/DataCollectionJSONWriterTest.cpp
       test/DataCollectionProtoWriterTest.cpp
       test/DataCollectionSenderTest.cpp
   )

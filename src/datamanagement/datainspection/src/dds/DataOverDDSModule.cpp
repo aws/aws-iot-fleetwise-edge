@@ -3,6 +3,7 @@
 
 // Includes
 #include "DataOverDDSModule.h"
+#include "LoggingModule.h"
 #include "dds/CameraDataPublisher.h"
 #include "dds/CameraDataSubscriber.h"
 #include <bitset>
@@ -48,7 +49,7 @@ DataOverDDSModule::init( const DDSDataSourcesConfig &ddsDataSourcesConfig )
             subscriber = std::make_unique<CameraDataSubscriber>();
             if ( ( !publisher->init( config ) ) || ( !subscriber->init( config ) ) )
             {
-                mLogger.error( "DataOverDDSModule::init", "Failed to init the Publisher/Subscriber" );
+                FWE_LOG_ERROR( "Failed to init the Publisher/Subscriber" );
                 return false;
             }
             else
@@ -60,12 +61,12 @@ DataOverDDSModule::init( const DDSDataSourcesConfig &ddsDataSourcesConfig )
                     mSubscribers.emplace_back( std::move( subscriber ) );
                 }
 
-                mLogger.info( "DataOverDDSModule::init", "Camera Publisher/Subscriber successfully initialised" );
+                FWE_LOG_INFO( "Camera Publisher/Subscriber successfully initialised" );
             }
             break;
 
         default:
-            mLogger.warn( "DataOverDDSModule::init", "Not supported SensorType" );
+            FWE_LOG_WARN( "Not supported SensorType" );
             break;
         }
     }
@@ -82,11 +83,11 @@ DataOverDDSModule::start()
     mShouldStop.store( false );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "DataOverDDSModule::start", "DataOverDDSModule Thread failed to start" );
+        FWE_LOG_TRACE( "DataOverDDSModule Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "DataOverDDSModule::start", "DataOverDDSModule Thread started" );
+        FWE_LOG_TRACE( "DataOverDDSModule Thread started" );
         mThread.setThreadName( "fwDIDDSModule" );
     }
 
@@ -141,9 +142,8 @@ DataOverDDSModule::doWork( void *data )
                     {
                         // Hmm, we have received a notification to request data from a source that's
                         // not configured. We should log an error and skip the event.
-                        DDSModule->mLogger.error( "DataOverDDSModule::doWork",
-                                                  "Received an event for a Source that's not configured, Source ID: " +
-                                                      std::to_string( eventItem.sourceID ) );
+                        FWE_LOG_ERROR( "Received an event for a Source that's not configured, Source ID: " +
+                                       std::to_string( eventItem.sourceID ) );
                     }
                     else
                     {
@@ -155,10 +155,10 @@ DataOverDDSModule::doWork( void *data )
 
                         // Go ahead and request the data from the underlying source
                         publishIterator->second->publishDataRequest( request );
-                        DDSModule->mLogger.trace(
-                            "DataOverDDSModule::doWork",
+                        FWE_LOG_TRACE(
+
                             "Send a request to the DDS Network upon eventID: " + std::to_string( eventItem.eventID ) +
-                                " to DeviceID " + std::to_string( eventItem.sourceID ) );
+                            " to DeviceID " + std::to_string( eventItem.sourceID ) );
                     }
                 }
             }
@@ -180,12 +180,12 @@ DataOverDDSModule::connect()
             // Register the module as a listener of the Subscriber
             if ( ( !sub->subscribeListener( this ) ) || ( !sub->connect() ) )
             {
-                mLogger.error( "DataOverDDSModule::connect", "Failed to connect Subscriber" );
+                FWE_LOG_ERROR( "Failed to connect Subscriber" );
                 return false;
             }
             else
             {
-                mLogger.trace( "DataOverDDSModule::connect", "Subscriber connected" );
+                FWE_LOG_TRACE( "Subscriber connected" );
             }
         }
 
@@ -193,12 +193,12 @@ DataOverDDSModule::connect()
         {
             if ( !pub.second->connect() )
             {
-                mLogger.error( "DataOverDDSModule::connect", "Failed to connect Publisher" );
+                FWE_LOG_ERROR( "Failed to connect Publisher" );
                 return false;
             }
             else
             {
-                mLogger.trace( "DataOverDDSModule::connect", "Publisher connected" );
+                FWE_LOG_TRACE( "Publisher connected" );
             }
         }
     }
@@ -217,12 +217,12 @@ DataOverDDSModule::disconnect()
         {
             if ( ( !sub->unSubscribeListener( this ) ) || ( !sub->disconnect() ) )
             {
-                mLogger.error( "DataOverDDSModule::disconnect", "Failed to disconnect Subscriber" );
+                FWE_LOG_ERROR( "Failed to disconnect Subscriber" );
                 return false;
             }
             else
             {
-                mLogger.trace( "DataOverDDSModule::disconnect", "Subscriber disconnected" );
+                FWE_LOG_TRACE( "Subscriber disconnected" );
             }
         }
 
@@ -230,12 +230,12 @@ DataOverDDSModule::disconnect()
         {
             if ( !pub.second->disconnect() )
             {
-                mLogger.error( "DataOverDDSModule::disconnect", "Failed to disconnect Publisher" );
+                FWE_LOG_ERROR( "Failed to disconnect Publisher" );
                 return false;
             }
             else
             {
-                mLogger.trace( "DataOverDDSModule::disconnect", "Publisher disconnected" );
+                FWE_LOG_TRACE( "Publisher disconnected" );
             }
         }
     }
@@ -253,7 +253,7 @@ DataOverDDSModule::isAlive()
         {
             if ( !sub->isAlive() )
             {
-                mLogger.error( "DataOverDDSModule::isAlive", "Subscriber not alive" );
+                FWE_LOG_ERROR( "Subscriber not alive" );
                 return false;
             }
         }
@@ -262,7 +262,7 @@ DataOverDDSModule::isAlive()
         {
             if ( !pub.second->isAlive() )
             {
-                mLogger.error( "DataOverDDSModule::isAlive", "  Publisher not alive" );
+                FWE_LOG_ERROR( "Publisher not alive" );
                 return false;
             }
         }
@@ -280,7 +280,7 @@ DataOverDDSModule::onEventOfInterestDetected( const std::vector<EventMetadata> &
     // We don't need to guard for thread safety as this notification comes
     // from the Inspection thread only, but we still guard as the main loop
     // might be running an ongoing request.
-    mLogger.trace( "DataOverDDSModule::onEventOfInterestDetected", "Received a new event " );
+    FWE_LOG_TRACE( "Received a new event" );
     std::lock_guard<std::mutex> lock( mEventMetaMutex );
     {
         mEventMetatdata = eventMetadata;

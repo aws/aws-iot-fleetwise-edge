@@ -3,6 +3,7 @@
 
 #include "AwsSDKMemoryManager.h"
 #include <aws/core/utils/memory/AWSMemory.h>
+#include <cstddef>
 
 namespace Aws
 {

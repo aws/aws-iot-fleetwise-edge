@@ -7,7 +7,6 @@
 #include "ClockHandler.h"
 #include "IActiveDecoderDictionaryListener.h"
 #include "IVehicleDataConsumer.h"
-#include "LoggingModule.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "Timer.h"
@@ -134,7 +133,6 @@ private:
     IdsToStates mDataSourceStates;
     Platform::Linux::Signal mWait;
     Timer mTimer;
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     SourcesToConsumers mDataSourcesToConsumers;
     IdsToDataSources mIdsToDataSources;

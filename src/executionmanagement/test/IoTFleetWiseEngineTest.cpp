@@ -5,13 +5,15 @@
 #include "IoTFleetWiseEngine.h"
 #include "IoTFleetWiseConfig.h"
 #include "LogLevel.h"
+#include "WaitUntil.h"
+#include <fstream>
 #include <gtest/gtest.h>
-#include <unistd.h>
-
 #include <linux/can.h>
 #include <linux/can/isotp.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
+using namespace Aws::IoTFleetWise::TestingSupport;
 using namespace Aws::IoTFleetWise::ExecutionManagement;
 using namespace Aws::IoTFleetWise::DataManagement;
 
@@ -96,10 +98,10 @@ TEST_F( IoTFleetWiseEngineTest, CheckPublishDataQueue )
     ASSERT_TRUE( engine.mCollectedDataReadyToPublish->push( collectedDataPtr ) );
 
     ASSERT_TRUE( engine.start() );
-    std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    ASSERT_TRUE( engine.isAlive() );
-    std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-    ASSERT_TRUE( engine.disconnect() );
+
+    WAIT_ASSERT_TRUE( engine.isAlive() );
+
+    WAIT_ASSERT_TRUE( engine.disconnect() );
     ASSERT_TRUE( engine.stop() );
 }
 

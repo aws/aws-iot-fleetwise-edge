@@ -3,6 +3,7 @@
 
 // Includes
 #include "GeohashFunctionNode.h"
+#include "LoggingModule.h"
 #include "TraceModule.h"
 
 namespace Aws
@@ -31,7 +32,7 @@ GeohashFunctionNode::evaluateGeohash( double latitude,
     std::string currentGeohashString{};
     if ( Geohash::encode( latitude, longitude, Geohash::MAX_PRECISION, currentGeohashString ) )
     {
-        // mLogger.info( "GeohashFunctionNode::evaluateGeohash", "Geohash calculated: " + currentGeohashString );
+        // FWE_LOG_INFO( "Geohash calculated: " + currentGeohashString );
         // First we want to make sure both geohash string has the valid format for comparison
         if ( ( this->mGeohashInfo.mGeohashString.length() >= precision ) &&
              ( currentGeohashString.length() >= precision ) )
@@ -40,9 +41,8 @@ GeohashFunctionNode::evaluateGeohash( double latitude,
             if ( currentGeohashString.substr( 0, precision ) !=
                  this->mGeohashInfo.mGeohashString.substr( 0, precision ) )
             {
-                mLogger.trace( "GeohashFunctionNode::evaluateGeohash",
-                               "Geohash has changed from " + this->mGeohashInfo.mGeohashString + " to " +
-                                   currentGeohashString + " at given precision " + std::to_string( precision ) );
+                FWE_LOG_TRACE( "Geohash has changed from " + this->mGeohashInfo.mGeohashString + " to " +
+                               currentGeohashString + " at given precision " + std::to_string( precision ) );
                 this->mIsGeohashNew = true;
             }
         }
@@ -50,22 +50,20 @@ GeohashFunctionNode::evaluateGeohash( double latitude,
         {
             // There's no existing Geohash, set the flag to true. One use case is first time Geohash evaluation.
             this->mIsGeohashNew = true;
-            mLogger.trace( "GeohashFunctionNode::evaluateGeohash", "Geohash start at: " + currentGeohashString );
+            FWE_LOG_TRACE( "Geohash start at: " + currentGeohashString );
         }
         else
         {
             TraceModule::get().incrementVariable( TraceVariable::GE_COMPARE_PRECISION_ERROR );
-            mLogger.error( "GeohashFunctionNode::evaluateGeohash",
-                           "Cannot compare two Geohashes as they have less precision than required" );
+            FWE_LOG_ERROR( "Cannot compare two Geohashes as they have less precision than required" );
         }
         this->mGeohashInfo.mGeohashString = currentGeohashString;
     }
     else
     {
         TraceModule::get().incrementVariable( TraceVariable::GE_EVALUATE_ERROR_LAT_LON );
-        mLogger.error( "GeohashFunctionNode::evaluateGeohash",
-                       "Unable to calculate Geohash with lat/lon: " + std::to_string( latitude ) + ", " +
-                           std::to_string( longitude ) );
+        FWE_LOG_ERROR( "Unable to calculate Geohash with lat/lon: " + std::to_string( latitude ) + ", " +
+                       std::to_string( longitude ) );
     }
     return this->mIsGeohashNew;
 }
@@ -77,8 +75,7 @@ GeohashFunctionNode::consumeGeohash( GeohashInfo &geohashInfo )
     this->mIsGeohashNew = false;
     geohashInfo = this->mGeohashInfo;
     this->mGeohashInfo.mPrevReportedGeohashString = this->mGeohashInfo.mGeohashString;
-    mLogger.trace( "GeohashFunctionNode::consumeGeohash ",
-                   "Previous Geohash is updated to " + this->mGeohashInfo.mPrevReportedGeohashString );
+    FWE_LOG_TRACE( "Previous Geohash is updated to " + this->mGeohashInfo.mPrevReportedGeohashString );
 }
 
 bool

@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 #include "IWaveGpsSource.h"
+#include "WaitUntil.h"
 #include <climits>
 #include <cstdio>
 #include <fstream>
@@ -12,6 +13,7 @@
 #include <unistd.h>
 
 using namespace Aws::IoTFleetWise::DataManagement;
+using namespace Aws::IoTFleetWise::TestingSupport;
 
 class IWaveGpsSourceTest : public ::testing::Test
 {
@@ -72,17 +74,15 @@ TEST_F( IWaveGpsSourceTest, testDecoding )
     gpsSource.start();
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-
     CollectedSignal firstSignal;
     CollectedSignal secondSignal;
-    ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
+    WAIT_ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
     ASSERT_TRUE( signalBufferPtr->pop( secondSignal ) );
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     // raw value from NMEA 5234.56789 01234.56789 converted to DD
-    ASSERT_NEAR( firstSignal.value, 52.5761, 0.0001 );
-    ASSERT_NEAR( secondSignal.value, 12.5761, 0.0001 );
+    ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );
+    ASSERT_NEAR( secondSignal.value.value.doubleVal, 12.5761, 0.0001 );
 }
 
 // Test longitude west
@@ -106,15 +106,13 @@ TEST_F( IWaveGpsSourceTest, testWestNegativeLongitude )
     gpsSource.start();
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-
     CollectedSignal firstSignal;
     CollectedSignal secondSignal;
-    ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
+    WAIT_ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
     ASSERT_TRUE( signalBufferPtr->pop( secondSignal ) );
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     // raw value from NMEA 5234.56789 01234.56789 converted to DD
-    ASSERT_NEAR( firstSignal.value, 52.5761, 0.0001 );
-    ASSERT_NEAR( secondSignal.value, -12.5761, 0.0001 ); // negative number
+    ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );
+    ASSERT_NEAR( secondSignal.value.value.doubleVal, -12.5761, 0.0001 ); // negative number
 }

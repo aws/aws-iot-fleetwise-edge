@@ -6,6 +6,7 @@
 #include "CollectionSchemeManager.h"
 #include "DecoderManifestIngestion.h"
 #include "EnumUtility.h"
+#include "LoggingModule.h"
 #include <string>
 #include <utility>
 
@@ -50,11 +51,11 @@ CollectionSchemeManager::sendCheckin()
         }
         checkinLogStr += checkinMsg[i];
     }
-    mLogger.trace( "CollectionSchemeManager::sendCheckin", "CHECKIN: " + checkinLogStr );
+    FWE_LOG_TRACE( "CHECKIN: " + checkinLogStr );
 
     if ( mSchemaListenerPtr == nullptr )
     {
-        mLogger.error( "CollectionSchemeManager::sendCheckin", "Cannot set the checkin message" );
+        FWE_LOG_ERROR( "Cannot set the checkin message" );
         return false;
     }
     else
@@ -74,8 +75,7 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
 
     if ( mSchemaPersistency == nullptr )
     {
-        mLogger.error( "CollectionSchemeManager::retrieve",
-                       "Failed to acquire a valid handle on the scheme local persistency module" );
+        FWE_LOG_ERROR( "Failed to acquire a valid handle on the scheme local persistency module" );
         return false;
     }
     switch ( retrieveType )
@@ -89,15 +89,14 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
         errStr = "Failed to retrieve the DecoderManifest from the persistency module due to an error: ";
         break;
     default:
-        mLogger.error( "CollectionSchemeManager::retrieve",
-                       "Unknown error: " + std::to_string( toUType( retrieveType ) ) );
+        FWE_LOG_ERROR( "Unknown error: " + std::to_string( toUType( retrieveType ) ) );
         return false;
     }
 
     protoSize = mSchemaPersistency->getSize( retrieveType );
     if ( protoSize <= 0 )
     {
-        mLogger.info( "CollectionSchemeManager::retrieve", infoStr + "zero" );
+        FWE_LOG_INFO( infoStr + "zero" );
         return false;
     }
     protoOutput.resize( protoSize );
@@ -106,10 +105,10 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
     {
         auto error = mSchemaPersistency->getErrorString( ret );
         errStr += error != nullptr ? error : "Unknown error";
-        mLogger.error( "CollectionSchemeManager::retrieve", errStr );
+        FWE_LOG_ERROR( errStr );
         return false;
     }
-    mLogger.info( "CollectionSchemeManager::retrieve", infoStr + std::to_string( protoSize ) + " successfully" );
+    FWE_LOG_INFO( infoStr + std::to_string( protoSize ) + " successfully" );
     if ( retrieveType == DataType::COLLECTION_SCHEME_LIST )
     {
         // updating mCollectionSchemeList
@@ -145,18 +144,17 @@ CollectionSchemeManager::store( DataType storeType )
 
     if ( mSchemaPersistency == nullptr )
     {
-        mLogger.error( "CollectionSchemeManager::store",
-                       "Failed to acquire a valid handle on the scheme local persistency module" );
+        FWE_LOG_ERROR( "Failed to acquire a valid handle on the scheme local persistency module" );
         return;
     }
     if ( ( storeType == DataType::COLLECTION_SCHEME_LIST ) && ( mCollectionSchemeList == nullptr ) )
     {
-        mLogger.error( "CollectionSchemeManager::store", "Invalid CollectionSchemeList" );
+        FWE_LOG_ERROR( "Invalid CollectionSchemeList" );
         return;
     }
     if ( ( storeType == DataType::DECODER_MANIFEST ) && ( mDecoderManifest == nullptr ) )
     {
-        mLogger.error( "CollectionSchemeManager::store", "Invalid DecoderManifest" );
+        FWE_LOG_ERROR( "Invalid DecoderManifest" );
         return;
     }
     switch ( storeType )
@@ -170,14 +168,13 @@ CollectionSchemeManager::store( DataType storeType )
         logStr = "The DecoderManifest";
         break;
     default:
-        mLogger.error( "CollectionSchemeManager::store",
-                       "cannot store unsupported type of " + std::to_string( toUType( storeType ) ) );
+        FWE_LOG_ERROR( "cannot store unsupported type of " + std::to_string( toUType( storeType ) ) );
         return;
     }
 
     if ( protoInput.empty() )
     {
-        mLogger.error( "CollectionSchemeManager::store", logStr + " data size is zero" );
+        FWE_LOG_ERROR( logStr + " data size is zero" );
         return;
     }
     ret = mSchemaPersistency->write( protoInput.data(), protoInput.size(), storeType );
@@ -186,11 +183,11 @@ CollectionSchemeManager::store( DataType storeType )
         logStr += " because of this error: ";
         auto error = mSchemaPersistency->getErrorString( ret );
         logStr += error != nullptr ? error : "Unknown error";
-        mLogger.error( "CollectionSchemeManager::store", "failed to persist " + logStr );
+        FWE_LOG_ERROR( "failed to persist " + logStr );
     }
     else
     {
-        mLogger.trace( "CollectionSchemeManager::store", logStr + " persisted successfully" );
+        FWE_LOG_TRACE( logStr + " persisted successfully" );
     }
 }
 } // namespace DataManagement

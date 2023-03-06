@@ -3,6 +3,7 @@
 
 // Includes
 #include "CollectionSchemeIngestion.h"
+#include "LoggingModule.h"
 
 namespace Aws
 {
@@ -40,7 +41,7 @@ CollectionSchemeIngestion::build()
     if ( mProtoCollectionSchemeMessagePtr->campaign_arn().empty() ||
          mProtoCollectionSchemeMessagePtr->decoder_manifest_arn().empty() )
     {
-        mLogger.error( "CollectionSchemeIngestion::build", "CollectionScheme does not have ID or DM ID" );
+        FWE_LOG_ERROR( "CollectionScheme does not have ID or DM ID" );
         return false;
     }
 
@@ -48,12 +49,11 @@ CollectionSchemeIngestion::build()
     if ( mProtoCollectionSchemeMessagePtr->expiry_time_ms_epoch() <
          mProtoCollectionSchemeMessagePtr->start_time_ms_epoch() )
     {
-        mLogger.error( "CollectionSchemeIngestion::build", "CollectionScheme end time comes before start time" );
+        FWE_LOG_ERROR( "CollectionScheme end time comes before start time" );
         return false;
     }
 
-    mLogger.trace( "CollectionSchemeIngestion::build",
-                   "Building CollectionScheme with ID: " + mProtoCollectionSchemeMessagePtr->campaign_arn() );
+    FWE_LOG_TRACE( "Building CollectionScheme with ID: " + mProtoCollectionSchemeMessagePtr->campaign_arn() );
 
     // Build Collected Signals
     for ( int signalIndex = 0; signalIndex < mProtoCollectionSchemeMessagePtr->signal_information_size();
@@ -71,8 +71,7 @@ CollectionSchemeIngestion::build()
         signalInfo.fixedWindowPeriod = signalInformation.fixed_window_period_ms();
         signalInfo.isConditionOnlySignal = signalInformation.condition_only_signal();
 
-        mLogger.trace( "CollectionSchemeIngestion::build",
-                       "Adding signalID: " + std::to_string( signalInfo.signalID ) + " to list of signals to collect" );
+        FWE_LOG_TRACE( "Adding signalID: " + std::to_string( signalInfo.signalID ) + " to list of signals to collect" );
         mCollectedSignals.emplace_back( signalInfo );
     }
 
@@ -91,9 +90,8 @@ CollectionSchemeIngestion::build()
         rawCAN.sampleBufferSize = rawCanFrame.sample_buffer_size();
         rawCAN.minimumSampleIntervalMs = rawCanFrame.minimum_sample_period_ms();
 
-        mLogger.trace( "CollectionSchemeIngestion::build",
-                       "Adding rawCAN frame to collect ID: " + std::to_string( rawCAN.frameID ) +
-                           " node ID: " + rawCAN.interfaceID );
+        FWE_LOG_TRACE( "Adding rawCAN frame to collect ID: " + std::to_string( rawCAN.frameID ) +
+                       " node ID: " + rawCAN.interfaceID );
         mCollectedRawCAN.emplace_back( rawCAN );
     }
 
@@ -105,30 +103,28 @@ CollectionSchemeIngestion::build()
             getNumberOfNodes( mProtoCollectionSchemeMessagePtr->condition_based_collection_scheme().condition_tree(),
                               Aws::IoTFleetWise::DataInspection::MAX_EQUATION_DEPTH );
 
-        mLogger.info( "CollectionSchemeIngestion::build",
-                      "CollectionScheme is Condition Based. Building AST with " + std::to_string( numNodes ) +
-                          " nodes" );
+        FWE_LOG_INFO( "CollectionScheme is Condition Based. Building AST with " + std::to_string( numNodes ) +
+                      " nodes" );
 
         mExpressionNodes.resize( numNodes );
 
         // As pointers to elements inside the vector are used after this no realloc for mExpressionNodes is allowed
-        uint32_t currentIndex = 0; // start at index 0 of mExpressionNodes for first node
+        std::size_t currentIndex = 0; // start at index 0 of mExpressionNodes for first node
         mExpressionNode =
             serializeNode( mProtoCollectionSchemeMessagePtr->condition_based_collection_scheme().condition_tree(),
                            currentIndex,
                            Aws::IoTFleetWise::DataInspection::MAX_EQUATION_DEPTH );
-        mLogger.info( "CollectionSchemeIngestion::build", "AST complete" );
+        FWE_LOG_INFO( "AST complete" );
     }
     // time based node
     // For time based node the condition is always set to true hence: currentNode.booleanValue=true
     else if ( mProtoCollectionSchemeMessagePtr->collection_scheme_type_case() ==
               CollectionSchemesMsg::CollectionScheme::kTimeBasedCollectionScheme )
     {
-        mLogger.info( "CollectionSchemeIngestion::build",
-                      "CollectionScheme is Time based with interval of: " +
-                          std::to_string( mProtoCollectionSchemeMessagePtr->time_based_collection_scheme()
-                                              .time_based_collection_scheme_period_ms() ) +
-                          " ms" );
+        FWE_LOG_INFO( "CollectionScheme is Time based with interval of: " +
+                      std::to_string( mProtoCollectionSchemeMessagePtr->time_based_collection_scheme()
+                                          .time_based_collection_scheme_period_ms() ) +
+                      " ms" );
 
         mExpressionNodes.emplace_back();
         ExpressionNode &currentNode = mExpressionNodes.back();
@@ -138,7 +134,7 @@ CollectionSchemeIngestion::build()
     }
     else
     {
-        mLogger.error( "CollectionSchemeIngestion::build", "COLLECTION_SCHEME_TYPE_NOT_SET" );
+        FWE_LOG_ERROR( "COLLECTION_SCHEME_TYPE_NOT_SET" );
     }
 
     // Build Image capture collection info
@@ -161,20 +157,18 @@ CollectionSchemeIngestion::build()
             imageCaptureData.beforeDurationMs = imageData.time_based_image_data().before_duration_ms();
             // Image format
             imageCaptureData.imageFormat = static_cast<uint32_t>( imageData.image_type() );
-            mLogger.info( "CollectionSchemeIngestion::build",
-                          "Adding Image capture settings for DeviceID: " +
-                              std::to_string( imageCaptureData.deviceID ) );
+            FWE_LOG_INFO( "Adding Image capture settings for DeviceID: " +
+                          std::to_string( imageCaptureData.deviceID ) );
 
             mImagesCaptureData.emplace_back( imageCaptureData );
         }
         else
         {
-            mLogger.warn( "CollectionSchemeIngestion::build", "Unsupported Image capture settings provided, skipping" );
+            FWE_LOG_WARN( "Unsupported Image capture settings provided, skipping" );
         }
     }
 
-    mLogger.info( "CollectionSchemeIngestion::build",
-                  "Successfully built CollectionScheme ID: " + mProtoCollectionSchemeMessagePtr->campaign_arn() );
+    FWE_LOG_INFO( "Successfully built CollectionScheme ID: " + mProtoCollectionSchemeMessagePtr->campaign_arn() );
 
     // Set ready flag to true
     mReady = true;
@@ -199,28 +193,25 @@ CollectionSchemeIngestion::convertFunctionType(
     switch ( function )
     {
     case CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_MIN:
-        mLogger.info( "CollectionSchemeIngestion::convertFunctionType", "Converting node to: LAST_FIXED_WINDOW_MIN" );
+        FWE_LOG_INFO( "Converting node to: LAST_FIXED_WINDOW_MIN" );
         return WindowFunction::LAST_FIXED_WINDOW_MIN;
     case CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_MAX:
-        mLogger.info( "CollectionSchemeIngestion::convertFunctionType", "Converting node to: LAST_FIXED_WINDOW_MAX" );
+        FWE_LOG_INFO( "Converting node to: LAST_FIXED_WINDOW_MAX" );
         return WindowFunction::LAST_FIXED_WINDOW_MAX;
     case CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_AVG:
-        mLogger.info( "CollectionSchemeIngestion::convertFunctionType", "Converting node to: LAST_FIXED_WINDOW_AVG" );
+        FWE_LOG_INFO( "Converting node to: LAST_FIXED_WINDOW_AVG" );
         return WindowFunction::LAST_FIXED_WINDOW_AVG;
     case CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_PREV_LAST_WINDOW_MIN:
-        mLogger.info( "CollectionSchemeIngestion::convertFunctionType",
-                      "Converting node to: PREV_LAST_FIXED_WINDOW_MIN" );
+        FWE_LOG_INFO( "Converting node to: PREV_LAST_FIXED_WINDOW_MIN" );
         return WindowFunction::PREV_LAST_FIXED_WINDOW_MIN;
     case CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_PREV_LAST_WINDOW_MAX:
-        mLogger.info( "CollectionSchemeIngestion::convertFunctionType",
-                      "Converting node to: PREV_LAST_FIXED_WINDOW_MAX" );
+        FWE_LOG_INFO( "Converting node to: PREV_LAST_FIXED_WINDOW_MAX" );
         return WindowFunction::PREV_LAST_FIXED_WINDOW_MAX;
     case CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_PREV_LAST_WINDOW_AVG:
-        mLogger.info( "CollectionSchemeIngestion::convertFunctionType",
-                      "Converting node to: PREV_LAST_FIXED_WINDOW_AVG" );
+        FWE_LOG_INFO( "Converting node to: PREV_LAST_FIXED_WINDOW_AVG" );
         return WindowFunction::PREV_LAST_FIXED_WINDOW_AVG;
     default:
-        mLogger.error( "CollectionSchemeIngestion::convertFunctionType", "Function node type not supported." );
+        FWE_LOG_ERROR( "Function node type not supported." );
         return WindowFunction::NONE;
     }
 }
@@ -231,52 +222,43 @@ CollectionSchemeIngestion::convertOperatorType( CollectionSchemesMsg::ConditionN
     switch ( op )
     {
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType", "Converting operator to: OPERATOR_SMALLER" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_SMALLER" );
         return ExpressionNodeType::OPERATOR_SMALLER;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_BIGGER:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType", "Converting operator to: OPERATOR_BIGGER" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_BIGGER" );
         return ExpressionNodeType::OPERATOR_BIGGER;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER_EQUAL:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
-                      "Converting operator to: OPERATOR_SMALLER_EQUAL" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_SMALLER_EQUAL" );
         return ExpressionNodeType::OPERATOR_SMALLER_EQUAL;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_BIGGER_EQUAL:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
-                      "Converting operator to: OPERATOR_BIGGER_EQUAL" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_BIGGER_EQUAL" );
         return ExpressionNodeType::OPERATOR_BIGGER_EQUAL;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_EQUAL:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType", "Converting operator to: OPERATOR_EQUAL" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_EQUAL" );
         return ExpressionNodeType::OPERATOR_EQUAL;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_NOT_EQUAL:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
-                      "Converting operator NodeOperator_Operator_COMPARE_NOT_EQUAL to OPERATOR_NOT_EQUAL" );
+        FWE_LOG_INFO( "Converting operator NodeOperator_Operator_COMPARE_NOT_EQUAL to OPERATOR_NOT_EQUAL" );
         return ExpressionNodeType::OPERATOR_NOT_EQUAL;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_AND:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
-                      "Converting operator to: OPERATOR_LOGICAL_AND" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_LOGICAL_AND" );
         return ExpressionNodeType::OPERATOR_LOGICAL_AND;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_OR:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType", "Converting operator to: OPERATOR_LOGICAL_OR" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_LOGICAL_OR" );
         return ExpressionNodeType::OPERATOR_LOGICAL_OR;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_NOT:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
-                      "Converting operator to: OPERATOR_LOGICAL_NOT" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_LOGICAL_NOT" );
         return ExpressionNodeType::OPERATOR_LOGICAL_NOT;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_PLUS:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
-                      "Converting operator to: OPERATOR_ARITHMETIC_PLUS" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_ARITHMETIC_PLUS" );
         return ExpressionNodeType::OPERATOR_ARITHMETIC_PLUS;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MINUS:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
-                      "Converting operator to: OPERATOR_ARITHMETIC_MINUS" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_ARITHMETIC_MINUS" );
         return ExpressionNodeType::OPERATOR_ARITHMETIC_MINUS;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MULTIPLY:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
-                      "Converting operator to: OPERATOR_ARITHMETIC_MULTIPLY" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_ARITHMETIC_MULTIPLY" );
         return ExpressionNodeType::OPERATOR_ARITHMETIC_MULTIPLY;
     case CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_DIVIDE:
-        mLogger.info( "CollectionSchemeIngestion::convertOperatorType",
-                      "Converting operator to: OPERATOR_ARITHMETIC_DIVIDE" );
+        FWE_LOG_INFO( "Converting operator to: OPERATOR_ARITHMETIC_DIVIDE" );
         return ExpressionNodeType::OPERATOR_ARITHMETIC_DIVIDE;
     default:
         return ExpressionNodeType::BOOLEAN;
@@ -308,7 +290,7 @@ CollectionSchemeIngestion::getNumberOfNodes( const CollectionSchemesMsg::Conditi
 
 ExpressionNode *
 CollectionSchemeIngestion::serializeNode( const CollectionSchemesMsg::ConditionNode &node,
-                                          uint32_t &nextIndex,
+                                          std::size_t &nextIndex,
                                           int remainingDepth )
 {
     if ( remainingDepth <= 0 )
@@ -316,32 +298,37 @@ CollectionSchemeIngestion::serializeNode( const CollectionSchemesMsg::ConditionN
         return nullptr;
     }
     mExpressionNodes.emplace_back();
-    ExpressionNode *currentNode = &( mExpressionNodes[nextIndex] );
+    ExpressionNode *currentNode = nullptr;
+    if ( mExpressionNodes.empty() || ( mExpressionNodes.size() <= nextIndex ) )
+    {
+        return nullptr;
+    }
+    else
+    {
+        currentNode = &( mExpressionNodes[nextIndex] );
+    }
     nextIndex++;
 
     if ( node.node_case() == CollectionSchemesMsg::ConditionNode::kNodeSignalId )
     {
         currentNode->signalID = node.node_signal_id();
         currentNode->nodeType = ExpressionNodeType::SIGNAL;
-        mLogger.trace( "CollectionSchemeIngestion::serializeNode",
-                       "Creating SIGNAL node with ID: " + std::to_string( currentNode->signalID ) );
+        FWE_LOG_TRACE( "Creating SIGNAL node with ID: " + std::to_string( currentNode->signalID ) );
         return currentNode;
     }
     else if ( node.node_case() == CollectionSchemesMsg::ConditionNode::kNodeDoubleValue )
     {
         currentNode->floatingValue = node.node_double_value();
         currentNode->nodeType = ExpressionNodeType::FLOAT;
-        mLogger.trace( "CollectionSchemeIngestion::serializeNode",
-                       "Creating FLOAT node with value: " + std::to_string( currentNode->floatingValue ) );
+        FWE_LOG_TRACE( "Creating FLOAT node with value: " + std::to_string( currentNode->floatingValue ) );
         return currentNode;
     }
     else if ( node.node_case() == CollectionSchemesMsg::ConditionNode::kNodeBooleanValue )
     {
         currentNode->booleanValue = node.node_boolean_value();
         currentNode->nodeType = ExpressionNodeType::BOOLEAN;
-        mLogger.trace( "CollectionSchemeIngestion::serializeNode",
-                       "Creating BOOLEAN node with value: " +
-                           std::to_string( static_cast<int>( currentNode->booleanValue ) ) );
+        FWE_LOG_TRACE( "Creating BOOLEAN node with value: " +
+                       std::to_string( static_cast<int>( currentNode->booleanValue ) ) );
         return currentNode;
     }
     else if ( node.node_case() == CollectionSchemesMsg::ConditionNode::kNodeFunction )
@@ -353,8 +340,7 @@ CollectionSchemeIngestion::serializeNode( const CollectionSchemesMsg::ConditionN
             currentNode->function.windowFunction =
                 convertFunctionType( node.node_function().window_function().window_type() );
             currentNode->nodeType = ExpressionNodeType::WINDOWFUNCTION;
-            mLogger.trace( "CollectionSchemeIngestion::serializeNode",
-                           "Creating Window FUNCTION node for Signal ID:" + std::to_string( currentNode->signalID ) );
+            FWE_LOG_TRACE( "Creating Window FUNCTION node for Signal ID:" + std::to_string( currentNode->signalID ) );
             return currentNode;
         }
         else if ( node.node_function().functionType_case() ==
@@ -369,20 +355,20 @@ CollectionSchemeIngestion::serializeNode( const CollectionSchemesMsg::ConditionN
                 static_cast<uint8_t>( node.node_function().geohash_function().geohash_precision() );
             currentNode->function.geohashFunction.gpsUnitType =
                 static_cast<GeohashFunction::GPSUnitType>( node.node_function().geohash_function().gps_unit() );
-            mLogger.trace(
-                "CollectionSchemeIngestion::serializeNode",
+            FWE_LOG_TRACE(
+
                 "Creating Geohash FUNCTION node: Lat SignalID: " +
-                    std::to_string( currentNode->function.geohashFunction.latitudeSignalID ) +
-                    "; Lon SignalID: " + std::to_string( currentNode->function.geohashFunction.longitudeSignalID ) +
-                    "; precision: " + std::to_string( currentNode->function.geohashFunction.precision ) +
-                    "; GPS Unit Type: " +
-                    std::to_string( static_cast<uint8_t>( currentNode->function.geohashFunction.gpsUnitType ) ) );
+                std::to_string( currentNode->function.geohashFunction.latitudeSignalID ) +
+                "; Lon SignalID: " + std::to_string( currentNode->function.geohashFunction.longitudeSignalID ) +
+                "; precision: " + std::to_string( currentNode->function.geohashFunction.precision ) +
+                "; GPS Unit Type: " +
+                std::to_string( static_cast<uint8_t>( currentNode->function.geohashFunction.gpsUnitType ) ) );
             return currentNode;
         }
         else
         {
             // unsupported function type
-            mLogger.warn( "CollectionSchemeIngestion::serializeNode", "Unsupported Function Node Type" );
+            FWE_LOG_WARN( "Unsupported Function Node Type" );
         }
     }
     else if ( node.node_case() == CollectionSchemesMsg::ConditionNode::kNodeOperator )
@@ -390,12 +376,12 @@ CollectionSchemeIngestion::serializeNode( const CollectionSchemesMsg::ConditionN
         // If no left node this node_operator is invalid
         if ( node.node_operator().has_left_child() )
         {
-            mLogger.trace( "CollectionSchemeIngestion::serializeNode", "Processing left child" );
+            FWE_LOG_TRACE( "Processing left child" );
             currentNode->nodeType = convertOperatorType( node.node_operator().operator_() );
             // If no valid function found return always false
             if ( currentNode->nodeType == ExpressionNodeType::BOOLEAN )
             {
-                mLogger.info( "CollectionSchemeIngestion::serializeNode", "Setting BOOLEAN node to false" );
+                FWE_LOG_INFO( "Setting BOOLEAN node to false" );
                 currentNode->booleanValue = false;
                 return currentNode;
             }
@@ -405,14 +391,14 @@ CollectionSchemeIngestion::serializeNode( const CollectionSchemesMsg::ConditionN
             if ( ( currentNode->nodeType != ExpressionNodeType::OPERATOR_LOGICAL_NOT ) &&
                  node.node_operator().has_right_child() )
             {
-                mLogger.trace( "CollectionSchemeIngestion::serializeNode", "Processing right child" );
+                FWE_LOG_TRACE( "Processing right child" );
                 ExpressionNode *right =
                     serializeNode( node.node_operator().right_child(), nextIndex, remainingDepth - 1 );
                 currentNode->right = right;
             }
             else
             {
-                mLogger.trace( "CollectionSchemeIngestion::serializeNode", "Setting right child to nullptr" );
+                FWE_LOG_TRACE( "Setting right child to nullptr" );
                 currentNode->right = nullptr;
             }
             return currentNode;

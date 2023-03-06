@@ -268,7 +268,7 @@ TEST_F( AwsIotConnectivityModuleTest, sendWithoutTopic )
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
     AwsIotChannel c( m.get(), nullptr );
     std::uint8_t input[] = { 0xca, 0xfe };
-    ASSERT_EQ( c.send( input, sizeof( input ) ), ConnectivityError::NotConfigured );
+    ASSERT_EQ( c.sendBuffer( input, sizeof( input ) ), ConnectivityError::NotConfigured );
     c.invalidateConnection();
 }
 
@@ -279,7 +279,7 @@ TEST_F( AwsIotConnectivityModuleTest, sendWithoutConnection )
     AwsIotChannel c( m.get(), nullptr );
     std::uint8_t input[] = { 0xca, 0xfe };
     c.setTopic( "topic" );
-    ASSERT_EQ( c.send( input, sizeof( input ) ), ConnectivityError::NoConnection );
+    ASSERT_EQ( c.sendBuffer( input, sizeof( input ) ), ConnectivityError::NoConnection );
     c.invalidateConnection();
 }
 
@@ -291,7 +291,7 @@ TEST_F( AwsIotConnectivityModuleTest, sendWrongInput )
     AwsIotChannel c( m.get(), nullptr );
     ASSERT_TRUE( m->connect( "key", "cert", "endpoint", "clientIdTest", bootstrap ) );
     c.setTopic( "topic" );
-    ASSERT_EQ( c.send( nullptr, 10 ), ConnectivityError::WrongInputData );
+    ASSERT_EQ( c.sendBuffer( nullptr, 10 ), ConnectivityError::WrongInputData );
     con->OnDisconnect( *con );
     c.invalidateConnection();
 }
@@ -306,7 +306,7 @@ TEST_F( AwsIotConnectivityModuleTest, sendTooBig )
     c.setTopic( "topic" );
     std::vector<uint8_t> a;
     a.resize( c.getMaxSendSize() + 1U );
-    ASSERT_EQ( c.send( a.data(), a.size() ), ConnectivityError::WrongInputData );
+    ASSERT_EQ( c.sendBuffer( a.data(), a.size() ), ConnectivityError::WrongInputData );
     con->OnDisconnect( *con );
     c.invalidateConnection();
 }
@@ -336,15 +336,15 @@ TEST_F( AwsIotConnectivityModuleTest, sendMultiple )
             } ) );
 
     // Queue 2 packets
-    ASSERT_EQ( c.send( input, sizeof( input ) ), ConnectivityError::Success );
-    ASSERT_EQ( c.send( input, sizeof( input ) ), ConnectivityError::Success );
+    ASSERT_EQ( c.sendBuffer( input, sizeof( input ) ), ConnectivityError::Success );
+    ASSERT_EQ( c.sendBuffer( input, sizeof( input ) ), ConnectivityError::Success );
 
     // Confirm 1st (success as packetId is 1---v):
     completeHandlers.front().operator()( *con, 1, 0 );
     completeHandlers.pop_front();
 
     // Queue another:
-    ASSERT_EQ( c.send( input, sizeof( input ) ), ConnectivityError::Success );
+    ASSERT_EQ( c.sendBuffer( input, sizeof( input ) ), ConnectivityError::Success );
 
     // Confirm 2nd (success as packetId is 2---v):
     completeHandlers.front().operator()( *con, 2, 0 );
@@ -383,7 +383,8 @@ TEST_F( AwsIotConnectivityModuleTest, sdkRAMExceeded )
             memMgr.AllocateMemory( 50 * AwsIotChannel::MAXIMUM_IOT_SDK_HEAP_MEMORY_BYTES, alignof( std::size_t ) );
         ASSERT_NE( alloc3, nullptr );
 
-        ASSERT_EQ( c.send( input.data(), input.size() * sizeof( std::uint8_t ) ), ConnectivityError::QuotaReached );
+        ASSERT_EQ( c.sendBuffer( input.data(), input.size() * sizeof( std::uint8_t ) ),
+                   ConnectivityError::QuotaReached );
         memMgr.FreeMemory( alloc3 );
     }
     {
@@ -393,7 +394,7 @@ TEST_F( AwsIotConnectivityModuleTest, sdkRAMExceeded )
         auto alloc4 = memMgr.AllocateMemory( AwsIotChannel::MAXIMUM_IOT_SDK_HEAP_MEMORY_BYTES - ( offset + required ),
                                              alignof( std::size_t ) );
         ASSERT_NE( alloc4, nullptr );
-        ASSERT_EQ( c.send( input.data(), sizeof( input ) ), ConnectivityError::QuotaReached );
+        ASSERT_EQ( c.sendBuffer( input.data(), sizeof( input ) ), ConnectivityError::QuotaReached );
         memMgr.FreeMemory( alloc4 );
 
         // check that allocation and hence send succeed when there is just enough memory
@@ -415,7 +416,7 @@ TEST_F( AwsIotConnectivityModuleTest, sdkRAMExceeded )
                     return true;
                 } ) );
 
-        ASSERT_EQ( c.send( input.data(), sizeof( input ) ), ConnectivityError::Success );
+        ASSERT_EQ( c.sendBuffer( input.data(), sizeof( input ) ), ConnectivityError::Success );
         memMgr.FreeMemory( alloc5 );
 
         // // Confirm 1st (success as packetId is 1---v):

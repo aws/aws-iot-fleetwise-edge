@@ -36,7 +36,6 @@
    __libc_csu_init
    Memcheck:Leak
    match-leak-kinds: reachable
-   fun:malloc
    ...
    fun:__libc_csu_init
    ...

@@ -12,7 +12,7 @@ if len(sys.argv) < 2:
     print("Usage: python3 " + sys.argv[0] + " <TIMESTREAM_RESULT_JSON_FILE> [<OUTPUT_HTML_FILE>]")
     exit(-1)
 
-with open(sys.argv[1], "r") as fp:
+with open(sys.argv[1]) as fp:
     data = json.load(fp)
 
 columns = {}
@@ -25,7 +25,7 @@ for column in data["ColumnInfo"]:
 def get_val(row, column):
     return (
         None
-        if not column in columns or not "ScalarValue" in row["Data"][columns[column]]
+        if column not in columns or "ScalarValue" not in row["Data"][columns[column]]
         else row["Data"][columns[column]]["ScalarValue"]
     )
 
@@ -35,9 +35,9 @@ for row in data["Rows"]:
     ts = get_val(row, "time")
     signal_name = get_val(row, "measure_name")
     val = get_val(row, "measure_value::double")
-    if val == None:
+    if val is None:
         val = get_val(row, "measure_value::bigint")
-    if val == None:
+    if val is None:
         val = get_val(row, "measure_value::boolean") != "false"
     df.at[ts, signal_name] = float(val)
 

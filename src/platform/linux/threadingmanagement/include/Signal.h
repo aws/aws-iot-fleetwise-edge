@@ -21,6 +21,8 @@ namespace Linux
 /**
  * @brief Wrapper on top of a condition variable. Helps Thread state transitions.
  */
+// coverity[cert_dcl60_cpp_violation] false positive - class only defined once
+// coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
 class Signal
 {
 public:

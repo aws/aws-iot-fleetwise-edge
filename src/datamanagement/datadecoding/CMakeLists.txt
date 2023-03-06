@@ -23,7 +23,6 @@ target_link_libraries(
   ${libraryTargetName}
   Boost::filesystem
   IoTFleetWise::DataCollection
-  #IoTFleetWise::DataManagementTypes
   IoTFleetWise::Platform::Linux
   IoTFleetWise::Vehiclenetwork
 )

@@ -27,7 +27,6 @@ RemoteProfiler::RemoteProfiler( std::shared_ptr<ISender> metricsSender,
     , fProfilerPrefix( std::move( profilerPrefix ) )
     , fCurrentUserPayloadInLogRoot( 0 )
 {
-    std::unique_ptr<ConsoleLogger> consoleLogger( new ConsoleLogger() );
     initLogStructure();
     fLastCPURUsage.reportCPUUsageInfo();
     Aws::IoTFleetWise::Platform::Linux::CPUUsageInfo::reportPerThreadUsageData( fLastThreadUsage );
@@ -50,11 +49,10 @@ RemoteProfiler::sendMetricsOut()
     builder["indentation"] = ""; // If you want whitespace-less output
     const std::string output = Json::writeString( builder, fMetricsRoot );
     uint32_t ret = static_cast<uint32_t>(
-        fMetricsSender->send( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() ) );
+        fMetricsSender->sendBuffer( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() ) );
     if ( static_cast<uint32_t>( ConnectivityError::Success ) != ret )
     {
-        fLogger.error( "RemoteProfiler::sendMetricsOut",
-                       "Send error " + std::to_string( static_cast<uint32_t>( ret ) ) );
+        FWE_LOG_ERROR( "Send error " + std::to_string( static_cast<uint32_t>( ret ) ) );
     }
     fMetricsRoot.clear();
     fCurrentMetricsPending = 0;
@@ -76,17 +74,20 @@ RemoteProfiler::sendLogsOut()
     if ( ( fLogSender != nullptr ) && ( fCurrentUserPayloadInLogRoot > 0 ) )
     {
         uint32_t ret = static_cast<uint32_t>(
-            fLogSender->send( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() ) );
+            fLogSender->sendBuffer( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() ) );
         if ( static_cast<uint32_t>( ConnectivityError::Success ) != ret )
         {
-            fLogger.error( "RemoteProfiler::sendLogsOut",
-                           "Send error " + std::to_string( static_cast<uint32_t>( ret ) ) );
+            FWE_LOG_ERROR( " Send error " + std::to_string( static_cast<uint32_t>( ret ) ) );
         }
     }
 }
 
 void
-RemoteProfiler::logMessage( LogLevel level, const std::string &function, const std::string &logEntry )
+RemoteProfiler::logMessage( LogLevel level,
+                            const std::string &filename,
+                            const uint32_t lineNumber,
+                            const std::string &function,
+                            const std::string &logEntry )
 {
     if ( level < fLogLevelThreshold )
     {
@@ -95,9 +96,12 @@ RemoteProfiler::logMessage( LogLevel level, const std::string &function, const s
     Json::Value logNode;
 
     logNode["logLevel"] = levelToString( level );
+    logNode["logFile"] = filename;
+    logNode["logLineNumber"] = lineNumber;
     logNode["logFunction"] = function;
     logNode["logEntry"] = logEntry;
-    uint32_t size = static_cast<uint32_t>( function.length() + logEntry.length() + JSON_MAX_OVERHEAD_BYTES_PER_LOG );
+    uint32_t size = static_cast<uint32_t>( filename.length() + function.length() + logEntry.length() +
+                                           JSON_MAX_OVERHEAD_BYTES_PER_LOG );
     bool sendOutBeforeAdding = false;
     {
         std::lock_guard<std::mutex> lock( loggingMutex );
@@ -142,14 +146,13 @@ RemoteProfiler::start()
 {
     if ( fMetricsSender == nullptr )
     {
-        fLogger.error( "RemoteProfiler::start", "Trying to start without sender" );
+        FWE_LOG_ERROR( "Trying to start without sender" );
         return false;
     }
     if ( ( ( fInitialLogMaxInterval == 0 ) && ( fLogLevelThreshold != LogLevel::Off ) ) ||
          ( ( fInitialLogMaxInterval != 0 ) && ( fLogLevelThreshold == LogLevel::Off ) ) )
     {
-        fLogger.warn( "RemoteProfiler::start",
-                      "Logging is turned off by putting LogLevel Threshold to Off but log max interval is not "
+        FWE_LOG_WARN( "Logging is turned off by putting LogLevel Threshold to Off but log max interval is not "
                       "0, which is implausible" );
     }
     // Prevent concurrent stop/init
@@ -159,11 +162,11 @@ RemoteProfiler::start()
     fShouldStop.store( false );
     if ( !fThread.create( doWork, this ) )
     {
-        fLogger.trace( "RemoteProfiler::start", "Remote Profiler Thread failed to start" );
+        FWE_LOG_TRACE( "Remote Profiler Thread failed to start" );
     }
     else
     {
-        fLogger.trace( "RemoteProfiler::start", "Remote Profiler Thread started" );
+        FWE_LOG_TRACE( "Remote Profiler Thread started" );
         fThread.setThreadName( "fwCNProfiler" );
     }
 
@@ -180,12 +183,12 @@ RemoteProfiler::stop()
 
     std::lock_guard<std::mutex> lock( fThreadMutex );
     fShouldStop.store( true, std::memory_order_relaxed );
-    fLogger.trace( "RemoteProfiler::stop", "Request stop" );
+    FWE_LOG_TRACE( "Request stop" );
     fWait.notify();
     fThread.release();
     initLogStructure();
     fMetricsRoot.clear();
-    fLogger.trace( "RemoteProfiler::stop", "Stop finished" );
+    FWE_LOG_TRACE( "Stop finished" );
     fShouldStop.store( false, std::memory_order_relaxed );
     return !fThread.isActive();
 }

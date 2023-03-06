@@ -13,7 +13,6 @@
 #include "ICollectionSchemeManager.h"
 #include "IDecoderManifest.h"
 #include "Listener.h"
-#include "LoggingModule.h"
 #include "SchemaListener.h"
 #include "Signal.h"
 #include "Thread.h"
@@ -198,10 +197,10 @@ private:
      */
     static void doWork( void *data );
 
-    TimePoint calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs );
+    static TimePoint calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs );
 
     /**
-     * @brief template function for generate a message on an event for mLogger usage
+     * @brief template function for generate a message on an event for logging
      * Include Event printed in string msg, collectionScheme ID, startTime, stopTime of the collectionScheme, and
      * current timestamp all in seconds.
      * @param msg string for log;
@@ -217,7 +216,7 @@ private:
                                   const TimePoint &currTime );
 
     /**
-     * @brief supporting function for mLogger
+     * @brief supporting function for logging
      * Prints out enabled CollectionScheme ID string and Idle CollectionScheme ID string
      * @param enableStr string for enabled CollectionScheme IDs;
      * @param idleStr string for Idle CollectionScheme IDs;
@@ -225,7 +224,7 @@ private:
     void printExistingCollectionSchemes( std::string &enableStr, std::string &idleStr );
 
     /**
-     * @brief supporting function for mLogger
+     * @brief supporting function for logging
      * Prints status when main thread wakes up from notification or timer return.
      * The status includes flag mUpdateAvailable, and currTime in seconds.
      * @param wakeupStr string to print status;
@@ -310,7 +309,7 @@ private:
     static const std::string CHECKIN;
     // Supported Network Protocol. This list will expand when new protocol added
     static constexpr std::array<VehicleDataSourceProtocol, 2> SUPPORTED_NETWORK_PROTOCOL = {
-        VehicleDataSourceProtocol::RAW_SOCKET, VehicleDataSourceProtocol::OBD };
+        { VehicleDataSourceProtocol::RAW_SOCKET, VehicleDataSourceProtocol::OBD } };
 
     Thread mThread;
     // Atomic flag to signal the state of main thread. If true, we should stop
@@ -321,7 +320,6 @@ private:
     // Platform signal that wakes up main thread
     Platform::Linux::Signal mWait;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
-    LoggingModule mLogger;
 
     // Shared pointer to a SchemaListener Object allow CollectionSchemeManagement to send data to Schema
     SchemaListenerPtr mSchemaListenerPtr;
@@ -337,6 +335,13 @@ private:
 
     // Time interval in ms to send checkin message
     uint64_t mCheckinIntervalInMsec{ DEFAULT_CHECKIN_INTERVAL_IN_MILLISECOND };
+
+    // Get the Signal Type from DM
+    inline SignalType
+    getSignalType( const SignalID signalID )
+    {
+        return mDecoderManifest->getSignalType( signalID );
+    }
 
 protected:
     /*

@@ -221,7 +221,7 @@ machine.
 
 ### Launch your development machine
 
-An Ubuntu 18.04 development machine with 200GB free disk space will be required. A local Intel
+An Ubuntu 20.04 development machine with 200GB free disk space will be required. A local Intel
 x86_64 (amd64) machine can be used, however it is recommended to use the following instructions to
 launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
 [here](https://aws.amazon.com/ec2/pricing/on-demand/).
@@ -267,11 +267,10 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
       `build-essential dkms can-utils git linux-modules-extra-aws`. Additionally it installs the
       following: `can-isotp`. It also installs a systemd service called `setup-socketcan` that
       brings up the virtual SocketCAN interface `vcan0` at startup.
-   1. Install the following Ubuntu packages: `python3.7 python3-setuptools curl`. It then installs
-      Python PIP for Python 3.7 and the following PIP packages:
-      `wrapt cantools prompt_toolkit python-can can-isotp matplotlib`. It also installs a systemd
-      service called `cansim` that periodically transmits data on the virtual SocketCAN bus `vcan0`
-      to simulate vehicle data.
+   1. Install the following Ubuntu packages: `python3 python3-pip`. It then installs the following
+      PIP packages: `wrapt cantools prompt_toolkit python-can can-isotp matplotlib`. It also
+      installs a systemd service called `cansim` that periodically transmits data on the virtual
+      SocketCAN bus `vcan0` to simulate vehicle data.
 
    ```bash
    sudo -H ./tools/install-deps-native.sh \
@@ -335,9 +334,8 @@ collect data from it.
 1. Run the following _on the development machine_ to install the dependencies of the AWS IoT
    FleetWise Cloud demo script:
 
-   1. Following command installs the following Ubuntu packages: `python3.7 python3-setuptools curl`.
-      It then installs Python PIP for Python 3.7 and the following PIP packages:
-      `wrapt plotly pandas cantools`
+   1. Following command installs the following Ubuntu packages: `python3 python3-pip`. It then
+      installs the following PIP packages: `wrapt plotly pandas cantools`
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
@@ -1579,12 +1577,14 @@ Customers can set the System level logging severity externally via the software 
 described below in the configuration section. Each log entry includes the following attributes:
 
 ```
-[Thread: ID] [Time] [Level] [function]: [Message]
+[Thread: ID] [Time] [Level] [Filename:LineNumber] [Function()]: [Message]
 ```
 
 - Thread — the thread ID triggering the log entry.
 - Time — the timestamp in milliseconds since Epoch.
 - Level — the severity of the log entry.
+- Filename - the file name that invoked the log entry.
+- LineNumber - the line in the file that invoked the log entry.
 - Function — the function name that invoked the log entry.
 - Message — the actual log message.
 
@@ -1692,11 +1692,9 @@ The kernel module for ISO-TP (can-isotp) would need to be installed in addition 
 The device software code base includes modules that are still in development an are disabled by
 default. These modules are not intended for use in a production environment. This includes the Data
 Distribution Service Support (DDS) that is used to communicate with any sensor node connected over a
-DDS bus, a Remote Profiler module that helps sending traces from the device to AWS Cloud Watch, and
-a JSON data serialization module that’s intended for dumping the collected data in a JSON format
-locally (mainly for local debugging needs). The device software has been checked for any memory
-leaks and runtime errors such as type overflows using Valgrind. No issues have been detected during
-the load tests.
+DDS bus and a Remote Profiler module that helps sending traces from the device to AWS Cloud Watch.
+The device software has been checked for any memory leaks and runtime errors such as type overflows
+using Valgrind. No issues have been detected during the load tests.
 
 ## Getting Help
 

@@ -24,9 +24,6 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesa
 
     ```bash
     cd ~/aws-iot-fleetwise-edge
-    CODENAME=$(grep UBUNTU_CODENAME /etc/os-release | cut -d'=' -f2 )
-    # update the ubuntu version to your host
-    sed -i "s/bionic/${CODENAME}/g" ./tools/arm64.list
     sudo -H ./tools/install-deps-cross-arm64.sh \
         && rm -rf build \
         && ./tools/build-fwe-cross-arm64.sh
@@ -78,9 +75,9 @@ on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 1. Use screen command on your develop machine terminal to veiw serial output.(Modify the device path
    `/dev/xxxxx` to the correct path)
 
-```
-screen /dev/xxxxx 1843200
-```
+   ```bash
+   screen /dev/xxxxx 1843200
+   ```
 
 1. Power on S4 Spider board. You can see the count down during U-Boot. Hit enter key to stop U-Boot.
 1. Enter following settings to flash the micro SD-card data to board
@@ -157,12 +154,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
        && sudo mkdir -p /etc/aws-iot-fleetwise \
        && sudo cp config/* /etc/aws-iot-fleetwise
 
-    cp ./tools/install-socketcan.sh ./tools/setup-vcan.sh
-    sed -i '17,68d' ./tools/setup-vcan.sh
-    ./tools/setup-vcan.sh
-    sudo ./tools/install-fwe.sh
-    sed -i 's/python3.7/python3/g' ./tools/cansim/run-cansim.sh
-    sed -i 's/python3.7/python3/g' ./tools/install-cansim.sh
+    sudo ./tools/install-socketcan.sh
     sed -i -e 's/^After/# After/' -e 's/^Wants/#Wants/' ./tools/cansim/cansim@.service
     sudo -H ./tools/install-cansim.sh
    ```
@@ -181,8 +173,6 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud
-   sed -i 's/python3.7/python3/g' ./install-deps.sh
    sudo -H ./install-deps.sh
-   sed -i 's/python3.7/python3/g' ./demo.sh
    ./demo.sh --vehicle-name fwdemo-rcars4 --campaign-file campaign-obd-heartbeat.json
    ```

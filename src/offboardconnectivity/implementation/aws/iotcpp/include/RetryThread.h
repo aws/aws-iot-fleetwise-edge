@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "LoggingModule.h"
 #include "Thread.h"
 #include <atomic>
 
@@ -92,8 +91,6 @@ private:
     const uint32_t fMaxBackoffMs;
 
     uint32_t fCurrentWaitTime;
-
-    LoggingModule fLogger;
 
     Thread fThread;
     std::atomic<bool> fShouldStop;

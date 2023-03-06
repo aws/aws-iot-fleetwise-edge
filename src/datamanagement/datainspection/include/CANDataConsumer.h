@@ -9,7 +9,6 @@
 #include "ClockHandler.h"
 #include "IDecoderDictionary.h"
 #include "IVehicleDataConsumer.h"
-#include "LoggingModule.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "Timer.h"
@@ -98,7 +97,6 @@ private:
     std::atomic<bool> mShouldStop{ false };
     std::atomic<bool> mShouldSleep{ false };
     mutable std::mutex mThreadMutex;
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     std::mutex mDecoderDictMutex;
     std::unique_ptr<CANDecoder> mCANDecoder;

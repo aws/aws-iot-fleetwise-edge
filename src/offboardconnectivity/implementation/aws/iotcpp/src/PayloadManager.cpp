@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "PayloadManager.h"
+#include "LoggingModule.h"
 #include "TraceModule.h"
 #include <cstring>
 #include <memory>
@@ -24,7 +25,7 @@ PayloadManager::preparePayload( uint8_t *const buf,
     if ( buf == nullptr )
     {
         TraceModule::get().incrementVariable( TraceVariable::PM_MEMORY_NULL );
-        mLogger.error( "PayloadManager::preparePayload", "Payload provided is empty" );
+        FWE_LOG_ERROR( "Payload provided is empty" );
         return false;
     }
 
@@ -35,7 +36,7 @@ PayloadManager::preparePayload( uint8_t *const buf,
     if ( size < ( data.size() + hdrSize ) )
     {
         TraceModule::get().incrementVariable( TraceVariable::PM_MEMORY_INSUFFICIENT );
-        mLogger.error( "PayloadManager::preparePayload", "Payload Buffer size not sufficient" );
+        FWE_LOG_ERROR( "Payload Buffer size not sufficient" );
         return false;
     }
 
@@ -57,7 +58,7 @@ PayloadManager::storeData( const std::uint8_t *buf,
     bool isDataPersisted = false;
     if ( collectionSchemeParams.persist )
     {
-        mLogger.trace( "PayloadManager::storeData", "The schema activates data persistency" );
+        FWE_LOG_TRACE( "The schema activates data persistency" );
         std::string payload;
         if ( buf != nullptr )
         {
@@ -68,14 +69,12 @@ PayloadManager::storeData( const std::uint8_t *buf,
         // compress it anyway for storage
         if ( !collectionSchemeParams.compression )
         {
-            mLogger.trace( "PayloadManager::storeData",
-                           "CollectionScheme does not activate compression, but will apply compression for local "
+            FWE_LOG_TRACE( "CollectionScheme does not activate compression, but will apply compression for local "
                            "persistency anyway" );
             if ( snappy::Compress( payload.data(), payload.size(), &compressedData ) == 0u )
             {
                 TraceModule::get().incrementVariable( TraceVariable::PM_COMPRESS_ERROR );
-                mLogger.error( "PayloadManager::storeData",
-                               "Error occurred when compressing the payload. The payload is likely corrupted." );
+                FWE_LOG_ERROR( "Error occurred when compressing the payload. The payload is likely corrupted." );
                 return isDataPersisted;
             }
         }
@@ -87,34 +86,33 @@ PayloadManager::storeData( const std::uint8_t *buf,
 
         size_t totalWriteSize = compressedData.size() + sizeof( PayloadHeader );
         // Allocate a bigger buffer to prefix payload header to the payload
-        std::unique_ptr<uint8_t[]> writeBuffer( new uint8_t[totalWriteSize]() );
+        std::vector<uint8_t> writeBuffer( totalWriteSize );
         // Add metadata to the payload before storage
-        if ( !preparePayload( writeBuffer.get(), totalWriteSize, compressedData, collectionSchemeParams ) )
+        if ( !preparePayload( writeBuffer.data(), totalWriteSize, compressedData, collectionSchemeParams ) )
         {
-            mLogger.error( "PayloadManager::storeData", "Error occurred during payload preparation" );
+            FWE_LOG_ERROR( "Error occurred during payload preparation" );
             return isDataPersisted;
         }
 
-        ErrorCode status = mPersistencyPtr->write( writeBuffer.get(), totalWriteSize, DataType::EDGE_TO_CLOUD_PAYLOAD );
+        ErrorCode status =
+            mPersistencyPtr->write( writeBuffer.data(), totalWriteSize, DataType::EDGE_TO_CLOUD_PAYLOAD );
 
         if ( status == ErrorCode::SUCCESS )
         {
             // set the ErrorCode::SUCCESSful storage flag to true
             isDataPersisted = true;
-            mLogger.trace( "PayloadManager::storeData",
-                           "Payload of size: " + std::to_string( totalWriteSize ) +
-                               " Bytes (header: " + std::to_string( sizeof( PayloadHeader ) ) +
-                               ") has been ErrorCode::SUCCESSfully persisted" );
+            FWE_LOG_TRACE( "Payload of size : " + std::to_string( totalWriteSize ) + " Bytes (header: " +
+                           std::to_string( sizeof( PayloadHeader ) ) + ") has been ErrorCode::SUCCESSfully persisted" );
         }
         else
         {
             TraceModule::get().incrementVariable( TraceVariable::PM_STORE_ERROR );
-            mLogger.error( "PayloadManager::storeData", "Failed to persist data on disk" );
+            FWE_LOG_ERROR( "Failed to persist data on disk" );
         }
     }
     else
     {
-        mLogger.trace( "PayloadManager::storeData", "CollectionScheme does not activate persistency on disk" );
+        FWE_LOG_TRACE( "CollectionScheme does not activate persistency on disk" );
     }
     return isDataPersisted;
 }
@@ -130,8 +128,8 @@ PayloadManager::retrieveData( std::vector<std::string> &data )
     }
 
     // Parsed data will be stored here
-    std::unique_ptr<uint8_t[]> readBuffer( new uint8_t[readSize] );
-    ErrorCode status = mPersistencyPtr->read( readBuffer.get(), readSize, DataType::EDGE_TO_CLOUD_PAYLOAD );
+    std::vector<uint8_t> readBuffer( readSize );
+    ErrorCode status = mPersistencyPtr->read( readBuffer.data(), readSize, DataType::EDGE_TO_CLOUD_PAYLOAD );
 
     if ( status != ErrorCode::SUCCESS )
     {
@@ -149,7 +147,7 @@ PayloadManager::retrieveData( std::vector<std::string> &data )
         {
             size_t j = 0;
             PayloadHeader payloadHdr{};
-            memcpy( &payloadHdr, &( readBuffer.get()[pos] ), sizeof( PayloadHeader ) );
+            memcpy( &payloadHdr, &( readBuffer[pos] ), sizeof( PayloadHeader ) );
             pos += sizeof( PayloadHeader );
 
             // capture the size of the payload
@@ -159,7 +157,7 @@ PayloadManager::retrieveData( std::vector<std::string> &data )
             dataString.clear();
             for ( j = 0; ( j < size ) && ( ( pos + j ) < readSize ); ++j )
             {
-                dataString += ( readBuffer.get()[pos + j] ); // NOLINT(clang-diagnostic-sign-conversion)
+                dataString += static_cast<char>( readBuffer[pos + j] );
             }
 
             std::string payloadData;
@@ -167,15 +165,13 @@ PayloadManager::retrieveData( std::vector<std::string> &data )
             // uncompress if the collectionScheme did not require compression
             if ( !payloadHdr.compressionRequired )
             {
-                mLogger.trace( "PayloadManager::retrieveData",
-                               "CollectionScheme does not require compression, uncompress " +
-                                   std::to_string( dataString.size() ) +
-                                   " bytes before transmitting the "
-                                   "persisted data." );
+                FWE_LOG_TRACE( "CollectionScheme does not require compression, uncompress " +
+                               std::to_string( dataString.size() ) +
+                               " bytes before transmitting the "
+                               "persisted data." );
                 if ( !snappy::Uncompress( dataString.data(), dataString.size(), &payloadData ) )
                 {
-                    mLogger.error(
-                        "PayloadManager::retrieveData",
+                    FWE_LOG_ERROR(
                         "Error occurred while un-compressing the payload from disk. The payload is likely corrupted." );
                     return ErrorCode::INVALID_DATA;
                 }
@@ -189,8 +185,7 @@ PayloadManager::retrieveData( std::vector<std::string> &data )
             pos += j;
         }
     }
-    mLogger.info( "PayloadManager::retrieveData",
-                  "Payload of Size: " + std::to_string( readSize ) + " Bytes has been loaded from disk" );
+    FWE_LOG_INFO( "Payload of Size: " + std::to_string( readSize ) + " Bytes has been loaded from disk" );
 
     return ErrorCode::SUCCESS;
 }

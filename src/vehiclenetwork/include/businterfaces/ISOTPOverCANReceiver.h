@@ -6,7 +6,6 @@
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
 #include "ClockHandler.h"
-#include "LoggingModule.h"
 #include "Timer.h"
 #include "datatypes/ISOTPOverCANOptions.h"
 #include <iostream>
@@ -50,7 +49,7 @@ public:
      * @brief Close the Socket between the source and the destination
      * @return True if success, False otherwise
      */
-    bool disconnect();
+    bool disconnect() const;
 
     /**
      * @brief Checks the health state of the connection.
@@ -81,7 +80,6 @@ public:
 private:
     ISOTPOverCANReceiverOptions mReceiverOptions;
     Timer mTimer;
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     int mSocket{};
 };

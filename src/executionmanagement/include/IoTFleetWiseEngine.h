@@ -9,7 +9,6 @@
 #include "CacheAndPersist.h"
 #include "ClockHandler.h"
 #include "CollectionInspectionWorkerThread.h"
-#include "CollectionScheme.h"
 #include "CollectionSchemeManager.h"
 #include "DataCollectionSender.h"
 #ifdef FWE_FEATURE_CAMERA
@@ -19,7 +18,6 @@
 #include "IWaveGpsSource.h"
 #endif
 #include "IDataReadyToPublishListener.h"
-#include "LoggingModule.h"
 #include "OBDOverCANModule.h"
 #include "RemoteProfiler.h"
 #include "Schema.h"
@@ -90,24 +88,6 @@ public:
      */
     bool checkAndSendRetrievedData();
 
-    /**
-     * @brief Attach a vehicle data source to IoTFleetWise. All functions in the data source must be
-     * thread safe. The source instance is needed so that FleetWise can access its output data
-     * buffer ( holding the vehicle data messages ) and to register to the connect and disconnect
-     * events. A vehicle data consumer will be attached to the source.
-     * This function can be called either on startup or runtime.
-     * The life cycle of the source is managed by the caller ( e.g. init, connect, disconnect).
-     */
-    void attachVehicleDataSource( VehicleDataSourcePtr vehicleDataSource );
-
-    /**
-     * @brief Detach a vehicle data source to IoTFleetWise. No further data produced by this source
-     * will be visible to IoTFleetWise.
-     * This function can be called either on shutdown or runtime.
-     * The life cycle of the source is managed by the caller ( e.g. init, connect, disconnect).
-     */
-    static void detachVehicleDataSource( VehicleDataSourcePtr vehicleDataSource );
-
 private:
     // atomic state of the bus. If true, we should stop
     bool shouldStop() const;
@@ -133,10 +113,8 @@ private:
     Timer mPrintMetricsCyclicTimer;
     uint64_t mPrintMetricsCyclicPeriodMs{ 0 }; // default to 0 which means no cyclic printing
 
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     std::unique_ptr<VehicleDataSourceBinder> mVehicleDataSourceBinder;
-    CollectionSchemePtr mCollectionScheme;
 
     std::shared_ptr<OBDOverCANModule> mOBDOverCANModule;
     std::shared_ptr<DataCollectionSender> mDataCollectionSender;

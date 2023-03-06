@@ -5,7 +5,6 @@
 
 // Includes
 #include "CollectionInspectionAPITypes.h"
-#include "LoggingModule.h"
 #include "OBDDataDecoder.h"
 #include "businterfaces/ISOTPOverCANSenderReceiver.h"
 
@@ -142,7 +141,6 @@ private:
     bool requestDTCs( const SID sid );
     bool receiveDTCs( const SID sid, DTCInfo &info );
 
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     // A map contains the Supported PIDs for each service mode
     std::unordered_map<SID, SupportedPIDs> mSupportedPIDs;

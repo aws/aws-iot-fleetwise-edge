@@ -7,7 +7,6 @@
 #include "CollectionInspectionEngine.h"
 #include "IDataReadyToPublishListener.h"
 #include "Listener.h"
-#include "LoggingModule.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "Timer.h"
@@ -111,7 +110,7 @@ private:
 
     static void doWork( void *data );
 
-    TimePoint calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs );
+    static TimePoint calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs );
 
     CollectionInspectionEngine fCollectionInspectionEngine;
 
@@ -126,7 +125,6 @@ private:
     std::mutex fInspectionMatrixMutex;
     std::mutex fThreadMutex;
     Platform::Linux::Signal fWait;
-    LoggingModule fLogger;
     uint32_t fIdleTimeMs{ DEFAULT_THREAD_IDLE_TIME_MS };
     std::shared_ptr<const Clock> fClock = ClockHandler::getClock();
 };

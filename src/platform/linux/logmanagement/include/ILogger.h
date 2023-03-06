@@ -25,10 +25,16 @@ public:
      * @brief Logs a log message in different way depending on the implementation class
      *
      * @param level log level
+     * @param filename calling file
+     * @param lineNumber line number
      * @param function calling function
      * @param logEntry actual message
      */
-    virtual void logMessage( LogLevel level, const std::string &function, const std::string &logEntry ) = 0;
+    virtual void logMessage( LogLevel level,
+                             const std::string &filename,
+                             const uint32_t lineNumber,
+                             const std::string &function,
+                             const std::string &logEntry ) = 0;
 
     /**
      * @brief converts the Log Level enum to a human readable string

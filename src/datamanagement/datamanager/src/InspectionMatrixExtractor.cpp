@@ -3,6 +3,7 @@
 
 // Includes
 #include "CollectionSchemeManager.h"
+#include "LoggingModule.h"
 #include "TraceModule.h"
 #include <stack>
 #include <string>
@@ -38,6 +39,7 @@ CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectio
         inspectionSignal.minimumSampleIntervalMs = collectionSignals[i].minimumSampleIntervalMs;
         inspectionSignal.fixedWindowPeriod = collectionSignals[i].fixedWindowPeriod;
         inspectionSignal.isConditionOnlySignal = collectionSignals[i].isConditionOnlySignal;
+        inspectionSignal.signalType = getSignalType( collectionSignals[i].signalID );
         conditionData.signals.emplace_back( inspectionSignal );
     }
 
@@ -51,8 +53,7 @@ CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectio
         CANFrame.minimumSampleIntervalMs = collectionCANFrames[i].minimumSampleIntervalMs;
         if ( CANFrame.channelID == INVALID_CAN_SOURCE_NUMERIC_ID )
         {
-            mLogger.warn( "CollectionSchemeManager::addConditionData",
-                          "Invalid Interface ID provided: " + collectionCANFrames[i].interfaceID );
+            FWE_LOG_WARN( "Invalid Interface ID provided: " + collectionCANFrames[i].interfaceID );
         }
         else
         {

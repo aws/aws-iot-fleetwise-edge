@@ -6,10 +6,10 @@
 // Includes
 #include "IReceiver.h"
 #include "ISender.h"
-#include "LoggingModule.h"
 #include "PayloadManager.h"
 #include <atomic>
 #include <aws/crt/Api.h>
+#include <cstddef>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -60,6 +60,8 @@ using Aws::IoTFleetWise::OffboardConnectivity::ConnectivityError;
  * constructor must be established before anything meaningful can be done with this class
  * @see AwsIotConnectivityModule
  */
+// coverity[cert_dcl60_cpp_violation] false positive - class only defined once
+// coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
 class AwsIotChannel : public Aws::IoTFleetWise::OffboardConnectivity::ISender,
                       public Aws::IoTFleetWise::OffboardConnectivity::IReceiver
 {
@@ -108,9 +110,10 @@ public:
 
     size_t getMaxSendSize() const override;
 
-    ConnectivityError send( const std::uint8_t *buf,
-                            size_t size,
-                            struct CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) override;
+    ConnectivityError sendBuffer(
+        const std::uint8_t *buf,
+        size_t size,
+        struct CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) override;
 
     bool
     isTopicValid()
@@ -148,7 +151,6 @@ private:
     std::shared_ptr<PayloadManager> mPayloadManager;
     std::string mTopicName;
     std::atomic<bool> mSubscribed;
-    Aws::IoTFleetWise::Platform::Linux::LoggingModule mLogger;
 
     bool mSubscribeAsynchronously;
 };

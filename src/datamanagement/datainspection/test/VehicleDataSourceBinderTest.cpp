@@ -7,6 +7,7 @@
 #include "IActiveDecoderDictionaryListener.h"
 #include "Signal.h"
 #include "Thread.h"
+#include "WaitUntil.h"
 #include "businterfaces/CANDataSource.h"
 #include <functional>
 #include <gtest/gtest.h>
@@ -24,6 +25,7 @@ using namespace Aws::IoTFleetWise::DataInspection;
 using namespace Aws::IoTFleetWise::VehicleNetwork;
 using namespace Aws::IoTFleetWise::DataManagement;
 using namespace Aws::IoTFleetWise::Platform::Linux;
+using namespace Aws::IoTFleetWise::TestingSupport;
 
 static int
 setup()
@@ -450,7 +452,7 @@ protected:
         VehicleDataSourceConfig canSourceConfig;
         canSourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
         canSourceConfig.transportProperties.emplace( "protocolName", "CAN" );
-        canSourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
+        canSourceConfig.transportProperties.emplace( "threadIdleTimeMs", "100" );
         canSourceConfig.maxNumberOfVehicleDataMessages = 1000;
         std::vector<VehicleDataSourceConfig> canSourceConfigs = { canSourceConfig };
         canSourcePtr = std::make_shared<CANDataSource>();
@@ -466,8 +468,8 @@ protected:
 
         canConsumerPtr = std::make_shared<CANDataConsumer>();
         canConsumerPtr2 = std::make_shared<CANDataConsumer>();
-        ASSERT_TRUE( canConsumerPtr->init( 0, canSignalBufferPtr, 1000 ) );
-        ASSERT_TRUE( canConsumerPtr2->init( 1, canSignalBufferPtr, 1000 ) );
+        ASSERT_TRUE( canConsumerPtr->init( 0, canSignalBufferPtr, 100 ) );
+        ASSERT_TRUE( canConsumerPtr2->init( 1, canSignalBufferPtr, 100 ) );
         canConsumerPtr->setCANBufferPtr( canRawBufferPtr );
         canConsumerPtr2->setCANBufferPtr( canRawBufferPtr );
         ASSERT_TRUE( binder.connect() );
@@ -497,22 +499,24 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestCollectCANFrame 
 
     binder.onChangeOfActiveDictionary( canDictionarySharedPtr, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    struct can_frame frame = {};
-    sendTestMessage( socketFD, frame );
-    // Sleep for sometime on this thread to allow the other thread to finish
-    // As SocketCanBusChannel and CANDataConsumer wait 1 second we must
-    // wait more than 2 seconds here
-    std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
-
     // Verify raw CAN Frames are collected correctly
     CollectedCanRawFrame rawCANMsg;
-    ASSERT_TRUE( canConsumerPtr->getCANBufferPtr()->pop( rawCANMsg ) );
+    struct can_frame frame = {};
+    auto sendAndPop = [&] {
+        sendTestMessage( socketFD, frame );
+        return canConsumerPtr->getCANBufferPtr()->pop( rawCANMsg );
+    };
+    WAIT_ASSERT_TRUE( sendAndPop() );
     ASSERT_EQ( 8, rawCANMsg.size );
     for ( int i = 0; i < rawCANMsg.size; ++i )
     {
         ASSERT_EQ( frame.data[i], rawCANMsg.data[i] );
     }
-    ASSERT_TRUE( canConsumerPtr2->getCANBufferPtr()->pop( rawCANMsg ) );
+    auto sendAndPop2 = [&] {
+        sendTestMessage( socketFD, frame );
+        return canConsumerPtr2->getCANBufferPtr()->pop( rawCANMsg );
+    };
+    WAIT_ASSERT_TRUE( sendAndPop2() );
     ASSERT_EQ( 8, rawCANMsg.size );
     for ( int i = 0; i < rawCANMsg.size; ++i )
     {
@@ -529,21 +533,24 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestCollectSelectedS
 
     binder.onChangeOfActiveDictionary( canDictionarySharedPtr, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    struct can_frame frame = {};
-    sendTestMessage( socketFD, frame );
-    // Sleep for sometime on this thread to allow the other thread to finish
-    // As SocketCanBusChannel and CANDataConsumer wait 1 second we must
-    // wait more than 2 seconds here
-    std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
-
     // Verify signals are decoded and collected correctly
     CollectedSignal signal;
-    ASSERT_TRUE( canConsumerPtr->getSignalBufferPtr()->pop( signal ) );
+    auto sendAndPop = [&] {
+        struct can_frame frame = {};
+        sendTestMessage( socketFD, frame );
+        return canConsumerPtr->getSignalBufferPtr()->pop( signal );
+    };
+    WAIT_ASSERT_TRUE( sendAndPop() );
     ASSERT_EQ( 0x123, signal.signalID );
-    ASSERT_DOUBLE_EQ( 0x0804, signal.value );
-    ASSERT_TRUE( canConsumerPtr2->getSignalBufferPtr()->pop( signal ) );
+    ASSERT_DOUBLE_EQ( 0x0804, signal.value.value.doubleVal );
+    auto sendAndPop2 = [&] {
+        struct can_frame frame = {};
+        sendTestMessage( socketFD, frame );
+        return canConsumerPtr2->getSignalBufferPtr()->pop( signal );
+    };
+    WAIT_ASSERT_TRUE( sendAndPop2() );
     ASSERT_EQ( 0x123, signal.signalID );
-    ASSERT_DOUBLE_EQ( 0x0804, signal.value );
+    ASSERT_DOUBLE_EQ( 0x0804, signal.value.value.doubleVal );
 }
 
 /** @brief In this test, no signals in the CAN Frame will be collected based on decoder dictionary
@@ -554,17 +561,20 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestNotCollectSignal
 
     binder.onChangeOfActiveDictionary( canDictionarySharedPtr, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    struct can_frame frame = {};
-    sendTestMessage( socketFD, frame );
-    // Sleep for sometime on this thread to allow the other thread to finish
-    // As SocketCanBusChannel and CANDataConsumer wait 1 second we must
-    // wait more than 2 seconds here
-    std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
-
     // Verify NO signals are decoded and collected based on decoder dictionary
     CollectedSignal signal;
-    ASSERT_FALSE( canConsumerPtr->getSignalBufferPtr()->pop( signal ) );
-    ASSERT_FALSE( canConsumerPtr2->getSignalBufferPtr()->pop( signal ) );
+    auto sendAndPop = [&] {
+        struct can_frame frame = {};
+        sendTestMessage( socketFD, frame );
+        return canConsumerPtr->getSignalBufferPtr()->pop( signal );
+    };
+    DELAY_ASSERT_FALSE( sendAndPop() );
+    auto sendAndPop2 = [&] {
+        struct can_frame frame = {};
+        sendTestMessage( socketFD, frame );
+        return canConsumerPtr2->getSignalBufferPtr()->pop( signal );
+    };
+    DELAY_ASSERT_FALSE( sendAndPop2() );
 }
 
 /** @brief In this test, only one signal from the CAN Frame to
@@ -576,31 +586,19 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestCollectSignalBuf
 
     binder.onChangeOfActiveDictionary( canDictionarySharedPtr, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    struct can_frame frame = {};
-
-    auto f = []( int socketFD, struct can_frame frame, int msgCnt ) {
-        for ( int i = 0; i < msgCnt; ++i )
-        {
-            sendTestMessage( socketFD, frame );
-        }
-    };
-
-    std::thread canMessageThread( f, socketFD, frame, 1 );
-    canMessageThread.join();
-    // Sleep for sometime on this thread to allow the other thread to finish
-    // As SocketCanBusChannel and CANDataConsumer wait 1 second we must
-    // wait more than 2 seconds here
-    std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
-
     // Verify signals are decoded and collected correctly
     std::unordered_map<SignalID, double> collectedSignals;
-    CollectedSignal signal;
-    while ( !canConsumerPtr->getSignalBufferPtr()->empty() )
-    {
-        canConsumerPtr->getSignalBufferPtr()->pop( signal );
-        collectedSignals[signal.signalID] = signal.value;
-    }
-    ASSERT_EQ( 2, collectedSignals.size() );
+    auto sendPopAndGetCollectedSize = [&] {
+        struct can_frame frame = {};
+        sendTestMessage( socketFD, frame );
+        CollectedSignal signal;
+        if ( canConsumerPtr->getSignalBufferPtr()->pop( signal ) )
+        {
+            collectedSignals[signal.signalID] = signal.value.value.doubleVal;
+        }
+        return collectedSignals.size();
+    };
+    WAIT_ASSERT_EQ( 2U, sendPopAndGetCollectedSize() );
     ASSERT_EQ( 1, collectedSignals.count( 0x111 ) );
     ASSERT_EQ( 1, collectedSignals.count( 0x528 ) );
     if ( collectedSignals.count( 0x111 ) > 0 )
@@ -622,22 +620,19 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestCollectSignalBuf
 
     binder.onChangeOfActiveDictionary( canDictionarySharedPtr, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    struct can_frame frame = {};
-    sendTestMessage( socketFD, frame );
-    // Sleep for sometime on this thread to allow the other thread to finish
-    // As SocketCanBusChannel and CANDataConsumer wait 1 second we must
-    // wait more than 2 seconds here
-    std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
-
     // Verify signals are decoded and collected correctly
     std::unordered_map<SignalID, double> collectedSignals;
-    CollectedSignal signal;
-    while ( !canConsumerPtr->getSignalBufferPtr()->empty() )
-    {
-        canConsumerPtr->getSignalBufferPtr()->pop( signal );
-        collectedSignals[signal.signalID] = signal.value;
-    }
-    ASSERT_EQ( 4, collectedSignals.size() );
+    auto sendPopAndGetCollectedSize = [&] {
+        struct can_frame frame = {};
+        sendTestMessage( socketFD, frame );
+        CollectedSignal signal;
+        if ( canConsumerPtr->getSignalBufferPtr()->pop( signal ) )
+        {
+            collectedSignals[signal.signalID] = signal.value.value.doubleVal;
+        }
+        return collectedSignals.size();
+    };
+    WAIT_ASSERT_EQ( 4U, sendPopAndGetCollectedSize() );
     ASSERT_EQ( 1, collectedSignals.count( 0x111 ) );
     ASSERT_EQ( 0x0040, collectedSignals[0x111] );
     ASSERT_EQ( 1, collectedSignals.count( 0x528 ) );
@@ -657,22 +652,19 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestCollectSignalBuf
 
     binder.onChangeOfActiveDictionary( canDictionarySharedPtr, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    struct can_frame frame = {};
-    sendTestMessage( socketFD, frame );
-    // Sleep for sometime on this thread to allow the other thread to finish
-    // As SocketCanBusChannel and CANDataConsumer wait 1 second we must
-    // wait more than 2 seconds here
-    std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
-
     // Verify signals are decoded and collected correctly
     std::unordered_map<SignalID, double> collectedSignals;
-    CollectedSignal signal;
-    while ( !canConsumerPtr->getSignalBufferPtr()->empty() )
-    {
-        canConsumerPtr->getSignalBufferPtr()->pop( signal );
-        collectedSignals[signal.signalID] = signal.value;
-    }
-    ASSERT_EQ( 4, collectedSignals.size() );
+    struct can_frame frame = {};
+    auto sendPopAndGetCollectedSize = [&] {
+        sendTestMessage( socketFD, frame );
+        CollectedSignal signal;
+        if ( canConsumerPtr->getSignalBufferPtr()->pop( signal ) )
+        {
+            collectedSignals[signal.signalID] = signal.value.value.doubleVal;
+        }
+        return collectedSignals.size();
+    };
+    WAIT_ASSERT_EQ( 4U, sendPopAndGetCollectedSize() );
     ASSERT_EQ( 1, collectedSignals.count( 0x111 ) );
     ASSERT_EQ( 0x0040, collectedSignals[0x111] );
     ASSERT_EQ( 1, collectedSignals.count( 0x528 ) );
@@ -708,22 +700,19 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestCollectSignalBuf
 
     binder.onChangeOfActiveDictionary( canDictionarySharedPtr, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    struct can_frame frame = {};
-    sendTestExtendedIdMessage( socketFD, frame );
-    // Sleep for sometime on this thread to allow the other thread to finish
-    // As SocketCanBusChannel and CANDataConsumer wait 1 second we must
-    // wait more than 2 seconds here
-    std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
-
     // Verify signals are decoded and collected correctly
     std::unordered_map<SignalID, double> collectedSignals;
-    CollectedSignal signal;
-    while ( !canConsumerPtr->getSignalBufferPtr()->empty() )
-    {
-        canConsumerPtr->getSignalBufferPtr()->pop( signal );
-        collectedSignals[signal.signalID] = signal.value;
-    }
-    ASSERT_EQ( 4, collectedSignals.size() );
+    struct can_frame frame = {};
+    auto sendPopAndGetCollectedSize = [&] {
+        sendTestExtendedIdMessage( socketFD, frame );
+        CollectedSignal signal;
+        if ( canConsumerPtr->getSignalBufferPtr()->pop( signal ) )
+        {
+            collectedSignals[signal.signalID] = signal.value.value.doubleVal;
+        }
+        return collectedSignals.size();
+    };
+    WAIT_ASSERT_EQ( 4U, sendPopAndGetCollectedSize() );
     ASSERT_EQ( 1, collectedSignals.count( 0x111 ) );
     ASSERT_EQ( 0x0040, collectedSignals[0x111] );
     ASSERT_EQ( 1, collectedSignals.count( 0x528 ) );
@@ -771,18 +760,21 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestChangeDecoderDic
     // update dictionary while thread is still busy decoding. This test check whether Vehicle Data
     // Consumer can gracefully handle such multi thread scenario.
     binder.onChangeOfActiveDictionary( canDictionarySharedPtr, VehicleDataSourceProtocol::RAW_SOCKET );
+
     canMessageThread.join();
-    std::this_thread::sleep_for( std::chrono::seconds( 4 ) );
     // Verify signals are decoded and collected correctly
     std::unordered_map<SignalID, double> collectedSignals;
-    CollectedSignal signal;
-    while ( !canConsumerPtr->getSignalBufferPtr()->empty() )
-    {
-        canConsumerPtr->getSignalBufferPtr()->pop( signal );
-        collectedSignals[signal.signalID] = signal.value;
-    }
-    // make sure we still receive the two signals.
-    ASSERT_EQ( 2, collectedSignals.size() );
+    auto sendPopAndGetCollectedSize = [&] {
+        struct can_frame frame = {};
+        sendTestMessage( socketFD, frame );
+        CollectedSignal signal;
+        if ( canConsumerPtr->getSignalBufferPtr()->pop( signal ) )
+        {
+            collectedSignals[signal.signalID] = signal.value.value.doubleVal;
+        }
+        return collectedSignals.size();
+    };
+    WAIT_ASSERT_EQ( 2U, sendPopAndGetCollectedSize() );
     ASSERT_EQ( 1, collectedSignals.count( 0x111 ) );
     ASSERT_EQ( 1, collectedSignals.count( 0x528 ) );
     if ( collectedSignals.count( 0x111 ) > 0 )
@@ -803,28 +795,18 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderTestDiscardInputBuff
 {
     // set decoder dictionary as invalid
     binder.onChangeOfActiveDictionary( nullptr, VehicleDataSourceProtocol::RAW_SOCKET );
-    // give one second for all producer and consumer to shut down
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-    struct can_frame frame = {};
-    auto f = []( int socketFD, struct can_frame frame, int msgCnt ) {
-        for ( int i = 0; i < msgCnt; ++i )
-        {
-            sendTestMessage( socketFD, frame );
-        }
-    };
-    // Create a separate thread to send 8 CAN Frames
-    std::thread canMessageThread( f, socketFD, frame, 8 );
-    // Wait until thread complete.
-    canMessageThread.join();
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+
     // Verify no signals were collected due to missing decoder dictionary
-    ASSERT_TRUE( canConsumerPtr->getSignalBufferPtr()->empty() );
+    auto sendAndCheckConsumerEmpty = [&] {
+        struct can_frame frame = {};
+        sendTestMessage( socketFD, frame );
+        return canConsumerPtr->getSignalBufferPtr()->empty();
+    };
+    DELAY_ASSERT_TRUE( sendAndCheckConsumerEmpty() );
     // Now we provide Vehicle Data Binder a valid decoder dictionary
     binder.onChangeOfActiveDictionary( std::make_shared<CANDecoderDictionary>( generateDecoderDictionary4() ),
                                        VehicleDataSourceProtocol::RAW_SOCKET );
-    // As the network channels just woken up and the consumer input queue is empty, we should still
-    // expect empty output queue
-    ASSERT_TRUE( canConsumerPtr->getSignalBufferPtr()->empty() );
+    WAIT_ASSERT_FALSE( sendAndCheckConsumerEmpty() );
 }
 
 /** @brief In this test, we validate the startup and the shutdown APIs.
@@ -841,7 +823,7 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderStartupAndShutdownCy
     VehicleDataSourceConfig canSourceConfig;
     canSourceConfig.transportProperties.emplace( "interfaceName", "vcan0" );
     canSourceConfig.transportProperties.emplace( "protocolName", "CAN" );
-    canSourceConfig.transportProperties.emplace( "threadIdleTimeMs", "1000" );
+    canSourceConfig.transportProperties.emplace( "threadIdleTimeMs", "100" );
     canSourceConfig.maxNumberOfVehicleDataMessages = 1000;
     std::vector<VehicleDataSourceConfig> canSourceConfigs = { canSourceConfig };
     ASSERT_TRUE( canSource->init( canSourceConfigs ) );
@@ -853,7 +835,7 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderStartupAndShutdownCy
 
     canConsumer = std::make_shared<CANDataConsumer>();
 
-    ASSERT_TRUE( canConsumer->init( 0, signalBufferPtr, 1000 ) );
+    ASSERT_TRUE( canConsumer->init( 0, signalBufferPtr, 100 ) );
     canConsumer->setCANBufferPtr( canRawBufferPtr );
     ASSERT_TRUE( networkBinder.connect() );
     ASSERT_TRUE( networkBinder.addVehicleDataSource( canSource ) );
@@ -861,27 +843,30 @@ TEST_F( VehicleDataSourceBinderTest, VehicleDataSourceBinderStartupAndShutdownCy
     // Initially Channels and Consumers should be running but in a sleep mode
     // We send few messages on the bus and check that they are neither consumed
     // by the Channel nor by the consumer
-    struct can_frame frame = {};
-    sendTestMessage( socketFD, frame );
-    // Sleep to accommodate the polling frequency of the threads.
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-    ASSERT_TRUE( canSource->getBuffer()->empty() );
-    ASSERT_TRUE( canConsumer->getCANBufferPtr()->empty() );
+    auto sendAndCheckSourceEmpty = [&] {
+        struct can_frame frame = {};
+        sendTestMessage( socketFD, frame );
+        return canSource->getBuffer()->empty();
+    };
+    DELAY_ASSERT_TRUE( sendAndCheckSourceEmpty() );
+    auto sendAndCheckConsumerEmpty = [&] {
+        struct can_frame frame = {};
+        sendTestMessage( socketFD, frame );
+        return canConsumer->getCANBufferPtr()->empty();
+    };
+    DELAY_ASSERT_TRUE( sendAndCheckConsumerEmpty() );
     // Pass a null decoder manifest, and check that both the channel and the consumer
     // are still sleeping.
     binder.onChangeOfActiveDictionary( nullptr, VehicleDataSourceProtocol::RAW_SOCKET );
-    sendTestMessage( socketFD, frame );
-    // Sleep to accommodate the polling frequency of the threads.
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-    ASSERT_TRUE( canSource->getBuffer()->empty() );
-    ASSERT_TRUE( canConsumer->getCANBufferPtr()->empty() );
+
+    DELAY_ASSERT_TRUE( sendAndCheckSourceEmpty() );
+    DELAY_ASSERT_TRUE( sendAndCheckConsumerEmpty() );
     // Pass a correct decoder Manifest and Make sure that channel and consumer
     // consumed the data.
     dictionary = std::make_shared<const CANDecoderDictionary>( generateDecoderDictionary1() );
     networkBinder.onChangeOfActiveDictionary( dictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    sendTestMessage( socketFD, frame );
-    std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
-    ASSERT_FALSE( canConsumer->getCANBufferPtr()->empty() );
+
+    WAIT_ASSERT_FALSE( sendAndCheckSourceEmpty() );
+    WAIT_ASSERT_FALSE( sendAndCheckConsumerEmpty() );
     ASSERT_TRUE( networkBinder.disconnect() );
 }

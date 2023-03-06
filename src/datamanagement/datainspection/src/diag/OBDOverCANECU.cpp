@@ -3,6 +3,7 @@
 
 // Includes
 #include "OBDOverCANECU.h"
+#include "LoggingModule.h"
 #include "TraceModule.h"
 #include <sstream>
 #include <string>
@@ -14,7 +15,8 @@ namespace IoTFleetWise
 namespace DataInspection
 {
 
-constexpr size_t OBDOverCANECU::MAX_PID_RANGE;
+// NOLINT below due to C++17 warning of redundant declarations that are required to maintain C++14 compatibility
+constexpr size_t OBDOverCANECU::MAX_PID_RANGE; // NOLINT
 
 bool
 OBDOverCANECU::init( const std::string &gatewayCanInterfaceName,
@@ -40,11 +42,11 @@ OBDOverCANECU::init( const std::string &gatewayCanInterfaceName,
 
     if ( mISOTPSenderReceiver.init( optionsECU ) && mISOTPSenderReceiver.connect() )
     {
-        mLogger.trace( "OBDOverCANECU::init", "Successfully initialized ECU with ecu id: " + mStreamRxID );
+        FWE_LOG_TRACE( "Successfully initialized ECU with ecu id: " + mStreamRxID );
     }
     else
     {
-        mLogger.error( "OBDOverCANECU::init", "Failed to initialize the ECU with ecu id: " + mStreamRxID );
+        FWE_LOG_ERROR( "Failed to initialize the ECU with ecu id: " + mStreamRxID );
         return false;
     }
     return true;
@@ -53,7 +55,7 @@ OBDOverCANECU::init( const std::string &gatewayCanInterfaceName,
 uint32_t
 OBDOverCANECU::flush( uint32_t timeout )
 {
-    mLogger.trace( "OBDOverCANECU::flushSocket", "Flushed socket for ECU with ecu id: " + mStreamRxID );
+    FWE_LOG_TRACE( "Flushed socket for ECU with ecu id: " + mStreamRxID );
     return mISOTPSenderReceiver.flush( timeout );
 }
 
@@ -68,9 +70,8 @@ OBDOverCANECU::requestReceiveSupportedPIDs( const SID sid )
         if ( mSupportedPIDs.find( sid ) == mSupportedPIDs.end() )
         {
             SupportedPIDs allSupportedPIDs;
-            mLogger.trace( "OBDOverCANECU::requestReceiveSupportedPIDs",
-                           "Requesting Supported PIDs from the ECU " + mStreamRxID + " for SID " +
-                               std::to_string( toUType( sid ) ) );
+            FWE_LOG_TRACE( "Requesting Supported PIDs from the ECU " + mStreamRxID + " for SID " +
+                           std::to_string( toUType( sid ) ) );
 
             // Request supported PID range. Per ISO 15765, we can only send six PID at one time
             auto pidList =
@@ -85,8 +86,7 @@ OBDOverCANECU::requestReceiveSupportedPIDs( const SID sid )
                     TraceModule::get().incrementVariable( TraceVariable::OBD_ENG_PID_REQ_ERROR );
                     // log warning as all emissions-related OBD ECUs which support at least one of the
                     // services defined in J1979 shall support Service $01 and PID $00
-                    mLogger.warn( "OBDOverCANECU::requestReceiveSupportedPIDs",
-                                  "Failed to receive supported PID range from the ECU " + mStreamRxID );
+                    FWE_LOG_WARN( "Failed to receive supported PID range from the ECU " + mStreamRxID );
                 }
             }
             // check if we need to send out more PID range request
@@ -101,10 +101,8 @@ OBDOverCANECU::requestReceiveSupportedPIDs( const SID sid )
                 }
             }
             mSupportedPIDs.emplace( sid, allSupportedPIDs );
-            mLogger.traceBytesInVector( "OBDOverCANECU::requestReceiveSupportedPIDs",
-                                        "ECU " + mStreamRxID + " supports PIDs for SID " +
-                                            std::to_string( toUType( sid ) ),
-                                        allSupportedPIDs );
+            FWE_LOG_TRACE( "ECU " + mStreamRxID + " supports PIDs for SID " + std::to_string( toUType( sid ) ) + ": " +
+                           getStringFromBytes( allSupportedPIDs ) );
         }
     }
     return numRequests;
@@ -135,16 +133,38 @@ OBDOverCANECU::requestReceiveEmissionPIDs( const SID sid )
                 // Note Signal buffer is a multi producer single consumer queue. Besides current thread,
                 // Vehicle Data Consumer will also push signals onto this buffer
                 TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-                if ( !mSignalBufferPtr->push( CollectedSignal( signals.first, receptionTime, signals.second ) ) )
+                struct CollectedSignal collectedSignal;
+                const auto signalType = signals.second.signalType;
+                switch ( signalType )
+                {
+                case SignalType::UINT64:
+                    collectedSignal = CollectedSignal{
+                        signals.first, receptionTime, signals.second.signalValue.uint64Val, signalType };
+                    FWE_LOG_TRACE( "Received Signal " + std::to_string( signals.first ) + " : " +
+                                   std::to_string( signals.second.signalValue.uint64Val ) +
+                                   " for ECU: " + mStreamRxID );
+                    break;
+                case SignalType::INT64:
+                    collectedSignal = CollectedSignal{
+                        signals.first, receptionTime, signals.second.signalValue.int64Val, signalType };
+                    FWE_LOG_TRACE( "Received Signal " + std::to_string( signals.first ) + " : " +
+                                   std::to_string( signals.second.signalValue.int64Val ) + " for ECU: " + mStreamRxID );
+                    break;
+                default:
+                    collectedSignal = CollectedSignal{
+                        signals.first, receptionTime, signals.second.signalValue.doubleVal, signalType };
+                    FWE_LOG_TRACE( "Received Signal " + std::to_string( signals.first ) + " : " +
+                                   std::to_string( signals.second.signalValue.doubleVal ) +
+                                   " for ECU: " + mStreamRxID );
+                    break;
+                }
+
+                if ( !mSignalBufferPtr->push( collectedSignal ) )
                 {
                     TraceModule::get().decrementAtomicVariable(
                         TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-                    mLogger.warn( "OBDOverCANECU::requestReceiveEmissionPIDs",
-                                  "Signal Buffer full with ECU " + mStreamRxID );
+                    FWE_LOG_WARN( "Signal Buffer full with ECU " + mStreamRxID );
                 }
-                mLogger.trace( "OBDOverCANECU::requestReceiveEmissionPIDs",
-                               "Received Signal " + std::to_string( signals.first ) + ": " +
-                                   std::to_string( signals.second ) + " for ECU: " + mStreamRxID );
             }
         }
     }
@@ -159,12 +179,11 @@ OBDOverCANECU::getDTCData( DTCInfo &dtcInfo, size_t &numRequests )
     if ( requestReceiveDTCs( SID::STORED_DTC, dtcInfo ) )
     {
         successfulDTCRequest = true;
-        mLogger.trace( "OBDOverCANECU::getDTCData",
-                       "Total number of DTCs: " + std::to_string( dtcInfo.mDTCCodes.size() ) );
+        FWE_LOG_TRACE( "Total number of DTCs: " + std::to_string( dtcInfo.mDTCCodes.size() ) );
     }
     else
     {
-        mLogger.warn( "OBDOverCANECU::getDTCData", "Failed to receive DTCs for ECU: " + mStreamRxID );
+        FWE_LOG_WARN( "Failed to receive DTCs for ECU: " + mStreamRxID );
     }
     return successfulDTCRequest;
 }
@@ -178,23 +197,22 @@ OBDOverCANECU::requestReceivePIDs( SupportedPIDs::iterator &pidItr,
     std::vector<PID> currPIDs;
     while ( ( currPIDs.size() < MAX_PID_RANGE ) && ( pidItr != pids.end() ) )
     {
-        currPIDs.push_back( *pidItr++ );
+        currPIDs.push_back( *pidItr );
+        pidItr++;
     }
 
     if ( requestPIDs( sid, currPIDs ) )
     {
         if ( receivePIDs( sid, currPIDs, info ) )
         {
-            mLogger.trace( "OBDOverCANECU::requestReceivePIDs",
-                           "Received Emission PID data for SID: " + std::to_string( toUType( sid ) ) +
-                               " with ECU: " + mStreamRxID );
+            FWE_LOG_TRACE( "Received Emission PID data for SID: " + std::to_string( toUType( sid ) ) +
+                           " with ECU: " + mStreamRxID );
         }
         else
         {
             TraceModule::get().incrementVariable( TraceVariable::OBD_ENG_PID_REQ_ERROR );
-            mLogger.warn( "OBDOverCANECU::requestReceivePIDs",
-                          "Failed to receive emission PID data for SID: " + std::to_string( toUType( sid ) ) +
-                              " with ECU: " + mStreamRxID );
+            FWE_LOG_WARN( "Failed to receive emission PID data for SID: " + std::to_string( toUType( sid ) ) +
+                          " with ECU: " + mStreamRxID );
         }
     }
 }
@@ -213,7 +231,7 @@ OBDOverCANECU::receiveSupportedPIDs( const SID sid, SupportedPIDs &supportedPIDs
     {
         return true;
     }
-    mLogger.warn( "OBDOverCANECU::receiveSupportedPIDs", "Failed to decode PDU for ECU " + mStreamRxID );
+    FWE_LOG_WARN( "Failed to decode PDU for ECU " + mStreamRxID );
     return false;
 }
 
@@ -230,12 +248,14 @@ OBDOverCANECU::requestPIDs( const SID sid, const std::vector<PID> &pids )
     }
 
     // First insert the SID
-    mTxPDU.emplace_back( static_cast<uint8_t>( sid ) );
+    mTxPDU.push_back( static_cast<uint8_t>( sid ) );
     // Then insert the items of the PIDs
-    mTxPDU.insert( std::end( mTxPDU ), std::begin( pids ), std::end( pids ) );
-    mLogger.trace( "OBDOverCANECU::requestPIDs",
-                   "Start to request emission PID data for SID: " + std::to_string( toUType( sid ) ) +
-                       " with ECU: " + mStreamRxID );
+    for ( auto pid : pids )
+    {
+        mTxPDU.push_back( pid );
+    }
+    FWE_LOG_TRACE( "Start to request emission PID data for SID: " + std::to_string( toUType( sid ) ) +
+                   " with ECU: " + mStreamRxID );
 
     return mISOTPSenderReceiver.sendPDU( mTxPDU );
 }
@@ -248,7 +268,7 @@ OBDOverCANECU::receivePIDs( const SID sid, const std::vector<PID> &pids, Emissio
     // decoded according to J1979 8.1.2.2
     if ( !mISOTPSenderReceiver.receivePDU( ecuResponse ) )
     {
-        mLogger.warn( "OBDOverCANECU::receivePIDs", "Failed to receive PDU for ECU " + mStreamRxID );
+        FWE_LOG_WARN( "Failed to receive PDU for ECU " + mStreamRxID );
         return false;
     }
     // The info structure will be appended with the new decoded PIDs
@@ -258,8 +278,7 @@ OBDOverCANECU::receivePIDs( const SID sid, const std::vector<PID> &pids, Emissio
     }
     else
     {
-        mLogger.warn( "OBDOverCANECU::receivePIDs",
-                      "Failed to receive PID: ECU response is empty for ECU " + mStreamRxID );
+        FWE_LOG_WARN( "Failed to receive PID: ECU response is empty for ECU " + mStreamRxID );
         return false;
     }
     return true;
@@ -306,9 +325,8 @@ OBDOverCANECU::requestReceiveDTCs( const SID sid, DTCInfo &info )
     }
     else
     {
-        mLogger.warn( "OBDOverCANECU::requestReceiveDTCs",
-                      "Can't request/receive ECU PIDs, with ECU: " + mStreamRxID +
-                          " for SID: " + std::to_string( toUType( sid ) ) );
+        FWE_LOG_WARN( "Can't request/receive ECU PIDs, with ECU: " + mStreamRxID +
+                      " for SID: " + std::to_string( toUType( sid ) ) );
     }
     return false;
 }
@@ -352,7 +370,7 @@ OBDOverCANECU::updatePIDRequestList( const SID sid,
         std::copy_if( pidIntersectionList.begin(),
                       pidIntersectionList.end(),
                       std::back_inserter( pidsToRequest ),
-                      [&]( PID pid ) {
+                      [&]( PID pid ) -> bool {
                           if ( pidAssigned.count( pid ) == 0 )
                           {
                               pidAssigned.insert( pid );
@@ -363,8 +381,7 @@ OBDOverCANECU::updatePIDRequestList( const SID sid,
                               return false;
                           }
                       } );
-        mLogger.traceBytesInVector(
-            "OBDOverCANECU::updatePIDRequestList", "The PIDs to request from " + mStreamRxID + " are", pidsToRequest );
+        FWE_LOG_TRACE( "The PIDs to request from " + mStreamRxID + " are: " + getStringFromBytes( pidsToRequest ) );
         mPIDsToRequest[sid] = pidsToRequest;
     }
 }

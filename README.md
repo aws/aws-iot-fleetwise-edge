@@ -88,7 +88,7 @@ the following details:
 - **AvailabilityZone**: us-east-1
 - **Architecture**: x86_64
 - **CpuOptions**: {'CoreCount': 18, 'ThreadsPerCore': 2}
-- **AMI name**: ubuntu-bionic-18.04-amd64-server-20210224
+- **AMI name**: ubuntu-focal-20.04-amd64-server-20230112
 
 ## AWS IoT FleetWise Client-Server Communication
 

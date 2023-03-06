@@ -60,33 +60,6 @@ struct DecoderDictionary
 };
 
 /**
- * @brief Metadata regarding a signal
- *
- */
-struct SignalMetaData
-{
-    SignalMetaData( SignalID pSignalId, SignalDataType pDataType )
-        : signalId( pSignalId )
-        , dataType( pDataType )
-    {
-    }
-    SignalID signalId;
-    SignalDataType dataType;
-};
-
-inline bool
-operator<( const SignalMetaData &lhs, const SignalMetaData &rhs )
-{
-    return lhs.signalId < rhs.signalId;
-}
-
-inline bool
-operator==( const SignalMetaData &lhs, const SignalMetaData &rhs )
-{
-    return ( lhs.signalId == rhs.signalId ) && ( lhs.dataType == rhs.dataType );
-}
-
-/**
  * @brief CAN decoder dictionary to be used to decode CAN Frame message to signals. This dictionary comes from
  * CollectionScheme Management
  *

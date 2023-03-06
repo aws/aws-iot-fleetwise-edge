@@ -146,42 +146,42 @@ Resources:
             DeleteOnTermination: "true"
             Encrypted: "true"
 Mappings:
-  # Ubuntu 18.04 arm64 AMIs
+  # Ubuntu 20.04 arm64 AMIs
   AMIRegionMap:
     ap-northeast-1:
-      AMIID: ami-078fe86fa4c333481
+      AMIID: ami-0836b08b6e50975e0
     ap-northeast-2:
-      AMIID: ami-08b051fc14e6c551e
+      AMIID: ami-09a9b3cefb0428387
     ap-northeast-3:
-      AMIID: ami-02882efe4f6434b3c
+      AMIID: ami-0e48a9cf92bd86508
     ap-south-1:
-      AMIID: ami-04f6f742e1d9012e3
+      AMIID: ami-0a20a058ee035d49c
     ap-southeast-1:
-      AMIID: ami-062e2ec9a8bfa02d6
+      AMIID: ami-04a46a6d4dbeb5fe0
     ap-southeast-2:
-      AMIID: ami-0ac142889d7d97567
+      AMIID: ami-0c9be6cb7d01a9066
     ca-central-1:
-      AMIID: ami-07ba772924ecc689f
+      AMIID: ami-0c4c276bcaf3911b1
     eu-central-1:
-      AMIID: ami-01bced7e7239dbd82
+      AMIID: ami-048c3444604e23b5c
     eu-north-1:
-      AMIID: ami-00320b1b198c6f31e
+      AMIID: ami-04a8d27b5fe65dd51
     eu-west-1:
-      AMIID: ami-07648455888dfc767
+      AMIID: ami-0ea366b1f105cb0aa
     eu-west-2:
-      AMIID: ami-0fa14d6dc09479348
+      AMIID: ami-06b427ade4da0da55
     eu-west-3:
-      AMIID: ami-0dc556c21e5099c75
+      AMIID: ami-06cc80fe7e768f974
     sa-east-1:
-      AMIID: ami-0bd03f2c1034d9845
+      AMIID: ami-081f3905bf0562cdd
     us-east-1:
-      AMIID: ami-08353a25e80beea3e
+      AMIID: ami-0620aa8714211d0af
     us-east-2:
-      AMIID: ami-026141f3d5c6d2d0c
+      AMIID: ami-0bc02c3c09aaee8ea
     us-west-1:
-      AMIID: ami-0437ad1b6a022fafe
+      AMIID: ami-038e08160883bc1f9
     us-west-2:
-      AMIID: ami-0327006c87b23e535
+      AMIID: ami-0c4dfe348469b0ae5
 Outputs:
   Ec2InstanceId:
     Description: "EC2 instance ID"

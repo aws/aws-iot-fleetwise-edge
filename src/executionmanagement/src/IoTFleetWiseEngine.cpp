@@ -6,7 +6,7 @@
 #include "AwsBootstrap.h"
 #include "CANDataConsumer.h"
 #include "CollectionInspectionAPITypes.h"
-#include "CollectionSchemeJSONParser.h"
+#include "LoggingModule.h"
 #include "TraceModule.h"
 #include "businterfaces/AbstractVehicleDataSource.h"
 #include "businterfaces/CANDataSource.h"
@@ -66,29 +66,12 @@ IoTFleetWiseEngine::IoTFleetWiseEngine()
 
 IoTFleetWiseEngine::~IoTFleetWiseEngine()
 {
-    if ( mCollectionScheme )
-    {
-        mCollectionScheme->clear();
-    }
     // To make sure the thread stops during teardown of tests.
     if ( isAlive() )
     {
         stop();
     }
     setLogForwarding( nullptr );
-}
-
-void
-IoTFleetWiseEngine::attachVehicleDataSource( VehicleDataSourcePtr vehicleDataSource )
-{
-    mVehicleDataSource = std::move( vehicleDataSource );
-}
-
-void
-IoTFleetWiseEngine::detachVehicleDataSource( VehicleDataSourcePtr vehicleDataSource )
-{
-    // TODO
-    static_cast<void>( vehicleDataSource );
 }
 
 bool
@@ -105,7 +88,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             persistencyPath, config["staticConfig"]["persistency"]["persistencyPartitionMaxSize"].asInt() );
         if ( !mPersistDecoderManifestCollectionSchemesAndData->init() )
         {
-            mLogger.error( "IoTFleetWiseEngine::connect", "Failed to init persistency library" );
+            FWE_LOG_ERROR( "Failed to init persistency library" );
         }
         if ( config["staticConfig"]["persistency"].isMember( "persistencyUploadRetryIntervalMs" ) )
         {
@@ -188,14 +171,10 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         mAwsIotChannelSendCheckin = mAwsIotModule->createNewChannel( nullptr );
         mAwsIotChannelSendCheckin->setTopic( config["staticConfig"]["mqttConnection"]["checkinTopic"].asString() );
 
-        // These parameters need to be added to the Config file to enable the feature :
-        // useJsonBasedCollectionScheme
         mDataCollectionSender = std::make_shared<DataCollectionSender>(
             mAwsIotChannelSendCanData,
-            config["staticConfig"]["internalParameters"]["useJsonBasedCollection"].asBool(),
             config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asUInt(),
-            canIDTranslator,
-            persistencyPath );
+            canIDTranslator );
 
         // Pass on the AWS SDK Bootsrap handle to the IoTModule.
         auto bootstrapPtr = AwsBootstrap::getInstance().getClientBootStrap();
@@ -211,7 +190,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                                 config["staticConfig"]["mqttConnection"]["clientId"].asString(),
                                 bootstrapPtr,
                                 true );
-        /*************************Connectivity `bootstrap end***************************************/
+        /*************************Connectivity bootstrap end***************************************/
 
         /*************************Remote Profiling bootstrap begin**********************************/
         if ( config["staticConfig"].isMember( "remoteProfilerDefaultValues" ) )
@@ -251,8 +230,9 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 config["staticConfig"]["remoteProfilerDefaultValues"]["profilerPrefix"].asString() );
             if ( !mRemoteProfiler->start() )
             {
-                mLogger.warn( "IoTFleetWiseEngine::connect",
-                              "Failed to start the Remote Profiler - No remote profiling available until FWE restart" );
+                FWE_LOG_WARN(
+
+                    "Failed to start the Remote Profiler - No remote profiling available until FWE restart" );
             }
             setLogForwarding( mRemoteProfiler.get() );
         }
@@ -285,15 +265,14 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                  config["staticConfig"]["internalParameters"]["dataReductionProbabilityDisabled"].asBool() ) ) ||
              ( !mCollectionInspectionWorkerThread->start() ) )
         {
-            mLogger.error( "IoTFleetWiseEngine::connect", "Failed to init and start the Inspection Engine" );
+            FWE_LOG_ERROR( "Failed to init and start the Inspection Engine" );
             return false;
         }
         // Make sure the Inspection Engine can notify the Bootstrap thread about ready to be
         // published data.
         if ( !mCollectionInspectionWorkerThread->subscribeListener( this ) )
         {
-            mLogger.error( "IoTFleetWiseEngine::connect",
-                           "Failed register the Engine Thread to the Inspection Module" );
+            FWE_LOG_ERROR( "Failed register the Engine Thread to the Inspection Module" );
             return false;
         }
 
@@ -301,33 +280,12 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 
         /*************************CollectionScheme Ingestion bootstrap begin*********************************/
 
-        // These parameters need to be added to the Config file to enable the feature :
-        // jsonBasedCollectionSchemeFilename
-        // JsonBasedCollectionScheme
-        if ( config["staticConfig"]["internalParameters"]["useJsonBasedCollectionScheme"].asBool() )
-        {
-            // The main purpose to keep this code is for fast testing by enabling json collectionScheme as a file
-            CollectionSchemeJSONParser parser(
-                config["staticConfig"]["internalParameters"]["jsonBasedCollectionSchemeFilename"].asString() );
-
-            if ( ( !parser.parse() ) || ( !parser.getCollectionScheme() ) ||
-                 ( !parser.getCollectionScheme()->isValid() ) )
-            {
-                mLogger.error( "IoTFleetWiseEngine::connect", "Failed to Parse the Collection Scheme" );
-                return false;
-            }
-
-            mCollectionScheme = parser.getCollectionScheme();
-        }
-        else
-        {
-            // CollectionScheme Ingestion module executes in the context for the offboardconnectivity thread. Upcoming
-            // messages are expected to come either on the decoder manifest topic or the collectionScheme topic or both
-            // ( eventually ).
-            mSchemaPtr = std::make_shared<Schema>( mAwsIotChannelReceiveDecoderManifest,
-                                                   mAwsIotChannelReceiveCollectionSchemeList,
-                                                   mAwsIotChannelSendCheckin );
-        }
+        // CollectionScheme Ingestion module executes in the context for the offboardconnectivity thread. Upcoming
+        // messages are expected to come either on the decoder manifest topic or the collectionScheme topic or both
+        // ( eventually ).
+        mSchemaPtr = std::make_shared<Schema>( mAwsIotChannelReceiveDecoderManifest,
+                                               mAwsIotChannelReceiveCollectionSchemeList,
+                                               mAwsIotChannelSendCheckin );
 
         /*****************************CollectionScheme Management bootstrap begin*****************************/
 
@@ -340,7 +298,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                  mPersistDecoderManifestCollectionSchemesAndData,
                  canIDTranslator ) )
         {
-            mLogger.error( "IoTFleetWiseEngine::connect", "Failed to init the CollectionScheme Manager" );
+            FWE_LOG_ERROR( "Failed to init the CollectionScheme Manager" );
             return false;
         }
 
@@ -349,8 +307,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         if ( !mSchemaPtr->subscribeListener(
                  static_cast<CollectionSchemeManagementListener *>( mCollectionSchemeManagerPtr.get() ) ) )
         {
-            mLogger.error( "IoTFleetWiseEngine::connect",
-                           "Failed register the CollectionScheme Manager to the CollectionScheme Ingestion Module" );
+            FWE_LOG_ERROR( "Failed register the CollectionScheme Manager to the CollectionScheme Ingestion Module" );
             return false;
         }
 
@@ -359,8 +316,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         if ( !mCollectionSchemeManagerPtr->subscribeListener(
                  static_cast<IActiveConditionProcessor *>( mCollectionInspectionWorkerThread.get() ) ) )
         {
-            mLogger.error( "IoTFleetWiseEngine::connect",
-                           "Failed register the Inspection Engine to the CollectionScheme Manager Module" );
+            FWE_LOG_ERROR( "Failed register the Inspection Engine to the CollectionScheme Manager Module" );
             return false;
         }
 
@@ -374,7 +330,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         mVehicleDataSourceBinder = std::make_unique<VehicleDataSourceBinder>();
         if ( ( mVehicleDataSourceBinder == nullptr ) || ( !mVehicleDataSourceBinder->connect() ) )
         {
-            mLogger.error( "IoTFleetWiseEngine::connect", "Failed to initialize the Vehicle DataSource binder" );
+            FWE_LOG_ERROR( "Failed to initialize the Vehicle DataSource binder" );
             return false;
         }
 
@@ -403,9 +359,8 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                     bool success = stringToCanTimestampType( timestampTypeInput, canTimestampType );
                     if ( !success )
                     {
-                        mLogger.warn( "IoTFleetWiseEngine::connect",
-                                      "Invalid can timestamp type provided: " + timestampTypeInput +
-                                          " so default to Software" );
+                        FWE_LOG_WARN( "Invalid can timestamp type provided: " + timestampTypeInput +
+                                      " so default to Software" );
                     }
                 }
                 auto canSourcePtr = std::make_shared<CANDataSource>( canTimestampType );
@@ -413,7 +368,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 
                 if ( canSourcePtr == nullptr || canConsumerPtr == nullptr )
                 {
-                    mLogger.error( "IoTFleetWiseEngine::connect", "Failed to create consumer/producer" );
+                    FWE_LOG_ERROR( "Failed to create consumer/producer" );
                     return false;
                 }
                 // Initialize the consumer/producers
@@ -426,7 +381,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                          signalBufferPtr,
                          config["staticConfig"]["threadIdleTimes"]["canDecoderThreadIdleTimeMs"].asUInt() ) ) )
                 {
-                    mLogger.error( "IoTFleetWiseEngine::connect", "Failed to initialize the producers/consumers" );
+                    FWE_LOG_ERROR( "Failed to initialize the producers/consumers" );
                     return false;
                 }
                 else
@@ -440,14 +395,14 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 // Handshake the binder and the channel
                 if ( !mVehicleDataSourceBinder->addVehicleDataSource( canSourcePtr ) )
                 {
-                    mLogger.error( "IoTFleetWiseEngine::connect", "Failed to add a network channel" );
+                    FWE_LOG_ERROR( "Failed to add a network channel" );
                     return false;
                 }
 
                 if ( !mVehicleDataSourceBinder->bindConsumerToVehicleDataSource(
                          canConsumerPtr, canSourcePtr->getVehicleDataSourceID() ) )
                 {
-                    mLogger.error( "IoTFleetWiseEngine::connect", "Failed to Bind Consumers to Producers" );
+                    FWE_LOG_ERROR( "Failed to Bind Consumers to Producers" );
                     return false;
                 }
             }
@@ -472,41 +427,38 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                         mOBDOverCANModule = obdOverCANModule;
                         if ( !mOBDOverCANModule->connect() )
                         {
-                            mLogger.error( "IoTFleetWiseEngine::connect", "Failed to connect OBD over CAN module" );
+                            FWE_LOG_ERROR( "Failed to connect OBD over CAN module" );
                             return false;
                         }
 
                         if ( !mCollectionSchemeManagerPtr->subscribeListener(
                                  static_cast<IActiveDecoderDictionaryListener *>( mOBDOverCANModule.get() ) ) )
                         {
-                            mLogger.error( "IoTFleetWiseEngine::connect",
-                                           "Failed to register the OBD Module to the CollectionScheme Manager" );
+                            FWE_LOG_ERROR( "Failed to register the OBD Module to the CollectionScheme Manager" );
                             return false;
                         }
                         if ( !mCollectionSchemeManagerPtr->subscribeListener(
                                  static_cast<IActiveConditionProcessor *>( mOBDOverCANModule.get() ) ) )
                         {
-                            mLogger.error( "IoTFleetWiseEngine::connect",
-                                           "Failed to register the OBD Module to the CollectionScheme Manager" );
+                            FWE_LOG_ERROR( "Failed to register the OBD Module to the CollectionScheme Manager" );
                             return false;
                         }
                     }
                 }
                 else
                 {
-                    mLogger.error( "IoTFleetWiseEngine::connect", "obdOverCANModule already initialised" );
+                    FWE_LOG_ERROR( "obdOverCANModule already initialised" );
                 }
             }
             else
             {
-                mLogger.error( "IoTFleetWiseEngine::connect", interfaceName["type"].asString() + " is not supported" );
+                FWE_LOG_ERROR( interfaceName["type"].asString() + " is not supported" );
             }
         }
         // Register Vehicle Data Source Binder as listener for CollectionScheme Manager
         if ( !mCollectionSchemeManagerPtr->subscribeListener( mVehicleDataSourceBinder.get() ) )
         {
-            mLogger.error(
-                "IoTFleetWiseEngine::connect",
+            FWE_LOG_ERROR(
                 "Could not register the vehicle data source binder as a listener to the collection campaign manager" );
             return false;
         }
@@ -518,7 +470,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         // read from persistent memory:
         if ( !mCollectionSchemeManagerPtr->connect() )
         {
-            mLogger.error( "IoTFleetWiseEngine::connect", "Failed to start the CollectionScheme Manager" );
+            FWE_LOG_ERROR( "Failed to start the CollectionScheme Manager" );
             return false;
         }
         /****************************CollectionScheme Manager bootstrap end*************************/
@@ -552,8 +504,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             }
             else
             {
-                mLogger.warn( "IoTFleetWiseEngine::connect",
-                              "Unsupported Transport config provided for a DDS Node, skipping it" );
+                FWE_LOG_WARN( "Unsupported Transport config provided for a DDS Node, skipping it" );
                 continue;
             }
 
@@ -564,8 +515,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             }
             else
             {
-                mLogger.warn( "IoTFleetWiseEngine::connect",
-                              "Unsupported Device type provided for a DDS Node, skipping it" );
+                FWE_LOG_WARN( "Unsupported Device type provided for a DDS Node, skipping it" );
                 continue;
             }
 
@@ -586,7 +536,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             // Init the Module
             if ( ( mDataOverDDSModule == nullptr ) || ( !mDataOverDDSModule->init( ddsNodes ) ) )
             {
-                mLogger.error( "IoTFleetWiseEngine::connect", "Failed to initialize the DDS Module" );
+                FWE_LOG_ERROR( "Failed to initialize the DDS Module" );
                 return false;
             }
             // Register the DDS Module as a listener to the Inspection Engine and connect it.
@@ -594,14 +544,14 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                      static_cast<InspectionEventListener *>( mDataOverDDSModule.get() ) ) ) ||
                  ( !mDataOverDDSModule->connect() ) )
             {
-                mLogger.error( "IoTFleetWiseEngine::connect", "Failed to connect the DDS Module" );
+                FWE_LOG_ERROR( "Failed to connect the DDS Module" );
                 return false;
             }
-            mLogger.info( "IoTFleetWiseEngine::connect", "DDS Module connected" );
+            FWE_LOG_INFO( "DDS Module connected" );
         }
         else
         {
-            mLogger.info( "IoTFleetWiseEngine::connect", "DDS Module disabled" );
+            FWE_LOG_INFO( "DDS Module disabled" );
         }
 
         /********************************DDS Module bootstrap end*********************************/
@@ -613,7 +563,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         bool iWaveInitSuccessful = false;
         if ( config["staticConfig"].isMember( "iWaveGpsExample" ) )
         {
-            mLogger.trace( "IoTFleetWiseEngine::connect", "Found 'iWaveGpsExample' section in config file" );
+            FWE_LOG_TRACE( "Found 'iWaveGpsExample' section in config file" );
             std::vector<VehicleDataSourceConfig> iWaveGpsConfigs( 1 );
             for ( auto const &key : config["staticConfig"]["iWaveGpsExample"].getMemberNames() )
             {
@@ -643,15 +593,14 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             if ( !mCollectionSchemeManagerPtr->subscribeListener(
                      static_cast<IActiveDecoderDictionaryListener *>( mIWaveGpsSource.get() ) ) )
             {
-                mLogger.error( "IoTFleetWiseEngine::connect",
-                               "Failed to register the IWaveGps to the CollectionScheme Manager" );
+                FWE_LOG_ERROR( "Failed to register the IWaveGps to the CollectionScheme Manager" );
                 return false;
             }
             mIWaveGpsSource->start();
         }
         else
         {
-            mLogger.error( "IoTFleetWiseEngine::connect", "IWaveGps initialization failed" );
+            FWE_LOG_ERROR( "IWaveGps initialization failed" );
             return false;
         }
         /********************************IWave GPS Example NMEA reader end******************************/
@@ -662,12 +611,11 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
     }
     catch ( const std::exception &e )
     {
-        mLogger.error( "IoTFleetWiseEngine::connect",
-                       "Fatal Error during AWS IoT FleetWise Bootstrap: " + std::string( e.what() ) );
+        FWE_LOG_ERROR( "Fatal Error during AWS IoT FleetWise Bootstrap: " + std::string( e.what() ) );
         return false;
     }
 
-    mLogger.info( "IoTFleetWiseEngine::connect", "Engine Connected" );
+    FWE_LOG_INFO( "Engine Connected" );
 
     return true;
 }
@@ -675,6 +623,12 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 bool
 IoTFleetWiseEngine::disconnect()
 {
+#ifdef FWE_EXAMPLE_IWAVEGPS
+    if ( mIWaveGpsSource )
+    {
+        mIWaveGpsSource->stop();
+    }
+#endif
 #ifdef FWE_FEATURE_CAMERA
     if ( mDataOverDDSModule )
     {
@@ -683,7 +637,7 @@ IoTFleetWiseEngine::disconnect()
              ( !mDataOverDDSModule->disconnect() ) )
         {
 
-            mLogger.error( "IoTFleetWiseEngine::disconnect", "Could not disconnect DDS Module" );
+            FWE_LOG_ERROR( "Could not disconnect DDS Module" );
             return false;
         }
     }
@@ -693,37 +647,43 @@ IoTFleetWiseEngine::disconnect()
     {
         if ( !mOBDOverCANModule->disconnect() )
         {
-            mLogger.error( "IoTFleetWiseEngine::disconnect", "Could not disconnect OBD over CAN module" );
+            FWE_LOG_ERROR( "Could not disconnect OBD over CAN module" );
             return false;
         }
     }
 
     if ( !mCollectionInspectionWorkerThread->stop() )
     {
-        mLogger.error( "IoTFleetWiseEngine::disconnect", "Could not stop the Inspection Engine" );
+        FWE_LOG_ERROR( "Could not stop the Inspection Engine" );
         return false;
     }
 
     setLogForwarding( nullptr );
     if ( ( mRemoteProfiler != nullptr ) && ( !mRemoteProfiler->stop() ) )
     {
-        mLogger.error( "IoTFleetWiseEngine::disconnect", "Could not stop the Remote Profiler" );
+        FWE_LOG_ERROR( "Could not stop the Remote Profiler" );
         return false;
     }
 
     if ( !mCollectionSchemeManagerPtr->disconnect() )
     {
-        mLogger.error( "IoTFleetWiseEngine::disconnect", "Could not stop the CollectionScheme Manager" );
+        FWE_LOG_ERROR( "Could not stop the CollectionScheme Manager" );
         return false;
     }
 
     // Stop the Binder
     if ( mVehicleDataSourceBinder && ( !mVehicleDataSourceBinder->disconnect() ) )
     {
-        mLogger.error( "IoTFleetWiseEngine::disconnect", "Could not disconnect the Binder" );
+        FWE_LOG_ERROR( "Could not disconnect the Binder" );
         return false;
     }
-    mLogger.info( "IoTFleetWiseEngine::disconnect", "Engine Disconnected" );
+
+    if ( mAwsIotModule->isAlive() && ( !mAwsIotModule->disconnect() ) )
+    {
+        FWE_LOG_ERROR( "Could not disconnect the off-board connectivity" );
+        return false;
+    }
+    FWE_LOG_INFO( "Engine Disconnected" );
     TraceModule::get().sectionEnd( TraceSection::FWE_SHUTDOWN );
     TraceModule::get().print();
     return true;
@@ -739,11 +699,11 @@ IoTFleetWiseEngine::start()
     mShouldStop.store( false );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "IoTFleetWiseEngine::start", "Engine Thread failed to start" );
+        FWE_LOG_TRACE( "Engine Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "IoTFleetWiseEngine::start", "Engine Thread started" );
+        FWE_LOG_TRACE( "Engine Thread started" );
         mThread.setThreadName( "fwEMEngine" );
     }
 
@@ -830,23 +790,20 @@ IoTFleetWiseEngine::doWork( void *data )
         }
         if ( timeTrigger > 0 )
         {
-            engine->mLogger.trace(
-                "IoTFleetWiseEngine::doWork",
-                "Waiting for: " + std::to_string( timeTrigger ) + " seconds. Persistency " +
-                    std::to_string( engine->mPersistencyUploadRetryIntervalMs ) + " configured, " +
-                    std::to_string( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) +
-                    " timer. Cyclic Metrics Print:" + std::to_string( engine->mPrintMetricsCyclicPeriodMs ) +
-                    " configured,  " + std::to_string( engine->mPrintMetricsCyclicTimer.getElapsedMs().count() ) +
-                    " timer." );
+            FWE_LOG_TRACE( "Waiting for :" + std::to_string( timeTrigger ) + " seconds. Persistency " +
+                           std::to_string( engine->mPersistencyUploadRetryIntervalMs ) + " configured, " +
+                           std::to_string( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) +
+                           " timer. Cyclic Metrics Print:" + std::to_string( engine->mPrintMetricsCyclicPeriodMs ) +
+                           " configured,  " +
+                           std::to_string( engine->mPrintMetricsCyclicTimer.getElapsedMs().count() ) + " timer." );
             engine->mWait.wait( static_cast<uint32_t>( timeTrigger * 1000 ) );
         }
         else
         {
             engine->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
             elapsedTimeUs += static_cast<uint32_t>( engine->mTimer.getElapsedMs().count() );
-            engine->mLogger.trace( "IoTFleetWiseEngine::doWork", "Event Arrived" );
-            engine->mLogger.trace( "IoTFleetWiseEngine::doWork",
-                                   "Time Elapsed waiting for the Event : " + std::to_string( elapsedTimeUs ) );
+            FWE_LOG_TRACE( "Event Arrived" );
+            FWE_LOG_TRACE( "Time Elapsed waiting for the Event : " + std::to_string( elapsedTimeUs ) );
         }
 
         // Dequeues the collected data queue and sends the data to cloud
@@ -868,19 +825,57 @@ IoTFleetWiseEngine::doWork( void *data )
                         firstSignalValues += " ...";
                         break;
                     }
-                    firstSignalValues += std::to_string( s.signalID ) + ":" + std::to_string( s.value ) + ",";
+                    auto signalValue = s.getValue();
+                    firstSignalValues += std::to_string( s.signalID ) + ":";
+                    switch ( signalValue.getType() )
+                    {
+                    case SignalType::UINT8:
+                        firstSignalValues += std::to_string( signalValue.value.uint8Val ) + ",";
+                        break;
+                    case SignalType::INT8:
+                        firstSignalValues += std::to_string( signalValue.value.int8Val ) + ",";
+                        break;
+                    case SignalType::UINT16:
+                        firstSignalValues += std::to_string( signalValue.value.uint16Val ) + ",";
+                        break;
+                    case SignalType::INT16:
+                        firstSignalValues += std::to_string( signalValue.value.int16Val ) + ",";
+                        break;
+                    case SignalType::UINT32:
+                        firstSignalValues += std::to_string( signalValue.value.uint32Val ) + ",";
+                        break;
+                    case SignalType::INT32:
+                        firstSignalValues += std::to_string( signalValue.value.int32Val ) + ",";
+                        break;
+                    case SignalType::UINT64:
+                        firstSignalValues += std::to_string( signalValue.value.uint64Val ) + ",";
+                        break;
+                    case SignalType::INT64:
+                        firstSignalValues += std::to_string( signalValue.value.int64Val ) + ",";
+                        break;
+                    case SignalType::FLOAT:
+                        firstSignalValues += std::to_string( signalValue.value.floatVal ) + ",";
+                        break;
+                    case SignalType::DOUBLE:
+                        firstSignalValues += std::to_string( signalValue.value.doubleVal ) + ",";
+                        break;
+                    case SignalType::BOOLEAN:
+                        firstSignalValues += std::to_string( static_cast<int>( signalValue.value.boolVal ) ) + ",";
+                        break;
+                    default:
+                        firstSignalValues += std::to_string( signalValue.value.doubleVal ) + ",";
+                        break;
+                    }
                 }
                 firstSignalValues += "]";
-                engine->mLogger.info(
-                    "IoTFleetWiseEngine::doWork",
-                    "FWE data ready to send with eventID " +
-                        std::to_string( triggeredCollectionSchemeDataPtr->eventID ) + " from " +
-                        triggeredCollectionSchemeDataPtr->metaData.collectionSchemeID +
-                        " Signals: " + std::to_string( triggeredCollectionSchemeDataPtr->signals.size() ) + " " +
-                        firstSignalValues + firstSignalTimestamp +
-                        " raw CAN frames: " + std::to_string( triggeredCollectionSchemeDataPtr->canFrames.size() ) +
-                        " DTCs: " + std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() ) +
-                        " Geohash: " + triggeredCollectionSchemeDataPtr->mGeohashInfo.mGeohashString );
+                FWE_LOG_INFO( "FWE data ready to send with eventID " +
+                              std::to_string( triggeredCollectionSchemeDataPtr->eventID ) + " from " +
+                              triggeredCollectionSchemeDataPtr->metaData.collectionSchemeID +
+                              " Signals:" + std::to_string( triggeredCollectionSchemeDataPtr->signals.size() ) + " " +
+                              firstSignalValues + firstSignalTimestamp + " raw CAN frames:" +
+                              std::to_string( triggeredCollectionSchemeDataPtr->canFrames.size() ) +
+                              " DTCs:" + std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() ) +
+                              " Geohash:" + triggeredCollectionSchemeDataPtr->mGeohashInfo.mGeohashString );
                 engine->mDataCollectionSender->send( triggeredCollectionSchemeDataPtr );
             } );
         TraceModule::get().setVariable( TraceVariable::QUEUE_INSPECTION_TO_SENDER, consumedElements );
@@ -927,8 +922,7 @@ IoTFleetWiseEngine::checkAndSendRetrievedData()
     if ( status == ErrorCode::SUCCESS )
     {
         ConnectivityError res = ConnectivityError::Success;
-        mLogger.trace( "IoTFleetWiseEngine::checkAndSendRetrievedData",
-                       "Number of Payloads to transmit : " + std::to_string( payloads.size() ) );
+        FWE_LOG_TRACE( "Number of Payloads to transmit : " + std::to_string( payloads.size() ) );
 
         for ( const auto &payload : payloads )
         {
@@ -937,34 +931,31 @@ IoTFleetWiseEngine::checkAndSendRetrievedData()
             if ( res != ConnectivityError::Success )
             {
                 // Error occurred in the transmission
-                mLogger.error( "IoTFleetWiseEngine::checkAndSendRetrievedData",
-                               "Payload transmission failed, will be retried on the next bootup" );
+                FWE_LOG_ERROR( "Payload transmission failed, will be retried on the next bootup" );
                 break;
             }
             else
             {
-                mLogger.trace( "IoTFleetWiseEngine::checkAndSendRetrievedData",
-                               "Payload has been successfully sent to the backend" );
+                FWE_LOG_TRACE( "Payload has been successfully sent to the backend" );
             }
         }
         if ( res == ConnectivityError::Success )
         {
             // All the stored data has been transmitted, erase the file contents
             mPersistDecoderManifestCollectionSchemesAndData->erase( DataType::EDGE_TO_CLOUD_PAYLOAD );
-            mLogger.info( "IoTFleetWiseEngine::checkAndSendRetrievedData",
-                          "All " + std::to_string( payloads.size() ) + " Payloads successfully sent to the backend" );
+            FWE_LOG_INFO( "All " + std::to_string( payloads.size() ) + " Payloads successfully sent to the backend" );
             return true;
         }
         return false;
     }
     else if ( status == ErrorCode::EMPTY )
     {
-        mLogger.trace( "IoTFleetWiseEngine::checkAndSendRetrievedData", "No Payloads to Retrieve" );
+        FWE_LOG_TRACE( "No Payloads to Retrieve" );
         return true;
     }
     else
     {
-        mLogger.error( "IoTFleetWiseEngine::checkAndSendRetrievedData", "Payload Retrieval Failed" );
+        FWE_LOG_ERROR( "Payload Retrieval Failed" );
         return false;
     }
 }

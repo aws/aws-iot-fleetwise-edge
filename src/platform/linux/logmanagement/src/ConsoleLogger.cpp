@@ -22,6 +22,15 @@ namespace Platform
 {
 namespace Linux
 {
+namespace Color
+{
+static const std::string red{ "\x1b[31m" };
+static const std::string yellow{ "\x1b[33m" };
+static const std::string blue{ "\x1b[34m" };
+static const std::string normal;
+static const std::string reset{ "\x1b[0m" };
+} // namespace Color
+
 LogLevel gSystemWideLogLevel;
 LogColorOption gLogColorOption = LogColorOption::Auto;
 
@@ -36,7 +45,11 @@ setLogForwarding( ILogger *logForwarder )
 }
 
 void
-forwardLog( LogLevel level, const std::string &function, const std::string &logEntry )
+forwardLog( LogLevel level,
+            const std::string &filename,
+            const uint32_t lineNumber,
+            const std::string &function,
+            const std::string &logEntry )
 {
     if ( gLogForwarder == nullptr )
     {
@@ -49,7 +62,7 @@ forwardLog( LogLevel level, const std::string &function, const std::string &logE
     }
     else
     {
-        gLogForwarder->logMessage( level, function, logEntry );
+        gLogForwarder->logMessage( level, filename, lineNumber, function, logEntry );
     }
 }
 
@@ -68,19 +81,25 @@ ConsoleLogger::ConsoleLogger()
 }
 
 void
-ConsoleLogger::logMessage( LogLevel level, const std::string &function, const std::string &logEntry )
+ConsoleLogger::logMessage( LogLevel level,
+                           const std::string &filename,
+                           const uint32_t lineNumber,
+                           const std::string &function,
+                           const std::string &logEntry )
 {
     if ( level >= gSystemWideLogLevel )
     {
-        std::printf( "%s[Thread: %" PRIu64 "] [%s] [%s] [%s]: [%s]%s\n",
+        std::printf( "%s[Thread: %" PRIu64 "] [%s] [%s] [%s:%i] [%s()]: [%s]%s\n",
                      levelToColor( level ).c_str(),
                      currentThreadId(),
                      timeAsString().c_str(),
                      levelToString( level ).c_str(),
+                     filename.c_str(),
+                     lineNumber,
                      function.c_str(),
                      logEntry.c_str(),
                      mColorEnabled ? Color::reset.c_str() : "" );
-        forwardLog( level, function, logEntry );
+        forwardLog( level, filename, lineNumber, function, logEntry );
     }
 }
 

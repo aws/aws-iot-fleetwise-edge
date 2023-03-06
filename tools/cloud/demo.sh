@@ -29,24 +29,30 @@ parse_args() {
         case $1 in
         --vehicle-name)
             VEHICLE_NAME=$2
+            shift
             ;;
         --fleet-size)
             FLEET_SIZE=$2
+            shift
             ;;
         --clean-up)
             CLEAN_UP=true
             ;;
         --campaign-file)
             CAMPAIGN_FILE=$2
+            shift
             ;;
         --dbc-file)
             DBC_FILE=$2
+            shift
             ;;
         --endpoint-url)
             ENDPOINT_URL=$2
+            shift
             ;;
         --region)
             REGION=$2
+            shift
             ;;
         --force-registration)
             FORCE_REGISTRATION=true
@@ -246,9 +252,9 @@ fi
 VEHICLE_NODE=`cat vehicle-node.json`
 OBD_NODES=`cat obd-nodes.json`
 if [ "${DBC_FILE}" == "" ]; then
-    DBC_NODES=`python3.7 dbc-to-nodes.py ${DEFAULT_DBC_FILE}`
+    DBC_NODES=`python3 dbc-to-nodes.py ${DEFAULT_DBC_FILE}`
 else
-    DBC_NODES=`python3.7 dbc-to-nodes.py ${DBC_FILE}`
+    DBC_NODES=`python3 dbc-to-nodes.py ${DBC_FILE}`
 fi
 
 echo "Checking for existing signal catalog..."
@@ -410,7 +416,7 @@ if [ "${DBC_FILE}" == "" ]; then
         --name ${NAME}-decoder-manifest \
         --network-file-definitions "${NETWORK_FILE_DEFINITIONS}" | jq -r .arn
 else
-    SIGNAL_DECODERS=`python3.7 dbc-to-json.py ${DBC_FILE}`
+    SIGNAL_DECODERS=`python3 dbc-to-json.py ${DBC_FILE}`
     aws iotfleetwise update-decoder-manifest \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
         --name ${NAME}-decoder-manifest \
@@ -590,7 +596,7 @@ aws timestream-query query \
 if [ "${DBC_FILE}" == "" ]; then
     echo "Converting to HTML..."
     OUTPUT_FILE_HTML="${NAME}.html"
-    python3.7 timestream-to-html.py ${NAME}-timestream-result.json ${OUTPUT_FILE_HTML}
+    python3 timestream-to-html.py ${NAME}-timestream-result.json ${OUTPUT_FILE_HTML}
 
     echo "You can now view the collected data."
     echo "----------------------------------"

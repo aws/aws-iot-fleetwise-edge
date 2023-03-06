@@ -11,7 +11,7 @@ This folder provides an additional meta layer on top of BSP 28.0, in order to ad
 
 ## Prerequisites
 
-Run the following script to install the prerequisites on an Ubuntu 18.04 host machine (assuming you
+Run the following script to install the prerequisites on an Ubuntu 20.04 host machine (assuming you
 have unzipped `aws-iot-fleetwise-edge.zip` to `~/aws-iot-fleetwise-edge`):
 
     sudo ~/aws-iot-fleetwise-edge/tools/install-deps-yocto.sh

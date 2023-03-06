@@ -20,4 +20,4 @@ if (($1>0)) && ! cangw -L | grep -q "cangw -A -s vcan0 -d vcan$1 -e"; then
 fi
 
 # Start the CAN simulator: for instance numbers greater than zero, only OBD is simulated
-/usr/bin/python3.7 /usr/share/cansim/cansim.py --interface "vcan$1" `(($1>0)) && echo "--only-obd"`
+/usr/bin/python3 /usr/share/cansim/cansim.py --interface "vcan$1" `(($1>0)) && echo "--only-obd"`

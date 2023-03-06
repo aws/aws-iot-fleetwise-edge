@@ -15,7 +15,7 @@ parser.add_argument("-i", "--interface", default="vcan0", help="CAN interface, e
 parser.add_argument("-o", "--only-obd", action="store_true", help="Only generate OBD messages")
 args = parser.parse_args()
 
-can_sim = canigen.canigen(
+can_sim = canigen.Canigen(
     interface=args.interface,
     database_filename=None if args.only_obd else "hscan.dbc",
     obd_config_filename="obd_config.json",
@@ -50,5 +50,5 @@ try:
 except KeyboardInterrupt:
     print("Stopping...")
     can_sim.stop()
-except:
+except Exception:
     raise

@@ -5,7 +5,6 @@
 
 // Includes
 #include "EnumUtility.h"
-#include "LoggingModule.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -46,8 +45,7 @@ enum class TraceVariable
     READ_SOCKET_FRAMES_16,
     READ_SOCKET_FRAMES_17,
     READ_SOCKET_FRAMES_18,
-    READ_SOCKET_FRAMES_19,
-    READ_SOCKET_FRAMES_MAX = READ_SOCKET_FRAMES_19,
+    READ_SOCKET_FRAMES_19, // If you add more, update references to this
     QUEUE_SOCKET_TO_CONSUMER_0,
     QUEUE_SOCKET_TO_CONSUMER_1,
     QUEUE_SOCKET_TO_CONSUMER_2,
@@ -67,8 +65,7 @@ enum class TraceVariable
     QUEUE_SOCKET_TO_CONSUMER_16,
     QUEUE_SOCKET_TO_CONSUMER_17,
     QUEUE_SOCKET_TO_CONSUMER_18,
-    QUEUE_SOCKET_TO_CONSUMER_19,
-    QUEUE_SOCKET_TO_CONSUMER_MAX = QUEUE_SOCKET_TO_CONSUMER_19,
+    QUEUE_SOCKET_TO_CONSUMER_19, // If you add more, update references to this
     QUEUE_INSPECTION_TO_SENDER,
     MAX_SYSTEMTIME_KERNELTIME_DIFF,
     PM_MEMORY_NULL,
@@ -89,6 +86,8 @@ enum class TraceVariable
     CE_PROCESSED_SIGNALS,
     CE_PROCESSED_CAN_FRAMES,
     CE_TRIGGERS,
+    OBD_POSSIBLE_PRECISION_LOSS_UINT64,
+    OBD_POSSIBLE_PRECISION_LOSS_INT64,
     TRACE_VARIABLE_SIZE
 };
 
@@ -141,8 +140,7 @@ enum class TraceSection
     CAN_DECODER_CYCLE_16,
     CAN_DECODER_CYCLE_17,
     CAN_DECODER_CYCLE_18,
-    CAN_DECODER_CYCLE_19,
-    CAN_DECODER_CYCLE_MAX = CAN_DECODER_CYCLE_19,
+    CAN_DECODER_CYCLE_19, // If you add more, update references to this
     TRACE_SECTION_SIZE
 };
 /**
@@ -439,8 +437,6 @@ private:
     struct AtomicVariableData mAtomicVariableData[toUType( TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE )];
 
     struct SectionData mSectionData[toUType( TraceSection::TRACE_SECTION_SIZE )];
-
-    LoggingModule mLogger;
 };
 } // namespace Linux
 } // namespace Platform

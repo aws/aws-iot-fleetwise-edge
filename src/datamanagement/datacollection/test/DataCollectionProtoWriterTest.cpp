@@ -3,9 +3,11 @@
 
 #include "DataCollectionProtoWriter.h"
 #include "ClockHandler.h"
+#include "Testing.h"
 #include <gtest/gtest.h>
 #include <math.h>
 
+using namespace Aws::IoTFleetWise::TestingSupport;
 using namespace Aws::IoTFleetWise::DataManagement;
 using namespace Aws::IoTFleetWise::Platform::Linux;
 
@@ -45,7 +47,8 @@ TEST_F( DataCollectionProtoWriterTest, TestVehicleData )
 
     uint32_t collectionEventID = std::rand();
     protoWriter.setupVehicleData( triggeredCollectionSchemeDataPtr, collectionEventID );
-    CollectedSignal collectedSignalMsg( 120 /*signalId*/, testTriggerTime + 2000 /*receiveTime*/, 77.88 /*value*/ );
+    CollectedSignal collectedSignalMsg(
+        120 /*signalId*/, testTriggerTime + 2000 /*receiveTime*/, 77.88 /*value*/, SignalType::DOUBLE );
     protoWriter.append( collectedSignalMsg );
     EXPECT_EQ( protoWriter.getVehicleDataMsgCount(), 1 );
 
