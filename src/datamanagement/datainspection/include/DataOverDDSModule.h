@@ -6,7 +6,6 @@
 // Includes
 #include "ClockHandler.h"
 #include "InspectionEventListener.h"
-#include "LoggingModule.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "Timer.h"
@@ -112,7 +111,6 @@ private:
     std::atomic<bool> mShouldStop{ false };
     std::atomic<bool> mNewEventReceived{ false };
     mutable std::mutex mThreadMutex;
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     Platform::Linux::Signal mWait;
     Timer mTimer;

@@ -6,9 +6,9 @@
 // Includes
 #include "AwsIotChannel.h"
 #include "Listener.h"
-#include "LoggingModule.h"
 #include "RetryThread.h"
 #include <atomic>
+#include <cstddef>
 #include <future>
 #include <string>
 
@@ -27,6 +27,8 @@ using namespace Aws::IoTFleetWise::Platform::Linux;
 /**
  * @brief bootstrap of the Aws Iot SDK. Only one object of this should normally exist
  * */
+// coverity[cert_dcl60_cpp_violation] false positive - class only defined once
+// coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
 class AwsIotConnectivityModule : public IRetryable, public IConnectivityModule
 {
 public:
@@ -127,7 +129,6 @@ private:
     Aws::Crt::String mEndpointUrl;
     Aws::Crt::ByteCursor mPrivateKey{ 0, nullptr };
     Aws::Crt::String mClientId;
-    Platform::Linux::LoggingModule mLogger;
     std::shared_ptr<Aws::Crt::Mqtt::MqttConnection> mConnection;
     std::unique_ptr<Aws::Iot::MqttClient> mMqttClient;
     RetryThread mRetryThread;

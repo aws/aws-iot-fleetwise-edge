@@ -24,25 +24,6 @@ namespace DataManagement
 constexpr uint8_t BYTE_SIZE = 8;
 
 /**
- * @brief SignalDataType defines the data type for each signal.
- */
-enum class SignalDataType
-{
-    UNDEFINED_TYPE,
-    BOOL_TYPE,
-    UINT8_TYPE,
-    UINT16_TYPE,
-    UINT32_TYPE,
-    UINT64_TYPE,
-    INT8_TYPE,
-    INT16_TYPE,
-    INT32_TYPE,
-    INT64_TYPE,
-    FLOAT_TYPE,
-    DOUBLE_TYPE
-};
-
-/**
  * @brief An invalid CAN Message Format, set as a CANMessageFormat object initialized to all zeros
  */
 const CANMessageFormat INVALID_CAN_MESSAGE_FORMAT = CANMessageFormat();
@@ -134,6 +115,11 @@ struct PIDSignalDecoderFormat
      *      For non-bitmask signals, the bit Mask Length shall always be 8.
      */
     uint8_t mBitMaskLength{ 0 };
+
+    /**
+     * @brief The datatype of the signal. The default is double for backward compatibility
+     */
+    SignalType mSignalType{ SignalType::DOUBLE };
 
 public:
     /**
@@ -241,6 +227,14 @@ public:
      * @return binary data in a vector
      */
     virtual const std::vector<uint8_t> &getData() const = 0;
+
+    /**
+     * @brief This function returns Signal Type from the Decoder
+     *
+     * @param signalID
+     * @return SignalType
+     */
+    virtual SignalType getSignalType( const SignalID signalID ) const = 0;
 
     /**
      * @brief Virtual destructor to be implemented by the base class

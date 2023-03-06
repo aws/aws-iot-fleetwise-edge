@@ -13,13 +13,13 @@ if len(sys.argv) < 2:
 
 db = cantools.database.load_file(sys.argv[1])
 
-with open("network-interfaces.json", "r") as f:
+with open("network-interfaces.json") as f:
     network_interfaces = json.load(f)
     for interface in network_interfaces:
         if interface["type"] == "CAN_INTERFACE":
             interface_id = interface["interfaceId"]
 
-signalDecodersToAdd = []
+signal_decoders_to_add = []
 
 for message in db.messages:
     for signal in message.signals:
@@ -47,16 +47,16 @@ for message in db.messages:
         else:
             signal_to_add["startBit"] = signal.start
 
-        signalDecodersToAdd.append(
+        signal_decoders_to_add.append(
             {
                 "type": "CAN_SIGNAL",
                 "canSignal": signal_to_add,
-                "fullyQualifiedName": "Vehicle.{}.{}".format(message.name, signal.name),
+                "fullyQualifiedName": f"Vehicle.{message.name}.{signal.name}",
                 "interfaceId": interface_id,
             }
         )
 
-out = json.dumps(signalDecodersToAdd, indent=4, sort_keys=True)
+out = json.dumps(signal_decoders_to_add, indent=4, sort_keys=True)
 
 if len(sys.argv) < 3:
     print(out)

@@ -4,6 +4,7 @@
 // Includes
 
 #include "TraceModule.h"
+#include "LoggingModule.h"
 #include <cstdio>
 #include <string>
 
@@ -178,6 +179,10 @@ TraceModule::getVariableName( TraceVariable variable )
         return "CeCCnt";
     case TraceVariable::CE_TRIGGERS:
         return "CeTrgCnt";
+    case TraceVariable::OBD_POSSIBLE_PRECISION_LOSS_UINT64:
+        return "ObdPrecU64";
+    case TraceVariable::OBD_POSSIBLE_PRECISION_LOSS_INT64:
+        return "ObdPrecI64";
     default:
         return "UNKNOWN";
     }
@@ -387,13 +392,12 @@ TraceModule::print()
         auto &v = mVariableData[i];
         auto variableNamePtr = getVariableName( static_cast<TraceVariable>( i ) );
         auto variableName = variableNamePtr != nullptr ? variableNamePtr : "Unknown variable name";
-        mLogger.trace( "TraceModule::print",
-                       std::string{ " TraceModule-ConsoleLogging-Variable '" } + variableName + "' [" +
-                           std::to_string( i ) + "] current value: [" + std::to_string( v.mCurrentValue ) +
-                           "] max value since last print: "
-                           "[" +
-                           std::to_string( v.mMaxValue ) + "] overall max value: [" +
-                           std::to_string( v.mMaxValueAllTime ) + "]" );
+        FWE_LOG_TRACE( std::string{ " TraceModule-ConsoleLogging-Variable '" } + variableName + "' [" +
+                       std::to_string( i ) + "] current value: [" + std::to_string( v.mCurrentValue ) +
+                       "] max value since last print: "
+                       "[" +
+                       std::to_string( v.mMaxValue ) + "] overall max value: [" + std::to_string( v.mMaxValueAllTime ) +
+                       "]" );
     }
     for ( auto i = 0; i < toUType( TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE ); i++ )
     {
@@ -401,13 +405,12 @@ TraceModule::print()
         auto atomicVariableNamePtr = getAtomicVariableName( static_cast<TraceAtomicVariable>( i ) );
         auto atomicVariableName =
             atomicVariableNamePtr != nullptr ? atomicVariableNamePtr : "Unknown atomic variable name";
-        mLogger.trace( "TraceModule::print",
-                       std::string{ " TraceModule-ConsoleLogging-TraceAtomicVariable '" } + atomicVariableName + "' [" +
-                           std::to_string( i ) + "] current value: [" + std::to_string( v.mCurrentValue.load() ) +
-                           "] max value since "
-                           "last print: [" +
-                           std::to_string( v.mMaxValue ) + "] overall max value: [" +
-                           std::to_string( v.mMaxValueAllTime ) + "]" );
+        FWE_LOG_TRACE( std::string{ " TraceModule-ConsoleLogging-TraceAtomicVariable '" } + atomicVariableName + "' [" +
+                       std::to_string( i ) + "] current value: [" + std::to_string( v.mCurrentValue.load() ) +
+                       "] max value since "
+                       "last print: [" +
+                       std::to_string( v.mMaxValue ) + "] overall max value: [" + std::to_string( v.mMaxValueAllTime ) +
+                       "]" );
     }
     for ( auto i = 0; i < toUType( TraceSection::TRACE_SECTION_SIZE ); i++ )
     {
@@ -415,19 +418,18 @@ TraceModule::print()
         auto currentHitCounter = v.mHitCounter - ( v.mCurrentlyActive ? 0 : 1 );
         auto sectionNamePtr = getSectionName( static_cast<TraceSection>( i ) );
         auto sectionName = sectionNamePtr != nullptr ? sectionNamePtr : "Unknown section name";
-        mLogger.trace( "TraceModule::print",
-                       std::string{ " TraceModule-ConsoleLogging-Section '" } + sectionName + "' [" +
-                           std::to_string( i ) + "] times section executed: [" + std::to_string( v.mHitCounter ) +
-                           "] avg execution time: "
-                           "[" +
-                           std::to_string( ( v.mHitCounter == 0 ? 0 : v.mTimeSpentSum / v.mHitCounter ) ) +
-                           "] max execution time since last print: [" + std::to_string( v.mMaxSpent ) + "] overall: [" +
-                           std::to_string( v.mMaxSpentAllTime ) +
-                           "] avg interval between execution: "
-                           "[" +
-                           std::to_string( ( currentHitCounter == 0 ? 0 : v.mIntervalSum / currentHitCounter ) ) +
-                           "] max interval since last print: [" + std::to_string( v.mMaxInterval ) + "] overall: [" +
-                           std::to_string( v.mMaxIntervalAllTime ) + "]" );
+        FWE_LOG_TRACE( std::string{ " TraceModule-ConsoleLogging-Section '" } + sectionName + "' [" +
+                       std::to_string( i ) + "] times section executed: [" + std::to_string( v.mHitCounter ) +
+                       "] avg execution time: "
+                       "[" +
+                       std::to_string( ( v.mHitCounter == 0 ? 0 : v.mTimeSpentSum / v.mHitCounter ) ) +
+                       "] max execution time since last print: [" + std::to_string( v.mMaxSpent ) + "] overall: [" +
+                       std::to_string( v.mMaxSpentAllTime ) +
+                       "] avg interval between execution: "
+                       "[" +
+                       std::to_string( ( currentHitCounter == 0 ? 0 : v.mIntervalSum / currentHitCounter ) ) +
+                       "] max interval since last print: [" + std::to_string( v.mMaxInterval ) + "] overall: [" +
+                       std::to_string( v.mMaxIntervalAllTime ) + "]" );
     }
 
     std::fflush( stdout );

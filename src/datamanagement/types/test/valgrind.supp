@@ -1,0 +1,8 @@
+{
+   __libc_csu_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:__libc_csu_init
+   ...
+}

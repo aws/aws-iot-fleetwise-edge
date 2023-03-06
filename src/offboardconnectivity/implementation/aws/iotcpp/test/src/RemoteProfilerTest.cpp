@@ -31,10 +31,10 @@ public:
     }
 
     ConnectivityError
-    send( const std::uint8_t *buf,
-          size_t size,
-          struct Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams collectionSchemeParams =
-              CollectionSchemeParams() ) override
+    sendBuffer( const std::uint8_t *buf,
+                size_t size,
+                struct Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams collectionSchemeParams =
+                    CollectionSchemeParams() ) override
     {
         static_cast<void>( collectionSchemeParams ); // Currently not implemented, hence unused
         std::cout << buf << std::endl;

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "CollectionInspectionWorkerThread.h"
+#include "WaitUntil.h"
 #include <cstring>
 #include <gtest/gtest.h>
 #include <random>
@@ -9,6 +10,7 @@
 
 using namespace Aws::IoTFleetWise::DataInspection;
 using namespace Aws::IoTFleetWise::DataManagement;
+using namespace Aws::IoTFleetWise::TestingSupport;
 
 class CollectionInspectionWorkerThreadTest : public ::testing::Test
 {
@@ -100,7 +102,22 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectBurstWithoutSubsampling )
     s1.sampleBufferSize = 50;
     s1.minimumSampleIntervalMs = 0;
     s1.fixedWindowPeriod = 77777;
+    s1.signalType = SignalType::DOUBLE;
     s1.isConditionOnlySignal = false;
+    InspectionMatrixSignalCollectionInfo s2{};
+    s2.signalID = 2222;
+    s2.sampleBufferSize = 50;
+    s2.minimumSampleIntervalMs = 0;
+    s2.fixedWindowPeriod = 77777;
+    s2.signalType = SignalType::INT32;
+    s2.isConditionOnlySignal = false;
+    InspectionMatrixSignalCollectionInfo s3{};
+    s3.signalID = 3333;
+    s3.sampleBufferSize = 50;
+    s3.minimumSampleIntervalMs = 0;
+    s3.fixedWindowPeriod = 77777;
+    s3.signalType = SignalType::BOOLEAN;
+    s3.isConditionOnlySignal = false;
     InspectionMatrixCanFrameCollectionInfo c1;
     c1.frameID = 0x380;
     c1.channelID = 3;
@@ -109,9 +126,17 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectBurstWithoutSubsampling )
     collectionSchemes->conditions[0].canFrames.push_back( c1 );
     collectionSchemes->conditions[0].triggerOnlyOnRisingEdge = true;
     collectionSchemes->conditions[0].signals.push_back( s1 );
+    collectionSchemes->conditions[0].signals.push_back( s2 );
+    collectionSchemes->conditions[0].signals.push_back( s3 );
     collectionSchemes->conditions[0].condition = getSignalsBiggerCondition( s1.signalID, 1 ).get();
     worker.onChangeInspectionMatrix( consCollectionSchemes );
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
+    signalBufferPtr->push( CollectedSignal( s3.signalID, timestamp, 0, s3.signalType ) );
+    signalBufferPtr->push( CollectedSignal( s3.signalID, timestamp, 1, s3.signalType ) );
+    signalBufferPtr->push( CollectedSignal( s3.signalID, timestamp, 0, s3.signalType ) );
+    signalBufferPtr->push( CollectedSignal( s2.signalID, timestamp, 10, s2.signalType ) );
+    signalBufferPtr->push( CollectedSignal( s2.signalID, timestamp, 15, s2.signalType ) );
+    signalBufferPtr->push( CollectedSignal( s2.signalID, timestamp, 20, s2.signalType ) );
     signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.1 ) );
     signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.2 ) );
     signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 1.5 ) );
@@ -124,16 +149,22 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectBurstWithoutSubsampling )
 
     worker.onNewDataAvailable();
 
-    std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData;
-    ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
+    WAIT_ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
 
-    ASSERT_EQ( collectedData->signals.size(), 3 );
+    ASSERT_EQ( collectedData->signals.size(), 9 );
 
-    EXPECT_EQ( collectedData->signals[0].value, 1.5 );
-    EXPECT_EQ( collectedData->signals[1].value, 0.2 );
-    EXPECT_EQ( collectedData->signals[2].value, 0.1 );
+    EXPECT_EQ( collectedData->signals[0].value.value.doubleVal, 1.5 );
+    EXPECT_EQ( collectedData->signals[1].value.value.doubleVal, 0.2 );
+    EXPECT_EQ( collectedData->signals[2].value.value.doubleVal, 0.1 );
+
+    EXPECT_EQ( collectedData->signals[3].value.value.int32Val, 20 );
+    EXPECT_EQ( collectedData->signals[4].value.value.int32Val, 15 );
+    EXPECT_EQ( collectedData->signals[5].value.value.int32Val, 10 );
+
+    EXPECT_EQ( collectedData->signals[6].value.value.boolVal, 0 );
+    EXPECT_EQ( collectedData->signals[7].value.value.boolVal, 1 );
+    EXPECT_EQ( collectedData->signals[8].value.value.boolVal, 0 );
 
     ASSERT_EQ( collectedData->canFrames.size(), 3 );
 
@@ -174,10 +205,9 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectionQueueFull )
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
     signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 1 ) );
     worker.onNewDataAvailable();
-    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData;
-    ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
+    WAIT_ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
     ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
     ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
     ASSERT_FALSE( outputCollectedData->pop( collectedData ) );
@@ -199,33 +229,27 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeDataWithoutNotify )
     s1.isConditionOnlySignal = false;
     collectionSchemes->conditions[0].signals.push_back( s1 );
     collectionSchemes->conditions[0].condition = getSignalsBiggerCondition( s1.signalID, 1 ).get();
+    collectionSchemes->conditions[0].triggerOnlyOnRisingEdge = true;
     worker.onChangeInspectionMatrix( consCollectionSchemes );
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
 
-    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
-
-    signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.1 ) );
-    signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.2 ) );
-    // this fulfills condition >1 so should trigger
-    signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 1.5 ) );
-
-    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.1 ) ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.2 ) ) );
+    // // this fulfills condition >1 so should trigger
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 1.5 ) ) );
 
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData;
-    ASSERT_FALSE( outputCollectedData->pop( collectedData ) );
 
     // After one second even without notifying data in the queue should be consumed
-    std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+    WAIT_ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
 
-    ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
+    ASSERT_EQ( collectedData->signals.size(), 3U );
 
-    ASSERT_EQ( collectedData->signals.size(), 3 );
+    EXPECT_EQ( collectedData->signals[0].value.value.doubleVal, 1.5 );
+    EXPECT_EQ( collectedData->signals[1].value.value.doubleVal, 0.2 );
+    EXPECT_EQ( collectedData->signals[2].value.value.doubleVal, 0.1 );
 
-    EXPECT_EQ( collectedData->signals[0].value, 1.5 );
-    EXPECT_EQ( collectedData->signals[1].value, 0.2 );
-    EXPECT_EQ( collectedData->signals[2].value, 0.1 );
-
-    ASSERT_FALSE( outputCollectedData->pop( collectedData ) );
+    DELAY_ASSERT_FALSE( outputCollectedData->pop( collectedData ) );
 
     worker.stop();
 }
@@ -257,22 +281,21 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     signal.isConditionOnlySignal = false;
     collectionSchemes->conditions[0].signals.push_back( signal );
     collectionSchemes->conditions[0].condition = getSignalsBiggerCondition( signal.signalID, 1 ).get();
+    collectionSchemes->conditions[0].triggerOnlyOnRisingEdge = true;
     // Make sure that DTCs should be collected
     collectionSchemes->conditions[0].includeActiveDtcs = true;
     inspectionWorker.onChangeInspectionMatrix( consCollectionSchemes );
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
 
-    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
     // Push the signals so that the condition is met
-    signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.1 ) );
-    signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.2 ) );
-    signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 1.5 ) );
-    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.1 ) ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.2 ) ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 1.5 ) ) );
+
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData;
-    ASSERT_FALSE( outputCollectedData->pop( collectedData ) );
-    std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+
     // Expect the data to be collected and has the DTCs
-    ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
+    WAIT_ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
     ASSERT_TRUE( collectedData->mDTCInfo.hasItems() );
     ASSERT_EQ( collectedData->mDTCInfo.mSID, SID::STORED_DTC );
     ASSERT_EQ( collectedData->mDTCInfo.mDTCCodes[0], "P0143" );
@@ -287,16 +310,14 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     // Push the DTCs to the buffer
     ASSERT_TRUE( activeDTCBufferPtr->push( dtcInfo ) );
     timestamp = fClock->systemTimeSinceEpochMs();
-    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
     // Push the signals so that the condition is met
-    signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.1 ) );
-    signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.2 ) );
-    signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 1.5 ) );
-    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
-    ASSERT_FALSE( outputCollectedData->pop( collectedData ) );
-    std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.1 ) ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.2 ) ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 1.5 ) ) );
+
     // Expect the data to be collected and has the DTCs
-    ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
+    WAIT_ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
     ASSERT_TRUE( collectedData->mDTCInfo.hasItems() );
     ASSERT_EQ( collectedData->mDTCInfo.mSID, SID::STORED_DTC );
     ASSERT_EQ( collectedData->mDTCInfo.mDTCCodes[0], "B0148" );
@@ -336,17 +357,15 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     inspectionWorker.onChangeInspectionMatrix( consCollectionSchemes );
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
 
-    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
     // Push the signals so that the condition is met
-    signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.1 ) );
-    signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.2 ) );
-    signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 1.5 ) );
-    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.1 ) ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.2 ) ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 1.5 ) ) );
+
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData;
-    ASSERT_FALSE( outputCollectedData->pop( collectedData ) );
-    std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+
     // Expect the data to be collected and has NO DTCs
-    ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
+    WAIT_ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
     ASSERT_FALSE( collectedData->mDTCInfo.hasItems() );
 
     inspectionWorker.stop();

@@ -3,6 +3,7 @@
 
 #include "CANDecoder.h"
 #include <gtest/gtest.h>
+#include <limits>
 #include <unistd.h>
 
 using namespace Aws::IoTFleetWise::DataManagement;
@@ -96,6 +97,104 @@ TEST( CANDecoderTest, CANDecoderTestSimpleMessage2 )
     ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 2 );
     ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mRawValue, 153638137 );
     ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[1].mRawValue, -299667802 );
+}
+
+// Precision Test
+TEST( CANDecoderTest, CANDecoderPrecisionTest )
+{
+    constexpr auto maxUnSignedVal = std::numeric_limits<uint64_t>::max();
+    constexpr auto maxSignedVal = std::numeric_limits<int64_t>::max();
+
+    // Test for max val
+    constexpr uint32_t msgSizeBytes = 16;
+    std::vector<uint8_t> frameData;
+    for ( size_t i = 0; i < 15; i++ )
+    {
+        frameData.emplace_back( 0xFF );
+    }
+    frameData.emplace_back( 0x7F );
+
+    CANSignalFormat sigFormat1;
+    sigFormat1.mSignalID = 1;
+    sigFormat1.mIsBigEndian = false;
+    sigFormat1.mIsSigned = false;
+    sigFormat1.mFirstBitPosition = 0;
+    sigFormat1.mSizeInBits = 64;
+    sigFormat1.mOffset = 0.0;
+    sigFormat1.mFactor = 1.0;
+    sigFormat1.mSignalType = SignalType::UINT64;
+
+    CANSignalFormat sigFormat2;
+    sigFormat2.mSignalID = 7;
+    sigFormat2.mIsBigEndian = false;
+    sigFormat2.mIsSigned = true;
+    sigFormat2.mFirstBitPosition = 64;
+    sigFormat2.mSizeInBits = 64;
+    sigFormat2.mOffset = 0.0;
+    sigFormat2.mFactor = 1.0;
+    sigFormat2.mSignalType = SignalType::INT64;
+
+    CANMessageFormat msgFormat;
+    msgFormat.mMessageID = 0x32A;
+    msgFormat.mSizeInBytes = msgSizeBytes;
+    msgFormat.mSignals.emplace_back( sigFormat1 );
+    msgFormat.mSignals.emplace_back( sigFormat2 );
+
+    CANDecoder decoder;
+    CANDecodedMessage decodedMsg;
+    std::unordered_set<SignalID> signalIDsToCollect = { 1, 7 };
+    ASSERT_TRUE(
+        decoder.decodeCANMessage( frameData.data(), msgSizeBytes, msgFormat, signalIDsToCollect, decodedMsg ) );
+
+    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 2 );
+
+    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mSignalType, SignalType::UINT64 );
+    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[1].mSignalType, SignalType::INT64 );
+
+    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mPhysicalValue.signalValue.uint64Val, maxUnSignedVal );
+    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[1].mPhysicalValue.signalValue.int64Val, maxSignedVal );
+}
+
+TEST( CANDecoderTest, CANDecoderPrecisionSignedTest )
+{
+    constexpr auto minSignedVal = std::numeric_limits<int64_t>::min();
+
+    // Test for max val
+    constexpr uint32_t msgSizeBytes = 8;
+    std::vector<uint8_t> frameData;
+    frameData.emplace_back( 0x00 );
+    for ( size_t i = 0; i < 6; i++ )
+    {
+        frameData.emplace_back( 0x00 );
+    }
+    frameData.emplace_back( 0x80 );
+
+    CANSignalFormat sigFormat1;
+    sigFormat1.mSignalID = 1;
+    sigFormat1.mIsBigEndian = false;
+    sigFormat1.mIsSigned = true;
+    sigFormat1.mFirstBitPosition = 0;
+    sigFormat1.mSizeInBits = 64;
+    sigFormat1.mOffset = 0.0;
+    sigFormat1.mFactor = 1.0;
+    sigFormat1.mSignalType = SignalType::INT64;
+
+    CANMessageFormat msgFormat;
+    msgFormat.mMessageID = 0x32A;
+    msgFormat.mSizeInBytes = msgSizeBytes;
+    msgFormat.mSignals.emplace_back( sigFormat1 );
+
+    CANDecoder decoder;
+    CANDecodedMessage decodedMsg;
+    std::unordered_set<SignalID> signalIDsToCollect = { 1 };
+    ASSERT_TRUE(
+        decoder.decodeCANMessage( frameData.data(), msgSizeBytes, msgFormat, signalIDsToCollect, decodedMsg ) );
+
+    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 1 );
+
+    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mSignalType, SignalType::INT64 );
+
+    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mPhysicalValue.signalValue.int64Val, minSignedVal );
 }
 
 TEST( CANDecoderTest, CANDecoderTestSimpleMessage3 )

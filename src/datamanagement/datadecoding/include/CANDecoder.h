@@ -7,7 +7,6 @@
 #include "CANDataTypes.h"
 #include "ClockHandler.h"
 #include "IDecoderManifest.h"
-#include "LoggingModule.h"
 #include "Timer.h"
 #include <memory>
 #include <unordered_set>
@@ -53,7 +52,6 @@ public:
     static int64_t extractSignalFromFrame( const uint8_t *frameData, const CANSignalFormat &signalDescription );
 
 private:
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
 };
 

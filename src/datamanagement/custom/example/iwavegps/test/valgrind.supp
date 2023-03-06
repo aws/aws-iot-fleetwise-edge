@@ -5,3 +5,12 @@
    fun:_ZN5boost8lockfree5queue*
    ...
 }
+
+{
+   __libc_csu_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:__libc_csu_init
+   ...
+}

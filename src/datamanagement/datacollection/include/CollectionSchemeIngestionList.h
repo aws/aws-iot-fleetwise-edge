@@ -5,7 +5,6 @@
 
 #include "CollectionSchemeIngestion.h"
 #include "ICollectionSchemeList.h"
-#include "LoggingModule.h"
 #include "collection_schemes.pb.h"
 #include <vector>
 
@@ -73,11 +72,6 @@ private:
      * @brief Used internally to hold the collectionSchemes message from the protobuffer
      */
     CollectionSchemesMsg::CollectionSchemes mCollectionSchemeListMsg;
-
-    /**
-     * @brief Logging module used to output to logs
-     */
-    LoggingModule mLogger;
 };
 
 } // namespace DataManagement

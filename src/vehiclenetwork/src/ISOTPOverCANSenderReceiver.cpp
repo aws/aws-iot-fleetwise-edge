@@ -5,6 +5,7 @@
 // Includes
 #include "businterfaces/ISOTPOverCANSenderReceiver.h"
 #include "ClockHandler.h"
+#include "LoggingModule.h"
 #include <cstring>
 #include <iostream>
 #include <linux/can.h>
@@ -67,9 +68,8 @@ ISOTPOverCANSenderReceiver::connect()
     mSocket = socket( PF_CAN, SOCK_DGRAM, CAN_ISOTP );
     if ( mSocket < 0 )
     {
-        mLogger.error( "ISOTPOverCANSenderReceiver::connect",
-                       "Failed to create the ISOTP rx id " + mStreamRxID +
-                           " to IF: " + mSenderReceiverOptions.mSocketCanIFName );
+        FWE_LOG_ERROR( "Failed to create the ISOTP rx id " + mStreamRxID +
+                       " to IF:" + mSenderReceiverOptions.mSocketCanIFName );
         return false;
     }
 
@@ -81,7 +81,7 @@ ISOTPOverCANSenderReceiver::connect()
 
     if ( ( retOptFlag < 0 ) || ( retFrameCtrFlag < 0 ) )
     {
-        mLogger.error( "ISOTPOverCANSenderReceiver::connect", "Failed to set ISO-TP socket option flags" );
+        FWE_LOG_ERROR( "Failed to set ISO-TP socket option flags" );
         return false;
     }
     // CAN PF and Interface Index
@@ -93,14 +93,12 @@ ISOTPOverCANSenderReceiver::connect()
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     if ( bind( mSocket, (struct sockaddr *)&interfaceAddress, sizeof( interfaceAddress ) ) < 0 )
     {
-        mLogger.error( "ISOTPOverCANSenderReceiver::connect",
-                       "Failed to bind the ISOTP rx id " + mStreamRxID +
-                           " to IF: " + mSenderReceiverOptions.mSocketCanIFName );
+        FWE_LOG_ERROR( " Failed to bind the ISOTP rx id " + mStreamRxID +
+                       " to IF: " + mSenderReceiverOptions.mSocketCanIFName );
         close( mSocket );
         return false;
     }
-    mLogger.trace( "ISOTPOverCANSenderReceiver::connect",
-                   "ISOTP rx id " + mStreamRxID + " connected to IF: " + mSenderReceiverOptions.mSocketCanIFName );
+    FWE_LOG_TRACE( "ISOTP rx id " + mStreamRxID + " connected to IF: " + mSenderReceiverOptions.mSocketCanIFName );
     return true;
 }
 
@@ -109,13 +107,11 @@ ISOTPOverCANSenderReceiver::disconnect()
 {
     if ( close( mSocket ) < 0 )
     {
-        mLogger.error( "ISOTPOverCANSenderReceiver::connect",
-                       "Failed to disconnect the ISOTP rx id " + mStreamRxID +
-                           " from IF: " + mSenderReceiverOptions.mSocketCanIFName );
+        FWE_LOG_ERROR( "Failed to disconnect the ISOTP rx id " + mStreamRxID +
+                       " from IF: " + mSenderReceiverOptions.mSocketCanIFName );
         return false;
     }
-    mLogger.trace( "ISOTPOverCANSenderReceiver::disconnect",
-                   "ISOTP rx id " + mStreamRxID + " disconnected from IF: " + mSenderReceiverOptions.mSocketCanIFName );
+    FWE_LOG_TRACE( "ISOTP rx id " + mStreamRxID + " disconnected from IF: " + mSenderReceiverOptions.mSocketCanIFName );
     return true;
 }
 
@@ -148,9 +144,8 @@ ISOTPOverCANSenderReceiver::flush( uint32_t timeout )
     auto readRes = read( mSocket, flushBuffer.data(), MAX_PDU_SIZE );
     if ( readRes <= 0 )
     {
-        mLogger.error( "ISOTPOverCANSenderReceiver::flush",
-                       "Failed to read PDU from socket: " + mStreamRxID + " with error code " +
-                           std::to_string( readRes ) );
+        FWE_LOG_ERROR( "Failed to read PDU from socket: " + mStreamRxID + " with error code " +
+                       std::to_string( readRes ) );
     }
     return pollNeededTime;
 }
@@ -166,15 +161,13 @@ ISOTPOverCANSenderReceiver::receivePDU( std::vector<uint8_t> &pduData )
         {
             // Responses are not always expected, so use trace level logging. E.g. supported PID requests for
             // unsupported PIDs can be ignored by some ECUs.
-            mLogger.trace( "ISOTPOverCANSenderReceiver::receivePDU",
-                           "Timeout reading PDU from socket: " + mStreamRxID );
+            FWE_LOG_TRACE( "Timeout reading PDU from socket: " + mStreamRxID );
             return false;
         }
         if ( res < 0 )
         {
-            mLogger.warn( "ISOTPOverCANSenderReceiver::receivePDU",
-                          "Failed to read PDU from socket: " + mStreamRxID + " with error code " +
-                              std::to_string( res ) );
+            FWE_LOG_WARN( "Failed to read PDU from socket: " + mStreamRxID + " with error code " +
+                          std::to_string( res ) );
             // Error (<0) or timeout (==0):
             return false;
         }
@@ -192,9 +185,8 @@ ISOTPOverCANSenderReceiver::receivePDU( std::vector<uint8_t> &pduData )
     {
         pduData.resize( 0 );
     }
-    mLogger.traceBytesInVector( "ISOTPOverCANSenderReceiver::receivePDU",
-                                "Socket: " + mStreamRxID + " received a PDU of size " + std::to_string( bytesRead ),
-                                pduData );
+    FWE_LOG_TRACE( "Socket: " + mStreamRxID + " received a PDU of size " + std::to_string( bytesRead ) + ": " +
+                   getStringFromBytes( pduData ) );
 
     return bytesRead > 0;
 }
@@ -204,9 +196,8 @@ ISOTPOverCANSenderReceiver::sendPDU( const std::vector<uint8_t> &pduData )
 {
     auto socket = mSenderReceiverOptions.mBroadcastSocket < 0 ? mSocket : mSenderReceiverOptions.mBroadcastSocket;
     int bytesWritten = static_cast<int>( write( socket, pduData.data(), pduData.size() ) );
-    mLogger.traceBytesInVector( "ISOTPOverCANSenderReceiver::sendPDU",
-                                "Socket: " + mStreamRxID + " sent a PDU of size " + std::to_string( bytesWritten ),
-                                pduData );
+    FWE_LOG_TRACE( "Socket: " + mStreamRxID + " sent a PDU of size " + std::to_string( bytesWritten ) + ": " +
+                   getStringFromBytes( pduData ) );
     return ( ( bytesWritten > 0 ) && ( bytesWritten == static_cast<int>( pduData.size() ) ) );
 }
 

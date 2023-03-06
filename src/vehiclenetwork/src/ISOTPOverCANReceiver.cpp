@@ -5,6 +5,7 @@
 // Includes
 #include "businterfaces/ISOTPOverCANReceiver.h"
 #include "ClockHandler.h"
+#include "LoggingModule.h"
 #include <cstring>
 #include <iostream>
 #include <linux/can.h>
@@ -62,8 +63,7 @@ ISOTPOverCANReceiver::connect()
     mSocket = socket( PF_CAN, SOCK_DGRAM /*| SOCK_NONBLOCK*/, CAN_ISOTP );
     if ( mSocket < 0 )
     {
-        mLogger.error( "ISOTPOverCANReceiver::connect",
-                       "Failed to create the ISOTP Socket to IF: " + mReceiverOptions.mSocketCanIFName );
+        FWE_LOG_ERROR( "Failed to create the ISOTP Socket to IF: " + mReceiverOptions.mSocketCanIFName );
         return false;
     }
 
@@ -74,7 +74,7 @@ ISOTPOverCANReceiver::connect()
 
     if ( ( retOptFlag < 0 ) || ( retFrameCtrFlag < 0 ) )
     {
-        mLogger.error( "ISOTPOverCANReceiver::connect", "Failed to set ISO-TP socket option flags" );
+        FWE_LOG_ERROR( "Failed to set ISO-TP socket option flags" );
         return false;
     }
     // CAN PF and Interface Index
@@ -85,27 +85,23 @@ ISOTPOverCANReceiver::connect()
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     if ( bind( mSocket, (struct sockaddr *)&interfaceAddress, sizeof( interfaceAddress ) ) < 0 )
     {
-        mLogger.error( "ISOTPOverCANReceiver::connect",
-                       "Failed to bind the ISOTP Socket to IF: " + mReceiverOptions.mSocketCanIFName );
+        FWE_LOG_ERROR( "Failed to bind the ISOTP Socket to IF: " + mReceiverOptions.mSocketCanIFName );
         close( mSocket );
         return false;
     }
-    mLogger.trace( "ISOTPOverCANReceiver::connect",
-                   "ISOTP Socket connected to IF: " + mReceiverOptions.mSocketCanIFName );
+    FWE_LOG_TRACE( "ISOTP Socket connected to IF: " + mReceiverOptions.mSocketCanIFName );
     return true;
 }
 
 bool
-ISOTPOverCANReceiver::disconnect()
+ISOTPOverCANReceiver::disconnect() const
 {
     if ( close( mSocket ) < 0 )
     {
-        mLogger.error( "ISOTPOverCANReceiver::connect",
-                       "Failed to disconnect the ISOTP Socket from IF: " + mReceiverOptions.mSocketCanIFName );
+        FWE_LOG_ERROR( "Failed to disconnect the ISOTP Socket from IF: " + mReceiverOptions.mSocketCanIFName );
         return false;
     }
-    mLogger.trace( "ISOTPOverCANReceiver::disconnect",
-                   "ISOTP Socket disconnected from IF: " + mReceiverOptions.mSocketCanIFName );
+    FWE_LOG_TRACE( "ISOTP Socket disconnected from IF: " + mReceiverOptions.mSocketCanIFName );
     return true;
 }
 
@@ -136,7 +132,7 @@ ISOTPOverCANReceiver::receivePDU( std::vector<uint8_t> &pduData )
     pduData.resize( MAX_PDU_SIZE );
     // coverity[check_return : SUPPRESS]
     int bytesRead = static_cast<int>( read( mSocket, pduData.data(), MAX_PDU_SIZE ) );
-    mLogger.trace( "ISOTPOverCANReceiver::receivePDU", "Received a PDU of size: " + std::to_string( bytesRead ) );
+    FWE_LOG_TRACE( "Received a PDU of size: " + std::to_string( bytesRead ) );
     // Remove the unnecessary bytes from the PDU container.
     if ( bytesRead > 0 )
     {

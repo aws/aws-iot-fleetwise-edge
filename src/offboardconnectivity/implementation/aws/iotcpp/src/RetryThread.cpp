@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "RetryThread.h"
+#include "LoggingModule.h"
 
 using namespace Aws::IoTFleetWise::OffboardConnectivityAwsIot;
 
@@ -14,6 +15,7 @@ RetryThread::RetryThread( IRetryable &retryable, uint32_t startBackoffMs, uint32
     , fCurrentWaitTime( 0 )
     , fShouldStop( false )
 {
+    // coverity[misra_cpp_2008_rule_5_2_10_violation] For std::atomic this must be performed in a single statement
     fInstance = fInstanceCounter++;
 }
 
@@ -27,11 +29,11 @@ RetryThread::start()
     fShouldStop.store( false );
     if ( !fThread.create( doWork, this ) )
     {
-        fLogger.trace( "RetryThread::start", "Retry Thread failed to start" );
+        FWE_LOG_TRACE( "Retry Thread failed to start" );
     }
     else
     {
-        fLogger.trace( "RetryThread::start", "Retry Thread started" );
+        FWE_LOG_TRACE( "Retry Thread started" );
         fThread.setThreadName( "fwCNRetry" + std::to_string( fInstance ) );
     }
 
@@ -48,7 +50,7 @@ RetryThread::stop()
 
     std::lock_guard<std::mutex> lock( fThreadMutex );
     fShouldStop.store( true );
-    fLogger.trace( "RetryThread::stop", "Request stop" );
+    FWE_LOG_TRACE( "Request stop" );
     fWait.notify();
     fThread.release();
     fShouldStop.store( false, std::memory_order_relaxed );
@@ -65,18 +67,16 @@ RetryThread::doWork( void *data )
         RetryStatus result = retryThread->fRetryable.attempt();
         if ( result != RetryStatus::RETRY )
         {
-            retryThread->fLogger.trace( "RetryThread::doWork",
-                                        "Finished with code " + std::to_string( static_cast<int>( result ) ) );
+            FWE_LOG_TRACE( "Finished with code " + std::to_string( static_cast<int>( result ) ) );
             retryThread->fRetryable.onFinished( result );
             return;
         }
-        retryThread->fLogger.trace( "RetryThread::doWork",
-                                    "Current retry time is: " + std::to_string( retryThread->fCurrentWaitTime ) );
+        FWE_LOG_TRACE( "Current retry time is: " + std::to_string( retryThread->fCurrentWaitTime ) );
         retryThread->fWait.wait( retryThread->fCurrentWaitTime );
         // exponential backoff
         retryThread->fCurrentWaitTime = std::min( retryThread->fCurrentWaitTime * 2, retryThread->fMaxBackoffMs );
     }
     // If thread is shutdown without succeeding signal abort
-    retryThread->fLogger.trace( "RetryThread::doWork", "Stop thread with ABORT" );
+    FWE_LOG_TRACE( "Stop thread with ABORT" );
     retryThread->fRetryable.onFinished( RetryStatus::ABORT );
 }

@@ -2,12 +2,16 @@
 
 ## Prerequisites
 
-The demo applies for Python 3.7 + environment. Install the dependencies:
+The demo applies for Python 3.8+ environment. Install the dependencies:
 
-    sudo ./install-deps.sh
+```bash
+sudo ./install-deps.sh
+```
 
 ## Running the Demo
 
 Run the demo:
 
-    ./demo.sh
+```bash
+./demo.sh
+```

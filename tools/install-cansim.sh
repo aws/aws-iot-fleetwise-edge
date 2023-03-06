@@ -11,6 +11,7 @@ parse_args() {
         case $1 in
         --bus-count)
             BUS_COUNT=$2
+            shift
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
@@ -24,14 +25,11 @@ parse_args() {
 
 parse_args "$@"
 
-# Install Python 3.7 and pip
-apt update && apt install -y python3.7 python3-setuptools curl
-curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-python3.7 get-pip.py --user
-rm get-pip.py
+# Install Python 3 and pip
+apt update && apt install -y python3 python3-pip
 
 # Install pip packages
-python3.7 -m pip install \
+pip3 install \
     wrapt==1.10.0 \
     cantools==36.4.0 \
     prompt_toolkit==3.0.21 \

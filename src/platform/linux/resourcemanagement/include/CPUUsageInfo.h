@@ -22,6 +22,8 @@ namespace Linux
 /**
  * @brief Utility class to track and report CPU commutative time usage.
  */
+// coverity[cert_dcl60_cpp_violation] false positive - class only defined once
+// coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
 class CPUUsageInfo
 {
 public:

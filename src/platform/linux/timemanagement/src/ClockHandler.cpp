@@ -37,7 +37,9 @@ public:
         auto timeNow = std::chrono::system_clock::now();
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>( timeNow.time_since_epoch() ).count() % 1000;
         auto timeNowFormatted = std::chrono::system_clock::to_time_t( timeNow );
-        timeAsString << std::put_time( std::gmtime( &timeNowFormatted ), "%FT%T." ) << std::setfill( '0' )
+        struct tm tmStruct = {};
+        // coverity[misra_cpp_2008_rule_18_0_4_violation] No C++14 method exists to convert from time_t to struct tm
+        timeAsString << std::put_time( gmtime_r( &timeNowFormatted, &tmStruct ), "%FT%T." ) << std::setfill( '0' )
                      << std::setw( 3 ) << ms << "Z";
         return timeAsString.str();
     }

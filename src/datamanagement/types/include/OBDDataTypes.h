@@ -25,7 +25,34 @@ using namespace Aws::IoTFleetWise::VehicleNetwork;
 using namespace Aws::IoTFleetWise::Platform::Linux;
 using namespace Aws::IoTFleetWise::Platform::Utility;
 
-using SignalValue = double;
+union OBDValue {
+    double doubleVal;
+    uint64_t uint64Val;
+    int64_t int64Val;
+};
+
+struct OBDSignal
+{
+    OBDValue signalValue;
+    SignalType signalType;
+
+    template <typename T>
+    OBDSignal( T val, SignalType type )
+        : signalType( type )
+    {
+        switch ( signalType )
+        {
+        case SignalType::UINT64:
+            signalValue.uint64Val = static_cast<uint64_t>( val );
+            break;
+        case SignalType::INT64:
+            signalValue.int64Val = static_cast<int64_t>( val );
+            break;
+        default:
+            signalValue.doubleVal = static_cast<double>( val );
+        }
+    }
+};
 
 // List of OBD Service IDs/ Modes
 enum class SIDs : uint32_t
@@ -202,12 +229,12 @@ struct DTCInfo
 };
 
 // List of Emission related PIDs requested
-// on the bus and there physical values
+// on the bus and their physical values
 // e.g. PID = 0x0C( RPM)
 struct EmissionInfo
 {
     SID mSID;
-    std::map<uint32_t, SignalValue> mPIDsToValues;
+    std::map<uint32_t, OBDSignal> mPIDsToValues;
 };
 
 // Structure of a single PID OBD request.

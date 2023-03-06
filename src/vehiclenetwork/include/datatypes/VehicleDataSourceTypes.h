@@ -54,7 +54,7 @@ enum class VehicleDataSourceState
 // ECU IDs
 enum class ECUID
 {
-    INVALID_ECU_ID,
+    INVALID_ECU_ID = 0,
     BROADCAST_ID = 0x7DF,
     BROADCAST_EXTENDED_ID = 0x18DB33F1,
     LOWEST_ECU_EXTENDED_RX_ID = 0x18DAF100,

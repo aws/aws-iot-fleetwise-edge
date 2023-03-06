@@ -13,6 +13,7 @@
 #include <unordered_map>
 // As _Find_first() is not part of C++ standard and compiler specific other structure could be considered
 #include <bitset>
+#include <boost/variant.hpp>
 
 namespace Aws
 {
@@ -84,9 +85,13 @@ public:
      *
      * @param id id of the obd based or can based signal
      * @param receiveTime timestamp at which time was the signal seen on the physical bus
-     * @param value the signal value as double
+     * @param value the signal value
      */
-    void addNewSignal( InspectionSignalID id, const TimePoint &receiveTime, InspectionValue value );
+    template <typename T>
+    void addNewSignal( InspectionSignalID id, const TimePoint &receiveTime, T value );
+
+    template <typename T = double>
+    void addSignalToBuffer( const InspectionMatrixSignalCollectionInfo &signalIn );
 
     /**
      * @brief Add new raw CAN Frame history buffer. If frame is not needed call will be just ignored
@@ -159,9 +164,10 @@ private:
     private:
         std::bitset<MAX_NUMBER_OF_ACTIVE_CONDITION> mAlreadyConsumed{ 0 };
     };
+    template <typename T = double>
     struct SignalSample : SampleConsumed
     {
-        InspectionValue mValue{ 0.0 };
+        T mValue;
         InspectionTimestamp mTimestamp{ 0 };
     };
 
@@ -183,6 +189,7 @@ private:
      * need to look at historic values. The window is time based and not sample based.
      * Currently the last 2 windows are maintained inside this class.
      * */
+    template <typename T = double>
     class FixedTimeWindowFunctionData
     {
     public:
@@ -195,24 +202,24 @@ private:
         InspectionTimestamp mLastTimeCalculated{ 0 }; /** <the time the last window stopped*/
 
         // This value represent the newest window that was complete and calculated
-        InspectionValue mLastMin{ std::numeric_limits<InspectionValue>::min() };
-        InspectionValue mLastMax{ std::numeric_limits<InspectionValue>::max() };
-        InspectionValue mLastAvg{ 0 };
+        T mLastMin{ std::numeric_limits<T>::min() };
+        T mLastMax{ std::numeric_limits<T>::max() };
+        T mLastAvg{ 0 };
         bool mLastAvailable{ false }; /** <if this is false there is no data for this window. For example if the window
                                        * is 30 minutes long in the first 30 minutes of running FWE receiving the signal
                                        * no data is available
                                        */
         // This values represents the value before the newest window
-        InspectionValue mPreviousLastMin{ std::numeric_limits<InspectionValue>::min() };
-        InspectionValue mPreviousLastMax{ std::numeric_limits<InspectionValue>::max() };
-        InspectionValue mPreviousLastAvg{ 0 };
+        T mPreviousLastMin{ std::numeric_limits<T>::min() };
+        T mPreviousLastMax{ std::numeric_limits<T>::max() };
+        T mPreviousLastAvg{ 0 };
         bool mPreviousLastAvailable{ false };
 
         // This values are changed online with every new signal sample and will be used to calculate
         // the next window as soon as the window time is over
-        InspectionValue mCollectingMin{ std::numeric_limits<InspectionValue>::min() };
-        InspectionValue mCollectingMax{ std::numeric_limits<InspectionValue>::max() };
-        InspectionValue mCollectingSum{ 0 };
+        T mCollectingMin{ std::numeric_limits<T>::min() };
+        T mCollectingMax{ std::numeric_limits<T>::max() };
+        double mCollectingSum{ 0 };
         uint32_t mCollectedSignals{ 0 };
 
         /**
@@ -225,9 +232,7 @@ private:
          */
         bool updateWindow( InspectionTimestamp timestamp, InspectionTimestamp &nextWindowFunctionTimesOut );
         inline void
-        addValue( InspectionValue value,
-                  InspectionTimestamp timestamp,
-                  InspectionTimestamp &nextWindowFunctionTimesOut )
+        addValue( T value, InspectionTimestamp timestamp, InspectionTimestamp &nextWindowFunctionTimesOut )
         {
             updateWindow( timestamp, nextWindowFunctionTimesOut );
             updateInternalVariables( value );
@@ -235,18 +240,18 @@ private:
 
     private:
         inline void
-        updateInternalVariables( InspectionValue value )
+        updateInternalVariables( T value )
         {
             mCollectingMin = std::min( mCollectingMin, value );
             mCollectingMax = std::max( mCollectingMax, value );
-            mCollectingSum += value;
+            mCollectingSum += static_cast<double>( value );
             mCollectedSignals++;
         }
         inline void
         initNewWindow( InspectionTimestamp timestamp, InspectionTimestamp &nextWindowFunctionTimesOut )
         {
-            mCollectingMin = std::numeric_limits<InspectionValue>::max();
-            mCollectingMax = std::numeric_limits<InspectionValue>::min();
+            mCollectingMin = std::numeric_limits<T>::max();
+            mCollectingMax = std::numeric_limits<T>::min();
             mCollectingSum = 0;
             mCollectedSignals = 0;
             mLastTimeCalculated +=
@@ -261,6 +266,7 @@ private:
      * The signal can be used as part of a condition or only to be published in the case
      * a condition is true
      */
+    template <typename T = double>
     struct SignalHistoryBuffer
     {
         SignalHistoryBuffer() = default;
@@ -272,26 +278,26 @@ private:
         }
 
         uint32_t mMinimumSampleIntervalMs{ 0 };
-        std::vector<struct SignalSample>
+        std::vector<struct SignalSample<T>>
             mBuffer; // ringbuffer, Consider to move to raw pointer allocated with new[] if vector allocates too much
         uint32_t mSize{ 0 };            // minimum size needed by all conditions, buffer must be at least this big
         uint32_t mCurrentPosition{ 0 }; /**< position in ringbuffer needs to come after size as it depends on it */
         uint32_t mCounter{ 0 };         /**< over all recorded samples*/
         TimePoint mLastSample{ 0, 0 };
-        std::vector<FixedTimeWindowFunctionData>
+        std::vector<FixedTimeWindowFunctionData<T>>
             mWindowFunctionData; /**< every signal buffer can have multiple windows over different time periods*/
         std::bitset<MAX_NUMBER_OF_ACTIVE_CONDITION>
             mConditionsThatEvaluateOnThisSignal; /**< if bit 0 is set it means element with index 0 of vector conditions
                                                  needs to reevaluate if this signal changes*/
 
-        inline FixedTimeWindowFunctionData *
+        inline FixedTimeWindowFunctionData<T> *
         addFixedWindow( uint32_t windowSizeMs )
         {
             if ( windowSizeMs == 0 )
             {
                 return nullptr;
             }
-            FixedTimeWindowFunctionData *findWindow = getFixedWindow( windowSizeMs );
+            FixedTimeWindowFunctionData<T> *findWindow = getFixedWindow( windowSizeMs );
             if ( findWindow != nullptr )
             {
                 return findWindow;
@@ -300,7 +306,7 @@ private:
             return &( mWindowFunctionData.back() );
         }
 
-        inline FixedTimeWindowFunctionData *
+        inline FixedTimeWindowFunctionData<T> *
         getFixedWindow( uint32_t windowSizeMs )
         {
             if ( windowSizeMs == 0 )
@@ -347,6 +353,32 @@ private:
         TimePoint mLastSample{ 0, 0 };
     };
 
+    // VSS supported datatypes
+    using signalHistoryBufferPtrVar = boost::variant<SignalHistoryBuffer<int64_t> *,
+                                                     SignalHistoryBuffer<float> *,
+                                                     SignalHistoryBuffer<bool> *,
+                                                     SignalHistoryBuffer<uint8_t> *,
+                                                     SignalHistoryBuffer<int8_t> *,
+                                                     SignalHistoryBuffer<uint16_t> *,
+                                                     SignalHistoryBuffer<int16_t> *,
+                                                     SignalHistoryBuffer<uint32_t> *,
+                                                     SignalHistoryBuffer<int32_t> *,
+                                                     SignalHistoryBuffer<uint64_t> *,
+                                                     SignalHistoryBuffer<double> *>;
+
+    // VSS supported datatypes
+    using FixedTimeWindowFunctionPtrVar = boost::variant<FixedTimeWindowFunctionData<int64_t> *,
+                                                         FixedTimeWindowFunctionData<float> *,
+                                                         FixedTimeWindowFunctionData<bool> *,
+                                                         FixedTimeWindowFunctionData<uint8_t> *,
+                                                         FixedTimeWindowFunctionData<int8_t> *,
+                                                         FixedTimeWindowFunctionData<uint16_t> *,
+                                                         FixedTimeWindowFunctionData<int16_t> *,
+                                                         FixedTimeWindowFunctionData<uint32_t> *,
+                                                         FixedTimeWindowFunctionData<int32_t> *,
+                                                         FixedTimeWindowFunctionData<uint64_t> *,
+                                                         FixedTimeWindowFunctionData<double> *>;
+
     /**
      * @brief Stores information specific to one condition like the last time if was true
      */
@@ -358,13 +390,60 @@ private:
         }
         InspectionTimestamp mLastDataTimestampPublished{ 0 };
         TimePoint mLastTrigger{ 0, 0 };
-        std::unordered_map<InspectionSignalID, SignalHistoryBuffer *>
+        // TODO** :: Update the type here
+        std::unordered_map<InspectionSignalID, signalHistoryBufferPtrVar>
             mEvaluationSignals; // for fast lookup signals used for evaluation
-        std::unordered_map<InspectionSignalID, FixedTimeWindowFunctionData *>
+        std::unordered_map<InspectionSignalID, FixedTimeWindowFunctionPtrVar>
             mEvaluationFunctions; // for fast lookup functions used for evaluation
         const ConditionWithCollectedData &mCondition;
         // Unique Identifier of the Event matched by this condition.
         EventID mEventID{ 0 };
+
+        template <typename T = double>
+        SignalHistoryBuffer<T> *
+        getEvaluationSignalsBufferPtr( InspectionSignalID signalIDIn )
+        {
+            auto evaluationSignalPtr = mEvaluationSignals.find( signalIDIn );
+            if ( evaluationSignalPtr == mEvaluationSignals.end() )
+            {
+                return nullptr;
+            }
+            try
+            {
+                auto vecPtr = boost::get<SignalHistoryBuffer<T> *>( &( evaluationSignalPtr->second ) );
+                if ( vecPtr != nullptr )
+                {
+                    return *vecPtr;
+                }
+            }
+            catch ( ... )
+            {
+            }
+            return nullptr;
+        }
+
+        template <typename T = double>
+        FixedTimeWindowFunctionData<T> *
+        getFixedTimeWindowFunctionDataPtr( InspectionSignalID signalIDIn )
+        {
+            auto evaluationfunctionPtr = mEvaluationFunctions.find( signalIDIn );
+            if ( evaluationfunctionPtr == mEvaluationFunctions.end() )
+            {
+                return nullptr;
+            }
+            try
+            {
+                auto vecPtr = boost::get<FixedTimeWindowFunctionData<T> *>( &( evaluationfunctionPtr->second ) );
+                if ( vecPtr != nullptr )
+                {
+                    return *vecPtr;
+                }
+            }
+            catch ( ... )
+            {
+            }
+            return nullptr;
+        }
     };
 
     enum class ExpressionErrorCode
@@ -377,7 +456,6 @@ private:
         NOT_IMPLEMENTED_FUNCTION
     };
 
-    SignalHistoryBuffer &addSignalToBuffer( const InspectionMatrixSignalCollectionInfo &signal );
     bool preAllocateBuffers();
     bool isSignalPartOfEval( const struct ExpressionNode *expression,
                              InspectionSignalID signalID,
@@ -391,17 +469,26 @@ private:
     ExpressionErrorCode getLatestSignalValue( InspectionSignalID id,
                                               ActiveCondition &condition,
                                               InspectionValue &result );
-    static ExpressionErrorCode getSampleWindowFunction( WindowFunction function,
-                                                        InspectionSignalID signalID,
-                                                        ActiveCondition &condition,
-                                                        InspectionValue &result );
+    ExpressionErrorCode getSampleWindowFunction( WindowFunction function,
+                                                 InspectionSignalID signalID,
+                                                 ActiveCondition &condition,
+                                                 InspectionValue &result );
+
+    template <typename T>
+    ExpressionErrorCode getSampleWindowFunctionType( WindowFunction function,
+                                                     InspectionSignalID signalID,
+                                                     ActiveCondition &condition,
+                                                     InspectionValue &result );
+
     ExpressionErrorCode getGeohashFunctionNode( const struct ExpressionNode *expression,
                                                 ActiveCondition &condition,
                                                 bool &resultValueBool );
+    template <typename T>
     void collectLastSignals( InspectionSignalID id,
                              uint32_t minimumSamplingInterval,
                              uint32_t maxNumberOfSignalsToCollect,
                              uint32_t conditionId,
+                             SignalType signalTypeIn,
                              InspectionTimestamp &newestSignalTimestamp,
                              std::vector<CollectedSignal> &output );
     void collectLastCanFrames( CANRawFrameID canID,
@@ -411,6 +498,11 @@ private:
                                uint32_t conditionId,
                                InspectionTimestamp &newestSignalTimestamp,
                                std::vector<CollectedCanRawFrame> &output );
+
+    template <typename T>
+    void updateConditionBuffer( const InspectionMatrixSignalCollectionInfo &inspectionMatrixCollectionInfoIn,
+                                ActiveCondition &acIn,
+                                const long unsigned int conditionIndexIn );
 
     void updateAllFixedWindowFunctions( InspectionTimestamp timestamp );
 
@@ -444,10 +536,73 @@ private:
         return ++counter;
     }
 
-    using SignalHistoryBufferCollection = std::unordered_map<InspectionSignalID, std::vector<SignalHistoryBuffer>>;
+    // VSS supported datatypes
+    using signalHistoryBufferVar = boost::variant<std::vector<SignalHistoryBuffer<uint8_t>>,
+                                                  std::vector<SignalHistoryBuffer<int8_t>>,
+                                                  std::vector<SignalHistoryBuffer<uint16_t>>,
+                                                  std::vector<SignalHistoryBuffer<int16_t>>,
+                                                  std::vector<SignalHistoryBuffer<uint32_t>>,
+                                                  std::vector<SignalHistoryBuffer<int32_t>>,
+                                                  std::vector<SignalHistoryBuffer<uint64_t>>,
+                                                  std::vector<SignalHistoryBuffer<int64_t>>,
+                                                  std::vector<SignalHistoryBuffer<float>>,
+                                                  std::vector<SignalHistoryBuffer<double>>,
+                                                  std::vector<SignalHistoryBuffer<bool>>>;
+    using SignalHistoryBufferCollection = std::unordered_map<InspectionSignalID, signalHistoryBufferVar>;
     SignalHistoryBufferCollection
         mSignalBuffers; /**< signal history buffer. First vector has the signalID as index. In the nested vector
                          * the different subsampling of this signal are stored. */
+
+    using SignalToBufferTypeMap = std::unordered_map<InspectionSignalID, SignalType>;
+    SignalToBufferTypeMap mSignalToBufferTypeMap;
+
+    template <typename T = double>
+    std::vector<SignalHistoryBuffer<T>> *
+    getSignalHistoryBufferPtr( InspectionSignalID signalIDIn )
+    {
+        std::vector<SignalHistoryBuffer<T>> *resVec = nullptr;
+        if ( mSignalBuffers.find( signalIDIn ) == mSignalBuffers.end() )
+        {
+            // create a new map entry
+            auto mapEntryVec = std::vector<SignalHistoryBuffer<T>>{};
+            try
+            {
+                signalHistoryBufferVar mapEntry = mapEntryVec;
+                mSignalBuffers.insert( { signalIDIn, mapEntry } );
+            }
+            catch ( ... )
+            {
+                FWE_LOG_ERROR( "Cannot Insert the signalHistoryBuffer vector for Signal " +
+                               std::to_string( signalIDIn ) );
+                return nullptr;
+            }
+        }
+
+        try
+        {
+            auto signalBufferVectorPtr = mSignalBuffers.find( signalIDIn );
+            if ( signalBufferVectorPtr != mSignalBuffers.end() )
+            {
+                resVec = boost::get<std::vector<SignalHistoryBuffer<T>>>( &( signalBufferVectorPtr->second ) );
+            }
+        }
+        catch ( ... )
+        {
+            FWE_LOG_ERROR( "Cannot retrive the signalHistoryBuffer vector for Signal " + std::to_string( signalIDIn ) );
+        }
+        return resVec;
+    }
+
+    template <typename T>
+    bool allocateBufferVector( SignalID signalIDIn, uint32_t &usedBytes );
+
+    template <typename T = double>
+    void updateBufferFixedWindowFunction( SignalID signalIDIn, InspectionTimestamp timestamp );
+
+    template <typename T>
+    ExpressionErrorCode getLatestBufferSignalValue( InspectionSignalID id,
+                                                    ActiveCondition &condition,
+                                                    InspectionValue &result );
 
     using CanFrameHistoryBufferCollection = std::vector<CanFrameHistoryBuffer>;
     CanFrameHistoryBufferCollection mCanFrameBuffers; /**< signal history buffer for raw can frames. */
@@ -485,10 +640,109 @@ private:
     uint32_t mNextConditionToCollectedIndex{ 0 };
 
     InspectionTimestamp mNextWindowFunctionTimesOut{ 0 };
-    Aws::IoTFleetWise::Platform::Linux::LoggingModule mLogger;
     DataReduction mDataReduction;
     bool mSendDataOnlyOncePerCondition{ false };
 };
+
+template <typename T>
+void
+CollectionInspectionEngine::addNewSignal( InspectionSignalID id, const TimePoint &receiveTime, T value )
+{
+    if ( mSignalBuffers.find( id ) == mSignalBuffers.end() || mSignalBuffers[id].empty() )
+    {
+        // Signal not collected by any active condition
+        return;
+    }
+    // Iterate through all sampling intervals of the signal
+    std::vector<SignalHistoryBuffer<T>> *signalHistoryBufferPtr = nullptr;
+    signalHistoryBufferPtr = getSignalHistoryBufferPtr<T>( id );
+    if ( signalHistoryBufferPtr == nullptr )
+    {
+        // Invalid access to the map Buffer datatype
+        return;
+    }
+    auto &bufferVec = *signalHistoryBufferPtr;
+    for ( auto &buf : bufferVec )
+    {
+        if ( ( ( buf.mSize > 0 ) && ( buf.mSize <= buf.mBuffer.size() ) ) &&
+             ( ( buf.mMinimumSampleIntervalMs == 0 ) ||
+               ( ( buf.mLastSample.systemTimeMs == 0 ) && ( buf.mLastSample.monotonicTimeMs == 0 ) ) ||
+               ( receiveTime.monotonicTimeMs >= buf.mLastSample.monotonicTimeMs + buf.mMinimumSampleIntervalMs ) ) )
+        {
+            buf.mCurrentPosition++;
+            if ( buf.mCurrentPosition >= buf.mSize )
+            {
+                buf.mCurrentPosition = 0;
+            }
+            buf.mBuffer[buf.mCurrentPosition].mValue = value;
+            buf.mBuffer[buf.mCurrentPosition].mTimestamp = receiveTime.systemTimeMs;
+            buf.mBuffer[buf.mCurrentPosition].setAlreadyConsumed( ALL_CONDITIONS, false );
+            buf.mCounter++;
+            buf.mLastSample = receiveTime;
+            for ( auto &window : buf.mWindowFunctionData )
+            {
+                window.addValue( value, receiveTime.monotonicTimeMs, mNextWindowFunctionTimesOut );
+            }
+            mConditionsWithInputSignalChanged |= buf.mConditionsThatEvaluateOnThisSignal;
+        }
+    }
+}
+
+template <typename T>
+bool
+CollectionInspectionEngine::FixedTimeWindowFunctionData<T>::updateWindow(
+    InspectionTimestamp timestamp, InspectionTimestamp &nextWindowFunctionTimesOut )
+{
+    if ( mLastTimeCalculated == 0 )
+    {
+        // First time a signal arrives start the window for this signal
+        mLastTimeCalculated = timestamp;
+        initNewWindow( timestamp, nextWindowFunctionTimesOut );
+    }
+    // check the last 2 windows as this class records the last and previous last data
+    else if ( timestamp >= mLastTimeCalculated + mWindowSizeMs * 2 )
+    {
+        // In the last window not a single sample arrived
+        mLastAvailable = false;
+        if ( mCollectedSignals == 0 )
+        {
+            mPreviousLastAvailable = false;
+        }
+        else
+        {
+            mPreviousLastAvailable = true;
+            mPreviousLastMin = mCollectingMin;
+            mPreviousLastMax = mCollectingMax;
+            mPreviousLastAvg = static_cast<T>( mCollectingSum / mCollectedSignals );
+        }
+        initNewWindow( timestamp, nextWindowFunctionTimesOut );
+    }
+    else if ( timestamp >= mLastTimeCalculated + mWindowSizeMs )
+    {
+        mPreviousLastMin = mLastMin;
+        mPreviousLastMax = mLastMax;
+        mPreviousLastAvg = mLastAvg;
+        mPreviousLastAvailable = mLastAvailable;
+        if ( mCollectedSignals == 0 )
+        {
+            mLastAvailable = false;
+        }
+        else
+        {
+            mLastAvailable = true;
+            mLastMin = mCollectingMin;
+            mLastMax = mCollectingMax;
+            mLastAvg = static_cast<T>( mCollectingSum / mCollectedSignals );
+        }
+        initNewWindow( timestamp, nextWindowFunctionTimesOut );
+    }
+    else
+    {
+        nextWindowFunctionTimesOut = std::min( nextWindowFunctionTimesOut, mLastTimeCalculated + mWindowSizeMs );
+        return false;
+    }
+    return true;
+}
 
 } // namespace DataInspection
 } // namespace IoTFleetWise

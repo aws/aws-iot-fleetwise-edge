@@ -5,7 +5,6 @@
 
 // Includes
 #include "ICacheAndPersist.h"
-#include "LoggingModule.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -110,7 +109,6 @@ private:
     std::string mCollectionSchemeListFile;
     std::string mCollectedDataFile;
     size_t mMaxPersistencePartitionSize;
-    LoggingModule mLogger;
 
     /**
      * @brief checks if the specified file exists, if not creates a new one

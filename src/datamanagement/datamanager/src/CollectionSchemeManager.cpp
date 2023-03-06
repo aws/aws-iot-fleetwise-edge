@@ -3,6 +3,7 @@
 
 // Includes
 #include "CollectionSchemeManager.h"
+#include "LoggingModule.h"
 #include "TraceModule.h"
 #include <chrono>
 #include <string>
@@ -53,11 +54,11 @@ CollectionSchemeManager::start()
     mShouldStop.store( false );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.error( "CollectionSchemeManager::start", "Thread failed to start" );
+        FWE_LOG_ERROR( "Thread failed to start" );
     }
     else
     {
-        mLogger.info( "CollectionSchemeManager::start", "Thread started" );
+        FWE_LOG_INFO( "Thread started" );
         mThread.setThreadName( "fwDMColSchMngr" );
     }
     return mThread.isValid();
@@ -77,7 +78,7 @@ CollectionSchemeManager::stop()
     mWait.notify();
     mThread.release();
     mShouldStop.store( false, std::memory_order_relaxed );
-    mLogger.info( "CollectionSchemeManager::stop", "Thread stopped" );
+    FWE_LOG_INFO( "Collection Scheme Thread stopped" );
     return true;
 }
 
@@ -87,7 +88,7 @@ CollectionSchemeManager::shouldStop() const
     return mShouldStop.load( std::memory_order_relaxed );
 }
 
-/* supporting functions for mLogger */
+/* supporting functions for logging */
 void
 CollectionSchemeManager::printEventLogMsg( std::string &msg,
                                            const std::string &id,
@@ -175,8 +176,7 @@ CollectionSchemeManager::doWork( void *data )
     }
     else
     {
-        collectionSchemeManager->mLogger.trace( "CollectionSchemeManager::doWork",
-                                                " Using a locally defined  decoder dictionary " );
+        FWE_LOG_TRACE( " Using a locally defined  decoder dictionary " );
     }
     do
     {
@@ -199,10 +199,10 @@ CollectionSchemeManager::doWork( void *data )
         if ( enabledCollectionSchemeMapChanged )
         {
             TraceModule::get().sectionBegin( TraceSection::MANAGER_EXTRACTION );
-            collectionSchemeManager->mLogger.trace(
-                "CollectionSchemeManager::doWork",
+            FWE_LOG_TRACE(
+
                 "Start extraction because of changed active collection schemes at system time " +
-                    std::to_string( checkTime.systemTimeMs ) );
+                std::to_string( checkTime.systemTimeMs ) );
             /*
              * Extract InspectionMatrix from mEnabledCollectionSchemeMap
              *
@@ -243,23 +243,19 @@ CollectionSchemeManager::doWork( void *data )
                               ->canMessageDecoderMethod.cbegin()
                               ->second.size()
                         : 0 );
-                collectionSchemeManager->mLogger.info(
-                    "CollectionSchemeManager::doWork",
-                    "FWE activated Decoder Manifest:" + std::string( " using decoder manifest:" ) +
-                        collectionSchemeManager->currentDecoderManifestID + " resulting in decoding rules for " +
-                        std::to_string( decoderDictionaryMap.size() ) +
-                        " protocols. Decoder CAN channels: " + decoderCanChannels + " and OBD PIDs:" + obdPids );
+                FWE_LOG_INFO( "FWE activated Decoder Manifest:" + std::string( " using decoder manifest:" ) +
+                              collectionSchemeManager->currentDecoderManifestID + " resulting in decoding rules for " +
+                              std::to_string( decoderDictionaryMap.size() ) +
+                              " protocols. Decoder CAN channels: " + decoderCanChannels + " and OBD PIDs:" + obdPids );
             }
             std::string canInfo;
             std::string enabled;
             std::string idle;
             collectionSchemeManager->printExistingCollectionSchemes( enabled, idle );
             // coverity[check_return : SUPPRESS]
-            collectionSchemeManager->mLogger.info(
-                "CollectionSchemeManager::doWork",
-                "FWE activated collection schemes:" + enabled +
-                    " using decoder manifest:" + collectionSchemeManager->currentDecoderManifestID + " resulting in " +
-                    std::to_string( inspectionMatrixOutput->conditions.size() ) + " inspection conditions" );
+            FWE_LOG_INFO( "FWE activated collection schemes:" + enabled + " using decoder manifest:" +
+                          collectionSchemeManager->currentDecoderManifestID + " resulting in " +
+                          std::to_string( inspectionMatrixOutput->conditions.size() ) + " inspection conditions" );
             TraceModule::get().sectionEnd( TraceSection::MANAGER_EXTRACTION );
         }
         /*
@@ -280,15 +276,14 @@ CollectionSchemeManager::doWork( void *data )
         {
             uint32_t waitTimeMs = static_cast<uint32_t>( collectionSchemeManager->mTimeLine.top().time.monotonicTimeMs -
                                                          currentMonotonicTime );
-            collectionSchemeManager->mLogger.trace( "CollectionSchemeManager::doWork",
-                                                    "Going to wait for " + std::to_string( waitTimeMs ) + " ms" );
+            FWE_LOG_TRACE( "Going to wait for " + std::to_string( waitTimeMs ) + " ms" );
             collectionSchemeManager->mWait.wait( waitTimeMs );
         }
         /* now it is either timer expires, an update arrives from PI, or stop() is called */
         collectionSchemeManager->updateAvailable();
         std::string wakeupStr;
         collectionSchemeManager->printWakeupStatus( wakeupStr );
-        collectionSchemeManager->mLogger.trace( "CollectionSchemeManager::doWork", wakeupStr );
+        FWE_LOG_TRACE( wakeupStr );
     } while ( !collectionSchemeManager->shouldStop() );
 }
 
@@ -339,9 +334,8 @@ CollectionSchemeManager::init( uint32_t checkinIntervalMsec,
                                CANInterfaceIDTranslator &canIDTranslator )
 {
     mCANIDTranslator = canIDTranslator;
-    mLogger.trace( "CollectionSchemeManager::init",
-                   "CollectionSchemeManager initialised with a checkin interval of: " +
-                       std::to_string( checkinIntervalMsec ) + " ms" );
+    FWE_LOG_TRACE( "CollectionSchemeManager initialised with a checkin interval of: " +
+                   std::to_string( checkinIntervalMsec ) + " ms" );
     if ( checkinIntervalMsec > 0 )
     {
         mCheckinIntervalInMsec = checkinIntervalMsec;
@@ -393,22 +387,19 @@ CollectionSchemeManager::processDecoderManifest()
 {
     if ( ( mDecoderManifest == nullptr ) || ( !mDecoderManifest->build() ) )
     {
-        mLogger.error( "CollectionSchemeManager::processDecoderManifest",
-                       " Failed to process the upcoming DecoderManifest." );
+        FWE_LOG_ERROR( " Failed to process the upcoming DecoderManifest." );
         return false;
     }
     // build is successful
     if ( mDecoderManifest->getID() == currentDecoderManifestID )
     {
-        mLogger.trace( "CollectionSchemeManager::processDecoderManifest",
-                       "Ignoring new decoder manifest with same name: " + currentDecoderManifestID );
+        FWE_LOG_TRACE( "Ignoring new decoder manifest with same name: " + currentDecoderManifestID );
         // no change in decoder manifest
         return false;
     }
-    mLogger.trace( "CollectionSchemeManager::processDecoderManifest",
-                   "Replace decoder manifest " + currentDecoderManifestID + " with " + mDecoderManifest->getID() +
-                       " while " + std::to_string( mEnabledCollectionSchemeMap.size() ) + " active and " +
-                       std::to_string( mIdleCollectionSchemeMap.size() ) + " idle collection schemes loaded" );
+    FWE_LOG_TRACE( "Replace decoder manifest " + currentDecoderManifestID + " with " + mDecoderManifest->getID() +
+                   " while " + std::to_string( mEnabledCollectionSchemeMap.size() ) + " active and " +
+                   std::to_string( mIdleCollectionSchemeMap.size() ) + " idle collection schemes loaded" );
     // store the new DM, update currentDecoderManifestID
     currentDecoderManifestID = mDecoderManifest->getID();
     store( DataType::DECODER_MANIFEST );
@@ -439,8 +430,7 @@ CollectionSchemeManager::processCollectionScheme()
 {
     if ( ( mCollectionSchemeList == nullptr ) || ( !mCollectionSchemeList->build() ) )
     {
-        mLogger.error( "CollectionSchemeManager::processCollectionScheme",
-                       "Incoming CollectionScheme does not exist or fails to build!" );
+        FWE_LOG_ERROR( "Incoming CollectionScheme does not exist or fails to build!" );
         return false;
     }
     // Build is successful. Store collectionScheme
@@ -463,11 +453,10 @@ CollectionSchemeManager::calculateMonotonicTime( const TimePoint &currTime, Time
     TimePoint convertedTime = timePointFromSystemTime( currTime, systemTimeMs );
     if ( ( convertedTime.systemTimeMs == 0 ) && ( convertedTime.monotonicTimeMs == 0 ) )
     {
-        mLogger.error( "CollectionSchemeManager::timePointFromSystemTime",
-                       "The system time " + std::to_string( systemTimeMs ) +
-                           " corresponds to a time in the past before the monotonic" +
-                           " clock started ticking. Current system time: " + std::to_string( currTime.systemTimeMs ) +
-                           ". Current monotonic time: " + std::to_string( currTime.monotonicTimeMs ) );
+        FWE_LOG_ERROR( "The system time " + std::to_string( systemTimeMs ) +
+                       " corresponds to a time in the past before the monotonic" +
+                       " clock started ticking. Current system time: " + std::to_string( currTime.systemTimeMs ) +
+                       ". Current monotonic time: " + std::to_string( currTime.monotonicTimeMs ) );
         return TimePoint{ systemTimeMs, 0 };
     }
     return convertedTime;
@@ -496,10 +485,9 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
         {
             // Encounters a collectionScheme that does not have matching DM
             // Rebuild has to bail out. Call cleanupCollectionSchemes() before exiting.
-            mLogger.trace( "CollectionSchemeManager::rebuildMapsandTimeLine",
-                           "CollectionScheme does not have matching DM ID. Current DM ID: " + currentDecoderManifestID +
-                               " but collection scheme " + collectionScheme->getCollectionSchemeID() + " needs " +
-                               collectionScheme->getDecoderManifestID() );
+            FWE_LOG_TRACE( "CollectionScheme does not have matching DM ID. Current DM ID: " + currentDecoderManifestID +
+                           " but collection scheme " + collectionScheme->getCollectionSchemeID() + " needs " +
+                           collectionScheme->getDecoderManifestID() );
 
             cleanupCollectionSchemes();
             return false;
@@ -526,7 +514,7 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
     std::string enableStr;
     std::string idleStr;
     printExistingCollectionSchemes( enableStr, idleStr );
-    mLogger.trace( "CollectionSchemeManager::rebuildMapsandTimeLine", enableStr + idleStr );
+    FWE_LOG_TRACE( enableStr + idleStr );
     return ret;
 }
 
@@ -558,9 +546,8 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
         {
             // Encounters a collectionScheme that does not have matching DM
             // Rebuild has to bail out. Call cleanupCollectionSchemes() before exiting.
-            mLogger.trace( "CollectionSchemeManager::updateMapsandTimeLine",
-                           "CollectionScheme does not have matching DM ID: " + currentDecoderManifestID + " " +
-                               collectionScheme->getDecoderManifestID() );
+            FWE_LOG_TRACE( "CollectionScheme does not have matching DM ID: " + currentDecoderManifestID + " " +
+                           collectionScheme->getDecoderManifestID() );
 
             cleanupCollectionSchemes();
             return false;
@@ -598,7 +585,7 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
                 std::string completedStr;
                 completedStr = "Stopping enabled CollectionScheme: ";
                 printEventLogMsg( completedStr, id, startTime, stopTime, currTime );
-                mLogger.trace( "CollectionSchemeManager::updateMapsandTimeLine", completedStr );
+                FWE_LOG_TRACE( completedStr );
             }
             else if ( stopTime != currCollectionScheme->getExpiryTime() )
             {
@@ -621,7 +608,7 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
                 std::string startStr;
                 startStr = "Starting idle collectionScheme now: ";
                 printEventLogMsg( startStr, id, startTime, stopTime, currTime );
-                mLogger.trace( "CollectionSchemeManager::updateMapsandTimeLine", startStr );
+                FWE_LOG_TRACE( startStr );
             }
             else if ( ( startTime > currTime.systemTimeMs ) &&
                       ( ( startTime != currCollectionScheme->getStartTime() ) ||
@@ -643,7 +630,7 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
             std::string addStr;
             addStr = "Adding new collectionScheme: ";
             printEventLogMsg( addStr, id, startTime, stopTime, currTime );
-            mLogger.trace( "CollectionSchemeManager::updateMapsandTimeLine", addStr );
+            FWE_LOG_TRACE( addStr );
             if ( ( startTime <= currTime.systemTimeMs ) && ( stopTime > currTime.systemTimeMs ) )
             {
                 mEnabledCollectionSchemeMap[id] = collectionScheme;
@@ -660,7 +647,8 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
     }
     /* Check in newCollectionSchemeIDs set, if any Idle collectionScheme is missing from the set*/
     std::string removeStr;
-    for ( auto it = mIdleCollectionSchemeMap.begin(); it != mIdleCollectionSchemeMap.end(); )
+    auto it = mIdleCollectionSchemeMap.begin();
+    while ( it != mIdleCollectionSchemeMap.end() )
     {
         if ( newCollectionSchemeIDs.find( it->first ) == newCollectionSchemeIDs.end() )
         {
@@ -673,7 +661,8 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
         }
     }
     /* Check in newCollectionSchemeIDs set, if any enabled collectionScheme is missing from the set*/
-    for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); )
+    it = mEnabledCollectionSchemeMap.begin();
+    while ( it != mEnabledCollectionSchemeMap.end() )
     {
         if ( newCollectionSchemeIDs.find( it->first ) == newCollectionSchemeIDs.end() )
         {
@@ -688,13 +677,12 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
     }
     if ( !removeStr.empty() )
     {
-        mLogger.trace( "CollectionSchemeManager::updateMapsandTimeLine",
-                       "Removing collectionSchemes missing from PI updates: " + removeStr );
+        FWE_LOG_TRACE( "Removing collectionSchemes missing from PI updates: " + removeStr );
     }
     std::string enableStr;
     std::string idleStr;
     printExistingCollectionSchemes( enableStr, idleStr );
-    mLogger.trace( "CollectionSchemeManager::updateMapsandTimeLine", enableStr + idleStr );
+    FWE_LOG_TRACE( enableStr + idleStr );
     return ret;
 }
 
@@ -791,8 +779,7 @@ CollectionSchemeManager::checkTimeLine( const TimePoint &currTime )
                 // client request, this dataPair is obsolete, just drop it
                 // keep searching for next valid TimePoint
                 // to set up timer
-                mLogger.trace( "CollectionSchemeManager::checkTimeLine",
-                               "CollectionScheme not found: " + topCollectionSchemeID );
+                FWE_LOG_TRACE( "CollectionScheme not found: " + topCollectionSchemeID );
                 mTimeLine.pop();
                 continue;
             }
@@ -820,12 +807,11 @@ CollectionSchemeManager::checkTimeLine( const TimePoint &currTime )
             // this dataPair has a valid collectionScheme ID, but the start time or stop time is already updated
             // not equal to topTime any more; This is an obsolete dataPair. Simply drop it and move on
             // to next pair
-            mLogger.trace( "CollectionSchemeManager::checkTimeLine",
-                           "Found collectionScheme: " + topCollectionSchemeID +
-                               " but time does not match: "
-                               "topTime " +
-                               std::to_string( topTime.systemTimeMs ) + " timeFromCollectionScheme " +
-                               std::to_string( timeOfInterest ) );
+            FWE_LOG_TRACE( "Found collectionScheme: " + topCollectionSchemeID +
+                           " but time does not match: "
+                           "topTime " +
+                           std::to_string( topTime.systemTimeMs ) + " timeFromCollectionScheme " +
+                           std::to_string( timeOfInterest ) );
             mTimeLine.pop();
             continue;
         }
@@ -848,7 +834,7 @@ CollectionSchemeManager::checkTimeLine( const TimePoint &currTime )
                                   currCollectionScheme->getStartTime(),
                                   currCollectionScheme->getExpiryTime(),
                                   topTime );
-                mLogger.info( "CollectionSchemeManager::checkTimeLine", enableStr );
+                FWE_LOG_INFO( enableStr );
             }
             else
             {
@@ -860,7 +846,7 @@ CollectionSchemeManager::checkTimeLine( const TimePoint &currTime )
                                   currCollectionScheme->getStartTime(),
                                   currCollectionScheme->getExpiryTime(),
                                   topTime );
-                mLogger.info( "CollectionSchemeManager::checkTimeLine", disableStr );
+                FWE_LOG_INFO( disableStr );
                 mEnabledCollectionSchemeMap.erase( topCollectionSchemeID );
             }
         }
@@ -875,9 +861,8 @@ CollectionSchemeManager::checkTimeLine( const TimePoint &currTime )
     }
     if ( !mTimeLine.empty() )
     {
-        mLogger.trace( "CollectionSchemeManager::checkTimeLine",
-                       "Top pair: " + std::to_string( mTimeLine.top().time.monotonicTimeMs ) + " " +
-                           mTimeLine.top().id + " currTime: " + std::to_string( currTime.monotonicTimeMs ) );
+        FWE_LOG_TRACE( "Top pair: " + std::to_string( mTimeLine.top().time.monotonicTimeMs ) + " " +
+                       mTimeLine.top().id + " currTime: " + std::to_string( currTime.monotonicTimeMs ) );
     }
     return ret;
 }

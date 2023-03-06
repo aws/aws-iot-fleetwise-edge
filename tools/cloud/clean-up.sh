@@ -17,18 +17,23 @@ parse_args() {
         case $1 in
         --vehicle-name)
             VEHICLE_NAME=$2
+            shift
             ;;
         --fleet-size)
             FLEET_SIZE=$2
+            shift
             ;;
         --timestamp)
             TIMESTAMP=$2
+            shift
             ;;
         --endpoint-url)
             ENDPOINT_URL=$2
+            shift
             ;;
         --region)
             REGION=$2
+            shift
             ;;
         --help)
             echo "Usage: $0 [OPTION]"

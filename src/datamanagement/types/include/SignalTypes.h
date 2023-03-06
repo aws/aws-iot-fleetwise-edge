@@ -38,6 +38,27 @@ using SignalID = uint32_t;
 static constexpr SignalID INVALID_SIGNAL_ID = 0xFFFFFFFF;
 
 /**
+ * @brief VSS supported datatypes
+ * https://covesa.github.io/vehicle_signal_specification/rule_set/data_entry/data_types/
+ * We currently supports 11 datatypes
+ * We don't support string yet until cloud can support it
+ */
+enum struct SignalType
+{
+    UINT8 = 0,
+    INT8 = 1,
+    UINT16 = 2,
+    INT16 = 3,
+    UINT32 = 4,
+    INT32 = 5,
+    UINT64 = 6,
+    INT64 = 7,
+    FLOAT = 8,
+    DOUBLE = 9,
+    BOOLEAN = 10
+};
+
+/**
  * @brief Format that defines a CAN Signal Format
  */
 struct CANSignalFormat
@@ -81,6 +102,11 @@ struct CANSignalFormat
      * @brief Indicates whether the signal is the actual mux signal in the frame.
      */
     bool mIsMultiplexorSignal{ false };
+
+    /**
+     * @brief The datatype of the signal. The default is double for backward compatibility
+     */
+    SignalType mSignalType{ SignalType::DOUBLE };
 
     /**
      * @brief If mIsMultiplexorSignal is true, this value will be the value e.g. m0. If false, the value will be maxbit8

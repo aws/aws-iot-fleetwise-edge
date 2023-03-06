@@ -66,7 +66,7 @@ public:
      *
      * @return SUCCESS if connection is established.
      */
-    virtual ConnectivityError send(
+    virtual ConnectivityError sendBuffer(
         const std::uint8_t *buf,
         size_t size,
         struct CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) = 0;

@@ -28,7 +28,8 @@ for message in db.messages:
             signals[message_text] = set()
         if signal.name in signals[message_text]:
             print(
-                f"Signal {signal.name} occurs multiple times in the message {message_text}, only the first occurrence will be used"
+                f"Signal {signal.name} occurs multiple times in the message {message_text}, only"
+                " the first occurrence will be used"
             )
             continue
         signals[message_text].add(signal.name)
@@ -61,9 +62,9 @@ for message in db.messages:
             node["sensor"]["description"] = signal.comment
         if signal.unit:
             node["sensor"]["unit"] = signal.unit
-        if not signal.minimum is None and datatype != "BOOLEAN":
+        if signal.minimum is not None and datatype != "BOOLEAN":
             node["sensor"]["min"] = signal.minimum
-        if not signal.maximum is None and datatype != "BOOLEAN":
+        if signal.maximum is not None and datatype != "BOOLEAN":
             node["sensor"]["max"] = signal.maximum
         nodes.append(node)
 

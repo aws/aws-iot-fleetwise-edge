@@ -19,7 +19,7 @@ env:
 
 jobs:
   linting:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -29,34 +29,37 @@ jobs:
       - run: pip install pre-commit
       - run: unbuffer pre-commit run --all-files
   build-amd64:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - uses: "./.github/template/fwe-build"
         with:
           build-arch: "native"
           upload-arch: "amd64"
+          cache-paths: /usr/local/x86_64-linux-gnu
 
   build-arm64:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - uses: "./.github/template/fwe-build"
         with:
           build-arch: "cross-arm64"
           upload-arch: "arm64"
+          cache-paths: /usr/local/aarch64-linux-gnu:/usr/local/x86_64-linux-gnu
 
   build-armhf:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - uses: "./.github/template/fwe-build"
         with:
           build-arch: "cross-armhf"
           upload-arch: "armhf"
+          cache-paths: /usr/local/arm-linux-gnueabihf:/usr/local/x86_64-linux-gnu
 
   build-docker:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs:
       - build-amd64
       - build-arm64
@@ -73,7 +76,7 @@ jobs:
           find linux -name aws-iot-fleetwise-edge -exec chmod +x {} \;
       - uses: docker/setup-qemu-action@v2
       - uses: docker/setup-buildx-action@v2
-      - uses: aws-actions/configure-aws-credentials@v1
+      - uses: aws-actions/configure-aws-credentials@v1-node16
         if: github.ref_type == 'tag'
         with:
           role-to-assume: ${{ secrets.PUBLIC_ECR_PUSH_ROLE }}

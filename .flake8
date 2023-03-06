@@ -1,0 +1,8 @@
+[flake8]
+max-line-length = 100
+ignore =
+    E203,  # not pep8, black adds whitespace before ':'
+    W503,  # not pep8, black adds line break before binary operator
+    PT004,
+    PT005,
+pytest-fixture-no-parentheses = true

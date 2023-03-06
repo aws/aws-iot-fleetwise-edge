@@ -6,7 +6,6 @@
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
 #include "ClockHandler.h"
-#include "LoggingModule.h"
 #include "Timer.h"
 #include "datatypes/ISOTPOverCANOptions.h"
 #include <iostream>
@@ -96,7 +95,6 @@ public:
 private:
     ISOTPOverCANSenderReceiverOptions mSenderReceiverOptions;
     Timer mTimer;
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     int mSocket{};
     std::string mStreamRxID;

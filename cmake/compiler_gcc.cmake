@@ -7,6 +7,7 @@ link_libraries(
 
 if(FWE_STATIC_LINK)
   set(CMAKE_FIND_LIBRARY_SUFFIXES .a)
+  set(Boost_USE_STATIC_LIBS ON)
   link_libraries("-static-libstdc++" "-static-libgcc")
 endif()
 

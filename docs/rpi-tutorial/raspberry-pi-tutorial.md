@@ -76,7 +76,7 @@ Amazon.
 
 ## Step 2: Launch your development machine
 
-These steps require an Ubuntu 18.04 development machine with 10 GB free disk space. If necessary,
+These steps require an Ubuntu 20.04 development machine with 10 GB free disk space. If necessary,
 you can use a local Intel x86_64 (amd64) machine. We recommended using the following instructions to
 launch an AWS EC2 Graviton (arm64) instance. For more information about Amazon EC2 pricing, see
 [Amazon EC2 On-Demand Pricing](https://aws.amazon.com/ec2/pricing/on-demand/).
@@ -219,7 +219,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    ```
    - Look for this message to verify:
      ```
-     [INFO ] [AwsIotConnectivityModule::connect] [Connection completed successfully]
+     [INFO ] [AwsIotConnectivityModule.cpp:161] [connect()] [Connection completed successfully]
      ```
    - Use the
      [troubleshooting information and solutions](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/troubleshooting.html)
@@ -230,8 +230,8 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
 1. On the development machine, install the AWS IoT FleetWise cloud demo script dependencies by
    running the following commands. The script installs the following Ubuntu packages:
-   `python3.7 python3-setuptools curl`, and then installs Python PIP for Python 3.7 and the
-   following PIP packages: `wrapt plotly pandas cantools`.
+   `python3 python3-pip`, and then installs the following PIP packages:
+   `wrapt plotly pandas cantools`.
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \

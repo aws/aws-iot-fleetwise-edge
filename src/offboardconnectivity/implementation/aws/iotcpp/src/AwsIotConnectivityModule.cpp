@@ -4,7 +4,7 @@
 #include "AwsIotConnectivityModule.h"
 #include "AwsBootstrap.h"
 #include "AwsSDKMemoryManager.h"
-
+#include "LoggingModule.h"
 #include "TraceModule.h"
 
 #include <algorithm>
@@ -72,7 +72,7 @@ AwsIotConnectivityModule::connect( const std::string &privateKey,
         return false;
     }
 
-    mLogger.info( "AwsIotConnectivityModule::connect", "Establishing an MQTT Connection" );
+    FWE_LOG_INFO( "Establishing an MQTT Connection" );
     // Connection callbacks
     setupCallbacks();
 
@@ -105,7 +105,7 @@ AwsIotConnectivityModule::resetConnection()
     mConnectionCompletedPromise = std::promise<bool>();
     if ( mConnectionEstablished )
     {
-        mLogger.info( "AwsIotConnectivityModule::disconnect", "Closing the MQTT Connection" );
+        FWE_LOG_INFO( "Closing the MQTT Connection" );
         if ( mConnection->Disconnect() )
         {
             mConnectionClosedPromise.get_future().wait();
@@ -120,6 +120,11 @@ AwsIotConnectivityModule::resetConnection()
 bool
 AwsIotConnectivityModule::disconnect()
 {
+    for ( auto channel : mChannels )
+    {
+        channel->unsubscribe();
+        channel->invalidateConnection();
+    }
     mRetryThread.stop();
     return resetConnection();
 }
@@ -138,9 +143,8 @@ AwsIotConnectivityModule::setupCallbacks()
             {
                 auto errString = ErrorDebugString( errorCode );
                 TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_FAILED );
-                mLogger.error( "AwsIotConnectivityModule::connect", "Connection failed with error" );
-                mLogger.error( "AwsIotConnectivityModule::connect",
-                               errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
+                FWE_LOG_ERROR( "Connection failed with error" );
+                FWE_LOG_ERROR( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
                 mConnectionCompletedPromise.set_value( false );
             }
             else
@@ -148,13 +152,13 @@ AwsIotConnectivityModule::setupCallbacks()
                 if ( returnCode != Mqtt::ReturnCode::AWS_MQTT_CONNECT_ACCEPTED )
                 {
                     TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_REJECTED );
-                    mLogger.error( "AwsIotConnectivityModule::connect", "Connection failed with mqtt return code" );
-                    mLogger.error( "AwsIotConnectivityModule::connect", std::to_string( (int)returnCode ) );
+                    FWE_LOG_ERROR( "Connection failed with mqtt return code" );
+                    FWE_LOG_ERROR( std::to_string( (int)returnCode ) );
                     mConnectionCompletedPromise.set_value( false );
                 }
                 else
                 {
-                    mLogger.info( "AwsIotConnectivityModule::connect", "Connection completed successfully" );
+                    FWE_LOG_INFO( "Connection completed successfully" );
                     mConnectionCompletedPromise.set_value( true );
                 }
             }
@@ -167,7 +171,7 @@ AwsIotConnectivityModule::setupCallbacks()
         std::string errorString = "The MQTT Connection has been interrupted due to: ";
         auto errStr = ErrorDebugString( error );
         errorString.append( errStr != nullptr ? std::string( errStr ) : std::string( "Unknown error" ) );
-        mLogger.error( "AwsIotConnectivityModule::setupCallbacks", errorString );
+        FWE_LOG_ERROR( errorString );
         mConnected = false;
     };
 
@@ -176,13 +180,13 @@ AwsIotConnectivityModule::setupCallbacks()
         (void)connectCode;
         (void)sessionPresent;
         TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_RESUMED );
-        mLogger.info( "AwsIotConnectivityModule::setupCallbacks", "The MQTT Connection has resumed" );
+        FWE_LOG_INFO( "The MQTT Connection has resumed" );
         mConnected = true;
     };
 
     auto onDisconnect = [&]( Mqtt::MqttConnection &mqttConnection ) {
         (void)mqttConnection;
-        mLogger.info( "AwsIotConnectivityModule::setupCallbacks", "The MQTT Connection is closed" );
+        FWE_LOG_INFO( "The MQTT Connection is closed" );
         mConnectionClosedPromise.set_value();
         mConnected = false;
         mConnectionEstablished = false;
@@ -205,7 +209,7 @@ AwsIotConnectivityModule::setupCallbacks()
         (void)retain;
         (void)qos;
         os << "Data received on the topic:  " << topic << " with a payload length of: " << payload.len;
-        mLogger.trace( "AwsIotConnectivityModule::setupCallbacks", os.str() );
+        FWE_LOG_TRACE( os.str() );
     } );
 }
 
@@ -229,21 +233,19 @@ AwsIotConnectivityModule::createMqttConnection( Aws::Crt::Io::ClientBootstrap *c
 {
     if ( ( mCertificate.len == 0 ) || ( mPrivateKey.len == 0 ) || mEndpointUrl.empty() || mClientId.empty() )
     {
-        mLogger.error( "AwsIotConnectivityModule::connect",
-                       "Please provide X.509 Certificate, private Key, endpoint and client-Id" );
+        FWE_LOG_ERROR( "Please provide X.509 Certificate, private Key, endpoint and client-Id" );
         return false;
     }
     if ( clientBootstrap == nullptr )
     {
-        mLogger.error( "AwsIotConnectivityModule::connect", "ClientBootstrap failed with error" );
+        FWE_LOG_ERROR( "ClientBootstrap failed with error" );
         return false;
     }
     else if ( !( *clientBootstrap ) )
     {
         auto errString = ErrorDebugString( clientBootstrap->LastError() );
-        mLogger.error( "AwsIotConnectivityModule::connect", "ClientBootstrap failed with error" );
-        mLogger.error( "AwsIotConnectivityModule::connect",
-                       errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
+        FWE_LOG_ERROR( "ClientBootstrap failed with error" );
+        FWE_LOG_ERROR( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
         return false;
     }
 
@@ -260,9 +262,8 @@ AwsIotConnectivityModule::createMqttConnection( Aws::Crt::Io::ClientBootstrap *c
     if ( !clientConfig )
     {
         auto errString = ErrorDebugString( clientConfig.LastError() );
-        mLogger.error( "AwsIotConnectivityModule::connect", "Client Configuration initialization failed with error" );
-        mLogger.error( "AwsIotConnectivityModule::connect",
-                       errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
+        FWE_LOG_ERROR( "Client Configuration initialization failed with error" );
+        FWE_LOG_ERROR( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
         return false;
     }
     /*
@@ -273,9 +274,8 @@ AwsIotConnectivityModule::createMqttConnection( Aws::Crt::Io::ClientBootstrap *c
     if ( !*mMqttClient )
     {
         auto errString = ErrorDebugString( mMqttClient->LastError() );
-        mLogger.error( "AwsIotConnectivityModule::connect", "MQTT Client Creation failed with error" );
-        mLogger.error( "AwsIotConnectivityModule::connect",
-                       errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
+        FWE_LOG_ERROR( "MQTT Client Creation failed with error" );
+        FWE_LOG_ERROR( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
         return false;
     }
 
@@ -287,7 +287,7 @@ AwsIotConnectivityModule::createMqttConnection( Aws::Crt::Io::ClientBootstrap *c
     {
         auto errString = ErrorDebugString( mMqttClient->LastError() );
         auto errLog = errString != nullptr ? std::string( errString ) : std::string( "Unknown error" );
-        mLogger.error( "AwsIotConnectivityModule::connect", "MQTT Connection Creation failed with error " + errLog );
+        FWE_LOG_ERROR( "MQTT Connection Creation failed with error " + errLog );
         return false;
     }
     return true;
@@ -301,11 +301,11 @@ AwsIotConnectivityModule::attempt()
         std::string error = "The MQTT Connection failed due to: ";
         auto errString = ErrorDebugString( mConnection->LastError() );
         error.append( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
-        mLogger.warn( "AwsIotConnectivityModule::attempt", error );
+        FWE_LOG_WARN( error );
         return RetryStatus::RETRY;
     }
 
-    mLogger.trace( "AwsIotConnectivityModule::attempt", "Waiting of connection completed callback" );
+    FWE_LOG_TRACE( "Waiting of connection completed callback" );
     mConnectionEstablished = true;
     // Block until the connection establishes or fails.
     // If the connection fails, the module will also fail.
@@ -339,9 +339,5 @@ AwsIotConnectivityModule::onFinished( RetryStatus code )
 
 AwsIotConnectivityModule::~AwsIotConnectivityModule()
 {
-    for ( auto channel : mChannels )
-    {
-        channel->invalidateConnection();
-    }
     disconnect();
 }

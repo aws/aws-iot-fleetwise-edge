@@ -9,13 +9,13 @@ import sys
 cmake_build_dir = sys.argv[1]
 lines = []
 
-with open(cmake_build_dir + "/compile_commands.json", "r") as f:
+with open(cmake_build_dir + "/compile_commands.json") as f:
     lines = f.readlines()
 f.close()
 
 index = 0
 while index < len(lines):
-    x = re.search('"command": ".+iotcpp\/test\/include.+', lines[index])
+    x = re.search(r'"command": ".+iotcpp\/test\/include.+', lines[index])
     if x:
         del lines[index - 2 : index + 3]  # remove a json block
         index = index - 3

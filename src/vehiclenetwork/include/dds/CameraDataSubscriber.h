@@ -7,7 +7,6 @@
 #include "CameraPubSubTypes.h"
 #include "ClockHandler.h"
 #include "IDDSSubscriber.h"
-#include "LoggingModule.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "Timer.h"
@@ -94,7 +93,6 @@ private:
     std::atomic<bool> mNewResponseReceived{ false };
     mutable std::mutex mThreadMutex;
     Timer mTimer;
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     Platform::Linux::Signal mWait;
     CameraDataItem mDataItem;

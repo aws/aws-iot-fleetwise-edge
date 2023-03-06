@@ -8,7 +8,6 @@
 #include "CollectionInspectionAPITypes.h"
 #include "IActiveConditionProcessor.h"
 #include "IActiveDecoderDictionaryListener.h"
-#include "LoggingModule.h"
 #include "OBDDataDecoder.h"
 #include "OBDOverCANECU.h"
 #include "Signal.h"
@@ -173,7 +172,6 @@ private:
     std::atomic<bool> mShouldRequestDTCs{ false };
     std::vector<std::shared_ptr<OBDOverCANECU>> mECUs;
     mutable std::mutex mThreadMutex;
-    LoggingModule mLogger;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     // Stop signal
     Platform::Linux::Signal mWait;

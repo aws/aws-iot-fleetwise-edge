@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "dds/CameraDataPublisher.h"
+#include "WaitUntil.h"
 #include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/subscriber/DataReaderListener.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
@@ -16,6 +17,7 @@
 #include <thread>
 
 using namespace Aws::IoTFleetWise::VehicleNetwork;
+using namespace Aws::IoTFleetWise::TestingSupport;
 
 class TestSubscriber : public DataReaderListener
 {
@@ -206,9 +208,9 @@ TEST( CameraDataPublisherTest, testSendDataUPDTransport )
     DDSDataRequest dataRequest{ 123, 1, 1 };
     publisher.publishDataRequest( dataRequest );
     // Give some time so that the Subscriber receives the message
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+
     // Verify that the data arrived
-    ASSERT_EQ( subscriber.dataItem.dataItemId(), 123 );
+    WAIT_ASSERT_EQ( subscriber.dataItem.dataItemId(), 123U );
     ASSERT_TRUE( publisher.disconnect() );
     ASSERT_FALSE( publisher.isAlive() );
 }
@@ -256,9 +258,9 @@ TEST( CameraDataPublisherTest, testSendDataSHMTransport )
     DDSDataRequest dataRequest{ 123, 1, 1 };
     publisher.publishDataRequest( dataRequest );
     // Give some time so that the Subscriber receives the message
-    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+
     // Verify that the data arrived
-    ASSERT_EQ( subscriber.dataItem.dataItemId(), 123 );
+    WAIT_ASSERT_EQ( subscriber.dataItem.dataItemId(), 123U );
     ASSERT_TRUE( publisher.disconnect() );
     ASSERT_FALSE( publisher.isAlive() );
 }

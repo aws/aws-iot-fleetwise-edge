@@ -6,7 +6,6 @@
 // Includes
 #include "CacheAndPersist.h"
 #include "ISender.h"
-#include "LoggingModule.h"
 #include <iostream>
 #include <memory>
 #include <snappy.h>
@@ -65,7 +64,6 @@ public:
     ErrorCode retrieveData( std::vector<std::string> &data );
 
 private:
-    Aws::IoTFleetWise::Platform::Linux::LoggingModule mLogger;
     std::shared_ptr<CacheAndPersist> mPersistencyPtr;
 
     /**
@@ -80,10 +78,10 @@ private:
      *
      * @return true if prep was successful, false if error occurred
      */
-    bool preparePayload( uint8_t *const buf,
-                         size_t size,
-                         const std::string &data,
-                         const struct CollectionSchemeParams &collectionSchemeParams );
+    static bool preparePayload( uint8_t *const buf,
+                                size_t size,
+                                const std::string &data,
+                                const struct CollectionSchemeParams &collectionSchemeParams );
 };
 } // namespace OffboardConnectivityAwsIot
 } // namespace IoTFleetWise

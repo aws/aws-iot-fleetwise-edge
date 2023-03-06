@@ -68,6 +68,18 @@ public:
         return mProtoBinaryData;
     }
 
+    inline SignalType
+    getSignalType( const SignalID signalID ) const override
+    {
+        if ( mSignalIDToTypeMap.find( signalID ) == mSignalIDToTypeMap.end() )
+        {
+            FWE_LOG_WARN( "Signal Type not found for requested SignalID:" + std::to_string( signalID ) +
+                          ", using type as double" );
+            return SignalType::DOUBLE;
+        }
+        return mSignalIDToTypeMap.at( signalID );
+    }
+
 private:
     /**
      * @brief The DecoderManifest message that will hold the deserialized proto.
@@ -109,10 +121,8 @@ private:
      */
     std::unordered_map<SignalID, PIDSignalDecoderFormat> mSignalToPIDDictionary;
 
-    /**
-     * @brief Logging module used to output to logs
-     */
-    LoggingModule mLogger;
+    using SignalIDToTypeMap = std::unordered_map<SignalID, SignalType>;
+    SignalIDToTypeMap mSignalIDToTypeMap;
 };
 } // namespace DataManagement
 } // namespace IoTFleetWise

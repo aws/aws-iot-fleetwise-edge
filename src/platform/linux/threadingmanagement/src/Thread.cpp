@@ -86,10 +86,6 @@ Thread::isValid() const
 void *
 Thread::workerFunctionWrapper( void *params )
 {
-    // POSIX settings
-    pthread_setcancelstate( PTHREAD_CANCEL_ENABLE, nullptr );
-    pthread_setcanceltype( PTHREAD_CANCEL_ASYNCHRONOUS, nullptr );
-
     ThreadSettings *threadSettings = static_cast<ThreadSettings *>( params );
     Thread *self = threadSettings->mSelf;
 

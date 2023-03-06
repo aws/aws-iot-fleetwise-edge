@@ -87,18 +87,15 @@ public:
      */
     struct DecoderManifestCb : IReceiverCallback
     {
-        LoggingModule &mLogger; //< Logger used to allow the callback to publish a log
-        Schema &mSchema;        //< Member variable to the Schema object which will receive the data
+        Schema &mSchema; //< Member variable to the Schema object which will receive the data
 
         /**
          * @brief Constructor that will initialize the member variables
          *
          * @param collectionSchemeIngestion Reference to a Schema object which allow this struct to pass data to
-         * @param logger Logger object allowing logs to be published by this struct
          */
-        DecoderManifestCb( Schema &collectionSchemeIngestion, LoggingModule &logger )
-            : mLogger( logger )
-            , mSchema( collectionSchemeIngestion )
+        DecoderManifestCb( Schema &collectionSchemeIngestion )
+            : mSchema( collectionSchemeIngestion )
         {
         }
 
@@ -108,8 +105,7 @@ public:
             // Check for a empty input data
             if ( ( buf == nullptr ) || ( size == 0 ) )
             {
-                mLogger.error( "DecoderManifestCb::onDataReceived",
-                               "Received empty CollectionScheme List data from Cloud" );
+                FWE_LOG_ERROR( "Received empty CollectionScheme List data from Cloud" );
                 return;
             }
 
@@ -119,13 +115,13 @@ public:
             // Try to copy the binary data into the decoderManifest object
             if ( !decoderManifestPtr->copyData( buf, size ) )
             {
-                mLogger.error( "DecoderManifestCb::onDataReceived", "DecoderManifest copyData from IoT core failed" );
+                FWE_LOG_ERROR( "DecoderManifest copyData from IoT core failed" );
                 return;
             }
 
             // Successful copy, so we cache the decoderManifest in the Schema object
             mSchema.setDecoderManifest( decoderManifestPtr );
-            mLogger.trace( "DecoderManifestCb::onDataReceived", "Received Decoder Manifest in PI DecoderManifestCb" );
+            FWE_LOG_TRACE( "Received Decoder Manifest in PI DecoderManifestCb" );
         }
     } mDecoderManifestCb;
 
@@ -135,18 +131,15 @@ public:
      */
     struct CollectionSchemeListCb : IReceiverCallback
     {
-        LoggingModule &mLogger; //< Logger used to allow the callback to publish a log
-        Schema &mSchema;        //< Member variable to the Schema object which will receive the data
+        Schema &mSchema; //< Member variable to the Schema object which will receive the data
 
         /**
          * @brief Constructor that will initialize the member variables
          *
          * @param collectionSchemeIngestion Reference to a Schema object which allow this struct to pass data to
-         * @param logger Logger object allowing logs to be published by this struct
          */
-        CollectionSchemeListCb( Schema &collectionSchemeIngestion, LoggingModule &logger )
-            : mLogger( logger )
-            , mSchema( collectionSchemeIngestion )
+        CollectionSchemeListCb( Schema &collectionSchemeIngestion )
+            : mSchema( collectionSchemeIngestion )
         {
         }
 
@@ -156,8 +149,7 @@ public:
             // Check for a empty input data
             if ( ( buf == nullptr ) || ( size == 0 ) )
             {
-                mLogger.error( "DecoderManifestCb::onDataReceived",
-                               "Received empty CollectionScheme List data from Cloud" );
+                FWE_LOG_ERROR( "Received empty CollectionScheme List data from Cloud" );
                 return;
             }
 
@@ -167,23 +159,17 @@ public:
             // Try to copy the binary data into the collectionSchemeList object
             if ( !collectionSchemeListPtr->copyData( buf, size ) )
             {
-                mLogger.error( "DecoderManifestCb::onDataReceived",
-                               "CollectionSchemeList copyData from IoT core failed" );
+                FWE_LOG_ERROR( "CollectionSchemeList copyData from IoT core failed" );
                 return;
             }
 
             // Successful copy, so we cache the collectionSchemeList in the Schema object
             mSchema.setCollectionSchemeList( collectionSchemeListPtr );
-            mLogger.trace( "CollectionSchemeListCb::onDataReceived", "Received CollectionSchemeList" );
+            FWE_LOG_TRACE( "Received CollectionSchemeList" );
         }
     } mCollectionSchemeListCb;
 
 private:
-    /**
-     * @brief Logger used to log output. This logger is fed into the callbacks.
-     */
-    LoggingModule mLogger;
-
     /**
      * @brief ISender object used to interface with cloud to send Checkins
      */

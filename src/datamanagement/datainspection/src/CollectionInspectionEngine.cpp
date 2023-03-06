@@ -20,23 +20,6 @@ CollectionInspectionEngine::CollectionInspectionEngine( bool sendDataOnlyOncePer
     setActiveDTCsConsumed( ALL_CONDITIONS, false );
 }
 
-CollectionInspectionEngine::SignalHistoryBuffer &
-CollectionInspectionEngine::addSignalToBuffer( const InspectionMatrixSignalCollectionInfo &signal )
-{
-
-    for ( auto &buffer : mSignalBuffers[signal.signalID] )
-    {
-        if ( buffer.mMinimumSampleIntervalMs == signal.minimumSampleIntervalMs )
-        {
-            buffer.mSize = std::max( buffer.mSize, signal.sampleBufferSize );
-            return buffer;
-        }
-    }
-    // No entry with same sample interval found
-    mSignalBuffers[signal.signalID].emplace_back( signal.sampleBufferSize, signal.minimumSampleIntervalMs );
-    return mSignalBuffers[signal.signalID].back();
-}
-
 bool
 CollectionInspectionEngine::isSignalPartOfEval( const struct ExpressionNode *expression,
                                                 InspectionSignalID signalID,
@@ -62,6 +45,33 @@ CollectionInspectionEngine::isSignalPartOfEval( const struct ExpressionNode *exp
     return leftRet || rightRet;
 }
 
+template <typename T>
+void
+CollectionInspectionEngine::addSignalToBuffer( const InspectionMatrixSignalCollectionInfo &signalIn )
+{
+    std::vector<SignalHistoryBuffer<T>> *signalHistoryBufferPtr = nullptr;
+    const auto signalIDIn = signalIn.signalID;
+
+    signalHistoryBufferPtr = getSignalHistoryBufferPtr<T>( signalIDIn );
+
+    if ( signalHistoryBufferPtr == nullptr )
+    {
+        return;
+    }
+    auto &bufferVec = *signalHistoryBufferPtr;
+    for ( auto &buffer : bufferVec )
+    {
+        if ( buffer.mMinimumSampleIntervalMs == signalIn.minimumSampleIntervalMs )
+        {
+            buffer.mSize = std::max( buffer.mSize, signalIn.sampleBufferSize );
+            buffer.addFixedWindow( signalIn.fixedWindowPeriod );
+            return;
+        }
+    }
+    bufferVec.emplace_back( signalIn.sampleBufferSize, signalIn.minimumSampleIntervalMs );
+    bufferVec.back().addFixedWindow( signalIn.fixedWindowPeriod );
+}
+
 void
 CollectionInspectionEngine::onChangeInspectionMatrix(
     const std::shared_ptr<const InspectionMatrix> &activeInspectionMatrix )
@@ -77,38 +87,72 @@ CollectionInspectionEngine::onChangeInspectionMatrix(
         if ( mConditions.size() >= MAX_NUMBER_OF_ACTIVE_CONDITION )
         {
             TraceModule::get().incrementVariable( TraceVariable::CE_TOO_MANY_CONDITIONS );
-            mLogger.warn( "CollectionInspectionEngine::onChangeInspectionMatrix",
-                          "Too many conditions are active. Up to " +
-                              std::to_string( MAX_NUMBER_OF_ACTIVE_CONDITION - 1 ) +
-                              " conditions can be active at a time. Additional conditions will be skipped" );
+            FWE_LOG_WARN( "Too many conditions are active. Up to " +
+                          std::to_string( MAX_NUMBER_OF_ACTIVE_CONDITION - 1 ) +
+                          " conditions can be active at a time. Additional conditions will be skipped" );
             break;
         }
         mConditions.emplace_back( p );
         if ( p.signals.size() > MAX_DIFFERENT_SIGNAL_IDS )
         {
             TraceModule::get().incrementVariable( TraceVariable::CE_SIGNAL_ID_OUTBOUND );
-            mLogger.error( "CollectionInspectionEngine::onChangeInspectionMatrix",
-                           "There can be only " + std::to_string( MAX_DIFFERENT_SIGNAL_IDS ) +
-                               " different signal IDs" );
+            FWE_LOG_ERROR( "There can be only " + std::to_string( MAX_DIFFERENT_SIGNAL_IDS ) +
+                           " different signal IDs" );
             return;
         }
         for ( auto &s : p.signals )
         {
             if ( s.signalID == INVALID_SIGNAL_ID )
             {
-                mLogger.error( "CollectionInspectionEngine::onChangeInspectionMatrix",
-                               "A SignalID with value" + std::to_string( INVALID_SIGNAL_ID ) + " is not allowed" );
+                FWE_LOG_ERROR( "A SignalID with value" + std::to_string( INVALID_SIGNAL_ID ) + " is not allowed" );
                 return;
             }
             if ( s.sampleBufferSize == 0 )
             {
                 TraceModule::get().incrementVariable( TraceVariable::CE_SAMPLE_SIZE_ZERO );
-                mLogger.error( "CollectionInspectionEngine::onChangeInspectionMatrix",
-                               "A Sample buffer size of 0 is not allowed" );
+                FWE_LOG_ERROR( "A Sample buffer size of 0 is not allowed" );
                 return;
             }
-            SignalHistoryBuffer &buf = addSignalToBuffer( s );
-            buf.addFixedWindow( s.fixedWindowPeriod );
+            auto signalIDIn = s.signalID;
+            mSignalToBufferTypeMap.insert( { signalIDIn, s.signalType } );
+            switch ( s.signalType )
+            {
+            case SignalType::UINT8:
+                addSignalToBuffer<uint8_t>( s );
+                break;
+            case SignalType::INT8:
+                addSignalToBuffer<int8_t>( s );
+                break;
+            case SignalType::UINT16:
+                addSignalToBuffer<uint16_t>( s );
+                break;
+            case SignalType::INT16:
+                addSignalToBuffer<int16_t>( s );
+                break;
+            case SignalType::UINT32:
+                addSignalToBuffer<uint32_t>( s );
+                break;
+            case SignalType::INT32:
+                addSignalToBuffer<int32_t>( s );
+                break;
+            case SignalType::UINT64:
+                addSignalToBuffer<uint64_t>( s );
+                break;
+            case SignalType::INT64:
+                addSignalToBuffer<int64_t>( s );
+                break;
+            case SignalType::FLOAT:
+                addSignalToBuffer<float>( s );
+                break;
+            case SignalType::DOUBLE:
+                addSignalToBuffer<double>( s );
+                break;
+            case SignalType::BOOLEAN:
+                addSignalToBuffer<bool>( s );
+                break;
+            default:
+                break;
+            }
         }
         for ( auto &c : p.canFrames )
         {
@@ -136,24 +180,43 @@ CollectionInspectionEngine::onChangeInspectionMatrix(
         auto &ac = mConditions[conditionIndex];
         for ( auto &s : ac.mCondition.signals )
         {
-            SignalHistoryBuffer *buf = nullptr;
-            for ( auto &buffer : mSignalBuffers[s.signalID] )
+            switch ( s.signalType )
             {
-                if ( buffer.mMinimumSampleIntervalMs == s.minimumSampleIntervalMs )
-                {
-                    buf = &buffer;
-                    break;
-                }
-            }
-            if ( ( buf != nullptr ) && isSignalPartOfEval( ac.mCondition.condition, s.signalID, MAX_EQUATION_DEPTH ) )
-            {
-                buf->mConditionsThatEvaluateOnThisSignal.set( conditionIndex );
-                ac.mEvaluationSignals[s.signalID] = buf;
-                FixedTimeWindowFunctionData *window = buf->getFixedWindow( s.fixedWindowPeriod );
-                if ( window != nullptr )
-                {
-                    ac.mEvaluationFunctions[s.signalID] = window;
-                }
+            case SignalType::UINT8:
+                updateConditionBuffer<uint8_t>( s, ac, conditionIndex );
+                break;
+            case SignalType::INT8:
+                updateConditionBuffer<int8_t>( s, ac, conditionIndex );
+                break;
+            case SignalType::UINT16:
+                updateConditionBuffer<uint16_t>( s, ac, conditionIndex );
+                break;
+            case SignalType::INT16:
+                updateConditionBuffer<int16_t>( s, ac, conditionIndex );
+                break;
+            case SignalType::UINT32:
+                updateConditionBuffer<uint32_t>( s, ac, conditionIndex );
+                break;
+            case SignalType::INT32:
+                updateConditionBuffer<int32_t>( s, ac, conditionIndex );
+                break;
+            case SignalType::UINT64:
+                updateConditionBuffer<uint64_t>( s, ac, conditionIndex );
+                break;
+            case SignalType::INT64:
+                updateConditionBuffer<int64_t>( s, ac, conditionIndex );
+                break;
+            case SignalType::FLOAT:
+                updateConditionBuffer<float>( s, ac, conditionIndex );
+                break;
+            case SignalType::DOUBLE:
+                updateConditionBuffer<double>( s, ac, conditionIndex );
+                break;
+            case SignalType::BOOLEAN:
+                updateConditionBuffer<bool>( s, ac, conditionIndex );
+                break;
+            default:
+                break;
             }
         }
     }
@@ -163,25 +226,66 @@ CollectionInspectionEngine::onChangeInspectionMatrix(
 
     (void)preAllocateBuffers();
 }
-bool
-CollectionInspectionEngine::preAllocateBuffers()
+
+template <typename T>
+void
+CollectionInspectionEngine::updateConditionBuffer(
+    const InspectionMatrixSignalCollectionInfo &inspectionMatrixCollectionInfoIn,
+    ActiveCondition &acIn,
+    const long unsigned int conditionIndexIn )
 {
-    // Allocate size
-    uint32_t usedBytes = 0;
-    // Allocate Signal Buffer
-    for ( auto &bufferVector : mSignalBuffers )
+    SignalID signalIDIn = inspectionMatrixCollectionInfoIn.signalID;
+    SignalHistoryBuffer<T> *buf = nullptr;
+    std::vector<SignalHistoryBuffer<T>> *signalHistoryBufferPtr = nullptr;
+
+    signalHistoryBufferPtr = getSignalHistoryBufferPtr<T>( signalIDIn );
+
+    if ( signalHistoryBufferPtr != nullptr )
     {
-        // Go trough different sample intervals
-        for ( auto &signal : bufferVector.second )
+        auto &bufferVec = *signalHistoryBufferPtr;
+        for ( auto &buffer : bufferVec )
         {
-            uint64_t requiredBytes = signal.mSize * static_cast<uint64_t>( sizeof( struct SignalSample ) );
+            if ( buffer.mMinimumSampleIntervalMs == inspectionMatrixCollectionInfoIn.minimumSampleIntervalMs )
+            {
+                buf = &buffer;
+                break;
+            }
+        }
+    }
+    if ( ( buf != nullptr ) && isSignalPartOfEval( acIn.mCondition.condition, signalIDIn, MAX_EQUATION_DEPTH ) )
+    {
+        buf->mConditionsThatEvaluateOnThisSignal.set( conditionIndexIn );
+        // acIn.mEvaluationSignals[signalIDIn] = buf;
+        acIn.mEvaluationSignals.insert( { signalIDIn, buf } );
+        FixedTimeWindowFunctionData<T> *window =
+            buf->getFixedWindow( inspectionMatrixCollectionInfoIn.fixedWindowPeriod );
+        if ( window != nullptr )
+        {
+            // acIn.mEvaluationFunctions[signalIDIn] = window;
+            acIn.mEvaluationFunctions.insert( { signalIDIn, window } );
+        }
+    }
+}
+
+template <typename T>
+bool
+CollectionInspectionEngine::allocateBufferVector( SignalID signalIDIn, uint32_t &usedBytes )
+{
+    std::vector<SignalHistoryBuffer<T>> *signalHistoryBufferPtr = nullptr;
+    signalHistoryBufferPtr = getSignalHistoryBufferPtr<T>( signalIDIn );
+
+    if ( signalHistoryBufferPtr != nullptr )
+    {
+        auto &bufferVec = *signalHistoryBufferPtr;
+        for ( auto &signal : bufferVec )
+        {
+            uint64_t requiredBytes = signal.mSize * static_cast<uint64_t>( sizeof( struct SignalSample<T> ) );
             if ( usedBytes + requiredBytes > MAX_SAMPLE_MEMORY )
             {
-                mLogger.warn( "CollectionInspectionEngine::preAllocateBuffers",
-                              "The requested " + std::to_string( signal.mSize ) +
-                                  " number of signal samples leads to a memory requirement  that's above the maximum "
-                                  "configured of " +
-                                  std::to_string( MAX_SAMPLE_MEMORY ) + "Bytes" );
+                FWE_LOG_WARN( "The requested " + std::to_string( signal.mSize ) +
+                              " number of signal samples leads to a memory requirement  that's above the maximum "
+                              "configured of " +
+                              std::to_string( MAX_SAMPLE_MEMORY ) + "Bytes" );
                 signal.mSize = 0;
                 return false;
             }
@@ -191,17 +295,109 @@ CollectionInspectionEngine::preAllocateBuffers()
             signal.mBuffer.resize( signal.mSize );
         }
     }
+    return true;
+}
+
+bool
+CollectionInspectionEngine::preAllocateBuffers()
+{
+    // Allocate size
+    uint32_t usedBytes = 0;
+
+    // Allocate Signal Buffer
+    for ( auto &bufferVector : mSignalBuffers )
+    {
+        auto signalID = bufferVector.first;
+        if ( mSignalToBufferTypeMap.find( signalID ) != mSignalToBufferTypeMap.end() )
+        {
+            auto signalType = mSignalToBufferTypeMap[signalID];
+            switch ( signalType )
+            {
+            case SignalType::UINT8:
+                if ( !allocateBufferVector<uint8_t>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            case SignalType::INT8:
+                if ( !allocateBufferVector<int8_t>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            case SignalType::UINT16:
+                if ( !allocateBufferVector<uint16_t>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            case SignalType::INT16:
+                if ( !allocateBufferVector<int16_t>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            case SignalType::UINT32:
+                if ( !allocateBufferVector<uint32_t>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            case SignalType::INT32:
+                if ( !allocateBufferVector<int32_t>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            case SignalType::UINT64:
+                if ( !allocateBufferVector<uint64_t>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            case SignalType::INT64:
+                if ( !allocateBufferVector<int64_t>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            case SignalType::FLOAT:
+                if ( !allocateBufferVector<float>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            case SignalType::DOUBLE:
+                if ( !allocateBufferVector<double>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            case SignalType::BOOLEAN:
+                if ( !allocateBufferVector<bool>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            default:
+                if ( !allocateBufferVector<double>( signalID, usedBytes ) )
+                {
+                    return false;
+                }
+                break;
+            }
+        }
+    }
     // Allocate Can buffer
     for ( auto &buf : mCanFrameBuffers )
     {
         uint64_t requiredBytes = buf.mSize * static_cast<uint64_t>( sizeof( struct CanFrameSample ) );
         if ( usedBytes + requiredBytes > MAX_SAMPLE_MEMORY )
         {
-            mLogger.warn( "CollectionInspectionEngine::preAllocateBuffers",
-                          "The requested " + std::to_string( buf.mSize ) +
-                              " number of CAN raw samples leads to a memory requirement  that's above the maximum "
-                              "configured of" +
-                              std::to_string( MAX_SAMPLE_MEMORY ) + "Bytes" );
+            FWE_LOG_WARN( "The requested " + std::to_string( buf.mSize ) +
+                          " number of CAN raw samples leads to a memory requirement  that's above the maximum "
+                          "configured of" +
+                          std::to_string( MAX_SAMPLE_MEMORY ) + "Bytes" );
             buf.mSize = 0;
             return false;
         }
@@ -217,6 +413,7 @@ void
 CollectionInspectionEngine::clear()
 {
     mSignalBuffers.clear();
+    mSignalToBufferTypeMap.clear();
     mCanFrameBuffers.clear();
     mConditions.clear();
     mNextConditionToCollectedIndex = 0;
@@ -226,13 +423,28 @@ CollectionInspectionEngine::clear()
     mConditionsNotTriggeredWaitingPublished.reset();
 }
 
+template <typename T>
 void
-CollectionInspectionEngine::updateAllFixedWindowFunctions( InspectionTimestamp timestamp )
+CollectionInspectionEngine::updateBufferFixedWindowFunction( SignalID signalIDIn, InspectionTimestamp timestamp )
 {
-    mNextWindowFunctionTimesOut = std::numeric_limits<InspectionTimestamp>::max();
-    for ( auto &signalVector : mSignalBuffers )
+    std::vector<SignalHistoryBuffer<T>> *signalHistoryBufferPtr = nullptr;
+    try
     {
-        for ( auto &signal : signalVector.second )
+        if ( mSignalBuffers.find( signalIDIn ) != mSignalBuffers.end() )
+        {
+            auto &mapVal = mSignalBuffers.at( signalIDIn );
+            signalHistoryBufferPtr = boost::get<std::vector<SignalHistoryBuffer<T>>>( &mapVal );
+        }
+    }
+    catch ( ... )
+    {
+        FWE_LOG_ERROR( "Failed to retrieve signalHistoryBuffer vector for signal ID " + std::to_string( signalIDIn ) );
+        return;
+    }
+    if ( signalHistoryBufferPtr != nullptr )
+    {
+        auto &bufferVec = *signalHistoryBufferPtr;
+        for ( auto &signal : bufferVec )
         {
             for ( auto &functionWindow : signal.mWindowFunctionData )
             {
@@ -246,6 +458,60 @@ CollectionInspectionEngine::updateAllFixedWindowFunctions( InspectionTimestamp t
     }
 }
 
+void
+CollectionInspectionEngine::updateAllFixedWindowFunctions( InspectionTimestamp timestamp )
+{
+    mNextWindowFunctionTimesOut = std::numeric_limits<InspectionTimestamp>::max();
+    for ( auto &signalVector : mSignalBuffers )
+    {
+        auto signalID = signalVector.first;
+        if ( mSignalToBufferTypeMap.find( signalID ) != mSignalToBufferTypeMap.end() )
+        {
+
+            auto signalType = mSignalToBufferTypeMap[signalID];
+            switch ( signalType )
+            {
+            case SignalType::UINT8:
+                updateBufferFixedWindowFunction<uint8_t>( signalID, timestamp );
+                break;
+            case SignalType::INT8:
+                updateBufferFixedWindowFunction<int8_t>( signalID, timestamp );
+                break;
+            case SignalType::UINT16:
+                updateBufferFixedWindowFunction<uint16_t>( signalID, timestamp );
+                break;
+            case SignalType::INT16:
+                updateBufferFixedWindowFunction<int16_t>( signalID, timestamp );
+                break;
+            case SignalType::UINT32:
+                updateBufferFixedWindowFunction<uint32_t>( signalID, timestamp );
+                break;
+            case SignalType::INT32:
+                updateBufferFixedWindowFunction<int32_t>( signalID, timestamp );
+                break;
+            case SignalType::UINT64:
+
+                updateBufferFixedWindowFunction<uint64_t>( signalID, timestamp );
+                break;
+            case SignalType::INT64:
+                updateBufferFixedWindowFunction<int64_t>( signalID, timestamp );
+                break;
+            case SignalType::FLOAT:
+                updateBufferFixedWindowFunction<float>( signalID, timestamp );
+                break;
+            case SignalType::DOUBLE:
+                updateBufferFixedWindowFunction<double>( signalID, timestamp );
+                break;
+            case SignalType::BOOLEAN:
+                updateBufferFixedWindowFunction<bool>( signalID, timestamp );
+                break;
+            default:
+                break;
+            }
+        }
+    }
+}
+
 bool
 CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
 {
@@ -253,6 +519,7 @@ CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
     // if any sampling window times out there is a new value available to be processed by a condition
     if ( currentTime.monotonicTimeMs >= mNextWindowFunctionTimesOut )
     {
+
         updateAllFixedWindowFunctions( currentTime.monotonicTimeMs );
     }
     auto conditionsToEvaluate = ( mConditionsWithConditionCurrentlyTrue | mConditionsWithInputSignalChanged ) &
@@ -299,11 +566,13 @@ CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
     return oneConditionIsTrue;
 }
 
+template <typename T = double>
 void
 CollectionInspectionEngine::collectLastSignals( InspectionSignalID id,
                                                 uint32_t minimumSamplingInterval,
                                                 uint32_t maxNumberOfSignalsToCollect,
                                                 uint32_t conditionId,
+                                                SignalType signalTypeIn,
                                                 InspectionTimestamp &newestSignalTimestamp,
                                                 std::vector<CollectedSignal> &output )
 {
@@ -312,8 +581,15 @@ CollectionInspectionEngine::collectLastSignals( InspectionSignalID id,
         // Signal not collected by any active condition
         return;
     }
-    // Iterate through all sampling intervals of the signal
-    for ( auto &buf : mSignalBuffers[id] )
+    std::vector<SignalHistoryBuffer<T>> *signalHistoryBufferPtr = nullptr;
+    signalHistoryBufferPtr = getSignalHistoryBufferPtr<T>( id );
+    if ( signalHistoryBufferPtr == nullptr )
+    {
+        // Access by Invalid DataType
+        return;
+    }
+    auto &bufferVec = *signalHistoryBufferPtr;
+    for ( auto &buf : bufferVec )
     {
         if ( ( buf.mMinimumSampleIntervalMs == minimumSamplingInterval ) && ( buf.mSize > 0 ) )
         {
@@ -332,7 +608,7 @@ CollectionInspectionEngine::collectLastSignals( InspectionSignalID id,
                 auto &sample = buf.mBuffer[static_cast<uint32_t>( pos )];
                 if ( ( !sample.isAlreadyConsumed( conditionId ) ) || ( !mSendDataOnlyOncePerCondition ) )
                 {
-                    output.emplace_back( id, sample.mTimestamp, sample.mValue );
+                    output.emplace_back( id, sample.mTimestamp, sample.mValue, signalTypeIn );
                     sample.setAlreadyConsumed( conditionId, true );
                 }
                 newestSignalTimestamp = std::max( newestSignalTimestamp, sample.mTimestamp );
@@ -396,12 +672,110 @@ CollectionInspectionEngine::collectData( ActiveCondition &condition,
     {
         if ( !s.isConditionOnlySignal )
         {
-            collectLastSignals( s.signalID,
-                                s.minimumSampleIntervalMs,
-                                s.sampleBufferSize,
-                                conditionId,
-                                newestSignalTimestamp,
-                                collectedData->signals );
+            switch ( s.signalType )
+            {
+            case SignalType::UINT8:
+                collectLastSignals<uint8_t>( s.signalID,
+                                             s.minimumSampleIntervalMs,
+                                             s.sampleBufferSize,
+                                             conditionId,
+                                             s.signalType,
+                                             newestSignalTimestamp,
+                                             collectedData->signals );
+                break;
+            case SignalType::INT8:
+                collectLastSignals<int8_t>( s.signalID,
+                                            s.minimumSampleIntervalMs,
+                                            s.sampleBufferSize,
+                                            conditionId,
+                                            s.signalType,
+                                            newestSignalTimestamp,
+                                            collectedData->signals );
+                break;
+            case SignalType::UINT16:
+                collectLastSignals<uint16_t>( s.signalID,
+                                              s.minimumSampleIntervalMs,
+                                              s.sampleBufferSize,
+                                              conditionId,
+                                              s.signalType,
+                                              newestSignalTimestamp,
+                                              collectedData->signals );
+                break;
+            case SignalType::INT16:
+                collectLastSignals<int16_t>( s.signalID,
+                                             s.minimumSampleIntervalMs,
+                                             s.sampleBufferSize,
+                                             conditionId,
+                                             s.signalType,
+                                             newestSignalTimestamp,
+                                             collectedData->signals );
+                break;
+            case SignalType::UINT32:
+                collectLastSignals<uint32_t>( s.signalID,
+                                              s.minimumSampleIntervalMs,
+                                              s.sampleBufferSize,
+                                              conditionId,
+                                              s.signalType,
+                                              newestSignalTimestamp,
+                                              collectedData->signals );
+                break;
+            case SignalType::INT32:
+                collectLastSignals<int32_t>( s.signalID,
+                                             s.minimumSampleIntervalMs,
+                                             s.sampleBufferSize,
+                                             conditionId,
+                                             s.signalType,
+                                             newestSignalTimestamp,
+                                             collectedData->signals );
+                break;
+            case SignalType::UINT64:
+                collectLastSignals<uint64_t>( s.signalID,
+                                              s.minimumSampleIntervalMs,
+                                              s.sampleBufferSize,
+                                              conditionId,
+                                              s.signalType,
+                                              newestSignalTimestamp,
+                                              collectedData->signals );
+                break;
+            case SignalType::INT64:
+                collectLastSignals<int64_t>( s.signalID,
+                                             s.minimumSampleIntervalMs,
+                                             s.sampleBufferSize,
+                                             conditionId,
+                                             s.signalType,
+                                             newestSignalTimestamp,
+                                             collectedData->signals );
+                break;
+            case SignalType::FLOAT:
+                collectLastSignals<float>( s.signalID,
+                                           s.minimumSampleIntervalMs,
+                                           s.sampleBufferSize,
+                                           conditionId,
+                                           s.signalType,
+                                           newestSignalTimestamp,
+                                           collectedData->signals );
+                break;
+            case SignalType::DOUBLE:
+                collectLastSignals<double>( s.signalID,
+                                            s.minimumSampleIntervalMs,
+                                            s.sampleBufferSize,
+                                            conditionId,
+                                            s.signalType,
+                                            newestSignalTimestamp,
+                                            collectedData->signals );
+                break;
+            case SignalType::BOOLEAN:
+                collectLastSignals<bool>( s.signalID,
+                                          s.minimumSampleIntervalMs,
+                                          s.sampleBufferSize,
+                                          conditionId,
+                                          s.signalType,
+                                          newestSignalTimestamp,
+                                          collectedData->signals );
+                break;
+            default:
+                break;
+            }
         }
     }
 
@@ -521,41 +895,6 @@ CollectionInspectionEngine::evaluateAndTriggerRichSensorCapture( const ActiveCon
 }
 
 void
-CollectionInspectionEngine::addNewSignal( InspectionSignalID id, const TimePoint &receiveTime, InspectionValue value )
-{
-    if ( mSignalBuffers.find( id ) == mSignalBuffers.end() || mSignalBuffers[id].empty() )
-    {
-        // Signal not collected by any active condition
-        return;
-    }
-    // Iterate through all sampling intervals of the signal
-    for ( auto &buf : mSignalBuffers[id] )
-    {
-        if ( ( buf.mSize > 0 ) && ( buf.mSize <= buf.mBuffer.size() ) &&
-             ( ( buf.mMinimumSampleIntervalMs == 0 ) ||
-               ( ( buf.mLastSample.systemTimeMs == 0 ) && ( buf.mLastSample.monotonicTimeMs == 0 ) ) ||
-               ( receiveTime.monotonicTimeMs >= buf.mLastSample.monotonicTimeMs + buf.mMinimumSampleIntervalMs ) ) )
-        {
-            buf.mCurrentPosition++;
-            if ( buf.mCurrentPosition >= buf.mSize )
-            {
-                buf.mCurrentPosition = 0;
-            }
-            buf.mBuffer[buf.mCurrentPosition].mValue = value;
-            buf.mBuffer[buf.mCurrentPosition].mTimestamp = receiveTime.systemTimeMs;
-            buf.mBuffer[buf.mCurrentPosition].setAlreadyConsumed( ALL_CONDITIONS, false );
-            buf.mCounter++;
-            buf.mLastSample = receiveTime;
-            for ( auto &window : buf.mWindowFunctionData )
-            {
-                window.addValue( value, receiveTime.monotonicTimeMs, mNextWindowFunctionTimesOut );
-            }
-            mConditionsWithInputSignalChanged |= buf.mConditionsThatEvaluateOnThisSignal;
-        }
-    }
-}
-
-void
 CollectionInspectionEngine::addNewRawCanFrame( CANRawFrameID canID,
                                                CANChannelNumericID channelID,
                                                const TimePoint &receiveTime,
@@ -598,26 +937,122 @@ CollectionInspectionEngine::setActiveDTCs( const DTCInfo &activeDTCs )
     mActiveDTCs = activeDTCs;
 }
 
+template <typename T>
 CollectionInspectionEngine::ExpressionErrorCode
-CollectionInspectionEngine::getLatestSignalValue( InspectionSignalID id,
-                                                  ActiveCondition &condition,
-                                                  InspectionValue &result )
+CollectionInspectionEngine::getLatestBufferSignalValue( InspectionSignalID id,
+                                                        ActiveCondition &condition,
+                                                        InspectionValue &result )
 {
-    auto mapLookup = condition.mEvaluationSignals.find( id );
-    if ( ( mapLookup == condition.mEvaluationSignals.end() ) || ( mapLookup->second == nullptr ) )
+
+    auto *s = condition.getEvaluationSignalsBufferPtr<T>( id );
+    if ( s == nullptr )
     {
-        mLogger.warn( "CollectionInspectionEngine::getLatestSignalValue", "SIGNAL_NOT_FOUND" );
+        FWE_LOG_WARN( "SIGNAL_NOT_FOUND" );
         // Signal not collected by any active condition
         return ExpressionErrorCode::SIGNAL_NOT_FOUND;
     }
-    SignalHistoryBuffer *s = mapLookup->second;
     if ( s->mCounter == 0 )
     {
         // Not a single sample collected yet
         return ExpressionErrorCode::SIGNAL_NOT_FOUND;
     }
-    result = s->mBuffer[s->mCurrentPosition].mValue;
+    result = static_cast<double>( s->mBuffer[s->mCurrentPosition].mValue );
     return ExpressionErrorCode::SUCCESSFUL;
+}
+
+CollectionInspectionEngine::ExpressionErrorCode
+CollectionInspectionEngine::getLatestSignalValue( InspectionSignalID id,
+                                                  ActiveCondition &condition,
+                                                  InspectionValue &result )
+{
+    if ( mSignalToBufferTypeMap.find( id ) == mSignalToBufferTypeMap.end() )
+    {
+        FWE_LOG_WARN( "SIGNAL_NOT_FOUND" );
+        // Signal not collected by any active condition
+        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+    }
+    auto signalType = mSignalToBufferTypeMap[id];
+    switch ( signalType )
+    {
+    case SignalType::UINT8:
+        return getLatestBufferSignalValue<uint8_t>( id, condition, result );
+        break;
+    case SignalType::INT8:
+        return getLatestBufferSignalValue<int8_t>( id, condition, result );
+        break;
+    case SignalType::UINT16:
+        return getLatestBufferSignalValue<uint16_t>( id, condition, result );
+        break;
+    case SignalType::INT16:
+        return getLatestBufferSignalValue<uint16_t>( id, condition, result );
+        break;
+    case SignalType::UINT32:
+        return getLatestBufferSignalValue<uint32_t>( id, condition, result );
+        break;
+    case SignalType::INT32:
+        return getLatestBufferSignalValue<int32_t>( id, condition, result );
+        break;
+    case SignalType::UINT64:
+        return getLatestBufferSignalValue<uint64_t>( id, condition, result );
+        break;
+    case SignalType::INT64:
+        return getLatestBufferSignalValue<int64_t>( id, condition, result );
+        break;
+    case SignalType::FLOAT:
+        return getLatestBufferSignalValue<float>( id, condition, result );
+        break;
+    case SignalType::DOUBLE:
+        return getLatestBufferSignalValue<double>( id, condition, result );
+        break;
+    case SignalType::BOOLEAN:
+        return getLatestBufferSignalValue<bool>( id, condition, result );
+        break;
+    default:
+        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+        break;
+    }
+}
+
+template <typename T = double>
+CollectionInspectionEngine::ExpressionErrorCode
+CollectionInspectionEngine::getSampleWindowFunctionType( WindowFunction function,
+                                                         InspectionSignalID signalID,
+                                                         ActiveCondition &condition,
+                                                         InspectionValue &result )
+{
+    auto w = condition.getFixedTimeWindowFunctionDataPtr<T>( signalID );
+    if ( w == nullptr )
+    {
+        // Signal not collected by any active condition
+        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+    }
+
+    switch ( function )
+    {
+    case WindowFunction::LAST_FIXED_WINDOW_AVG:
+        result = static_cast<double>( w->mLastAvg );
+        return w->mLastAvailable ? ExpressionErrorCode::SUCCESSFUL : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+    case WindowFunction::LAST_FIXED_WINDOW_MIN:
+        result = static_cast<double>( w->mLastMin );
+        return w->mLastAvailable ? ExpressionErrorCode::SUCCESSFUL : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+    case WindowFunction::LAST_FIXED_WINDOW_MAX:
+        result = static_cast<double>( w->mLastMax );
+        return w->mLastAvailable ? ExpressionErrorCode::SUCCESSFUL : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+    case WindowFunction::PREV_LAST_FIXED_WINDOW_AVG:
+        result = static_cast<double>( w->mPreviousLastAvg );
+        return w->mPreviousLastAvailable ? ExpressionErrorCode::SUCCESSFUL
+                                         : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+    case WindowFunction::PREV_LAST_FIXED_WINDOW_MIN:
+        result = static_cast<double>( w->mPreviousLastMin );
+        return w->mPreviousLastAvailable ? ExpressionErrorCode::SUCCESSFUL
+                                         : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+    case WindowFunction::PREV_LAST_FIXED_WINDOW_MAX:
+        result = static_cast<double>( w->mPreviousLastMax );
+        return w->mPreviousLastAvailable ? ExpressionErrorCode::SUCCESSFUL
+                                         : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+    default:
+        return ExpressionErrorCode::NOT_IMPLEMENTED_FUNCTION;
+    }
 }
 
 CollectionInspectionEngine::ExpressionErrorCode
@@ -626,39 +1061,51 @@ CollectionInspectionEngine::getSampleWindowFunction( WindowFunction function,
                                                      ActiveCondition &condition,
                                                      InspectionValue &result )
 {
-    auto mapLookup = condition.mEvaluationFunctions.find( signalID );
-    if ( ( mapLookup == condition.mEvaluationFunctions.end() ) || ( mapLookup->second == nullptr ) )
+    if ( mSignalToBufferTypeMap.find( signalID ) == mSignalToBufferTypeMap.end() )
     {
+        FWE_LOG_WARN( "SIGNAL_NOT_FOUND" );
         // Signal not collected by any active condition
         return ExpressionErrorCode::SIGNAL_NOT_FOUND;
     }
-    auto w = mapLookup->second;
-
-    switch ( function )
+    auto signalType = mSignalToBufferTypeMap[signalID];
+    switch ( signalType )
     {
-    case WindowFunction::LAST_FIXED_WINDOW_AVG:
-        result = w->mLastAvg;
-        return w->mLastAvailable ? ExpressionErrorCode::SUCCESSFUL : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
-    case WindowFunction::LAST_FIXED_WINDOW_MIN:
-        result = w->mLastMin;
-        return w->mLastAvailable ? ExpressionErrorCode::SUCCESSFUL : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
-    case WindowFunction::LAST_FIXED_WINDOW_MAX:
-        result = w->mLastMax;
-        return w->mLastAvailable ? ExpressionErrorCode::SUCCESSFUL : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
-    case WindowFunction::PREV_LAST_FIXED_WINDOW_AVG:
-        result = w->mPreviousLastAvg;
-        return w->mPreviousLastAvailable ? ExpressionErrorCode::SUCCESSFUL
-                                         : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
-    case WindowFunction::PREV_LAST_FIXED_WINDOW_MIN:
-        result = w->mPreviousLastMin;
-        return w->mPreviousLastAvailable ? ExpressionErrorCode::SUCCESSFUL
-                                         : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
-    case WindowFunction::PREV_LAST_FIXED_WINDOW_MAX:
-        result = w->mPreviousLastMax;
-        return w->mPreviousLastAvailable ? ExpressionErrorCode::SUCCESSFUL
-                                         : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+    case SignalType::UINT8:
+        return getSampleWindowFunctionType<uint8_t>( function, signalID, condition, result );
+        break;
+    case SignalType::INT8:
+        return getSampleWindowFunctionType<int8_t>( function, signalID, condition, result );
+        break;
+    case SignalType::UINT16:
+        return getSampleWindowFunctionType<uint16_t>( function, signalID, condition, result );
+        break;
+    case SignalType::INT16:
+        return getSampleWindowFunctionType<int16_t>( function, signalID, condition, result );
+        break;
+    case SignalType::UINT32:
+        return getSampleWindowFunctionType<uint32_t>( function, signalID, condition, result );
+        break;
+    case SignalType::INT32:
+        return getSampleWindowFunctionType<int32_t>( function, signalID, condition, result );
+        break;
+    case SignalType::UINT64:
+        return getSampleWindowFunctionType<uint64_t>( function, signalID, condition, result );
+        break;
+    case SignalType::INT64:
+        return getSampleWindowFunctionType<int64_t>( function, signalID, condition, result );
+        break;
+    case SignalType::FLOAT:
+        return getSampleWindowFunctionType<float>( function, signalID, condition, result );
+        break;
+    case SignalType::DOUBLE:
+        return getSampleWindowFunctionType<double>( function, signalID, condition, result );
+        break;
+    case SignalType::BOOLEAN:
+        return getSampleWindowFunctionType<bool>( function, signalID, condition, result );
+        break;
     default:
-        return ExpressionErrorCode::NOT_IMPLEMENTED_FUNCTION;
+        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+        break;
     }
 }
 
@@ -673,16 +1120,14 @@ CollectionInspectionEngine::getGeohashFunctionNode( const struct ExpressionNode 
     auto status = getLatestSignalValue( expression->function.geohashFunction.latitudeSignalID, condition, latitude );
     if ( status != ExpressionErrorCode::SUCCESSFUL )
     {
-        mLogger.warn( "CollectionInspectionEngine::getGeohashFunctionNode",
-                      "Unable to evaluate Geohash due to missing latitude signal" );
+        FWE_LOG_WARN( "Unable to evaluate Geohash due to missing latitude signal" );
         return status;
     }
     InspectionValue longitude = 0;
     status = getLatestSignalValue( expression->function.geohashFunction.longitudeSignalID, condition, longitude );
     if ( status != ExpressionErrorCode::SUCCESSFUL )
     {
-        mLogger.warn( "CollectionInspectionEngine::getGeohashFunctionNode",
-                      "Unable to evaluate Geohash due to missing longitude signal" );
+        FWE_LOG_WARN( "Unable to evaluate Geohash due to missing longitude signal" );
         return status;
     }
     resultValueBool = mGeohashFunctionNode.evaluateGeohash( latitude,
@@ -701,7 +1146,7 @@ CollectionInspectionEngine::eval( const struct ExpressionNode *expression,
 {
     if ( ( remainingStackDepth <= 0 ) || ( expression == nullptr ) )
     {
-        mLogger.warn( "CollectionInspectionEngine::eval", "STACK_DEPTH_REACHED or nullptr" );
+        FWE_LOG_WARN( "STACK_DEPTH_REACHED or nullptr" );
         return ExpressionErrorCode::STACK_DEPTH_REACHED;
     }
     if ( expression->nodeType == ExpressionNodeType::FLOAT )
@@ -798,61 +1243,6 @@ CollectionInspectionEngine::eval( const struct ExpressionNode *expression,
     default:
         return ExpressionErrorCode::NOT_IMPLEMENTED_TYPE;
     }
-}
-
-bool
-CollectionInspectionEngine::FixedTimeWindowFunctionData::updateWindow( InspectionTimestamp timestamp,
-                                                                       InspectionTimestamp &nextWindowFunctionTimesOut )
-{
-    if ( mLastTimeCalculated == 0 )
-    {
-        // First time a signal arrives start the window for this signal
-        mLastTimeCalculated = timestamp;
-        initNewWindow( timestamp, nextWindowFunctionTimesOut );
-    }
-    // check the last 2 windows as this class records the last and previous last data
-    else if ( timestamp >= mLastTimeCalculated + mWindowSizeMs * 2 )
-    {
-        // In the last window not a single sample arrived
-        mLastAvailable = false;
-        if ( mCollectedSignals == 0 )
-        {
-            mPreviousLastAvailable = false;
-        }
-        else
-        {
-            mPreviousLastAvailable = true;
-            mPreviousLastMin = mCollectingMin;
-            mPreviousLastMax = mCollectingMax;
-            mPreviousLastAvg = mCollectingSum / mCollectedSignals;
-        }
-        initNewWindow( timestamp, nextWindowFunctionTimesOut );
-    }
-    else if ( timestamp >= mLastTimeCalculated + mWindowSizeMs )
-    {
-        mPreviousLastMin = mLastMin;
-        mPreviousLastMax = mLastMax;
-        mPreviousLastAvg = mLastAvg;
-        mPreviousLastAvailable = mLastAvailable;
-        if ( mCollectedSignals == 0 )
-        {
-            mLastAvailable = false;
-        }
-        else
-        {
-            mLastAvailable = true;
-            mLastMin = mCollectingMin;
-            mLastMax = mCollectingMax;
-            mLastAvg = mCollectingSum / mCollectedSignals;
-        }
-        initNewWindow( timestamp, nextWindowFunctionTimesOut );
-    }
-    else
-    {
-        nextWindowFunctionTimesOut = std::min( nextWindowFunctionTimesOut, mLastTimeCalculated + mWindowSizeMs );
-        return false;
-    }
-    return true;
 }
 
 EventID

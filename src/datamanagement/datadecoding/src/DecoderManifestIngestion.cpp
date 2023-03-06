@@ -3,6 +3,7 @@
 
 #include "DecoderManifestIngestion.h"
 #include "CollectionInspectionAPITypes.h"
+#include "LoggingModule.h"
 #include <iostream>
 
 namespace Aws
@@ -118,16 +119,15 @@ DecoderManifestIngestion::copyData( const std::uint8_t *inputBuffer, const size_
     // check for a null input buffer or size set to 0
     if ( ( inputBuffer == nullptr ) || ( size == 0 ) )
     {
-        mLogger.error( "DecoderManifestIngestion::copyData", "Input buffer invalid" );
+        FWE_LOG_ERROR( "Input buffer invalid" );
         return false;
     }
 
     // We have to guard against document sizes that are too large
     if ( size > DECODER_MANIFEST_BYTE_SIZE_LIMIT )
     {
-        mLogger.error( "DecoderManifestIngestion::copyData",
-                       "Decoder Manifest binary too big. Size: " + std::to_string( size ) +
-                           " limit: " + std::to_string( DECODER_MANIFEST_BYTE_SIZE_LIMIT ) );
+        FWE_LOG_ERROR( "Decoder Manifest binary too big. Size: " + std::to_string( size ) +
+                       " limit: " + std::to_string( DECODER_MANIFEST_BYTE_SIZE_LIMIT ) );
         return false;
     }
 
@@ -137,14 +137,14 @@ DecoderManifestIngestion::copyData( const std::uint8_t *inputBuffer, const size_
     // Check to make sure the vector size is the same as our input size
     if ( mProtoBinaryData.size() != size )
     {
-        mLogger.error( "DecoderManifestIngestion::copyData", "Copied data not the same size as input data" );
+        FWE_LOG_ERROR( "Copied data not the same size as input data" );
         return false;
     }
 
     // Set the ready flag to false, as we have new data that needs to be parsed
     mReady = false;
 
-    mLogger.trace( "DecoderManifestIngestion::copyData", "Copy of DecoderManifest data success" );
+    FWE_LOG_TRACE( "Copy of DecoderManifest data success" );
     return true;
 }
 
@@ -161,7 +161,7 @@ DecoderManifestIngestion::build()
     // Ensure that we have data to parse
     if ( mProtoBinaryData.empty() )
     {
-        mLogger.error( "DecoderManifestIngestion::build", "Failed to build due to an empty Decoder Manifest" );
+        FWE_LOG_ERROR( "Failed to build due to an empty Decoder Manifest" );
         // Error, input buffer empty or invalid
         return false;
     }
@@ -169,7 +169,7 @@ DecoderManifestIngestion::build()
     // Try to parse the binary data into our mProtoDecoderManifest member variable
     if ( !mProtoDecoderManifest.ParseFromArray( mProtoBinaryData.data(), static_cast<int>( mProtoBinaryData.size() ) ) )
     {
-        mLogger.error( "DecoderManifestIngestion::build", "Failed to parse DecoderManifest proto" );
+        FWE_LOG_ERROR( "Failed to parse DecoderManifest proto" );
         // Error parsing proto binary
         return false;
     }
@@ -178,14 +178,12 @@ DecoderManifestIngestion::build()
     if ( ( mProtoDecoderManifest.can_signals_size() == 0 ) && ( mProtoDecoderManifest.obd_pid_signals_size() == 0 ) )
     {
         // Error, missing required decoding information in the Decoder mProtoDecoderManifest
-        mLogger.error(
-            "DecoderManifestIngestion::build",
+        FWE_LOG_ERROR(
             "CAN Nodes or CAN Signal array or OBD PID Signal array is empty. Failed to build Decoder Manifest" );
         return false;
     }
 
-    mLogger.info( "DecoderManifestIngestion::build",
-                  "Building Decoder Manifest with ID: " + mProtoDecoderManifest.arn() );
+    FWE_LOG_INFO( "Building Decoder Manifest with ID: " + mProtoDecoderManifest.arn() );
 
     // Iterate over CAN Signals and build the mCANSignalFormatDictionary
     for ( int i = 0; i < mProtoDecoderManifest.can_signals_size(); i++ )
@@ -209,11 +207,13 @@ DecoderManifestIngestion::build()
         canSignalFormat.mOffset = canSignal.offset();
         canSignalFormat.mFactor = canSignal.factor();
 
+        // TODO :: Update the datatype from the DM after the schema update for the datatype support
+        mSignalIDToTypeMap[canSignal.signal_id()] = SignalType::DOUBLE; // using double as default
+
         canSignalFormat.mIsMultiplexorSignal = false;
         canSignalFormat.mMultiplexorValue = 0;
 
-        mLogger.trace( "DecoderManifestIngestion::build",
-                       "Adding CAN Signal Format for Signal ID: " + std::to_string( canSignalFormat.mSignalID ) );
+        FWE_LOG_TRACE( "Adding CAN Signal Format for Signal ID: " + std::to_string( canSignalFormat.mSignalID ) );
 
         // Each CANMessageFormat object contains an array of signal decoding rules for each signal it contains. Cloud
         // sends us a set of Signal IDs so we need to iterate through them and either create new CANMessageFormat
@@ -267,7 +267,6 @@ DecoderManifestIngestion::build()
         // Get a reference to the OBD PID signal in the protobuf
         const DecoderManifestMsg::OBDPIDSignal &pidSignal = mProtoDecoderManifest.obd_pid_signals( i );
         mSignalToVehicleDataSourceProtocol[pidSignal.signal_id()] = VehicleDataSourceProtocol::OBD;
-
         PIDSignalDecoderFormat obdPIDSignalDecoderFormat =
             PIDSignalDecoderFormat( pidSignal.pid_response_length(),
                                     static_cast<SID>( pidSignal.service_mode() ),
@@ -279,9 +278,11 @@ DecoderManifestIngestion::build()
                                     static_cast<uint8_t>( pidSignal.bit_right_shift() ),
                                     static_cast<PID>( pidSignal.bit_mask_length() ) );
         mSignalToPIDDictionary[pidSignal.signal_id()] = obdPIDSignalDecoderFormat;
+        // TODO :: Update the datatype from the DM after the schema update for the datatype support
+        mSignalIDToTypeMap[pidSignal.signal_id()] = SignalType::DOUBLE; // using double as default
     }
 
-    mLogger.trace( "DecoderManifestIngestion::build", "Decoder Manifest build succeeded" );
+    FWE_LOG_TRACE( "Decoder Manifest build succeeded" );
     // Set our ready flag to true
     mReady = true;
     return true;

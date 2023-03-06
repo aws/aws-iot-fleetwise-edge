@@ -10,7 +10,6 @@ using namespace Aws::IoTFleetWise::Platform::Linux;
 
 namespace
 {
-constexpr char ALLOCATION_TAG[] = "AWS-SDK";
 constexpr size_t NUM_THREADS = 1;
 constexpr size_t MAX_HOSTS = 1;
 constexpr size_t MAX_TTL = 5;
@@ -35,7 +34,7 @@ struct AwsBootstrap::Impl
         auto &memMgr = AwsSDKMemoryManager::getInstance();
         mOptions.memoryManagementOptions.memoryManager = &memMgr;
 
-        auto clientBootstrapFn = [this]() {
+        auto clientBootstrapFn = [this]() -> std::shared_ptr<Aws::Crt::Io::ClientBootstrap> {
             // You need an event loop group to process IO events.
             // If you only have a few connections, 1 thread is ideal
             Aws::Crt::Io::EventLoopGroup eventLoopGroup( NUM_THREADS );
@@ -43,11 +42,12 @@ struct AwsBootstrap::Impl
             {
                 auto errString = Crt::ErrorDebugString( eventLoopGroup.LastError() );
                 auto errLog = errString != nullptr ? std::string( errString ) : std::string( "Unknown error" );
-                mLogger.error( "AwsBootstrap::Impl::Impl", "Event Loop Group Creation failed with error " + errLog );
+                FWE_LOG_ERROR( "Event Loop Group Creation failed with error " + errLog );
             }
             else
             {
                 Aws::Crt::Io::DefaultHostResolver defaultHostResolver( eventLoopGroup, MAX_HOSTS, MAX_TTL );
+                constexpr char ALLOCATION_TAG[] = "AWS-SDK";
                 auto bootstrap = Aws::MakeShared<Aws::Crt::Io::ClientBootstrap>(
                     ALLOCATION_TAG, eventLoopGroup, defaultHostResolver );
                 mBootstrap = bootstrap.get();
@@ -62,7 +62,7 @@ struct AwsBootstrap::Impl
     ~Impl()
     {
         Aws::ShutdownAPI( mOptions );
-        mLogger.trace( "AwsBootstrap::Impl::~Impl", "AWS API ShutDown Completed" );
+        FWE_LOG_TRACE( "AWS API ShutDown Completed" );
     }
 
     Impl( const Impl & ) = delete;
@@ -76,7 +76,6 @@ struct AwsBootstrap::Impl
         return mBootstrap;
     }
 
-    Platform::Linux::LoggingModule mLogger;
     Aws::SDKOptions mOptions;
 
     /**

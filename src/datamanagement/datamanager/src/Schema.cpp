@@ -17,8 +17,8 @@ using namespace Aws::IoTFleetWise::OffboardConnectivity;
 Schema::Schema( std::shared_ptr<IReceiver> receiverDecoderManifest,
                 std::shared_ptr<IReceiver> receiverCollectionSchemeList,
                 std::shared_ptr<ISender> sender )
-    : mDecoderManifestCb( *this, mLogger )
-    , mCollectionSchemeListCb( *this, mLogger )
+    : mDecoderManifestCb( *this )
+    , mCollectionSchemeListCb( *this )
     , mSender( std::move( sender ) )
 {
     // Register the listeners
@@ -56,13 +56,13 @@ Schema::sendCheckin( const std::vector<std::string> &documentARNs )
 
     if ( !mProtoCheckinMsg.SerializeToString( &mProtoCheckinMsgOutput ) )
     {
-        mLogger.error( "Schema::sendCheckin", "Checkin serialization failed" );
+        FWE_LOG_ERROR( "Checkin serialization failed" );
         return false;
     }
     else
     {
         // transmit the data to the cloud
-        mLogger.trace( "Schema::sendCheckin", "Sending a Checkin message to the backend" );
+        FWE_LOG_TRACE( "Sending a Checkin message to the backend" );
         return transmitCheckin();
     }
 }
@@ -72,16 +72,16 @@ Schema::transmitCheckin()
 {
     if ( mSender == nullptr )
     {
-        mLogger.error( "Schema::transmitCheckin", "Invalid sender instance" );
+        FWE_LOG_ERROR( "Invalid sender instance" );
         return false;
     }
 
-    auto res = mSender->send( reinterpret_cast<const uint8_t *>( mProtoCheckinMsgOutput.data() ),
-                              mProtoCheckinMsgOutput.size() );
+    auto res = mSender->sendBuffer( reinterpret_cast<const uint8_t *>( mProtoCheckinMsgOutput.data() ),
+                                    mProtoCheckinMsgOutput.size() );
 
     if ( res == ConnectivityError::Success )
     {
-        mLogger.trace( "Schema::transmitCheckin", "Checkin Message sent to the backend" );
+        FWE_LOG_TRACE( "Checkin Message sent to the backend" );
 
         // Trace log for more verbose Checkin Info
         std::string checkinDebugString;
@@ -98,7 +98,7 @@ Schema::transmitCheckin()
         }
         checkinDebugString += "]";
 
-        mLogger.trace( "Schema::transmitCheckin", checkinDebugString );
+        FWE_LOG_TRACE( checkinDebugString );
         return true;
     }
     else if ( res == ConnectivityError::NoConnection )
@@ -107,8 +107,7 @@ Schema::transmitCheckin()
     }
     else
     {
-        mLogger.error( "Schema::transmitCheckin",
-                       "offboardconnectivity error, will retry sending the checkin message" );
+        FWE_LOG_ERROR( "offboardconnectivity error, will retry sending the checkin message" );
         return false;
     }
 }

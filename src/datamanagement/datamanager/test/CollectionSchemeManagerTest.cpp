@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "CollectionSchemeManagerTest.h"
+#include "WaitUntil.h"
+
+using namespace Aws::IoTFleetWise::TestingSupport;
 
 /**********************test body ***********************************************/
 TEST( CollectionSchemeManagerTest, StopMainTest )
@@ -11,9 +14,9 @@ TEST( CollectionSchemeManagerTest, StopMainTest )
     test.init( 50, nullptr, canIDTranslator );
     test.myRegisterListener();
     ASSERT_TRUE( test.connect() );
-    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+
     /* stopping idling main thread */
-    ASSERT_TRUE( test.disconnect() );
+    WAIT_ASSERT_TRUE( test.disconnect() );
 
     /* build DMs */
     ASSERT_TRUE( test.connect() );
@@ -38,9 +41,9 @@ TEST( CollectionSchemeManagerTest, StopMainTest )
     test.myInvokeDecoderManifest();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     test.myInvokeCollectionScheme();
-    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+
     /* stopping main thread servicing a collectionScheme ending in 25 seconds */
-    ASSERT_TRUE( test.disconnect() );
+    WAIT_ASSERT_TRUE( test.disconnect() );
 }
 
 TEST( CollectionSchemeManagerTest, CollectionSchemeUpdateCallBackTest )
@@ -212,6 +215,6 @@ TEST( CollectionSchemeManagerTest, MockProducerTest )
     testList2.clear();
     test.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList2 );
     test.myInvokeCollectionScheme();
-    std::this_thread::sleep_for( std::chrono::milliseconds( 200 ) );
-    ASSERT_TRUE( test.disconnect() );
+
+    WAIT_ASSERT_TRUE( test.disconnect() );
 }

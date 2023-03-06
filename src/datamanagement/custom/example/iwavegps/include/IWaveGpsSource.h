@@ -66,9 +66,9 @@ protected:
 private:
     static bool validLatitude( double latitude );
     static bool validLongitude( double longitude );
-    bool extractIntegerFromConfig( const std::vector<VehicleDataSourceConfig> &sourceConfigs,
-                                   const std::string key,
-                                   uint32_t &extractedValue );
+    static bool extractIntegerFromConfig( const std::vector<VehicleDataSourceConfig> &sourceConfigs,
+                                          const std::string key,
+                                          uint32_t &extractedValue );
 
     /**
      * The NMEA protocol provides the position in $GPGGA in the following format
@@ -87,7 +87,6 @@ private:
     uint16_t mLongitudeStartBit = 0;
 
     int mFileHandle = -1;
-    LoggingModule mLogger;
     SignalBufferPtr mSignalBufferPtr;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     Timer mCyclicLoggingTimer;

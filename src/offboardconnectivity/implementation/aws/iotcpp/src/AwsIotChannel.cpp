@@ -3,6 +3,7 @@
 
 #include "AwsIotChannel.h"
 #include "AwsIotConnectivityModule.h"
+#include "LoggingModule.h"
 #include "TraceModule.h"
 #include <sstream>
 
@@ -43,7 +44,7 @@ AwsIotChannel::setTopic( const std::string &topicNameRef, bool subscribeAsynchro
 {
     if ( topicNameRef.empty() )
     {
-        mLogger.error( "AwsIotChannel::setTopic", "Empty ingestion topic name provided" );
+        FWE_LOG_ERROR( "Empty ingestion topic name provided" );
     }
     mSubscribeAsynchronously = subscribeAsynchronously;
     mTopicName = topicNameRef;
@@ -55,12 +56,12 @@ AwsIotChannel::subscribe()
     std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
     if ( !isTopicValid() )
     {
-        mLogger.error( "AwsIotChannel::subscribe", "Empty ingestion topic name provided" );
+        FWE_LOG_ERROR( "Empty ingestion topic name provided" );
         return ConnectivityError::NotConfigured;
     }
     if ( !isAliveNotThreadSafe() )
     {
-        mLogger.error( "AwsIotChannel::subscribe", "MQTT Connection not established, failed to subscribe" );
+        FWE_LOG_ERROR( "MQTT Connection not established, failed to subscribe" );
         return ConnectivityError::NoConnection;
     }
     auto connection = mConnectivityModule->getConnection();
@@ -78,7 +79,7 @@ AwsIotChannel::subscribe()
         (void)dup;
         (void)retain;
         os << "Message received on topic  " << topic << " payload length: " << byteBuf.len;
-        mLogger.trace( "AwsIotChannel::subscribeTopic", os.str() );
+        FWE_LOG_TRACE( os.str() );
         notifyListeners<const std::uint8_t *, size_t>(
             &IReceiverCallback::onDataReceived, byteBuf.buffer, byteBuf.len );
     };
@@ -98,29 +99,28 @@ AwsIotChannel::subscribe()
         {
             auto errString = aws_error_debug_str( errorCode );
             TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
-            mLogger.error( "AwsIotChannel::subscribeTopic", "Subscribe failed with error" );
-            mLogger.error( "AwsIotChannel::subscribeTopic",
-                           errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
+            FWE_LOG_ERROR( "Subscribe failed with error" );
+            FWE_LOG_ERROR( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
         }
         else
         {
             if ( ( packetId == 0u ) || ( QoS == Mqtt::QOS::AWS_MQTT_QOS_FAILURE ) )
             {
                 TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_REJECT );
-                mLogger.error( "AwsIotChannel::subscribeTopic", "Subscribe rejected by the Remote broker" );
+                FWE_LOG_ERROR( "Subscribe rejected by the Remote broker" );
             }
             else
             {
                 std::ostringstream os;
                 os << "Subscribe on topic  " << topic << " on packetId " << packetId << " succeeded";
-                mLogger.trace( "AwsIotChannel::subscribeTopic", os.str() );
+                FWE_LOG_TRACE( os.str() );
                 mSubscribed = true;
             }
             subscribeFinishedPromise.set_value();
         }
     };
 
-    mLogger.trace( "AwsIotChannel::subscribeTopic", "Subscribing..." );
+    FWE_LOG_TRACE( "Subscribing..." );
     connection->Subscribe( mTopicName.c_str(), Mqtt::QOS::AWS_MQTT_QOS_AT_LEAST_ONCE, onMessage, onSubAck );
 
     // Blocked call until subscribe finished this call should quickly either fail or succeed but
@@ -142,24 +142,24 @@ AwsIotChannel::getMaxSendSize() const
 }
 
 ConnectivityError
-AwsIotChannel::send( const std::uint8_t *buf, size_t size, struct CollectionSchemeParams collectionSchemeParams )
+AwsIotChannel::sendBuffer( const std::uint8_t *buf, size_t size, struct CollectionSchemeParams collectionSchemeParams )
 {
     std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
     if ( !isTopicValid() )
     {
-        mLogger.warn( "AwsIotChannel::send", "Invalid topic provided" );
+        FWE_LOG_WARN( "Invalid topic provided" );
         return ConnectivityError::NotConfigured;
     }
 
     if ( ( buf == nullptr ) || ( size == 0 ) )
     {
-        mLogger.warn( "AwsIotChannel::send", "No valid data provided" );
+        FWE_LOG_WARN( "No valid data provided" );
         return ConnectivityError::WrongInputData;
     }
 
     if ( size > getMaxSendSize() )
     {
-        mLogger.warn( "AwsIotChannel::send", "Payload provided is too long" );
+        FWE_LOG_WARN( "Payload provided is too long" );
         return ConnectivityError::WrongInputData;
     }
 
@@ -171,11 +171,11 @@ AwsIotChannel::send( const std::uint8_t *buf, size_t size, struct CollectionSche
 
             if ( isDataPersisted )
             {
-                mLogger.trace( "AwsIotChannel::send", "Payload has persisted successfully on disk" );
+                FWE_LOG_TRACE( "Payload has persisted successfully on disk" );
             }
             else
             {
-                mLogger.warn( "AwsIotChannel::send", "Payload has not been persisted" );
+                FWE_LOG_WARN( "Payload has not been persisted" );
             }
         }
         return ConnectivityError::NoConnection;
@@ -185,21 +185,20 @@ AwsIotChannel::send( const std::uint8_t *buf, size_t size, struct CollectionSche
     if ( ( mMaximumIotSDKHeapMemoryBytes != 0 ) && ( currentMemoryUsage > mMaximumIotSDKHeapMemoryBytes ) )
     {
         mConnectivityModule->releaseMemoryUsage( size );
-        mLogger.error( "AwsIotChannel::send",
-                       "Not sending out the message  with size " + std::to_string( size ) +
-                           " because IoT device SDK allocated the maximum defined memory. Currently allocated " +
-                           std::to_string( currentMemoryUsage ) );
+        FWE_LOG_ERROR( "Not sending out the message  with size " + std::to_string( size ) +
+                       " because IoT device SDK allocated the maximum defined memory. Currently allocated " +
+                       std::to_string( currentMemoryUsage ) );
         if ( mPayloadManager != nullptr )
         {
             bool isDataPersisted = mPayloadManager->storeData( buf, size, collectionSchemeParams );
 
             if ( isDataPersisted )
             {
-                mLogger.trace( "AwsIotChannel::send", "Data was persisted successfully" );
+                FWE_LOG_TRACE( "Data was persisted successfully" );
             }
             else
             {
-                mLogger.warn( "AwsIotChannel::send", "Data was not persisted and is lost" );
+                FWE_LOG_WARN( "Data was not persisted and is lost" );
             }
         }
         return ConnectivityError::QuotaReached;
@@ -224,14 +223,13 @@ AwsIotChannel::send( const std::uint8_t *buf, size_t size, struct CollectionSche
             }
             if ( ( packetId != 0U ) && ( errorCode == 0 ) )
             {
-                mLogger.trace( "AwsIotChannel::send",
-                               "Operation on packetId  " + std::to_string( packetId ) + " Succeeded" );
+                FWE_LOG_TRACE( "Operation on packetId  " + std::to_string( packetId ) + " Succeeded" );
             }
             else
             {
                 auto errSting = aws_error_debug_str( errorCode );
                 std::string errLog = errSting != nullptr ? std::string( errSting ) : std::string( "Unknown error" );
-                mLogger.error( "AwsIotChannel::send", std::string( "Operation failed with error" ) + errLog );
+                FWE_LOG_ERROR( std::string( "Operation failed with error" ) + errLog );
             }
         };
     connection->Publish( mTopicName.c_str(), Mqtt::QOS::AWS_MQTT_QOS_AT_MOST_ONCE, false, payload, onPublishComplete );
@@ -247,13 +245,14 @@ AwsIotChannel::unsubscribe()
         auto connection = mConnectivityModule->getConnection();
 
         std::promise<void> unsubscribeFinishedPromise;
-        mLogger.trace( "AwsIotChannel::unsubscribe", "Unsubscribing..." );
+        FWE_LOG_TRACE( "Unsubscribing..." );
         connection->Unsubscribe( mTopicName.c_str(),
                                  [&]( Mqtt::MqttConnection &mqttConnection, uint16_t packetId, int errorCode ) {
                                      (void)mqttConnection;
                                      (void)packetId;
                                      (void)errorCode;
-                                     mLogger.trace( "AwsIotChannel::unsubscribe", "Unsubscribed" );
+                                     FWE_LOG_TRACE( "Unsubscribed" );
+                                     mSubscribed = false;
                                      unsubscribeFinishedPromise.set_value();
                                  } );
         // Blocked call until subscribe finished this call should quickly either fail or succeed but

@@ -42,8 +42,7 @@
     "internalParameters": {
       "readyToPublishDataBufferSize": 10000,
       "systemWideLogLevel": "Trace",
-      "dataReductionProbabilityDisabled": false,
-      "useJsonBasedCollection": false
+      "dataReductionProbabilityDisabled": false
     },
     "publishToCloudParameters": {
       "maxPublishMessageCount": 1000,

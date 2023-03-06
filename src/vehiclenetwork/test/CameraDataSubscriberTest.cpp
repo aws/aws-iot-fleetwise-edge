@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "dds/CameraDataSubscriber.h"
+#include "WaitUntil.h"
 #include <fastdds/dds/publisher/DataWriter.hpp>
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 #include <fastdds/dds/publisher/Publisher.hpp>
@@ -16,6 +17,7 @@
 #include <stdlib.h>
 #include <thread>
 
+using namespace Aws::IoTFleetWise::TestingSupport;
 using namespace Aws::IoTFleetWise::VehicleNetwork;
 
 /**
@@ -512,8 +514,8 @@ TEST( CameraDataSubscriberTest, testReceiveDataAndPersistUDPMultipleImages )
         publisher.publishTestDataWithRealPNG( "Image1.png",
                                               std::string( currentDir ) + "/CameraSubscriberTestPNG.png" );
         // Give some time for the worker to wake up and consume the message.
-        std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
-        ASSERT_TRUE( dataListener.gotNotification );
+
+        WAIT_ASSERT_TRUE( dataListener.gotNotification );
         ASSERT_EQ( dataListener.artifact.path, config.temporaryCacheLocation + "Image1.png" );
         // Verify that  what we send on DDS is exactly what we received i.e the same PNG file.
         ASSERT_TRUE(
@@ -524,9 +526,9 @@ TEST( CameraDataSubscriberTest, testReceiveDataAndPersistUDPMultipleImages )
                                               std::string( currentDir ) + "/CameraSubscriberTestPNG.png" );
 
         // Give some time for the worker to wake up and consume the message.
-        std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
-        ASSERT_TRUE( dataListener.gotNotification );
-        ASSERT_EQ( dataListener.artifact.path, config.temporaryCacheLocation + "Image2.png" );
+
+        WAIT_ASSERT_TRUE( dataListener.gotNotification );
+        WAIT_ASSERT_EQ( dataListener.artifact.path, config.temporaryCacheLocation + "Image2.png" );
         // Verify that  what we send on DDS is exactly what we received i.e the same PNG file.
         ASSERT_TRUE(
             areIdentical( std::string( currentDir ) + "/CameraSubscriberTestPNG.png", dataListener.artifact.path ) );

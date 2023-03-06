@@ -6,7 +6,7 @@ Wants=network-online.target setup-socketcan.service
 [Service]
 Restart=always
 RestartSec=1
-ExecStart=/usr/bin/aws-iot-fleetwise-edge /etc/aws-iot-fleetwise/config-%i.json
+ExecStart=/usr/bin/run-fwe.sh %i
 
 [Install]
 WantedBy=multi-user.target

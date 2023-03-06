@@ -10,15 +10,6 @@
 #include <functional>
 #include <string>
 
-namespace Color
-{
-static const std::string red{ "\x1b[31m" };
-static const std::string yellow{ "\x1b[33m" };
-static const std::string blue{ "\x1b[34m" };
-static const std::string normal;
-static const std::string reset{ "\x1b[0m" };
-} // namespace Color
-
 namespace Aws
 {
 namespace IoTFleetWise
@@ -43,12 +34,19 @@ public:
 
     /**
      * @brief Logs a log message to the standard output. Includes current Thread ID and timestamp.
-     *        The log message has this structure : [Thread : ID] [Time] [Level] [function]: [Message]
+     *        The log message has this structure : [Thread : ID] [Time] [Level] [filename:lineNumber] [function]:
+     * [Message]
      * @param level log level
+     * @param filename file that emitted the log
+     * @param lineNumber line number
      * @param function calling function
      * @param logEntry actual message
      */
-    void logMessage( LogLevel level, const std::string &function, const std::string &logEntry ) override;
+    void logMessage( LogLevel level,
+                     const std::string &filename,
+                     const uint32_t lineNumber,
+                     const std::string &function,
+                     const std::string &logEntry ) override;
 
 private:
     /**

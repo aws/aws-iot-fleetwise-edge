@@ -1,14 +1,32 @@
 # Change Log
 
-## future release (TBD)
+## v1.0.4 (2023-03-02)
 
 Bugfixes:
 
 - Fix OBD timers not being reset. If the decoder manifest is empty or DTCs are not collected the OBD
   PID or DTC timers were not reset, causing a 100% CPU and log spam with the following message
   `[WARN ] [OBDOverCANModule::doWork]: [Request time overdue by -X ms]`.
+- Support OBD2 PIDs ECU response in different order than requested. Also accept ECU response if not
+  all requested PIDs are answered.
+- Unsubscribe and disconnect from MQTT on shutdown: previously a message arriving during shutdown
+  could cause a segmentation fault.
 
-## v1.0.3 (Jan 9, 2023)
+Improvements:
+
+- Update to Ubuntu 20.04 for the development environment.
+- Add flake8 checking of Python scripts.
+- Improve GitHub CI caching.
+- Improve MISRA C++ 2008, and AUTOSAR C++ compliance.
+- Improve logging: macros used to automatically add file, line number and function.
+- Improve unit test stability, by replacing sleep statements with 'wait until' loops.
+- Removed redundant JSON output code from `DataCollection*` files.
+
+Work in Progress:
+
+- Support for signal datatypes other than `double`, including `uint64_t` and `int64_t`.
+
+## v1.0.3 (2023-01-09)
 
 Features:
 
@@ -36,7 +54,7 @@ Improvements:
 - Improve quick start guide and demo script.
 - Clarify the meaning of the `startBit`.
 
-## v1.0.2 (Nov 28, 2022)
+## v1.0.2 (2022-11-28)
 
 Bugfixes:
 
@@ -58,7 +76,7 @@ Improvements:
   script.
 - Improve CERT-CPP compliance.
 
-## v1.0.1 (Nov 3, 2022)
+## v1.0.1 (2022-11-03)
 
 License Update:
 
@@ -93,7 +111,7 @@ Improvements:
 - Added an extra attribute, so that users can search vehicle in the FleetWise console
 - Added two extra steps for quick demo: suspending campaigns and resuming campaigns
 
-## v1.0.0 (Sept 27, 2022)
+## v1.0.0 (2022-09-27)
 
 Bugfixes:
 
@@ -113,7 +131,7 @@ Improvements:
 - Update FleetWise CLI Model to GA release version.
 - Update Customer Demo to remove service-linked role creation for FleetWise Account Registration.
 
-## v0.1.4 (Aug 29, 2022)
+## v0.1.4 (2022-08-29)
 
 Bugfixes:
 
@@ -130,7 +148,7 @@ Improvements:
 - OBDDataDecoder will only decode the payload with the PIDs that previously requested.
 - Improve OBD logging to log CAN ISOTP raw bytes for better debugging
 
-## v0.1.3 (Aug 3, 2022)
+## v0.1.3 (2022-08-03)
 
 Customer Demo:
 
@@ -162,7 +180,7 @@ Improvements:
 - Refactored Vehicle Network module to improve extensibility for other network types
 - Improvement to cansim to better handle ISO-TP error.
 
-## v0.1.2 (February 24, 2022)
+## v0.1.2 (2022-02-24)
 
 Features:
 
@@ -185,7 +203,7 @@ Bugfixes/Improvements:
   - CloudFormation template `fwdemo.yml` updated to pull source from GitHub instead of S3.
   - Developer guide converted to Markdown.
 
-## v0.1.1 (January 25, 2022)
+## v0.1.1 (2022-01-25)
 
 Features:
 
@@ -213,7 +231,7 @@ Bugfixes/Improvements:
       becoming unavailable after system upgrade of EC2 instance.
     - Edge agent now compiled and run on the same EC2 instance, rather than using CodePipeline.
 
-## v0.1.0 (November 29, 2021)
+## v0.1.0 (2021-11-29)
 
 Features:
 

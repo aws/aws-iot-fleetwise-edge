@@ -4,6 +4,7 @@
 // Includes
 #include "dds/CameraDataPublisher.h"
 #include "ClockHandler.h"
+#include "LoggingModule.h"
 #include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.h>
 #include <fastrtps/transport/UDPv4TransportDescriptor.h>
 #include <iostream>
@@ -28,7 +29,7 @@ CameraDataPublisher::~CameraDataPublisher()
         stop();
     }
 
-    // Clean up the ressources
+    // Clean up the resources
     if ( mDDSWriter != nullptr )
     {
         mDDSPublisher->delete_datawriter( mDDSWriter );
@@ -75,7 +76,7 @@ CameraDataPublisher::init( const DDSDataSourceConfig &dataSourceConfig )
     }
     else if ( dataSourceConfig.transportType == DDSTransportType::TCP )
     {
-        mLogger.trace( "CameraDataPublisher::init", "TCP Transport is NOT yet supported" );
+        FWE_LOG_TRACE( "TCP Transport is NOT yet supported" );
         return false;
     }
     // Create the DDS participant
@@ -121,11 +122,11 @@ CameraDataPublisher::start()
     mShouldStop.store( false );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "CameraDataPublisher::start", "Thread failed to start" );
+        FWE_LOG_TRACE( "Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "CameraDataPublisher::start", "Thread started" );
+        FWE_LOG_TRACE( "Thread started" );
         mThread.setThreadName( "fwVNDDSCamPub" + std::to_string( mID ) );
     }
     return mThread.isActive() && mThread.isValid();
@@ -139,7 +140,7 @@ CameraDataPublisher::stop()
     mWait.notify();
     mThread.release();
     mShouldStop.store( false, std::memory_order_relaxed );
-    mLogger.trace( "CameraDataPublisher::stop", "Thread stopped" );
+    FWE_LOG_TRACE( "Thread stopped" );
     return !mThread.isActive();
 }
 
@@ -166,7 +167,7 @@ CameraDataPublisher::doWork( void *data )
         {
             publisher->mDDSWriter->write( &publisher->mRequest );
             publisher->mRequestCompleted.store( true );
-            publisher->mLogger.trace( "CameraDataPublisher::doWork", "Data request send to the remote node" );
+            FWE_LOG_TRACE( "Data request send to the remote node" );
         }
     }
 }
@@ -198,7 +199,7 @@ CameraDataPublisher::on_publication_matched( DataWriter *writer, const Publicati
     if ( info.current_count_change == 1 )
     {
         mIsAlive.store( true, std::memory_order_relaxed );
-        mLogger.trace( "CameraDataPublisher::on_publication_matched", "A subscriber is available" );
+        FWE_LOG_TRACE( "A subscriber is available" );
     }
     else if ( info.current_count_change == -1 )
     {
@@ -219,7 +220,7 @@ CameraDataPublisher::publishDataRequest( const DDSDataRequest &dataRequest )
         mRequestCompleted.store( false );
     }
 
-    mLogger.trace( "CameraDataPublisher::publishDataRequest", "Request queued for sending" );
+    FWE_LOG_TRACE( "Request queued for sending" );
     mWait.notify();
 }
 

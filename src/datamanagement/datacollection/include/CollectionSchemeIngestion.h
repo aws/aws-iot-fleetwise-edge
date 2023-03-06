@@ -5,7 +5,6 @@
 
 #include "CollectionInspectionAPITypes.h"
 #include "ICollectionScheme.h"
-#include "LoggingModule.h"
 #include <unordered_map>
 
 namespace Aws
@@ -113,7 +112,7 @@ private:
      * @brief Function used to Flatten the Abstract Syntax Tree (AST)
      */
     ExpressionNode *serializeNode( const CollectionSchemesMsg::ConditionNode &node,
-                                   uint32_t &nextIndex,
+                                   std::size_t &nextIndex,
                                    const int depth );
 
     /**
@@ -129,18 +128,13 @@ private:
     /**
      * @brief  Private Local Function used by the serializeNode Function to return the used Function Type
      */
-    WindowFunction convertFunctionType(
+    static WindowFunction convertFunctionType(
         CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType function );
 
     /**
      * @brief Private Local Function used by the serializeNode Function to return the used Operator Type
      */
-    ExpressionNodeType convertOperatorType( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator op );
-
-    /**
-     * @brief Logging module used to output to logs
-     */
-    LoggingModule mLogger;
+    static ExpressionNodeType convertOperatorType( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator op );
 };
 } // namespace DataManagement
 } // namespace IoTFleetWise

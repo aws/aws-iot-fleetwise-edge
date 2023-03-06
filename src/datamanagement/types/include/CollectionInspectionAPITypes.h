@@ -84,6 +84,7 @@ struct InspectionMatrixSignalCollectionInfo
     bool isConditionOnlySignal;       /**< Should the collected signals be sent to cloud or are the number
                                        * of samples in the buffer only necessary for condition evaluation
                                        */
+    SignalType signalType{ SignalType::DOUBLE };
 };
 
 struct InspectionMatrixCanFrameCollectionInfo
@@ -126,12 +127,12 @@ struct CollectedCanRawFrame
     CollectedCanRawFrame() = default;
     CollectedCanRawFrame( CANRawFrameID frameIDIn,
                           CANChannelNumericID channelIdIn,
-                          Timestamp receiveTimeIn,
+                          Timestamp receiveTime,
                           std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> &dataIn,
                           uint8_t sizeIn )
         : frameID( frameIDIn )
         , channelId( channelIdIn )
-        , receiveTime( receiveTimeIn )
+        , receiveTime( receiveTime )
         , data( dataIn )
         , size( sizeIn )
     {
@@ -143,26 +144,212 @@ struct CollectedCanRawFrame
     uint8_t size{ 0 };
 };
 
-struct CollectedSignal
-{
-    CollectedSignal() = default;
-
-    CollectedSignal( SignalID signalIDIn, Timestamp receiveTimeIn, double valueIn )
-        : signalID( signalIDIn )
-        , receiveTime( receiveTimeIn )
-        , value( valueIn )
+union SignalValue {
+    int64_t int64Val;
+    float floatVal;
+    double doubleVal;
+    bool boolVal;
+    uint8_t uint8Val;
+    int8_t int8Val;
+    uint16_t uint16Val;
+    int16_t int16Val;
+    uint32_t uint32Val;
+    int32_t int32Val;
+    uint64_t uint64Val;
+    SignalValue &
+    operator=( const uint8_t value )
     {
+        uint8Val = value;
+        return *this;
     }
 
+    SignalValue &
+    operator=( const uint16_t value )
+    {
+        uint16Val = value;
+        return *this;
+    }
+
+    SignalValue &
+    operator=( const uint32_t value )
+    {
+        uint32Val = value;
+        return *this;
+    }
+
+    SignalValue &
+    operator=( const uint64_t value )
+    {
+        uint64Val = value;
+        return *this;
+    }
+
+    SignalValue &
+    operator=( const int8_t value )
+    {
+        int8Val = value;
+        return *this;
+    }
+
+    SignalValue &
+    operator=( const int16_t value )
+    {
+        int16Val = value;
+        return *this;
+    }
+    SignalValue &
+    operator=( const int32_t value )
+    {
+        int32Val = value;
+        return *this;
+    }
+    SignalValue &
+    operator=( const int64_t value )
+    {
+        int64Val = value;
+        return *this;
+    }
+
+    SignalValue &
+    operator=( const float value )
+    {
+        floatVal = value;
+        return *this;
+    }
+
+    SignalValue &
+    operator=( const double value )
+    {
+        doubleVal = value;
+        return *this;
+    }
+    SignalValue &
+    operator=( const bool value )
+    {
+        boolVal = value;
+        return *this;
+    }
+};
+
+struct SignalValueWrapper
+{
+    SignalValue value{ 0 };
+    SignalType type{ SignalType::DOUBLE };
+
+    SignalValueWrapper() = default;
+    ~SignalValueWrapper() = default;
+    SignalValueWrapper( const SignalValueWrapper & ) = default;
+    SignalValueWrapper &operator=( const SignalValueWrapper & ) = default;
+    SignalValueWrapper( SignalValueWrapper && ) = default;
+    SignalValueWrapper &operator=( SignalValueWrapper && ) = default;
+
+    template <typename T>
+    SignalValueWrapper( T sigValue, SignalType sigType )
+    {
+        setVal<T>( sigValue, sigType );
+    }
+
+    // For Backward Compatibility
+    SignalValueWrapper &
+    operator=( const double sigValue )
+    {
+        value = sigValue;
+        type = SignalType::DOUBLE;
+        return *this;
+    }
+
+    template <typename T>
+    void
+    setVal( const T sigValue, SignalType sigType )
+    {
+        value = sigValue;
+        type = sigType;
+    }
+
+    SignalType
+    getType() const
+    {
+        return type;
+    }
+};
+
+struct CollectedSignal
+{
     SignalID signalID{ INVALID_SIGNAL_ID };
     Timestamp receiveTime{ 0 };
-    double value{ 0.0 };
+    SignalValueWrapper value;
+
+    CollectedSignal() = default;
+
+    // Backward Compatibility
+    template <typename T>
+    CollectedSignal( SignalID signalIDIn, Timestamp receiveTime, T sigValue )
+        : signalID( signalIDIn )
+        , receiveTime( receiveTime )
+    {
+        value.setVal<double>( static_cast<double>( sigValue ), SignalType::DOUBLE );
+    }
+
+    template <typename T>
+    CollectedSignal( SignalID signalIDIn, Timestamp receiveTime, T sigValue, SignalType sigType )
+        : signalID( signalIDIn )
+        , receiveTime( receiveTime )
+    {
+        switch ( sigType )
+        {
+        case SignalType::UINT8:
+            value.setVal<uint8_t>( static_cast<uint8_t>( sigValue ), sigType );
+            break;
+        case SignalType::INT8:
+            value.setVal<int8_t>( static_cast<int8_t>( sigValue ), sigType );
+            break;
+        case SignalType::UINT16:
+            value.setVal<uint16_t>( static_cast<uint16_t>( sigValue ), sigType );
+            break;
+        case SignalType::INT16:
+            value.setVal<int16_t>( static_cast<int16_t>( sigValue ), sigType );
+            break;
+        case SignalType::UINT32:
+            value.setVal<uint32_t>( static_cast<uint32_t>( sigValue ), sigType );
+            break;
+        case SignalType::INT32:
+            value.setVal<int32_t>( static_cast<int32_t>( sigValue ), sigType );
+            break;
+        case SignalType::UINT64:
+            value.setVal<uint64_t>( static_cast<uint64_t>( sigValue ), sigType );
+            break;
+        case SignalType::INT64:
+            value.setVal<int64_t>( static_cast<int64_t>( sigValue ), sigType );
+            break;
+        case SignalType::FLOAT:
+            value.setVal<float>( static_cast<float>( sigValue ), sigType );
+            break;
+        case SignalType::DOUBLE:
+            value.setVal<double>( static_cast<double>( sigValue ), sigType );
+            break;
+        case SignalType::BOOLEAN:
+            value.setVal<bool>( static_cast<bool>( sigValue ), sigType );
+            break;
+        }
+    }
+
+    SignalType
+    getType() const
+    {
+        return value.getType();
+    }
+
+    SignalValueWrapper
+    getValue() const
+    {
+        return value;
+    }
 };
 
 using SignalBuffer =
-    boost::lockfree::queue<CollectedSignal>; /**<  multi NetworkChannel Consumers fill this queue and only one instance
-                                                of the Inspection and Collection Engine consumes it. It is used for Can
-                                                and OBD based signals */
+    boost::lockfree::queue<CollectedSignal>; /**<  multi NetworkChannel Consumers fill this queue and only one
+                                                instance of the Inspection and Collection Engine consumes it. It is used
+                                                for Can and OBD based signals */
 using CANBuffer =
     boost::lockfree::queue<CollectedCanRawFrame>; /**<  contains only raw can messages which at least one
                                                      collectionScheme needs to publish in a raw format. multi

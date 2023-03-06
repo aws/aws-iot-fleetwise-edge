@@ -61,10 +61,16 @@ public:
      * Can be called from multiple threads.
      *
      * @param level the log level used to decide if log entry should be uploaded
+     * @param filename the name of the file which emitted the log message
+     * @param lineNumber line number
      * @param function the name of the function which emitted the log message
      * @param logEntry the actual log message
      */
-    void logMessage( LogLevel level, const std::string &function, const std::string &logEntry ) override;
+    void logMessage( LogLevel level,
+                     const std::string &filename,
+                     const uint32_t lineNumber,
+                     const std::string &function,
+                     const std::string &logEntry ) override;
 
     /**
      * @brief implements IMetricsReceiver and uploads metrics over MQTT
@@ -131,7 +137,6 @@ private:
     std::shared_ptr<ISender> fLogSender;
     std::mutex fThreadMutex;
     std::mutex loggingMutex;
-    LoggingModule fLogger;
     Signal fWait;
     Json::Value fMetricsRoot;
     Json::Value fLogRoot;

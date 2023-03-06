@@ -4,6 +4,7 @@
 #include "Schema.h"
 #include "AwsIotChannel.h"
 #include "AwsIotConnectivityModule.h"
+
 #include "ClockHandler.h"
 #include "CollectionSchemeIngestion.h"
 #include "CollectionSchemeIngestionList.h"
@@ -44,10 +45,10 @@ public:
     }
 
     ConnectivityError
-    send( const std::uint8_t *buf,
-          size_t size,
-          struct Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams collectionSchemeParams =
-              CollectionSchemeParams() ) override
+    sendBuffer( const std::uint8_t *buf,
+                size_t size,
+                struct Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams collectionSchemeParams =
+                    CollectionSchemeParams() ) override
     {
         static_cast<void>( collectionSchemeParams ); // Currently not implemented, hence unused
 
@@ -59,7 +60,7 @@ public:
     }
 };
 
-TEST( CollectionSchemeIgestionTest, CollectionSchemeIgestionClass )
+TEST( CollectionSchemeIngestionTest, CollectionSchemeIngestionClass )
 {
     // Create a dummy AwsIotConnectivityModule object so that we can create dummy IReceiver objects to pass to the
     // constructor. Note that the MQTT callback aspect of CollectionSchemeProtoBuilder will not be used in this test.
@@ -120,7 +121,7 @@ public:
     }
 };
 
-TEST( CollectionSchemeIgestionTest, Checkins )
+TEST( CollectionSchemeIngestionTest, Checkins )
 {
     // Create a dummy AwsIotConnectivityModule object so that we can create dummy IReceiver objects
     auto awsIotModule = std::make_shared<AwsIotConnectivityModule>();

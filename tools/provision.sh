@@ -14,30 +14,41 @@ CERT_OUT_FILE="certificate.pem"
 PRIVATE_KEY_OUT_FILE="private-key.key"
 ENDPOINT_URL_OUT_FILE=""
 VEHICLE_NAME_OUT_FILE=""
+ONLY_CLEAN_UP=false
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case $1 in
         --vehicle-name)
             VEHICLE_NAME=$2
+            shift
             ;;
         --certificate-pem-outfile)
             CERT_OUT_FILE=$2
+            shift
             ;;
         --private-key-outfile)
             PRIVATE_KEY_OUT_FILE=$2
+            shift
             ;;
         --endpoint-url-outfile)
             ENDPOINT_URL_OUT_FILE=$2
+            shift
             ;;
         --vehicle-name-outfile)
             VEHICLE_NAME_OUT_FILE=$2
+            shift
             ;;
         --endpoint-url)
             ENDPOINT_URL=$2
+            shift
             ;;
         --region)
             REGION=$2
+            shift
+            ;;
+        --only-clean-up)
+            ONLY_CLEAN_UP=true
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
@@ -48,6 +59,7 @@ parse_args() {
             echo "  --vehicle-name-outfile <FILENAME>     Vehicle name output file"
             echo "  --endpoint-url <URL>                  The endpoint URL used for AWS CLI calls"
             echo "  --region                              The region used for AWS CLI calls, default: ${REGION}"
+            echo "  --only-clean-up                       Clean up resources created by previous runs of this script"
             exit 0
             ;;
         esac
@@ -74,6 +86,35 @@ if [ "${VEHICLE_NAME}" == "" ]; then
 fi
 
 NAME="${VEHICLE_NAME}-${TIMESTAMP}"
+
+if [ ${ONLY_CLEAN_UP} == true ]; then
+
+    PRINCIPAL_ARN=$(aws iot list-thing-principals --thing-name ${VEHICLE_NAME} --region ${REGION} | jq -r ".principals[0]")
+    CERTIFICATE_ID=$(echo ${PRINCIPAL_ARN} | cut -d'/' -f2 )
+    POLICY_NAME=$(aws iot list-principal-policies --principal ${PRINCIPAL_ARN} --region ${REGION} | jq -r ".policies[0].policyName")
+
+    RETRY_COUNTER=10
+    while ! aws iot delete-thing --thing-name ${VEHICLE_NAME} --region ${REGION}
+    do
+        # Delete depending resources
+        aws iot detach-thing-principal --thing-name ${VEHICLE_NAME} --principal ${PRINCIPAL_ARN} --region ${REGION} || true
+        aws iot detach-principal-policy --policy-name "${POLICY_NAME}" --principal ${PRINCIPAL_ARN} --region ${REGION} || true
+        aws iot delete-policy --policy-name "${POLICY_NAME}" --region ${REGION} || true
+        aws iot update-certificate --certificate-id ${CERTIFICATE_ID} --new-status INACTIVE --region ${REGION} || true
+        aws iot delete-certificate --certificate-id ${CERTIFICATE_ID} --region ${REGION} || true
+
+        echo "Wait one second before next retry"
+        sleep 1
+        if [ "${RETRY_COUNTER}" -eq "0" ]; then
+            echo "Failed aws iot delete-thing"
+            exit 1
+        fi
+        ((RETRY_COUNTER--))
+    done
+    echo "Successfully deleted iot thing"
+    exit 0
+
+fi
 
 echo -n "Date: "
 date --rfc-3339=seconds

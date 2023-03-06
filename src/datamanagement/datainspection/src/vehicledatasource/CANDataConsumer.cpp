@@ -3,6 +3,7 @@
 
 // Includes
 #include "CANDataConsumer.h"
+#include "LoggingModule.h"
 #include "TraceModule.h"
 #include <boost/lockfree/spsc_queue.hpp>
 #include <linux/can.h>
@@ -31,13 +32,12 @@ CANDataConsumer::init( VehicleDataSourceID canChannelID, SignalBufferPtr signalB
     mCANDecoder = std::make_unique<CANDecoder>();
     if ( signalBufferPtr.get() == nullptr )
     {
-        mLogger.trace( "CANDataConsumer::init", "Init Failed due to bufferPtr as nullptr" );
+        FWE_LOG_TRACE( "Init Failed due to bufferPtr as nullptr" );
         return false;
     }
     else
     {
-        mLogger.trace( "CANDataConsumer::init",
-                       "Init Network channel consumer with id: " + std::to_string( canChannelID ) );
+        FWE_LOG_TRACE( "Init Network channel consumer with id: " + std::to_string( canChannelID ) );
         mDataSourceID = canChannelID;
         mSignalBufferPtr = signalBufferPtr;
     }
@@ -52,8 +52,7 @@ void
 CANDataConsumer::suspendDataConsumption()
 {
     // Go back to sleep
-    mLogger.trace( "CANDataConsumer::suspendDataConsumption",
-                   "Going to sleep until a the resume signal. Consumer: " + std::to_string( mDataSourceID ) );
+    FWE_LOG_TRACE( "Going to sleep until a the resume signal. Consumer : " + std::to_string( mDataSourceID ) );
     mShouldSleep.store( true, std::memory_order_relaxed );
 }
 
@@ -89,9 +88,8 @@ CANDataConsumer::resumeDataConsumption( ConstDecoderDictionaryConstPtr &dictiona
                     canIds += std::to_string( decode.first ) + ", ";
                 }
             }
-            mLogger.trace( "CANDataConsumer::resumeDataConsumption",
-                           "Changing Decoder Dictionary on Consumer: " + std::to_string( mID ) +
-                               " with decoding rules for CAN-IDs: " + canIds );
+            FWE_LOG_TRACE( "Changing Decoder Dictionary on Consumer :" + std::to_string( mID ) +
+                           " with decoding rules for CAN-IDs: " + canIds );
             // Make sure the thread does not sleep anymore
             mShouldSleep.store( false );
             // Wake up the worker thread.
@@ -99,8 +97,7 @@ CANDataConsumer::resumeDataConsumption( ConstDecoderDictionaryConstPtr &dictiona
         }
         else
         {
-            mLogger.error( "CANDataConsumer::resumeDataConsumption",
-                           "Received invalid decoder dictionary: " + std::to_string( mID ) );
+            FWE_LOG_ERROR( "Received invalid decoder dictionary :" + std::to_string( mID ) );
         }
     }
 }
@@ -118,11 +115,11 @@ CANDataConsumer::start()
     mShouldSleep.store( true );
     if ( !mThread.create( doWork, this ) )
     {
-        mLogger.trace( "CANDataConsumer::start", "Thread failed to start" );
+        FWE_LOG_TRACE( "Thread failed to start" );
     }
     else
     {
-        mLogger.trace( "CANDataConsumer::start", "Thread started" );
+        FWE_LOG_TRACE( "Thread started" );
         mThread.setThreadName( "fwDIConsumer" + std::to_string( mID ) );
     }
 
@@ -137,7 +134,7 @@ CANDataConsumer::stop()
     mWait.notify();
     mThread.release();
     mShouldStop.store( false, std::memory_order_relaxed );
-    mLogger.trace( "CANDataConsumer::stop", "Thread stopped" );
+    FWE_LOG_TRACE( "Thread stopped" );
     return !mThread.isActive();
 }
 
@@ -197,10 +194,10 @@ CANDataConsumer::doWork( void *data )
     uint32_t processedFramesCounter = 0;
 
     TraceSection traceSection =
-        ( ( consumer->mDataSourceID + toUType( TraceSection::CAN_DECODER_CYCLE_0 ) <
-            toUType( TraceSection::CAN_DECODER_CYCLE_MAX ) )
+        ( ( consumer->mDataSourceID < static_cast<VehicleDataSourceID>( toUType( TraceSection::CAN_DECODER_CYCLE_19 ) -
+                                                                        toUType( TraceSection::CAN_DECODER_CYCLE_0 ) ) )
               ? static_cast<TraceSection>( consumer->mDataSourceID + toUType( TraceSection::CAN_DECODER_CYCLE_0 ) )
-              : TraceSection::CAN_DECODER_CYCLE_MAX );
+              : TraceSection::CAN_DECODER_CYCLE_19 );
     do
     {
         activations++;
@@ -208,8 +205,7 @@ CANDataConsumer::doWork( void *data )
         {
             // We either just started or there was a decoder manifest update that we can't use.
             // We should sleep
-            consumer->mLogger.trace( "CANDataConsumer::doWork",
-                                     "No valid decoding dictionary available, consumer going to sleep" );
+            FWE_LOG_TRACE( "No valid decoding dictionary available, Consumer going to sleep" );
             // Wait here for the decoder Manifest to come.
             consumer->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
             // At this point, we should be able to see events coming as the channel is also
@@ -231,9 +227,9 @@ CANDataConsumer::doWork( void *data )
         {
             TraceVariable traceQueue = static_cast<TraceVariable>(
                 consumer->mDataSourceID + toUType( TraceVariable::QUEUE_SOCKET_TO_CONSUMER_0 ) );
-            TraceModule::get().setVariable( ( traceQueue < TraceVariable::QUEUE_SOCKET_TO_CONSUMER_MAX )
+            TraceModule::get().setVariable( ( traceQueue < TraceVariable::QUEUE_SOCKET_TO_CONSUMER_19 )
                                                 ? traceQueue
-                                                : TraceVariable::QUEUE_SOCKET_TO_CONSUMER_MAX,
+                                                : TraceVariable::QUEUE_SOCKET_TO_CONSUMER_19,
                                             consumer->mInputBufferPtr->read_available() + 1 );
             CANDecodedMessage decodedMessage;
             decodedMessage.mChannelProtocol = consumer->mDataSourceProtocol;
@@ -323,15 +319,14 @@ CANDataConsumer::doWork( void *data )
                     {
                         TraceModule::get().decrementAtomicVariable(
                             TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
-                        consumer->mLogger.warn( "CANDataConsumer::doWork", "RAW CAN Frame Buffer Full" );
+                        FWE_LOG_WARN( "RAW CAN Frame Buffer Full" );
                     }
                     else
                     {
                         // Enable below logging for debugging
-                        // consumer->mLogger.trace( "CANDataConsumer::doWork",
-                        //                             "Collect RAW CAN Frame ID: " +
-                        //                                 std::to_string( static_cast<uint32_t>(
-                        //                                 messageId ) ) );
+                        // FWE_LOG_TRACE( "CANDataConsumer::doWork",
+                        //               "Collect RAW CAN Frame ID: " +
+                        //                   std::to_string( static_cast<uint32_t>( messageId ) ) );
                     }
                 }
                 // check if we want to decode can frame into signals and collect signals
@@ -350,8 +345,30 @@ CANDataConsumer::doWork( void *data )
                             for ( auto const &signal : decodedMessage.mFrameInfo.mSignals )
                             {
                                 // Create Collected Signal Object
-                                struct CollectedSignal collectedSignal(
-                                    signal.mSignalID, decodedMessage.mReceptionTime, signal.mPhysicalValue );
+                                struct CollectedSignal collectedSignal;
+                                const auto signalType = signal.mSignalType;
+                                switch ( signalType )
+                                {
+                                case SignalType::UINT64:
+                                    collectedSignal = CollectedSignal{ signal.mSignalID,
+                                                                       decodedMessage.mReceptionTime,
+                                                                       signal.mPhysicalValue.signalValue.uint64Val,
+                                                                       signal.mSignalType };
+                                    break;
+                                case SignalType::INT64:
+                                    collectedSignal = CollectedSignal{ signal.mSignalID,
+                                                                       decodedMessage.mReceptionTime,
+                                                                       signal.mPhysicalValue.signalValue.int64Val,
+                                                                       signal.mSignalType };
+                                    break;
+                                default:
+                                    collectedSignal = CollectedSignal{ signal.mSignalID,
+                                                                       decodedMessage.mReceptionTime,
+                                                                       signal.mPhysicalValue.signalValue.doubleVal,
+                                                                       signal.mSignalType };
+                                    break;
+                                }
+
                                 // Push collected signal to the Signal Buffer
                                 TraceModule::get().incrementAtomicVariable(
                                     TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
@@ -359,33 +376,30 @@ CANDataConsumer::doWork( void *data )
                                 {
                                     TraceModule::get().decrementAtomicVariable(
                                         TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-                                    consumer->mLogger.warn( "CANDataConsumer::doWork", "Signal Buffer Full" );
+                                    FWE_LOG_WARN( "Signal Buffer Full" );
                                 }
                                 else
                                 {
                                     // Enable below logging for debugging
-                                    // consumer->mLogger.trace( "CANDataConsumer::doWork",
-                                    //                             "Acquire Signal ID: " +
-                                    //                                 std::to_string( signal.mSignalID )
-                                    //                                 );
+                                    // FWE_LOG_TRACE( "CANDataConsumer::doWork",
+                                    //               "Acquire Signal ID: " + std::to_string( signal.mSignalID ) );
                                 }
                             }
                         }
                         else
                         {
                             // The decoding was not fully successful
-                            consumer->mLogger.warn( "CANDataConsumer::doWork",
-                                                    "CAN Frame " + std::to_string( messageId ) + " decoding failed" );
+                            FWE_LOG_WARN( "CAN Frame " + std::to_string( messageId ) + " decoding failed" );
                         }
                     }
                     else
                     {
                         // The CAN Message format is not valid, report as warning
-                        consumer->mLogger.warn(
-                            "CANDataConsumer::doWork",
+                        FWE_LOG_WARN(
+
                             "CANMessageFormat Invalid for format message id: " + std::to_string( format.mMessageID ) +
-                                " can message id: " + std::to_string( messageId ) +
-                                " on CAN Channel Id: " + std::to_string( consumer->mDataSourceID ) );
+                            " can message id: " + std::to_string( messageId ) +
+                            " on CAN Channel Id: " + std::to_string( consumer->mDataSourceID ) );
                     }
                 }
             }
@@ -406,7 +420,7 @@ CANDataConsumer::doWork( void *data )
                 }
                 logMessage << ". Waiting for some data to come. Idling for :" + std::to_string( consumer->mIdleTime ) +
                                   " ms";
-                consumer->mLogger.trace( "CANDataConsumer::doWork", logMessage.str() );
+                FWE_LOG_TRACE( logMessage.str() );
                 activations = 0;
                 logTimer.reset();
             }

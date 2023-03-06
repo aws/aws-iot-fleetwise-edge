@@ -75,9 +75,9 @@ main( int argc, char *argv[] )
     try
     {
         printVersion();
-        if ( argc != 2 )
+        if ( argc < 2 )
         {
-            std::cout << "error: invalid argument - only a config file is required" << std::endl;
+            std::cout << "error: no config file provided" << std::endl;
             return EXIT_FAILURE;
         }
 

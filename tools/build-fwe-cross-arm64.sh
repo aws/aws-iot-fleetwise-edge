@@ -4,6 +4,8 @@
 
 set -eo pipefail
 
+NATIVE_PREFIX="/usr/local/`gcc -dumpmachine`"
+export PATH=${NATIVE_PREFIX}/bin:${PATH}
 mkdir -p build && cd build
 cmake \
   -DFWE_STATIC_LINK=On \

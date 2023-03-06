@@ -3,6 +3,7 @@
 
 // Includes
 #include "DataCollectionSender.h"
+#include "LoggingModule.h"
 #include <boost/filesystem.hpp>
 #include <snappy.h>
 #include <sstream>
@@ -15,14 +16,10 @@ namespace DataManagement
 {
 
 DataCollectionSender::DataCollectionSender( std::shared_ptr<ISender> sender,
-                                            bool jsonOutputEnabled,
                                             unsigned maxMessageCount,
-                                            CANInterfaceIDTranslator &canIDTranslator,
-                                            std::string persistencyPath )
+                                            CANInterfaceIDTranslator &canIDTranslator )
     : mSender( std::move( sender ) )
-    , mJsonOutputEnabled( jsonOutputEnabled )
     , mProtoWriter( canIDTranslator )
-    , mJsonWriter( std::move( persistencyPath ) )
 {
     mTransmitThreshold = ( maxMessageCount > 0U ) ? maxMessageCount : UINT_MAX;
     mCollectionEventID = 0U;
@@ -33,7 +30,7 @@ DataCollectionSender::send( const TriggeredCollectionSchemeDataPtr triggeredColl
 {
     if ( triggeredCollectionSchemeDataPtr == nullptr )
     {
-        mLogger.warn( "DataCollectionSender::send", "Nothing to send as the input is empty" );
+        FWE_LOG_WARN( "Nothing to send as the input is empty" );
         return;
     }
 
@@ -41,11 +38,6 @@ DataCollectionSender::send( const TriggeredCollectionSchemeDataPtr triggeredColl
     mCollectionEventID = triggeredCollectionSchemeDataPtr->eventID;
 
     setCollectionSchemeParameters( triggeredCollectionSchemeDataPtr );
-
-    if ( mJsonOutputEnabled )
-    {
-        mJsonWriter.setupEvent( triggeredCollectionSchemeDataPtr, mCollectionEventID );
-    }
 
     if ( mSendDestination == SendDestination::MQTT )
     {
@@ -55,10 +47,6 @@ DataCollectionSender::send( const TriggeredCollectionSchemeDataPtr triggeredColl
     // Iterate through all the signals and add to the protobuf
     for ( const auto &signal : triggeredCollectionSchemeDataPtr->signals )
     {
-        if ( mJsonOutputEnabled )
-        {
-            mJsonWriter.append( signal );
-        }
         if ( mSendDestination == SendDestination::MQTT )
         {
             mProtoWriter.append( signal );
@@ -74,10 +62,6 @@ DataCollectionSender::send( const TriggeredCollectionSchemeDataPtr triggeredColl
     // Iterate through all the raw CAN frames and add to the protobuf
     for ( const auto &canFrame : triggeredCollectionSchemeDataPtr->canFrames )
     {
-        if ( mJsonOutputEnabled )
-        {
-            mJsonWriter.append( canFrame );
-        }
         if ( mSendDestination == SendDestination::MQTT )
         {
             mProtoWriter.append( canFrame );
@@ -118,10 +102,6 @@ DataCollectionSender::send( const TriggeredCollectionSchemeDataPtr triggeredColl
     // Add Geohash to the payload
     if ( triggeredCollectionSchemeDataPtr->mGeohashInfo.hasItems() )
     {
-        if ( mJsonOutputEnabled )
-        {
-            mJsonWriter.append( triggeredCollectionSchemeDataPtr->mGeohashInfo );
-        }
         if ( mSendDestination == SendDestination::MQTT )
         {
             mProtoWriter.append( triggeredCollectionSchemeDataPtr->mGeohashInfo );
@@ -134,17 +114,12 @@ DataCollectionSender::send( const TriggeredCollectionSchemeDataPtr triggeredColl
         }
     }
 
-    if ( mJsonOutputEnabled && ( mJsonWriter.getJSONMessageCount() > 0U ) )
-    {
-        const auto result = mJsonWriter.flushToFile();
-    }
     if ( mSendDestination == SendDestination::MQTT )
     {
         // Serialize and transmit any remaining messages
         if ( mProtoWriter.getVehicleDataMsgCount() >= 1U )
         {
-            mLogger.trace( "DataCollectionSender::send",
-                           "The data collection snapshot has been written on disk and is now scheduled for upload to "
+            FWE_LOG_TRACE( "The data collection snapshot has been written on disk and is now scheduled for upload to "
                            "AWS IoT Core" );
             serializeAndTransmit();
         }
@@ -156,8 +131,7 @@ DataCollectionSender::transmit()
 {
     if ( mSendDestination != SendDestination::MQTT )
     {
-        mLogger.trace( "DataCollectionSender::transmit",
-                       "Upload destination is not  set to AWS IoT Core. Skipping this request" );
+        FWE_LOG_TRACE( "Upload destination is not  set to AWS IoT Core. Skipping this request" );
         return ConnectivityError::Success;
     }
 
@@ -165,11 +139,10 @@ DataCollectionSender::transmit()
     // compress the data before transmitting if specified in the collectionScheme
     if ( mCollectionSchemeParams.compression )
     {
-        mLogger.trace( "DataCollectionSender::transmit",
-                       "Compress the payload before transmitting since compression flag is true" );
+        FWE_LOG_TRACE( "Compress the payload before transmitting since compression flag is true" );
         if ( snappy::Compress( mProtoOutput.data(), mProtoOutput.size(), &payloadData ) == 0u )
         {
-            mLogger.trace( "DataCollectionSender::transmit", "Error in compressing the payload" );
+            FWE_LOG_TRACE( "Error in compressing the payload" );
             return ConnectivityError::WrongInputData;
         }
     }
@@ -179,18 +152,16 @@ DataCollectionSender::transmit()
         payloadData = mProtoOutput;
     }
 
-    ConnectivityError ret = mSender->send(
+    ConnectivityError ret = mSender->sendBuffer(
         reinterpret_cast<const uint8_t *>( payloadData.data() ), payloadData.size(), mCollectionSchemeParams );
     if ( ret != ConnectivityError::Success )
     {
-        mLogger.error( "DataCollectionSender::transmit",
-                       "Failed to send vehicle data proto with error: " + std::to_string( static_cast<int>( ret ) ) );
+        FWE_LOG_ERROR( "Failed to send vehicle data proto with error: " + std::to_string( static_cast<int>( ret ) ) );
     }
     else
     {
-        mLogger.info( "DataCollectionSender::transmit",
-                      "A Payload of size: " + std::to_string( payloadData.length() ) +
-                          " bytes has been unloaded to AWS IoT Core" );
+        FWE_LOG_INFO( "A Payload of size: " + std::to_string( payloadData.length() ) +
+                      " bytes has been unloaded to AWS IoT Core" );
     }
     return ret;
 }
@@ -200,16 +171,14 @@ DataCollectionSender::transmit( const std::string &payload )
 {
     if ( mSendDestination != SendDestination::MQTT )
     {
-        mLogger.trace( "DataCollectionSender::transmit",
-                       "Upload destination is not  set to AWS IoT Core. Skipping this request" );
+        FWE_LOG_TRACE( "Upload destination is not  set to AWS IoT Core. Skipping this request" );
         return ConnectivityError::WrongInputData;
     }
 
-    auto res = mSender->send( reinterpret_cast<const uint8_t *>( payload.data() ), payload.size() );
+    auto res = mSender->sendBuffer( reinterpret_cast<const uint8_t *>( payload.data() ), payload.size() );
     if ( res != ConnectivityError::Success )
     {
-        mLogger.error( "DataCollectionSender::transmit",
-                       "offboardconnectivity error " + std::to_string( static_cast<int>( res ) ) );
+        FWE_LOG_ERROR( "offboardconnectivity error " + std::to_string( static_cast<int>( res ) ) );
     }
     return res;
 }
@@ -219,15 +188,14 @@ DataCollectionSender::serializeAndTransmit()
 {
     if ( mSendDestination != SendDestination::MQTT )
     {
-        mLogger.trace( "DataCollectionSender::serializeAndTransmit",
-                       "Upload destination is not  set to AWS IoT Core. Skipping this request" );
+        FWE_LOG_TRACE( "Upload destination is not  set to AWS IoT Core. Skipping this request" );
         return;
     }
 
     // Note: a class member is used to store the serialized proto output to avoid heap fragmentation
     if ( !mProtoWriter.serializeVehicleData( &mProtoOutput ) )
     {
-        mLogger.error( "DataCollectionSender::serializeAndTransmit", "serialization failed" );
+        FWE_LOG_ERROR( "serialization failed" );
     }
     else
     {
@@ -235,9 +203,8 @@ DataCollectionSender::serializeAndTransmit()
         auto res = transmit();
         if ( res != ConnectivityError::Success )
         {
-            mLogger.error( "DataCollectionSender::serializeAndTransmit",
-                           "offboardconnectivity error while transmitting data" +
-                               std::to_string( static_cast<int>( res ) ) );
+            FWE_LOG_ERROR( "offboardconnectivity error while transmitting data" +
+                           std::to_string( static_cast<int>( res ) ) );
         }
     }
 }

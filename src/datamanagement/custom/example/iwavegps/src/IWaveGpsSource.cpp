@@ -3,8 +3,8 @@
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
 #include "IWaveGpsSource.h"
+#include "LoggingModule.h"
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <fcntl.h>
 #include <unistd.h>
@@ -15,11 +15,12 @@ namespace IoTFleetWise
 {
 namespace DataManagement
 {
-constexpr const char *IWaveGpsSource::PATH_TO_NMEA;
-constexpr const char *IWaveGpsSource::CAN_CHANNEL_NUMBER;
-constexpr const char *IWaveGpsSource::CAN_RAW_FRAME_ID;
-constexpr const char *IWaveGpsSource::LATITUDE_START_BIT;
-constexpr const char *IWaveGpsSource::LONGITUDE_START_BIT;
+// NOLINT below due to C++17 warning of redundant declarations that are required to maintain C++14 compatibility
+constexpr const char *IWaveGpsSource::PATH_TO_NMEA;        // NOLINT
+constexpr const char *IWaveGpsSource::CAN_CHANNEL_NUMBER;  // NOLINT
+constexpr const char *IWaveGpsSource::CAN_RAW_FRAME_ID;    // NOLINT
+constexpr const char *IWaveGpsSource::LATITUDE_START_BIT;  // NOLINT
+constexpr const char *IWaveGpsSource::LONGITUDE_START_BIT; // NOLINT
 IWaveGpsSource::IWaveGpsSource( SignalBufferPtr signalBufferPtr )
 {
     mSignalBufferPtr = signalBufferPtr;
@@ -56,14 +57,13 @@ IWaveGpsSource::getThreadName()
 void
 IWaveGpsSource::pollData()
 {
-    char buffer[MAX_BYTES_READ_PER_POLL];
+    char buffer[MAX_BYTES_READ_PER_POLL]{};
 
     // Read from NMEA formatted file
     auto bytes = read( mFileHandle, buffer, MAX_BYTES_READ_PER_POLL - 1 );
-    buffer[MAX_BYTES_READ_PER_POLL - 1] = 0;
     if ( bytes < 0 )
     {
-        mLogger.error( "IWaveGpsSource::pollData", "Error reading from file" );
+        FWE_LOG_ERROR( "Error reading from file" );
         return;
     }
 
@@ -108,10 +108,9 @@ IWaveGpsSource::pollData()
     }
     if ( mCyclicLoggingTimer.getElapsedMs().count() > CYCLIC_LOG_PERIOD_MS )
     {
-        mLogger.trace( "IWaveGpsSource::pollData",
-                       "In the last " + std::to_string( CYCLIC_LOG_PERIOD_MS ) + " millisecond found " +
-                           std::to_string( mGpggaLineCounter ) + " lines with $GPGGA and extracted " +
-                           std::to_string( mValidCoordinateCounter ) + " valid coordinates from it" );
+        FWE_LOG_TRACE( "In the last " + std::to_string( CYCLIC_LOG_PERIOD_MS ) + " millisecond found " +
+                       std::to_string( mGpggaLineCounter ) + " lines with $GPGGA and extracted " +
+                       std::to_string( mValidCoordinateCounter ) + " valid coordinates from it" );
         mCyclicLoggingTimer.reset();
         mGpggaLineCounter = 0;
         mValidCoordinateCounter = 0;
@@ -121,12 +120,12 @@ IWaveGpsSource::pollData()
 bool
 IWaveGpsSource::validLatitude( double latitude )
 {
-    return latitude >= -90.0 && latitude <= 90.0;
+    return ( latitude >= -90.0 ) && ( latitude <= 90.0 );
 }
 bool
 IWaveGpsSource::validLongitude( double longitude )
 {
-    return longitude >= -180.0 && longitude <= 180.0;
+    return ( longitude >= -180.0 ) && ( longitude <= 180.0 );
 }
 
 double
@@ -208,15 +207,15 @@ IWaveGpsSource::init( const std::vector<VehicleDataSourceConfig> &sourceConfigs 
     uint32_t latitudeStartBit = 0;
     uint32_t longitudeStartBit = 0;
 
-    if ( sourceConfigs.size() > 1 || sourceConfigs.empty() )
+    if ( ( sourceConfigs.size() > 1 ) || sourceConfigs.empty() )
     {
-        mLogger.error( "IWaveGpsSource::init", "Only one source config is supported" );
+        FWE_LOG_ERROR( "Only one source config is supported" );
         return false;
     }
     auto settingsIterator = sourceConfigs[0].transportProperties.find( std::string( PATH_TO_NMEA ) );
     if ( settingsIterator == sourceConfigs[0].transportProperties.end() )
     {
-        mLogger.error( "IWaveGpsSource::init", "Could not find nmeaFilePath in the config" );
+        FWE_LOG_ERROR( "Could not find nmeaFilePath in the config" );
         return false;
     }
     else
@@ -246,7 +245,7 @@ IWaveGpsSource::extractIntegerFromConfig( const std::vector<VehicleDataSourceCon
     auto settingsIterator = sourceConfigs[0].transportProperties.find( std::string( key ) );
     if ( settingsIterator == sourceConfigs[0].transportProperties.end() )
     {
-        mLogger.error( "IWaveGpsSource::init", "Could not find " + key + " in the config" );
+        FWE_LOG_ERROR( "Could not find " + key + " in the config" );
         return false;
     }
     else
@@ -257,8 +256,7 @@ IWaveGpsSource::extractIntegerFromConfig( const std::vector<VehicleDataSourceCon
         }
         catch ( const std::exception &e )
         {
-            mLogger.error( "IWaveGpsSource::init",
-                           "Could not cast the " + key + ", invalid input: " + std::string( e.what() ) );
+            FWE_LOG_ERROR( "Could not cast the " + key + ", invalid input: " + std::string( e.what() ) );
             return false;
         }
     }
@@ -270,7 +268,7 @@ IWaveGpsSource::connect()
     mFileHandle = open( mPathToNmeaSource.c_str(), O_RDONLY | O_NOCTTY );
     if ( mFileHandle == -1 )
     {
-        mLogger.error( "IWaveGpsSource::init", "Could not open GPS NMEA file:" + mPathToNmeaSource );
+        FWE_LOG_ERROR( "Could not open GPS NMEA file:" + mPathToNmeaSource );
         return false;
     }
     return true;

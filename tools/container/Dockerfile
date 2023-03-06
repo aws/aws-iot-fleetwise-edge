@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-FROM public.ecr.aws/ubuntu/ubuntu:18.04
+FROM public.ecr.aws/ubuntu/ubuntu:20.04
 
 # Provided by buildx, e.g.: 'linux/amd64', 'linux/arm64', etc.:
 ARG TARGETPLATFORM
