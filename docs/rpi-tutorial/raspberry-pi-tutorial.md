@@ -119,20 +119,22 @@ processor present in the Raspberry Pi.
    ```
 
 1. Install the AWS IoT FleetWise Edge Agent dependencies. The command below installs the following
-   Ubuntu packages for cross-compiling the Edge Agent for ARM 64-bit:
+   Ubuntu packages for compiling the Edge Agent for ARM 64-bit:
 
    `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`.
 
-   Additionally, it installs the following: `jsoncpp protobuf aws-sdk-cpp`.
+   Additionally, it installs the following: `jsoncpp protobuf aws-sdk-cpp`. (If you are using a
+   local x86_64 development machine, use the `install-deps-cross-arm64.sh` script instead.)
 
    ```bash
-   sudo -H ./tools/install-deps-cross-arm64.sh
+   sudo -H ./tools/install-deps-native.sh
    ```
 
-1. To compile AWS IoT FleetWise Edge Agent software, run the following command:
+1. To compile AWS IoT FleetWise Edge Agent software, run the following command. (If you are using a
+   local x86_64 development machine, use the `build-fwe-cross-arm64.sh` script instead.)
 
    ```bash
-   ./tools/build-fwe-cross-arm64.sh
+   ./tools/build-fwe-native.sh
    ```
 
 ## Step 4: Provision AWS IoT credentials
