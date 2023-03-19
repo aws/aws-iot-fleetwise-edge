@@ -4,11 +4,13 @@
 
 set -eo pipefail
 
-repo init -b release/bsp28.0 -u https://source.codeaurora.org/external/autobsps32/auto_yocto_bsp
-repo sync
+# 'repo' requires that Git is configured, otherwise it interactively prompts for the configuration:
+git config user.name > /dev/null || git config --global user.name "ubuntu"
+git config user.email > /dev/null || git config --global user.email "ubuntu@`hostname`"
+git config color.ui || git config --global color.ui false
 
-git clone git://git.openembedded.org/meta-python2 sources/meta-python2
-cd sources/meta-python2 && git checkout c43c29e57f16af4e77441b201855321fbd546661 && cd ../..
+repo init -b release/bsp35.0 -u https://github.com/nxp-auto-linux/auto_yocto_bsp.git
+repo sync
 
 SCRIPTPATH=`dirname $0`
 cp -r ${SCRIPTPATH}/yocto/* .

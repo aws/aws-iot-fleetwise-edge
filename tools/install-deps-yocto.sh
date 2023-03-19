@@ -20,7 +20,3 @@ fi
 # Google 'repo' tool, see https://source.android.com/setup/develop/repo
 curl https://storage.googleapis.com/git-repo-downloads/repo > /usr/local/bin/repo
 chmod +x /usr/local/bin/repo
-# 'repo' requires that Git is configured, otherwise it interactively prompts for the configuration:
-git config user.name > /dev/null || git config --global user.name "ubuntu"
-git config user.email > /dev/null || git config --global user.email "ubuntu@`hostname`"
-git config color.ui || git config --global color.ui false
