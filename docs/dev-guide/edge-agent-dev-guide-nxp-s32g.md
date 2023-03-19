@@ -27,7 +27,7 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an NXP S3
 ## Build an SD-Card Image
 
 The following instructions use the development machine to build an SD-card image based on the Ubuntu
-variant of the NXP Linux BSP version 28.0, with the addition of the `can-isotp` kernel module
+variant of the NXP Linux BSP version 35.0, with the addition of the `can-isotp` kernel module
 required by AWS IoT FleetWise Edge Agent, an updated version of the `canutils` package and a
 `systemd` service called `setup-socketcan` for bringing up the CAN interfaces at startup.
 
