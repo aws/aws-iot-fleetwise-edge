@@ -2,26 +2,28 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import re
 import sys
 
 # argv[1] should hold the build dir path
 cmake_build_dir = sys.argv[1]
-lines = []
+
+compile_commands = []
 
 with open(cmake_build_dir + "/compile_commands.json") as f:
-    lines = f.readlines()
+    compile_commands = json.load(f)
 f.close()
 
-index = 0
-while index < len(lines):
-    x = re.search(r'"command": ".+iotcpp\/test\/include.+', lines[index])
-    if x:
-        del lines[index - 2 : index + 3]  # remove a json block
-        index = index - 3
-    index += 1
+output_compile_commands = []
+
+for block in compile_commands:
+    if "command" in block:
+        if re.search(r".+iotcpp\/test\/include.+", block["command"]):
+            continue
+    output_compile_commands.append(block)
 
 # re-write the db file for clang-tidy
 f = open(cmake_build_dir + "/Testing/Temporary/compile_commands.json", "w")
-f.writelines(lines)
+f.writelines(json.dumps(output_compile_commands, indent=2))
 f.close()
