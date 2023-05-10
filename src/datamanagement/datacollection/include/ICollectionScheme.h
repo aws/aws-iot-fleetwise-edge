@@ -30,11 +30,11 @@ enum class ImageCollectionType
 struct ImageCollectionInfo
 {
     ImageCollectionInfo() = default;
-    ImageCollectionInfo( ImageDeviceID id, uint32_t format, ImageCollectionType cType, uint32_t beforeDurationMs )
+    ImageCollectionInfo( ImageDeviceID id, uint32_t format, ImageCollectionType cType, uint32_t beforeDurationMsIn )
         : deviceID( id )
         , imageFormat( format )
         , collectionType( cType )
-        , beforeDurationMs( beforeDurationMs )
+        , beforeDurationMs( beforeDurationMsIn )
     {
     }
     ImageDeviceID deviceID{ 0 }; // Unique Identifier of the image sensor in the system
@@ -150,7 +150,8 @@ struct GeohashFunction
         DECIMAL_DEGREE = 0,
         MICROARCSECOND,
         MILLIARCSECOND,
-        ARCSECOND
+        ARCSECOND,
+        MAX
     };
     SignalID latitudeSignalID{ 0 };
     SignalID longitudeSignalID{ 0 };

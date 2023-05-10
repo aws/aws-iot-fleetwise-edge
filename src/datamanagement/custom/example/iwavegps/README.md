@@ -24,8 +24,8 @@ change the parameters without recompiling AWS IoT FleetWise Edge:
     "nmeaFilePath": "/dev/ttyUSB1",
     "canChannel" : "IWAVE-GPS-CAN",
     "canFrameId" : "1",
-    "longitudeStartBit" : "32",
-    "latitudeStartBit" : "0"
+    "longitudeStartBit" : "0",
+    "latitudeStartBit" : "32"
 }
 ```
 

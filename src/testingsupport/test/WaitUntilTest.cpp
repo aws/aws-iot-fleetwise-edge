@@ -13,13 +13,17 @@ TEST( TimerTest, waitUntilTest )
 {
     // A determent function with negative return, it will retry for `WAIT_TIME_OUT`
     auto startTime = std::chrono::steady_clock::now();
-    waitUntil( [] { return 1 == 2; } );
+    waitUntil( [] {
+        return 1 == 2;
+    } );
     auto elapsedTime = std::chrono::steady_clock::now() - startTime;
     ASSERT_LT( WAIT_TIME_OUT, elapsedTime );
 
     // A determent function with positive return, it won't retry or wait for `WAIT_TIME_OUT`
     startTime = std::chrono::steady_clock::now();
-    waitUntil( [] { return 1 == 1; } );
+    waitUntil( [] {
+        return 1 == 1;
+    } );
     elapsedTime = std::chrono::steady_clock::now() - startTime;
     ASSERT_GT( WAIT_TIME_OUT, elapsedTime );
 }

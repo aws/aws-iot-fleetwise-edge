@@ -384,7 +384,7 @@ OBDOverCANModule::autoDetectECUs( bool isExtendedID, std::vector<uint32_t> &canI
     {
         if ( broadcastTimer.getElapsedMs().count() > MAX_WAITING_MS )
         {
-            FWE_LOG_TRACE( "Time elapsed:" + std::to_string( broadcastTimer.getElapsedMs().count() ) +
+            FWE_LOG_TRACE( "Time elapsed: " + std::to_string( broadcastTimer.getElapsedMs().count() ) +
                            ", time to stop ECUs' detection" );
             break;
         }
@@ -421,7 +421,7 @@ OBDOverCANModule::autoDetectECUs( bool isExtendedID, std::vector<uint32_t> &canI
             canIDResponses.push_back( frameCANId );
         }
     }
-    FWE_LOG_TRACE( "Detected number of ECUs:" + std::to_string( canIDResponses.size() ) );
+    FWE_LOG_TRACE( "Detected number of ECUs: " + std::to_string( canIDResponses.size() ) );
     for ( std::size_t i = 0; i < canIDResponses.size(); ++i )
     {
         std::stringstream stream_rx;
@@ -565,12 +565,12 @@ OBDOverCANModule::isAlive()
 }
 
 void
-OBDOverCANModule::onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &activeConditions )
+OBDOverCANModule::onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
 {
     // We check here that at least one condition needs DTCs. If yes, we activate that.
-    if ( activeConditions )
+    if ( inspectionMatrix )
     {
-        for ( auto const &condition : activeConditions->conditions )
+        for ( auto const &condition : inspectionMatrix->conditions )
         {
             if ( condition.includeActiveDtcs )
             {
@@ -590,67 +590,65 @@ void
 OBDOverCANModule::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
                                               VehicleDataSourceProtocol networkProtocol )
 {
-    if ( networkProtocol == VehicleDataSourceProtocol::OBD )
+    if ( networkProtocol != VehicleDataSourceProtocol::OBD )
     {
-        std::lock_guard<std::mutex> lock( mDecoderDictMutex );
-        mDecoderDictionaryPtr = std::make_shared<OBDDecoderDictionary>();
-        // Here we up cast the decoder dictionary to CAN Decoder Dictionary to extract can decoder method
-        auto canDecoderDictionaryPtr = std::dynamic_pointer_cast<const CANDecoderDictionary>( dictionary );
-        // As OBD only has one port, we expect the decoder dictionary only has one channel
-        if ( mOBDDataDecoder != nullptr && canDecoderDictionaryPtr != nullptr )
+        return;
+    }
+    std::lock_guard<std::mutex> lock( mDecoderDictMutex );
+    mDecoderDictionaryPtr = std::make_shared<OBDDecoderDictionary>();
+    // Here we up cast the decoder dictionary to CAN Decoder Dictionary to extract can decoder method
+    auto canDecoderDictionaryPtr = std::dynamic_pointer_cast<const CANDecoderDictionary>( dictionary );
+    if ( canDecoderDictionaryPtr == nullptr )
+    {
+        FWE_LOG_TRACE( "Received empty Decoder Manifest" );
+        return;
+    }
+    // As OBD only has one port, we expect the decoder dictionary only has one channel
+    if ( canDecoderDictionaryPtr->canMessageDecoderMethod.size() != 1 )
+    {
+        FWE_LOG_WARN( "Received Invalid Decoder Manifest, ignoring it" );
+        return;
+    }
+    // Iterate through the received generic decoder dictionary to construct the OBD specific dictionary
+    std::vector<PID> pidsRequestedByDecoderDict{};
+    for ( const auto &canMessageDecoderMethod : canDecoderDictionaryPtr->canMessageDecoderMethod.cbegin()->second )
+    {
+        // The key is PID; The Value is decoder format
+        mDecoderDictionaryPtr->emplace( canMessageDecoderMethod.first, canMessageDecoderMethod.second.format );
+        // Check if this PID's decoder method contains signals to be collected by
+        // Decoder Dictionary. If so, add the PID to pidsRequestedByDecoderDict
+        // Note in worst case scenario when no OBD signals are to be collected, this will
+        // iterate through the entire OBD signal lists which only contains a few hundreds signals.
+        for ( const auto &signal : canMessageDecoderMethod.second.format.mSignals )
         {
-            // Iterate through the received generic decoder dictionary to construct the OBD specific dictionary
-            std::vector<PID> pidsRequestedByDecoderDict{};
-            if ( canDecoderDictionaryPtr->canMessageDecoderMethod.size() == 1 )
+            // if the signal is to be collected according to decoder dictionary, push
+            // the corresponding PID to the pidsRequestedByDecoderDict
+            if ( canDecoderDictionaryPtr->signalIDsToCollect.find( signal.mSignalID ) !=
+                 canDecoderDictionaryPtr->signalIDsToCollect.end() )
             {
-                for ( const auto &canMessageDecoderMethod :
-                      canDecoderDictionaryPtr->canMessageDecoderMethod.cbegin()->second )
-                {
-                    // The key is PID; The Value is decoder format
-                    mDecoderDictionaryPtr->emplace( canMessageDecoderMethod.first,
-                                                    canMessageDecoderMethod.second.format );
-                    // Check if this PID's decoder method contains signals to be collected by
-                    // Decoder Dictionary. If so, add the PID to pidsRequestedByDecoderDict
-                    // Note in worst case scenario when no OBD signals are to be collected, this will
-                    // iterate through the entire OBD signal lists which only contains a few hundreds signals.
-                    for ( const auto &signal : canMessageDecoderMethod.second.format.mSignals )
-                    {
-                        // if the signal is to be collected according to decoder dictionary, push
-                        // the corresponding PID to the pidsRequestedByDecoderDict
-                        if ( canDecoderDictionaryPtr->signalIDsToCollect.find( signal.mSignalID ) !=
-                             canDecoderDictionaryPtr->signalIDsToCollect.end() )
-                        {
-                            pidsRequestedByDecoderDict.emplace_back(
-                                static_cast<PID>( canMessageDecoderMethod.first ) );
-                            // We know this PID needs to be requested, break to move on next PID
-                            break;
-                        }
-                    }
-                }
+                pidsRequestedByDecoderDict.emplace_back( static_cast<PID>( canMessageDecoderMethod.first ) );
+                // We know this PID needs to be requested, break to move on next PID
+                break;
             }
-            std::sort( pidsRequestedByDecoderDict.begin(), pidsRequestedByDecoderDict.end() );
-            FWE_LOG_TRACE( "Decoder Dictionary requests PIDs: " + getStringFromBytes( pidsRequestedByDecoderDict ) );
-            // For now we only support OBD Service Mode 1 PID
-            mPIDsRequestedByDecoderDict[SID::CURRENT_STATS] = pidsRequestedByDecoderDict;
-
-            // If the program already know the supported PIDs from ECU, below two update will update
-            // For each ecu update the PIDs requested by the Dict
-            assignPIDsToECUs();
-
-            // Pass on the decoder manifest to the OBD Decoder and wake up the thread.
-            // Before that we should interrupt the thread so that no further decoding
-            // is done using the previous decoder, then assign the new decoder manifest,
-            // the wake up the thread.
-            mDecoderManifestAvailable.store( true, std::memory_order_relaxed );
-            // Wake up the worker thread.
-            mDataAvailableWait.notify();
-            FWE_LOG_INFO( "Decoder Manifest Updated" );
-        }
-        else
-        {
-            FWE_LOG_WARN( "Received Invalid Decoder Manifest, ignoring it" );
         }
     }
+    std::sort( pidsRequestedByDecoderDict.begin(), pidsRequestedByDecoderDict.end() );
+    FWE_LOG_TRACE( "Decoder Dictionary requests PIDs: " + getStringFromBytes( pidsRequestedByDecoderDict ) );
+    // For now we only support OBD Service Mode 1 PID
+    mPIDsRequestedByDecoderDict[SID::CURRENT_STATS] = pidsRequestedByDecoderDict;
+
+    // If the program already know the supported PIDs from ECU, below two update will update
+    // For each ecu update the PIDs requested by the Dict
+    assignPIDsToECUs();
+
+    // Pass on the decoder manifest to the OBD Decoder and wake up the thread.
+    // Before that we should interrupt the thread so that no further decoding
+    // is done using the previous decoder, then assign the new decoder manifest,
+    // the wake up the thread.
+    mDecoderManifestAvailable.store( true, std::memory_order_relaxed );
+    // Wake up the worker thread.
+    mDataAvailableWait.notify();
+    FWE_LOG_INFO( "Decoder Manifest Updated" );
 }
 
 } // namespace DataInspection

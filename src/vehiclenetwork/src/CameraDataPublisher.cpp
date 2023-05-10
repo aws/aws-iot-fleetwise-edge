@@ -17,7 +17,6 @@ namespace VehicleNetwork
 {
 CameraDataPublisher::CameraDataPublisher()
 {
-    mNetworkProtocol = VehicleDataSourceProtocol::DDS;
     mID = generateChannelID();
 }
 

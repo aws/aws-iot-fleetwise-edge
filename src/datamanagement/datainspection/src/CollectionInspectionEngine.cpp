@@ -73,13 +73,12 @@ CollectionInspectionEngine::addSignalToBuffer( const InspectionMatrixSignalColle
 }
 
 void
-CollectionInspectionEngine::onChangeInspectionMatrix(
-    const std::shared_ptr<const InspectionMatrix> &activeInspectionMatrix )
+CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
 {
     // Clears everything in this class including all data in the signal history buffer
     clear();
-    mActiveInspectionMatrix = activeInspectionMatrix; // Pointers and references into this memory are maintained so hold
-                                                      // a shared_ptr to it so it does not get deleted
+    mActiveInspectionMatrix = inspectionMatrix; // Pointers and references into this memory are maintained so hold
+                                                // a shared_ptr to it so it does not get deleted
     mConditionsNotTriggeredWaitingPublished.set();
     for ( auto &p : mActiveInspectionMatrix->conditions )
     {
@@ -90,6 +89,7 @@ CollectionInspectionEngine::onChangeInspectionMatrix(
             FWE_LOG_WARN( "Too many conditions are active. Up to " +
                           std::to_string( MAX_NUMBER_OF_ACTIVE_CONDITION - 1 ) +
                           " conditions can be active at a time. Additional conditions will be skipped" );
+            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::COLLECTION_SCHEME_ERROR );
             break;
         }
         mConditions.emplace_back( p );
@@ -98,6 +98,7 @@ CollectionInspectionEngine::onChangeInspectionMatrix(
             TraceModule::get().incrementVariable( TraceVariable::CE_SIGNAL_ID_OUTBOUND );
             FWE_LOG_ERROR( "There can be only " + std::to_string( MAX_DIFFERENT_SIGNAL_IDS ) +
                            " different signal IDs" );
+            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::COLLECTION_SCHEME_ERROR );
             return;
         }
         for ( auto &s : p.signals )
@@ -105,12 +106,14 @@ CollectionInspectionEngine::onChangeInspectionMatrix(
             if ( s.signalID == INVALID_SIGNAL_ID )
             {
                 FWE_LOG_ERROR( "A SignalID with value" + std::to_string( INVALID_SIGNAL_ID ) + " is not allowed" );
+                TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::COLLECTION_SCHEME_ERROR );
                 return;
             }
             if ( s.sampleBufferSize == 0 )
             {
                 TraceModule::get().incrementVariable( TraceVariable::CE_SAMPLE_SIZE_ZERO );
                 FWE_LOG_ERROR( "A Sample buffer size of 0 is not allowed" );
+                TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::COLLECTION_SCHEME_ERROR );
                 return;
             }
             auto signalIDIn = s.signalID;
@@ -287,6 +290,7 @@ CollectionInspectionEngine::allocateBufferVector( SignalID signalIDIn, uint32_t 
                               "configured of " +
                               std::to_string( MAX_SAMPLE_MEMORY ) + "Bytes" );
                 signal.mSize = 0;
+                TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::COLLECTION_SCHEME_ERROR );
                 return false;
             }
             usedBytes += static_cast<uint32_t>( requiredBytes );
@@ -1249,7 +1253,7 @@ EventID
 CollectionInspectionEngine::generateEventID( InspectionTimestamp timestamp )
 {
     // Generate an eventId as a combination of an event counter and a timestamp
-    uint32_t eventId = static_cast<uint32_t>( ( generateEventCounter() & 0xFF ) | ( timestamp << 8 ) );
+    uint32_t eventId = static_cast<uint32_t>( generateEventCounter() ) | static_cast<uint32_t>( timestamp << 8 );
     // As Kotlin reads eventId as int32, set most significant bit to 0 so event IDs stay positive
     eventId = eventId & 0x7FFFFFFF;
     return eventId;

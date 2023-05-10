@@ -85,7 +85,8 @@ inline Timer::Timer()
 inline void
 Timer::reset()
 {
-    mStart = mResume = Clock::now();
+    mStart = Clock::now();
+    mResume = mStart;
     mElapsed = Duration{ 0 };
     mIsTimerRunning = true;
 }

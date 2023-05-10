@@ -19,11 +19,6 @@ namespace IoTFleetWise
 namespace DataManagement
 {
 /**
- * @brief number of bits in one byte
- */
-constexpr uint8_t BYTE_SIZE = 8;
-
-/**
  * @brief An invalid CAN Message Format, set as a CANMessageFormat object initialized to all zeros
  */
 const CANMessageFormat INVALID_CAN_MESSAGE_FORMAT = CANMessageFormat();

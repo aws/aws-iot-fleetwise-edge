@@ -5,10 +5,9 @@
 
 // Includes
 #include "CANDataTypes.h"
-#include "ClockHandler.h"
-#include "IDecoderManifest.h"
-#include "Timer.h"
-#include <memory>
+#include "MessageTypes.h"
+#include "SignalTypes.h"
+#include <cstdint>
 #include <unordered_set>
 #include <vector>
 namespace Aws
@@ -33,15 +32,15 @@ public:
      * @param frameSize size in bytes of the frame.
      * @param format of the frame according to the DBC file.
      * @param signalIDsToCollect the id for the signals to be collected
-     * @param decodedMessage result of the decoding.
+     * @param decodedSignals result of the decoding.
      * @return True if the decoding is successful, False means that the decoding was
      * partially not successful
      */
-    bool decodeCANMessage( const uint8_t *frameData,
-                           size_t frameSize,
-                           const CANMessageFormat &format,
-                           const std::unordered_set<SignalID> &signalIDsToCollect,
-                           CANDecodedMessage &decodedMessage );
+    static bool decodeCANMessage( const uint8_t *frameData,
+                                  size_t frameSize,
+                                  const CANMessageFormat &format,
+                                  const std::unordered_set<SignalID> &signalIDsToCollect,
+                                  std::vector<CANDecodedSignal> &decodedSignals );
 
     /**
      * @brief extracts a signal raw value from a frame.
@@ -50,9 +49,6 @@ public:
      * @return 8 bytes representation of the physical value of the signal.
      */
     static int64_t extractSignalFromFrame( const uint8_t *frameData, const CANSignalFormat &signalDescription );
-
-private:
-    std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
 };
 
 } // namespace DataManagement

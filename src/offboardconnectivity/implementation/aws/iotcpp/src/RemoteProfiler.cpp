@@ -23,6 +23,7 @@ RemoteProfiler::RemoteProfiler( std::shared_ptr<ISender> metricsSender,
     , fInitialLogMaxInterval( initialLogMaxInterval )
     , fLastTimeMetricsSentOut( 0 )
     , fLastTimeMLogsSentOut( 0 )
+    , fLastTimeExecutionEnvironmentMetricsCollected( fClock->monotonicTimeSinceEpochMs() )
     , fLogLevelThreshold( initialLogLevelThresholdToSend )
     , fProfilerPrefix( std::move( profilerPrefix ) )
     , fCurrentUserPayloadInLogRoot( 0 )
@@ -30,7 +31,6 @@ RemoteProfiler::RemoteProfiler( std::shared_ptr<ISender> metricsSender,
     initLogStructure();
     fLastCPURUsage.reportCPUUsageInfo();
     Aws::IoTFleetWise::Platform::Linux::CPUUsageInfo::reportPerThreadUsageData( fLastThreadUsage );
-    fLastTimeExecutionEnvironmentMetricsCollected = fClock->monotonicTimeSinceEpochMs();
 }
 
 void
@@ -61,23 +61,26 @@ RemoteProfiler::sendMetricsOut()
 void
 RemoteProfiler::sendLogsOut()
 {
-    std::string output;
+    if ( fCurrentUserPayloadInLogRoot > 0 )
     {
-        // No logging in this area as this will deadlock
-        std::lock_guard<std::mutex> lock( loggingMutex );
-        Json::StreamWriterBuilder builder;
-        builder["indentation"] = ""; // If you want whitespace-less output
-        output = Json::writeString( builder, fLogRoot );
-        initLogStructure();
-    }
-
-    if ( ( fLogSender != nullptr ) && ( fCurrentUserPayloadInLogRoot > 0 ) )
-    {
-        uint32_t ret = static_cast<uint32_t>(
-            fLogSender->sendBuffer( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() ) );
-        if ( static_cast<uint32_t>( ConnectivityError::Success ) != ret )
+        std::string output;
         {
-            FWE_LOG_ERROR( " Send error " + std::to_string( static_cast<uint32_t>( ret ) ) );
+            // No logging in this area as this will deadlock
+            std::lock_guard<std::mutex> lock( loggingMutex );
+            Json::StreamWriterBuilder builder;
+            builder["indentation"] = ""; // If you want whitespace-less output
+            output = Json::writeString( builder, fLogRoot );
+            initLogStructure();
+        }
+
+        if ( ( fLogSender != nullptr ) )
+        {
+            uint32_t ret = static_cast<uint32_t>(
+                fLogSender->sendBuffer( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() ) );
+            if ( static_cast<uint32_t>( ConnectivityError::Success ) != ret )
+            {
+                FWE_LOG_ERROR( " Send error " + std::to_string( static_cast<uint32_t>( ret ) ) );
+            }
         }
     }
 }
@@ -135,7 +138,7 @@ RemoteProfiler::setMetric( const std::string &name, double value, const std::str
     }
     fCurrentMetricsPending++;
     Json::Value metric;
-    metric["name"] = fProfilerPrefix + name;
+    metric["name"] = fProfilerPrefix + "_" + name;
     metric["value"] = Json::Value( value );
     metric["unit"] = unit;
     fMetricsRoot["metric" + std::to_string( fCurrentMetricsPending )] = metric;
@@ -251,6 +254,7 @@ RemoteProfiler::doWork( void *data )
         {
             profiler->fLastTimeMetricsSentOut = currentTime;
             TraceModule::get().forwardAllMetricsToMetricsReceiver( profiler );
+            TraceModule::get().startNewObservationWindow( profiler->fInitialUploadInterval );
             profiler->collectExecutionEnvironmentMetrics();
             profiler->sendMetricsOut();
         }

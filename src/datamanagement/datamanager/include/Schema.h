@@ -81,6 +81,7 @@ public:
      */
     bool sendCheckin( const std::vector<std::string> &documentARNs ) override;
 
+private:
     /**
      * @brief This struct is used to receive the callback from MQTT IoT Core on receipt of data on the DecoderManifest
      * topic
@@ -123,7 +124,9 @@ public:
             mSchema.setDecoderManifest( decoderManifestPtr );
             FWE_LOG_TRACE( "Received Decoder Manifest in PI DecoderManifestCb" );
         }
-    } mDecoderManifestCb;
+    };
+
+    DecoderManifestCb mDecoderManifestCb;
 
     /**
      * @brief This struct is used to receive the callback from MQTT IoT Core on receipt of data on the
@@ -167,9 +170,10 @@ public:
             mSchema.setCollectionSchemeList( collectionSchemeListPtr );
             FWE_LOG_TRACE( "Received CollectionSchemeList" );
         }
-    } mCollectionSchemeListCb;
+    };
 
-private:
+    CollectionSchemeListCb mCollectionSchemeListCb;
+
     /**
      * @brief ISender object used to interface with cloud to send Checkins
      */

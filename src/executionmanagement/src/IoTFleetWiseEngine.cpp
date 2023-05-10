@@ -4,12 +4,9 @@
 // Includes
 #include "IoTFleetWiseEngine.h"
 #include "AwsBootstrap.h"
-#include "CANDataConsumer.h"
 #include "CollectionInspectionAPITypes.h"
 #include "LoggingModule.h"
 #include "TraceModule.h"
-#include "businterfaces/AbstractVehicleDataSource.h"
-#include "businterfaces/CANDataSource.h"
 #include <boost/lockfree/spsc_queue.hpp>
 #include <fstream>
 
@@ -56,6 +53,22 @@ getFileContents( const std::string &p )
 
     return ret;
 }
+
+#ifdef FWE_EXAMPLE_IWAVEGPS
+uint32_t
+stringToU32( const std::string &value )
+{
+    try
+    {
+        return static_cast<uint32_t>( std::stoul( value ) );
+    }
+    catch ( const std::exception &e )
+    {
+        throw std::runtime_error( "Could not cast " + value +
+                                  " to integer, invalid input: " + std::string( e.what() ) );
+    }
+}
+#endif
 
 } // namespace
 
@@ -176,7 +189,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asUInt(),
             canIDTranslator );
 
-        // Pass on the AWS SDK Bootsrap handle to the IoTModule.
+        // Pass on the AWS SDK Bootstrap handle to the IoTModule.
         auto bootstrapPtr = AwsBootstrap::getInstance().getClientBootStrap();
 
         const auto privateKey =
@@ -323,36 +336,16 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         // Allow CollectionSchemeManagement to send checkins through the Schema Object Callback
         mCollectionSchemeManagerPtr->setSchemaListenerPtr( mSchemaPtr );
 
-        /********************************Vehicle Data Source Binder bootstrap start*******************************/
+        /********************************Data source bootstrap start*******************************/
 
         auto obdOverCANModuleInit = false;
-        // Start the vehicle data source binder
-        mVehicleDataSourceBinder = std::make_unique<VehicleDataSourceBinder>();
-        if ( ( mVehicleDataSourceBinder == nullptr ) || ( !mVehicleDataSourceBinder->connect() ) )
-        {
-            FWE_LOG_ERROR( "Failed to initialize the Vehicle DataSource binder" );
-            return false;
-        }
-
-        // Initialize
         for ( const auto &interfaceName : config["networkInterfaces"] )
         {
             const auto &interfaceType = interfaceName["type"].asString();
 
             if ( interfaceType == CAN_INTERFACE_TYPE )
             {
-                std::vector<VehicleDataSourceConfig> canSourceConfigs( 1 );
-                auto &canSourceConfig = canSourceConfigs.back();
-                canSourceConfig.transportProperties.emplace(
-                    "interfaceName", interfaceName[CAN_INTERFACE_TYPE]["interfaceName"].asString() );
-                canSourceConfig.transportProperties.emplace(
-                    "protocolName", interfaceName[CAN_INTERFACE_TYPE]["protocolName"].asString() );
-                canSourceConfig.transportProperties.emplace(
-                    "threadIdleTimeMs",
-                    config["staticConfig"]["threadIdleTimes"]["socketCANThreadIdleTimeMs"].asString() );
-                canSourceConfig.maxNumberOfVehicleDataMessages =
-                    config["staticConfig"]["bufferSizes"]["socketCANBufferSize"].asUInt();
-                CAN_TIMESTAMP_TYPE canTimestampType = CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP; // default
+                CanTimestampType canTimestampType = CanTimestampType::KERNEL_SOFTWARE_TIMESTAMP; // default
                 if ( interfaceName[CAN_INTERFACE_TYPE].isMember( "timestampType" ) )
                 {
                     auto timestampTypeInput = interfaceName[CAN_INTERFACE_TYPE]["timestampType"].asString();
@@ -363,48 +356,29 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                                       " so default to Software" );
                     }
                 }
-                auto canSourcePtr = std::make_shared<CANDataSource>( canTimestampType );
-                auto canConsumerPtr = std::make_shared<CANDataConsumer>();
-
-                if ( canSourcePtr == nullptr || canConsumerPtr == nullptr )
+                auto canChannelId = canIDTranslator.getChannelNumericID( interfaceName["interfaceId"].asString() );
+                auto canConsumerPtr =
+                    std::make_unique<CANDataConsumer>( canChannelId, signalBufferPtr, canRawBufferPtr );
+                auto canSourcePtr = std::make_unique<CANDataSource>(
+                    canChannelId,
+                    canTimestampType,
+                    interfaceName[CAN_INTERFACE_TYPE]["interfaceName"].asString(),
+                    interfaceName[CAN_INTERFACE_TYPE]["protocolName"].asString() == "CAN-FD",
+                    config["staticConfig"]["threadIdleTimes"]["socketCANThreadIdleTimeMs"].asUInt(),
+                    *canConsumerPtr );
+                if ( !canSourcePtr->init() )
                 {
-                    FWE_LOG_ERROR( "Failed to create consumer/producer" );
+                    FWE_LOG_ERROR( "Failed to initialize CANDataSource" );
                     return false;
                 }
-                // Initialize the consumer/producers
-                // Currently we limit 1 channel to a single consumer. We can always extend this
-                // if we want to process the data coming from 1 channel to multiple consumers.
-                if ( ( !canSourcePtr->init( canSourceConfigs ) ) ||
-                     ( !canConsumerPtr->init(
-                         static_cast<VehicleDataSourceID>(
-                             canIDTranslator.getChannelNumericID( interfaceName["interfaceId"].asString() ) ),
-                         signalBufferPtr,
-                         config["staticConfig"]["threadIdleTimes"]["canDecoderThreadIdleTimeMs"].asUInt() ) ) )
+                if ( !mCollectionSchemeManagerPtr->subscribeListener(
+                         static_cast<IActiveDecoderDictionaryListener *>( canSourcePtr.get() ) ) )
                 {
-                    FWE_LOG_ERROR( "Failed to initialize the producers/consumers" );
+                    FWE_LOG_ERROR( "Failed to register the CANDataSource to the CollectionScheme Manager" );
                     return false;
                 }
-                else
-                {
-                    // CAN Consumers require a RAW Buffer after init
-                    // TODO: This is temporary change . Will need to think how this can be abstracted for all data
-                    // sources.
-                    canConsumerPtr->setCANBufferPtr( canRawBufferPtr );
-                }
-
-                // Handshake the binder and the channel
-                if ( !mVehicleDataSourceBinder->addVehicleDataSource( canSourcePtr ) )
-                {
-                    FWE_LOG_ERROR( "Failed to add a network channel" );
-                    return false;
-                }
-
-                if ( !mVehicleDataSourceBinder->bindConsumerToVehicleDataSource(
-                         canConsumerPtr, canSourcePtr->getVehicleDataSourceID() ) )
-                {
-                    FWE_LOG_ERROR( "Failed to Bind Consumers to Producers" );
-                    return false;
-                }
+                mCANDataConsumers.push_back( std::move( canConsumerPtr ) );
+                mCANDataSources.push_back( std::move( canSourcePtr ) );
             }
             else if ( interfaceType == OBD_INTERFACE_TYPE )
             {
@@ -455,15 +429,8 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 FWE_LOG_ERROR( interfaceName["type"].asString() + " is not supported" );
             }
         }
-        // Register Vehicle Data Source Binder as listener for CollectionScheme Manager
-        if ( !mCollectionSchemeManagerPtr->subscribeListener( mVehicleDataSourceBinder.get() ) )
-        {
-            FWE_LOG_ERROR(
-                "Could not register the vehicle data source binder as a listener to the collection campaign manager" );
-            return false;
-        }
 
-        /********************************Vehicle Data Source Binder bootstrap end*******************************/
+        /********************************Data source bootstrap end*******************************/
 
         // Only start the CollectionSchemeManager after all listeners have subscribed, otherwise
         // they will not be notified of the initial decoder manifest and collection schemes that are
@@ -532,9 +499,9 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         // Only if there is at least one DDS Node, we should create the DDS Module
         if ( !ddsNodes.empty() )
         {
-            mDataOverDDSModule.reset( new DataOverDDSModule() );
+            mDataOverDDSModule = std::make_shared<DataOverDDSModule>();
             // Init the Module
-            if ( ( mDataOverDDSModule == nullptr ) || ( !mDataOverDDSModule->init( ddsNodes ) ) )
+            if ( !mDataOverDDSModule->init( ddsNodes ) )
             {
                 FWE_LOG_ERROR( "Failed to initialize the DDS Module" );
                 return false;
@@ -564,23 +531,15 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         if ( config["staticConfig"].isMember( "iWaveGpsExample" ) )
         {
             FWE_LOG_TRACE( "Found 'iWaveGpsExample' section in config file" );
-            std::vector<VehicleDataSourceConfig> iWaveGpsConfigs( 1 );
-            for ( auto const &key : config["staticConfig"]["iWaveGpsExample"].getMemberNames() )
-            {
-                if ( key == IWaveGpsSource::CAN_CHANNEL_NUMBER )
-                {
-                    iWaveGpsConfigs.back().transportProperties.emplace(
-                        key,
-                        std::to_string( canIDTranslator.getChannelNumericID(
-                            config["staticConfig"]["iWaveGpsExample"][key].asString() ) ) );
-                }
-                else
-                {
-                    iWaveGpsConfigs.back().transportProperties.emplace(
-                        key, config["staticConfig"]["iWaveGpsExample"][key].asString() );
-                }
-            }
-            iWaveInitSuccessful = mIWaveGpsSource->init( iWaveGpsConfigs );
+            iWaveInitSuccessful = mIWaveGpsSource->init(
+                config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::PATH_TO_NMEA].asString(),
+                canIDTranslator.getChannelNumericID(
+                    config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::CAN_CHANNEL_NUMBER].asString() ),
+                stringToU32( config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::CAN_RAW_FRAME_ID].asString() ),
+                static_cast<uint16_t>( stringToU32(
+                    config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::LATITUDE_START_BIT].asString() ) ),
+                static_cast<uint16_t>( stringToU32(
+                    config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::LONGITUDE_START_BIT].asString() ) ) );
         }
         else
         {
@@ -671,11 +630,13 @@ IoTFleetWiseEngine::disconnect()
         return false;
     }
 
-    // Stop the Binder
-    if ( mVehicleDataSourceBinder && ( !mVehicleDataSourceBinder->disconnect() ) )
+    for ( auto &source : mCANDataSources )
     {
-        FWE_LOG_ERROR( "Could not disconnect the Binder" );
-        return false;
+        if ( !source->disconnect() )
+        {
+            FWE_LOG_ERROR( "Could not disconnect CAN data source" );
+            return false;
+        }
     }
 
     if ( mAwsIotModule->isAlive() && ( !mAwsIotModule->disconnect() ) )
@@ -868,15 +829,29 @@ IoTFleetWiseEngine::doWork( void *data )
                     }
                 }
                 firstSignalValues += "]";
-                FWE_LOG_INFO( "FWE data ready to send with eventID " +
-                              std::to_string( triggeredCollectionSchemeDataPtr->eventID ) + " from " +
-                              triggeredCollectionSchemeDataPtr->metaData.collectionSchemeID +
-                              " Signals:" + std::to_string( triggeredCollectionSchemeDataPtr->signals.size() ) + " " +
-                              firstSignalValues + firstSignalTimestamp + " raw CAN frames:" +
-                              std::to_string( triggeredCollectionSchemeDataPtr->canFrames.size() ) +
-                              " DTCs:" + std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() ) +
-                              " Geohash:" + triggeredCollectionSchemeDataPtr->mGeohashInfo.mGeohashString );
-                engine->mDataCollectionSender->send( triggeredCollectionSchemeDataPtr );
+                // Avoid invoking Data Collection Sender if there is nothing to send.
+                if ( triggeredCollectionSchemeDataPtr->signals.empty() &&
+                     triggeredCollectionSchemeDataPtr->canFrames.empty() &&
+                     triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.empty() &&
+                     ( !triggeredCollectionSchemeDataPtr->mGeohashInfo.hasItems() ) )
+                {
+                    FWE_LOG_INFO(
+                        "The trigger for Campaign:  " + triggeredCollectionSchemeDataPtr->metaData.collectionSchemeID +
+                        " activated eventID: " + std::to_string( triggeredCollectionSchemeDataPtr->eventID ) +
+                        " but no data is available to ingest" );
+                }
+                else
+                {
+                    FWE_LOG_INFO( "FWE data ready to send with eventID " +
+                                  std::to_string( triggeredCollectionSchemeDataPtr->eventID ) + " from " +
+                                  triggeredCollectionSchemeDataPtr->metaData.collectionSchemeID +
+                                  " Signals:" + std::to_string( triggeredCollectionSchemeDataPtr->signals.size() ) +
+                                  " " + firstSignalValues + firstSignalTimestamp + " raw CAN frames:" +
+                                  std::to_string( triggeredCollectionSchemeDataPtr->canFrames.size() ) + " DTCs:" +
+                                  std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() ) +
+                                  " Geohash:" + triggeredCollectionSchemeDataPtr->mGeohashInfo.mGeohashString );
+                    engine->mDataCollectionSender->send( triggeredCollectionSchemeDataPtr );
+                }
             } );
         TraceModule::get().setVariable( TraceVariable::QUEUE_INSPECTION_TO_SENDER, consumedElements );
 
@@ -888,10 +863,10 @@ IoTFleetWiseEngine::doWork( void *data )
                  IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS ) ) )
         {
             engine->mRetrySendingPersistedDataTimer.reset();
-            if ( engine->mAwsIotModule->isAlive() )
+            if ( engine->mAwsIotModule->isAlive() && engine->checkAndSendRetrievedData() )
             {
                 // Check if data was persisted, Retrieve all the data and send
-                uploadedPersistedDataOnce |= engine->checkAndSendRetrievedData();
+                uploadedPersistedDataOnce = true;
             }
         }
         if ( ( engine->mPrintMetricsCyclicPeriodMs > 0 ) &&
@@ -900,7 +875,8 @@ IoTFleetWiseEngine::doWork( void *data )
         {
             engine->mPrintMetricsCyclicTimer.reset();
             TraceModule::get().print();
-            TraceModule::get().startNewObservationWindow();
+            TraceModule::get().startNewObservationWindow(
+                static_cast<uint32_t>( engine->mPrintMetricsCyclicPeriodMs ) );
         }
     }
 }

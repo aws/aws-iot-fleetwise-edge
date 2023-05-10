@@ -856,12 +856,16 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleSubsamplingOfSameSignalUse
     // condition[1] has higher subsampling so less signals so it should the first in sorted list
     EXPECT_GE( std::count_if( collectedDataList[0]->signals.begin(),
                               collectedDataList[0]->signals.end(),
-                              []( CollectedSignal s ) { return s.signalID == 2222; } ),
+                              []( CollectedSignal s ) {
+                                  return s.signalID == 2222;
+                              } ),
                1 );
 
     EXPECT_GE( std::count_if( collectedDataList[1]->signals.begin(),
                               collectedDataList[1]->signals.end(),
-                              []( CollectedSignal s ) { return s.signalID == 1111; } ),
+                              []( CollectedSignal s ) {
+                                  return s.signalID == 1111;
+                              } ),
                1 );
 }
 
@@ -932,12 +936,16 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleFixedWindowsOfSameSignalUs
 
     EXPECT_GE( std::count_if( collectedDataList[0]->signals.begin(),
                               collectedDataList[0]->signals.end(),
-                              []( CollectedSignal s ) { return s.signalID == 2222; } ),
+                              []( CollectedSignal s ) {
+                                  return s.signalID == 2222;
+                              } ),
                1 );
 
     EXPECT_GE( std::count_if( collectedDataList[1]->signals.begin(),
                               collectedDataList[1]->signals.end(),
-                              []( CollectedSignal s ) { return s.signalID == 1111; } ),
+                              []( CollectedSignal s ) {
+                                  return s.signalID == 1111;
+                              } ),
                1 );
 }
 

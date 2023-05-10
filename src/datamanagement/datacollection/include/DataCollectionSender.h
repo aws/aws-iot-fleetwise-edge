@@ -75,7 +75,8 @@ public:
     ConnectivityError transmit( const std::string &payload );
 
 private:
-    uint32_t mCollectionEventID; // A unique ID that FWE generates each time a collectionScheme condition is triggered.
+    // A unique ID that FWE generates each time a collectionScheme condition is triggered
+    uint32_t mCollectionEventID{};
     std::shared_ptr<ISender> mSender;
     SendDestination mSendDestination{ SendDestination::MQTT };
     unsigned mTransmitThreshold; // max number of messages that can be sent to cloud at one time
@@ -87,7 +88,7 @@ private:
     /**
      * @brief Set up collectionSchemeParams struct
      */
-    void setCollectionSchemeParameters( const TriggeredCollectionSchemeDataPtr &triggeredCollectionSchemeDataPtr );
+    void setCollectionSchemeParameters( const TriggeredCollectionSchemeData &triggeredCollectionSchemeDataPtr );
 
     /**
      * @brief Serialize and send the protobuf data to the cloud

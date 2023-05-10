@@ -93,15 +93,7 @@ TEST_F( IWaveGpsSourceTest, testWestNegativeLongitude )
     *nmeaFile << "$GPGGA,133120.00,5234.56789,N,01234.56789,W,1,08,0.6,123.4,M,56.7,M,,*89\n\n";
     nmeaFile->close();
     IWaveGpsSource gpsSource( signalBufferPtr );
-    std::vector<VehicleDataSourceConfig> configs;
-    configs.emplace_back();
-    configs.back().transportProperties.emplace( IWaveGpsSource::PATH_TO_NMEA, filePath );
-    configs.back().transportProperties.emplace( IWaveGpsSource::CAN_CHANNEL_NUMBER, "1" );
-    configs.back().transportProperties.emplace( IWaveGpsSource::CAN_RAW_FRAME_ID, "1" );
-    configs.back().transportProperties.emplace( IWaveGpsSource::LATITUDE_START_BIT, "0" );
-    configs.back().transportProperties.emplace( IWaveGpsSource::LONGITUDE_START_BIT, "32" );
-
-    gpsSource.init( configs );
+    gpsSource.init( filePath, 1, 1, 0, 32 );
     gpsSource.connect();
     gpsSource.start();
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );

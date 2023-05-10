@@ -30,7 +30,7 @@ DataCollectionProtoWriter::setupVehicleData( const TriggeredCollectionSchemeData
 
     mVehicleData.Clear();
     mVehicleData.set_campaign_arn( triggeredCollectionSchemeData->metaData.collectionSchemeID );
-    mVehicleData.set_decoder_arn( triggeredCollectionSchemeData->metaData.decoderID );
+    mVehicleData.set_decoder_sync_id( triggeredCollectionSchemeData->metaData.decoderID );
     mVehicleData.set_collection_event_id( collectionEventID );
     mTriggerTime = triggeredCollectionSchemeData->triggerTime;
     mVehicleData.set_collection_event_time_ms_epoch( mTriggerTime );

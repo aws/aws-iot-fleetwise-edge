@@ -49,7 +49,7 @@ struct AwsBootstrap::Impl
                 Aws::Crt::Io::DefaultHostResolver defaultHostResolver( eventLoopGroup, MAX_HOSTS, MAX_TTL );
                 constexpr char ALLOCATION_TAG[] = "AWS-SDK";
                 auto bootstrap = Aws::MakeShared<Aws::Crt::Io::ClientBootstrap>(
-                    ALLOCATION_TAG, eventLoopGroup, defaultHostResolver );
+                    &ALLOCATION_TAG[0], eventLoopGroup, defaultHostResolver );
                 mBootstrap = bootstrap.get();
                 return bootstrap;
             }

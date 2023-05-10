@@ -62,7 +62,7 @@ Thread::release()
     // Wait till the Predicate
     mTerminateSignal->wait( Signal::WaitWithPredicate );
 
-    if ( ( mThread != 0u ) && ( pthread_join( mThread, nullptr ) != 0 ) )
+    if ( ( mThread != 0U ) && ( pthread_join( mThread, nullptr ) != 0 ) )
     {
         return false;
     }

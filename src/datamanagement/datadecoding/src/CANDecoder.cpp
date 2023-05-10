@@ -6,7 +6,7 @@
 #include "LoggingModule.h"
 #include <algorithm>
 #include <cmath>
-#define MASK64( nbits ) ( ( 0xFFFFFFFFFFFFFFFFULL ) >> ( 64 - ( nbits ) ) )
+#define MASK64( nbits ) ( static_cast<uint64_t>( 0xFFFFFFFFFFFFFFFFULL ) >> ( 64 - ( nbits ) ) )
 
 namespace Aws
 {
@@ -20,7 +20,7 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
                               size_t frameSize,
                               const CANMessageFormat &format,
                               const std::unordered_set<uint32_t> &signalIDsToCollect,
-                              CANDecodedMessage &decodedMessage )
+                              std::vector<CANDecodedSignal> &decodedSignals )
 {
     uint8_t errorCounter = 0;
     uint32_t frameSizeInBits = static_cast<uint32_t>( frameSize * 8 );
@@ -57,7 +57,7 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
                 }
                 auto physicalRawValue = static_cast<uint64_t>( multiplexorValue );
                 auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
-                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                decodedSignals.emplace_back(
                     CANDecodedSignal( it->mSignalID, rawValue, physicalValue, CANsignalType ) );
                 break;
             }
@@ -65,7 +65,7 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
 
                 auto physicalRawValue = static_cast<int64_t>( multiplexorValue );
                 auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
-                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                decodedSignals.emplace_back(
                     CANDecodedSignal( it->mSignalID, rawValue, physicalValue, CANsignalType ) );
                 break;
             }
@@ -73,7 +73,7 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
 
                 auto physicalRawValue = static_cast<double>( multiplexorValue );
                 auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
-                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                decodedSignals.emplace_back(
                     CANDecodedSignal( it->mSignalID, rawValue, physicalValue, CANsignalType ) );
                 break;
             }
@@ -124,7 +124,7 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
                     static_cast<uint64_t>( rawValue ) * static_cast<uint64_t>( format.mSignals[i].mFactor ) +
                     static_cast<uint64_t>( format.mSignals[i].mOffset );
                 auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
-                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                decodedSignals.emplace_back(
                     CANDecodedSignal( format.mSignals[i].mSignalID, rawValue, physicalValue, CANsignalType ) );
                 break;
             }
@@ -133,7 +133,7 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
                     static_cast<int64_t>( rawValue ) * static_cast<int64_t>( format.mSignals[i].mFactor ) +
                     static_cast<int64_t>( format.mSignals[i].mOffset );
                 auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
-                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                decodedSignals.emplace_back(
                     CANDecodedSignal( format.mSignals[i].mSignalID, rawValue, physicalValue, CANsignalType ) );
                 break;
             }
@@ -141,15 +141,13 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
                 auto physicalRawValue =
                     static_cast<double>( rawValue ) * format.mSignals[i].mFactor + format.mSignals[i].mOffset;
                 auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
-                decodedMessage.mFrameInfo.mSignals.emplace_back(
+                decodedSignals.emplace_back(
                     CANDecodedSignal( format.mSignals[i].mSignalID, rawValue, physicalValue, CANsignalType ) );
             }
             }
         }
     }
 
-    // Message decoding time
-    decodedMessage.mDecodingTime = mClock->systemTimeSinceEpochMs();
     // Should not harm, callers will ignore the return code.
     return errorCounter == 0;
 }
@@ -157,7 +155,6 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
 int64_t
 CANDecoder::extractSignalFromFrame( const uint8_t *frameData, const CANSignalFormat &signalDescription )
 {
-    const uint8_t BYTE_SIZE = 8;
     uint16_t startBit = static_cast<uint16_t>( signalDescription.mFirstBitPosition );
     uint8_t startByte = static_cast<uint8_t>( startBit / BYTE_SIZE );
     uint8_t startBitInByte = startBit % BYTE_SIZE;

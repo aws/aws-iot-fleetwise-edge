@@ -109,16 +109,16 @@ See [SECURITY](./SECURITY.md) for more information
 Edge Agent Reference Implementation for AWS IoT FleetWise depends on the following open source
 libraries. Refer to the corresponding links for more information.
 
-- [AWS SDK for C++: v1.9.253](https://github.com/aws/aws-sdk-cpp)
+- [AWS SDK for C++: v1.11.46](https://github.com/aws/aws-sdk-cpp)
   - [Curl: v7.58.0](https://github.com/curl/curl)
   - [OpenSSL: v1.1.1](https://github.com/openssl/openssl)
   - [zlib: v1.2.11](https://github.com/madler/zlib)
 - [GoogleTest: v1.10.0](https://github.com/google/googletest)
 - [Google Benchmark: v1.6.1](https://github.com/google/benchmark)
 - [Protobuf: v3.21.7](https://github.com/protocolbuffers/protobuf)
-- [Boost: v1.65.1](https://github.com/boostorg/boost)
-- [JsonCpp: v1.7.4](https://github.com/open-source-parsers/jsoncpp)
-- [Snappy: v1.1.7](https://github.com/google/snappy)
+- [Boost: v1.71.1](https://github.com/boostorg/boost)
+- [JsonCpp: v1.9.5](https://github.com/open-source-parsers/jsoncpp)
+- [Snappy: v1.1.8](https://github.com/google/snappy)
 
 Optional: The following dependencies are only required when the experimental option
 `FWE_FEATURE_CAMERA` is enabled.
@@ -135,6 +135,11 @@ See [LICENSE](./LICENSE) for more information.
 
 [Contact AWS Support](https://aws.amazon.com/contact-us/) if you have any technical questions about
 Edge Agent Reference Implementation for AWS IoT FleetWise.
+
+## Metrics
+
+See [Metrics](./docs/metrics.md) for details, which Edge specific metrics exist and how they can be
+accessed.
 
 ## Resources
 

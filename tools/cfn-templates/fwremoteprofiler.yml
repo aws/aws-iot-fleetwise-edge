@@ -1,0 +1,112 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+Resources:
+  RemoteProfilerCloudwatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: iot.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-RemoteProfilerCloudwatchRole
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "cloudwatch:PutMetricData"
+                  - "logs:CreateLogStream"
+                  - "logs:DescribeLogStreams"
+                  - "logs:PutLogEvents"
+                Resource:
+                  - "*"
+  RemoteProfilerMetricsRule:
+    Type: AWS::IoT::TopicRule
+    Properties:
+      RuleName: AwsIotFleetwiseMetricsUpload
+      TopicRulePayload:
+        Actions:
+          - CloudwatchMetric:
+              MetricName: "${metric1.name}"
+              MetricNamespace: AWSIotFleetWiseEdge
+              MetricUnit: "${metric1.unit}"
+              MetricValue: "${metric1.value}"
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+          - CloudwatchMetric:
+              MetricName: "${metric2.name}"
+              MetricNamespace: AWSIotFleetWiseEdge
+              MetricUnit: "${metric2.unit}"
+              MetricValue: "${metric2.value}"
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+          - CloudwatchMetric:
+              MetricName: "${metric3.name}"
+              MetricNamespace: AWSIotFleetWiseEdge
+              MetricUnit: "${metric3.unit}"
+              MetricValue: "${metric3.value}"
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+          - CloudwatchMetric:
+              MetricName: "${metric4.name}"
+              MetricNamespace: AWSIotFleetWiseEdge
+              MetricUnit: "${metric4.unit}"
+              MetricValue: "${metric4.value}"
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+          - CloudwatchMetric:
+              MetricName: "${metric5.name}"
+              MetricNamespace: AWSIotFleetWiseEdge
+              MetricUnit: "${metric5.unit}"
+              MetricValue: "${metric5.value}"
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+          - CloudwatchMetric:
+              MetricName: "${metric6.name}"
+              MetricNamespace: AWSIotFleetWiseEdge
+              MetricUnit: "${metric6.unit}"
+              MetricValue: "${metric6.value}"
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+          - CloudwatchMetric:
+              MetricName: "${metric7.name}"
+              MetricNamespace: AWSIotFleetWiseEdge
+              MetricUnit: "${metric7.unit}"
+              MetricValue: "${metric7.value}"
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+          - CloudwatchMetric:
+              MetricName: "${metric8.name}"
+              MetricNamespace: AWSIotFleetWiseEdge
+              MetricUnit: "${metric8.unit}"
+              MetricValue: "${metric8.value}"
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+          - CloudwatchMetric:
+              MetricName: "${metric9.name}"
+              MetricNamespace: AWSIotFleetWiseEdge
+              MetricUnit: "${metric9.unit}"
+              MetricValue: "${metric9.value}"
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+          - CloudwatchMetric:
+              MetricName: "${metric10.name}"
+              MetricNamespace: AWSIotFleetWiseEdge
+              MetricUnit: "${metric10.unit}"
+              MetricValue: "${metric10.value}"
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+        Description: Used by the Remote Profiler of the AWS IoT Fleetwise Edge Client see METRICS.md
+        Sql: SELECT * FROM 'aws-iot-fleetwise-metrics-upload'
+  RemoteProfilerLogRule:
+    Type: AWS::IoT::TopicRule
+    Properties:
+      RuleName: AwsIotFleetwiseLogsUpload
+      TopicRulePayload:
+        Actions:
+          - CloudwatchLogs:
+              LogGroupName: AWSIotFleetWiseEdge
+              RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
+        Description: Used by the Remote Profiler of the AWS IoT Fleetwise Edge Client see METRICS.md
+        Sql: SELECT * FROM 'aws-iot-fleetwise-logging-upload'
+  RemoteProfilerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: AWSIotFleetWiseEdge

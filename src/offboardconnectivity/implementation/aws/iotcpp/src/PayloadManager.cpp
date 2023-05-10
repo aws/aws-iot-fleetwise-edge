@@ -20,7 +20,7 @@ bool
 PayloadManager::preparePayload( uint8_t *const buf,
                                 size_t size,
                                 const std::string &data,
-                                const struct CollectionSchemeParams &collectionSchemeParams )
+                                const CollectionSchemeParams &collectionSchemeParams )
 {
     if ( buf == nullptr )
     {
@@ -71,7 +71,7 @@ PayloadManager::storeData( const std::uint8_t *buf,
         {
             FWE_LOG_TRACE( "CollectionScheme does not activate compression, but will apply compression for local "
                            "persistency anyway" );
-            if ( snappy::Compress( payload.data(), payload.size(), &compressedData ) == 0u )
+            if ( snappy::Compress( payload.data(), payload.size(), &compressedData ) == 0U )
             {
                 TraceModule::get().incrementVariable( TraceVariable::PM_COMPRESS_ERROR );
                 FWE_LOG_ERROR( "Error occurred when compressing the payload. The payload is likely corrupted." );

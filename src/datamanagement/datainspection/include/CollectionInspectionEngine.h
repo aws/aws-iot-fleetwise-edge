@@ -45,7 +45,7 @@ public:
      */
     CollectionInspectionEngine( bool sendDataOnlyOncePerCondition = true );
 
-    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &activeInspectionMatrix ) override;
+    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) override;
 
     /**
      * @brief Go through all conditions with changed condition signals and evaluate condition
@@ -269,7 +269,6 @@ private:
     template <typename T = double>
     struct SignalHistoryBuffer
     {
-        SignalHistoryBuffer() = default;
         SignalHistoryBuffer( uint32_t sizeIn, uint32_t sampleInterval )
             : mMinimumSampleIntervalMs( sampleInterval )
             , mSize( sizeIn )

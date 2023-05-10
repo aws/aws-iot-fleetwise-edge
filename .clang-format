@@ -2,6 +2,7 @@
 BasedOnStyle: Microsoft
 IndentWidth: 4
 AccessModifierOffset: -4
+AllowShortLambdasOnASingleLine: Empty
 AlwaysBreakAfterReturnType: AllDefinitions
 AlwaysBreakTemplateDeclarations: Yes
 BreakConstructorInitializers: BeforeComma

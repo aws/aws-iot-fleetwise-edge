@@ -55,16 +55,16 @@ AwsIotConnectivityModule::releaseMemoryUsage( std::size_t bytes )
 bool
 AwsIotConnectivityModule::connect( const std::string &privateKey,
                                    const std::string &certificate,
-                                   const std::string &endpointUrlRef,
-                                   const std::string &clientIdRef,
+                                   const std::string &endpointUrl,
+                                   const std::string &clientId,
                                    Aws::Crt::Io::ClientBootstrap *clientBootstrap,
                                    bool asynchronous )
 {
-    mClientId = clientIdRef.c_str() != nullptr ? clientIdRef.c_str() : "";
+    mClientId = clientId.c_str() != nullptr ? clientId.c_str() : "";
 
     mConnected = false;
     mCertificate = Crt::ByteCursorFromCString( certificate.c_str() );
-    mEndpointUrl = endpointUrlRef.c_str() != nullptr ? endpointUrlRef.c_str() : "";
+    mEndpointUrl = endpointUrl.c_str() != nullptr ? endpointUrl.c_str() : "";
     mPrivateKey = Crt::ByteCursorFromCString( privateKey.c_str() );
 
     if ( !createMqttConnection( clientBootstrap ) )
@@ -95,8 +95,9 @@ std::shared_ptr<AwsIotChannel>
 AwsIotConnectivityModule::createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager,
                                             std::size_t maximumIotSDKHeapMemoryBytes )
 {
-    mChannels.emplace_back( new AwsIotChannel( this, payloadManager, maximumIotSDKHeapMemoryBytes ) );
-    return mChannels.back();
+    auto channel = std::make_shared<AwsIotChannel>( this, payloadManager, maximumIotSDKHeapMemoryBytes );
+    mChannels.emplace_back( channel );
+    return channel;
 }
 
 bool

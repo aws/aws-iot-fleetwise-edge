@@ -66,7 +66,6 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
     // Iterate through all the tasks, and extracts each task info and push it into the
     // a structure per task. Each task is a thread in this context.
     DIR *taskDir = nullptr;
-    struct dirent *dp = nullptr;
     taskDir = opendir( "/proc/self/task/." );
     if ( taskDir == nullptr )
     {
@@ -76,8 +75,13 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
     threadCPUUsageInfos.clear();
     // Clock Frequency is needed to compute the user and system execution cpu cycles
     double clockTickFrequency = 1.0 / static_cast<double>( sysconf( _SC_CLK_TCK ) );
-    while ( ( dp = readdir( taskDir ) ) != nullptr )
+    while ( true )
     {
+        auto dp = readdir( taskDir );
+        if ( dp == nullptr )
+        {
+            break;
+        }
         std::string taskFileName = dp->d_name;
         if ( ( taskFileName.length() > 0 ) && ( taskFileName[0] != '.' ) )
         {
@@ -90,7 +94,7 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
                 CPUUsageInfo::ThreadId tid =
                     static_cast<CPUUsageInfo::ThreadId>( strtol( taskFileName.c_str(), nullptr, 10 ) );
                 char statContent[MAX_PROC_STAT_FILE_SIZE_READ];
-                if ( fgets( statContent, MAX_PROC_STAT_FILE_SIZE_READ - 1, fp ) != nullptr )
+                if ( fgets( &statContent[0], MAX_PROC_STAT_FILE_SIZE_READ - 1, fp ) != nullptr )
                 {
                     statContent[MAX_PROC_STAT_FILE_SIZE_READ - 1] = '\0'; // fgets should already null terminate string
                     char *c = &statContent[0];

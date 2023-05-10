@@ -10,13 +10,14 @@ std::atomic<int> RetryThread::fInstanceCounter( 0 );
 
 RetryThread::RetryThread( IRetryable &retryable, uint32_t startBackoffMs, uint32_t maxBackoffMs )
     : fRetryable( retryable )
+    // coverity[misra_cpp_2008_rule_5_2_10_violation] For std::atomic this must be performed in a single statement
+    // coverity[autosar_cpp14_m5_2_10_violation] For std::atomic this must be performed in a single statement
+    , fInstance( fInstanceCounter++ )
     , fStartBackoffMs( startBackoffMs )
     , fMaxBackoffMs( maxBackoffMs )
     , fCurrentWaitTime( 0 )
     , fShouldStop( false )
 {
-    // coverity[misra_cpp_2008_rule_5_2_10_violation] For std::atomic this must be performed in a single statement
-    fInstance = fInstanceCounter++;
 }
 
 bool

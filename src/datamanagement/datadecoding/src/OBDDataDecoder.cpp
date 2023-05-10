@@ -11,7 +11,7 @@
 #include <ios>
 #include <sstream>
 constexpr int POSITIVE_ECU_RESPONSE_BASE = 0x40;
-#define IS_BIT_SET( var, pos ) ( ( ( var ) & ( 1 << ( pos ) ) ) != 0 )
+#define IS_BIT_SET( var, pos ) ( ( ( var ) & static_cast<uint8_t>( 1U << ( pos ) ) ) != 0U )
 
 namespace Aws
 {
@@ -349,7 +349,7 @@ OBDDataDecoder::calculateValueFromFormula( PID pid,
         // we firstly right shift by 4, then apply bit mask 0b1111
         rawData = inputData[byteIdx];
         rawData >>= formula.mFirstBitPosition % BYTE_SIZE;
-        rawData &= ( 0xFF >> ( BYTE_SIZE - formula.mSizeInBits ) );
+        rawData &= static_cast<uint64_t>( 0xFFULL ) >> ( BYTE_SIZE - formula.mSizeInBits );
     }
     else
     {
@@ -359,7 +359,7 @@ OBDDataDecoder::calculateValueFromFormula( PID pid,
         while ( numOfBytes != 0 )
         {
             --numOfBytes;
-            rawData = ( rawData << BYTE_SIZE ) | inputData[byteIdx];
+            rawData = ( rawData << BYTE_SIZE ) | static_cast<uint64_t>( inputData[byteIdx] );
             byteIdx++;
         }
     }

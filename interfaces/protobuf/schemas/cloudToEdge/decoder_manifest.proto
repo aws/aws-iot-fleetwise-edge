@@ -9,9 +9,9 @@ package Aws.IoTFleetWise.Schemas.DecoderManifestMsg;
 message DecoderManifest {
 
   /*
-   * Amazon Resource Name and version of the decoder manifest
+   * Synchronization ID of the decoder manifest
    */
-  string arn = 1;
+  string sync_id = 1;
 
   /*
    * List of signals that are sent and received on the CAN BUS in the vehicle

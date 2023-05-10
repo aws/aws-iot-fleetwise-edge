@@ -81,7 +81,7 @@ private:
     static bool preparePayload( uint8_t *const buf,
                                 size_t size,
                                 const std::string &data,
-                                const struct CollectionSchemeParams &collectionSchemeParams );
+                                const CollectionSchemeParams &collectionSchemeParams );
 };
 } // namespace OffboardConnectivityAwsIot
 } // namespace IoTFleetWise

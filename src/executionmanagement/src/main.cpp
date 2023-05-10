@@ -17,19 +17,24 @@ using namespace Aws::IoTFleetWise::ExecutionManagement;
 static volatile sig_atomic_t mSignal = 0; // volatile has to be used since it will be modified by a signal handler,
                                           // executed as result of an asynchronous interrupt
 
-extern "C" void
-signalHandler( int signum )
+extern "C"
 {
-    // Very few things are safe in a signal handler. So we never do anything other than set the atomic int, not even
-    // print a message: https://stackoverflow.com/a/16891799
-    mSignal = signum;
+    // coverity[cert_msc54_cpp_violation] False positive - function does have C linkage
+    static void
+    signalHandler( int signum )
+    {
+        // Very few things are safe in a signal handler. So we never do anything other than set the atomic int, not even
+        // print a message: https://stackoverflow.com/a/16891799
+        mSignal = signum;
+    }
 }
 
 static void
 printVersion()
 {
-    std::cout << "Version: " << VERSION_PROJECT_VERSION << ", git tag: " << VERSION_GIT_TAG
-              << ", git commit sha: " << VERSION_GIT_COMMIT_SHA << ", Build time: " << VERSION_BUILD_TIME << std::endl;
+    std::cout << "Version: " << &VERSION_PROJECT_VERSION[0] << ", git tag: " << &VERSION_GIT_TAG[0]
+              << ", git commit sha: " << &VERSION_GIT_COMMIT_SHA[0] << ", Build time: " << &VERSION_BUILD_TIME[0]
+              << std::endl;
 }
 
 static void
@@ -88,7 +93,7 @@ main( int argc, char *argv[] )
         Json::Value config;
         if ( !IoTFleetWiseConfig::read( configFilename, config ) )
         {
-            std::cout << " AWS IoT FleetWise Edge Service failed to read config file: " + configFilename << std::endl;
+            std::cout << "AWS IoT FleetWise Edge Service failed to read config file: " + configFilename << std::endl;
             return EXIT_FAILURE;
         }
         // Set system wide log level
@@ -98,7 +103,7 @@ main( int argc, char *argv[] )
         // Connect the Engine
         if ( engine.connect( config ) && engine.start() )
         {
-            std::cout << " AWS IoT FleetWise Edge Service Started successfully " << std::endl;
+            std::cout << "AWS IoT FleetWise Edge Service Started successfully" << std::endl;
         }
         else
         {
@@ -112,11 +117,11 @@ main( int argc, char *argv[] )
         int exitCode = signalToExitCode( mSignal );
         if ( engine.stop() && engine.disconnect() )
         {
-            std::cout << " AWS IoT FleetWise Edge Service Stopped successfully " << std::endl;
+            std::cout << "AWS IoT FleetWise Edge Service Stopped successfully" << std::endl;
             return exitCode;
         }
 
-        std::cout << " AWS IoT FleetWise Edge Service Stopped with errors " << std::endl;
+        std::cout << "AWS IoT FleetWise Edge Service Stopped with errors" << std::endl;
         return EXIT_FAILURE;
     }
     catch ( const std::exception &e )

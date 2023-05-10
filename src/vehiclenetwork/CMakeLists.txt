@@ -6,7 +6,6 @@ set(libraryAliasName IoTFleetWise::Vehiclenetwork)
 
 
 set(SRCS
-  src/CANDataSource.cpp
   src/ISOTPOverCANReceiver.cpp
   src/ISOTPOverCANSender.cpp
   src/ISOTPOverCANSenderReceiver.cpp
@@ -27,7 +26,7 @@ add_library(
 # library, for example: #include "businterfaces/VehicleDataSource.h"
 target_include_directories(${libraryTargetName} PUBLIC include)
 
-find_package(Boost 1.65.1 REQUIRED COMPONENTS thread)
+find_package(Boost 1.71.0 REQUIRED COMPONENTS thread)
 if(FWE_FEATURE_CAMERA)
   find_package(fastrtps REQUIRED)
   find_package(fastcdr REQUIRED)
@@ -60,17 +59,12 @@ install(
   include/businterfaces/ISOTPOverCANReceiver.h
   include/businterfaces/ISOTPOverCANSender.h
   include/businterfaces/ISOTPOverCANSenderReceiver.h
-  include/businterfaces/AbstractVehicleDataSource.h
-  include/businterfaces/VehicleDataSourceListener.h
-  include/businterfaces/CANDataSource.h
   DESTINATION
   include
 )
 
 install(
   FILES
-  include/datatypes/VehicleDataMessage.h
-  include/datatypes/VehicleDataSourceConfig.h
   include/datatypes/VehicleDataSourceTypes.h
   include/datatypes/ISOTPOverCANOptions.h
   DESTINATION
@@ -97,8 +91,6 @@ endif()
 set(
   testSources
   test/ISOTPOverCANProtocolTest.cpp
-  test/VehicleDataMessageTest.cpp
-  test/CANDataSourceTest.cpp
 )
 
 if(FWE_FEATURE_CAMERA)

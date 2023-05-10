@@ -71,12 +71,13 @@ AwsIotChannel::subscribe()
     auto onMessage = [&]( Mqtt::MqttConnection &mqttConnection,
                           const String &topic,
                           const ByteBuf &byteBuf,
-                          bool dup /*dup*/,
-                          Mqtt::QOS /*qos*/,
-                          bool retain /*retain*/ ) {
+                          bool dup,
+                          Mqtt::QOS qos,
+                          bool retain ) {
         std::ostringstream os;
         (void)mqttConnection;
         (void)dup;
+        (void)qos;
         (void)retain;
         os << "Message received on topic  " << topic << " payload length: " << byteBuf.len;
         FWE_LOG_TRACE( os.str() );
@@ -91,7 +92,7 @@ AwsIotChannel::subscribe()
     auto onSubAck = [&]( Mqtt::MqttConnection &mqttConnection,
                          uint16_t packetId,
                          const String &topic,
-                         Mqtt::QOS QoS,
+                         Mqtt::QOS qos,
                          int errorCode ) {
         (void)mqttConnection;
         mSubscribed = false;
@@ -104,7 +105,7 @@ AwsIotChannel::subscribe()
         }
         else
         {
-            if ( ( packetId == 0u ) || ( QoS == Mqtt::QOS::AWS_MQTT_QOS_FAILURE ) )
+            if ( ( packetId == 0U ) || ( qos == Mqtt::QOS::AWS_MQTT_QOS_FAILURE ) )
             {
                 TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_REJECT );
                 FWE_LOG_ERROR( "Subscribe rejected by the Remote broker" );

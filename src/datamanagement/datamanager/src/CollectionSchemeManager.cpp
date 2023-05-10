@@ -19,7 +19,7 @@ namespace DataManagement
 
 const std::string CollectionSchemeManager::CHECKIN = "Checkin";
 CollectionSchemeManager::CollectionSchemeManager( std::string dm_id )
-    : currentDecoderManifestID( std::move( dm_id ) )
+    : mCurrentDecoderManifestID( std::move( dm_id ) )
 {
 }
 
@@ -28,7 +28,7 @@ CollectionSchemeManager::CollectionSchemeManager( std::string dm_id,
                                                   std::map<std::string, ICollectionSchemePtr> mapIdle )
     : mIdleCollectionSchemeMap( std::move( mapIdle ) )
     , mEnabledCollectionSchemeMap( std::move( mapEnabled ) )
-    , currentDecoderManifestID( std::move( dm_id ) )
+    , mCurrentDecoderManifestID( std::move( dm_id ) )
 {
 }
 
@@ -168,37 +168,38 @@ CollectionSchemeManager::doWork( void *data )
     collectionSchemeManager->prepareCheckinTimer();
     // Retrieve collectionSchemeList and decoderManifest from persistent storage
     static_cast<void>( collectionSchemeManager->retrieve( DataType::COLLECTION_SCHEME_LIST ) );
-    // If we have an injected Decoder Manifest, we shall not try to load another one from
-    // the persistency module
-    if ( !collectionSchemeManager->mUseLocalDictionary )
-    {
-        static_cast<void>( collectionSchemeManager->retrieve( DataType::DECODER_MANIFEST ) );
-    }
-    else
-    {
-        FWE_LOG_TRACE( " Using a locally defined  decoder dictionary " );
-    }
-    do
+    static_cast<void>( collectionSchemeManager->retrieve( DataType::DECODER_MANIFEST ) );
+    while ( true )
     {
         if ( collectionSchemeManager->mProcessDecoderManifest )
         {
             collectionSchemeManager->mProcessDecoderManifest = false;
             TraceModule::get().sectionBegin( TraceSection::MANAGER_DECODER_BUILD );
-            enabledCollectionSchemeMapChanged |= collectionSchemeManager->processDecoderManifest();
+            if ( collectionSchemeManager->processDecoderManifest() )
+            {
+                enabledCollectionSchemeMapChanged = true;
+            }
             TraceModule::get().sectionEnd( TraceSection::MANAGER_DECODER_BUILD );
         }
         if ( collectionSchemeManager->mProcessCollectionScheme )
         {
             collectionSchemeManager->mProcessCollectionScheme = false;
             TraceModule::get().sectionBegin( TraceSection::MANAGER_COLLECTION_BUILD );
-            enabledCollectionSchemeMapChanged |= collectionSchemeManager->processCollectionScheme();
+            if ( collectionSchemeManager->processCollectionScheme() )
+            {
+                enabledCollectionSchemeMapChanged = true;
+            }
             TraceModule::get().sectionEnd( TraceSection::MANAGER_COLLECTION_BUILD );
         }
         auto checkTime = collectionSchemeManager->mClock->timeSinceEpoch();
-        enabledCollectionSchemeMapChanged |= collectionSchemeManager->checkTimeLine( checkTime );
+        if ( collectionSchemeManager->checkTimeLine( checkTime ) )
+        {
+            enabledCollectionSchemeMapChanged = true;
+        }
         if ( enabledCollectionSchemeMapChanged )
         {
             TraceModule::get().sectionBegin( TraceSection::MANAGER_EXTRACTION );
+            TraceModule::get().sectionBegin( TraceSection::COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA );
             FWE_LOG_TRACE(
 
                 "Start extraction because of changed active collection schemes at system time " +
@@ -212,7 +213,7 @@ CollectionSchemeManager::doWork( void *data )
              * Then, propagate inspection matrix to Inspection engine
              */
             enabledCollectionSchemeMapChanged = false;
-            std::shared_ptr<InspectionMatrix> inspectionMatrixOutput = std::make_shared<InspectionMatrix>();
+            auto inspectionMatrixOutput = std::make_shared<InspectionMatrix>();
             collectionSchemeManager->inspectionMatrixExtractor( inspectionMatrixOutput );
             collectionSchemeManager->inspectionMatrixUpdater( inspectionMatrixOutput );
             /*
@@ -222,39 +223,34 @@ CollectionSchemeManager::doWork( void *data )
              *
              * the propagate the output to Vehicle Data Consumers
              */
-            if ( !collectionSchemeManager->mUseLocalDictionary )
-            {
-                std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> decoderDictionaryMap;
-                collectionSchemeManager->decoderDictionaryExtractor( decoderDictionaryMap );
-                // Publish decoder dictionaries update to all listeners
-                collectionSchemeManager->decoderDictionaryUpdater( decoderDictionaryMap );
-                // coverity[check_return : SUPPRESS]
-                std::string decoderCanChannels = std::to_string(
-                    ( decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET ) !=
-                          decoderDictionaryMap.end() &&
-                      decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] != nullptr )
-                        ? decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET]->canMessageDecoderMethod.size()
-                        : 0 );
-                std::string obdPids = std::to_string(
-                    ( ( decoderDictionaryMap.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap.end() ) &&
-                      ( decoderDictionaryMap[VehicleDataSourceProtocol::OBD] != nullptr ) &&
-                      ( !decoderDictionaryMap[VehicleDataSourceProtocol::OBD]->canMessageDecoderMethod.empty() ) )
-                        ? decoderDictionaryMap[VehicleDataSourceProtocol::OBD]
-                              ->canMessageDecoderMethod.cbegin()
-                              ->second.size()
-                        : 0 );
-                FWE_LOG_INFO( "FWE activated Decoder Manifest:" + std::string( " using decoder manifest:" ) +
-                              collectionSchemeManager->currentDecoderManifestID + " resulting in decoding rules for " +
-                              std::to_string( decoderDictionaryMap.size() ) +
-                              " protocols. Decoder CAN channels: " + decoderCanChannels + " and OBD PIDs:" + obdPids );
-            }
-            std::string canInfo;
+            std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> decoderDictionaryMap;
+            collectionSchemeManager->decoderDictionaryExtractor( decoderDictionaryMap );
+            // Publish decoder dictionaries update to all listeners
+            collectionSchemeManager->decoderDictionaryUpdater( decoderDictionaryMap );
+            // coverity[check_return : SUPPRESS]
+            std::string decoderCanChannels = std::to_string(
+                ( decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET ) != decoderDictionaryMap.end() &&
+                  decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] != nullptr )
+                    ? decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET]->canMessageDecoderMethod.size()
+                    : 0 );
+            std::string obdPids = std::to_string(
+                ( ( decoderDictionaryMap.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap.end() ) &&
+                  ( decoderDictionaryMap[VehicleDataSourceProtocol::OBD] != nullptr ) &&
+                  ( !decoderDictionaryMap[VehicleDataSourceProtocol::OBD]->canMessageDecoderMethod.empty() ) )
+                    ? decoderDictionaryMap[VehicleDataSourceProtocol::OBD]
+                          ->canMessageDecoderMethod.cbegin()
+                          ->second.size()
+                    : 0 );
+            FWE_LOG_INFO( "FWE activated Decoder Manifest:" + std::string( " using decoder manifest:" ) +
+                          collectionSchemeManager->mCurrentDecoderManifestID + " resulting in decoding rules for " +
+                          std::to_string( decoderDictionaryMap.size() ) +
+                          " protocols. Decoder CAN channels: " + decoderCanChannels + " and OBD PIDs:" + obdPids );
             std::string enabled;
             std::string idle;
             collectionSchemeManager->printExistingCollectionSchemes( enabled, idle );
             // coverity[check_return : SUPPRESS]
             FWE_LOG_INFO( "FWE activated collection schemes:" + enabled + " using decoder manifest:" +
-                          collectionSchemeManager->currentDecoderManifestID + " resulting in " +
+                          collectionSchemeManager->mCurrentDecoderManifestID + " resulting in " +
                           std::to_string( inspectionMatrixOutput->conditions.size() ) + " inspection conditions" );
             TraceModule::get().sectionEnd( TraceSection::MANAGER_EXTRACTION );
         }
@@ -284,7 +280,11 @@ CollectionSchemeManager::doWork( void *data )
         std::string wakeupStr;
         collectionSchemeManager->printWakeupStatus( wakeupStr );
         FWE_LOG_TRACE( wakeupStr );
-    } while ( !collectionSchemeManager->shouldStop() );
+        if ( collectionSchemeManager->shouldStop() )
+        {
+            break;
+        }
+    }
 }
 
 /* callback function */
@@ -388,20 +388,21 @@ CollectionSchemeManager::processDecoderManifest()
     if ( ( mDecoderManifest == nullptr ) || ( !mDecoderManifest->build() ) )
     {
         FWE_LOG_ERROR( " Failed to process the upcoming DecoderManifest." );
+        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::COLLECTION_SCHEME_ERROR );
         return false;
     }
     // build is successful
-    if ( mDecoderManifest->getID() == currentDecoderManifestID )
+    if ( mDecoderManifest->getID() == mCurrentDecoderManifestID )
     {
-        FWE_LOG_TRACE( "Ignoring new decoder manifest with same name: " + currentDecoderManifestID );
+        FWE_LOG_TRACE( "Ignoring new decoder manifest with same name: " + mCurrentDecoderManifestID );
         // no change in decoder manifest
         return false;
     }
-    FWE_LOG_TRACE( "Replace decoder manifest " + currentDecoderManifestID + " with " + mDecoderManifest->getID() +
+    FWE_LOG_TRACE( "Replace decoder manifest " + mCurrentDecoderManifestID + " with " + mDecoderManifest->getID() +
                    " while " + std::to_string( mEnabledCollectionSchemeMap.size() ) + " active and " +
                    std::to_string( mIdleCollectionSchemeMap.size() ) + " idle collection schemes loaded" );
-    // store the new DM, update currentDecoderManifestID
-    currentDecoderManifestID = mDecoderManifest->getID();
+    // store the new DM, update mCurrentDecoderManifestID
+    mCurrentDecoderManifestID = mDecoderManifest->getID();
     store( DataType::DECODER_MANIFEST );
     // when DM changes, check if we have collectionScheme loaded
     if ( isCollectionSchemeLoaded() )
@@ -431,6 +432,7 @@ CollectionSchemeManager::processCollectionScheme()
     if ( ( mCollectionSchemeList == nullptr ) || ( !mCollectionSchemeList->build() ) )
     {
         FWE_LOG_ERROR( "Incoming CollectionScheme does not exist or fails to build!" );
+        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::COLLECTION_SCHEME_ERROR );
         return false;
     }
     // Build is successful. Store collectionScheme
@@ -481,13 +483,14 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
     /* Separate collectionSchemes into Enabled and Idle bucket */
     for ( auto const &collectionScheme : collectionSchemeList )
     {
-        if ( collectionScheme->getDecoderManifestID() != currentDecoderManifestID )
+        if ( collectionScheme->getDecoderManifestID() != mCurrentDecoderManifestID )
         {
             // Encounters a collectionScheme that does not have matching DM
             // Rebuild has to bail out. Call cleanupCollectionSchemes() before exiting.
-            FWE_LOG_TRACE( "CollectionScheme does not have matching DM ID. Current DM ID: " + currentDecoderManifestID +
-                           " but collection scheme " + collectionScheme->getCollectionSchemeID() + " needs " +
-                           collectionScheme->getDecoderManifestID() );
+            FWE_LOG_TRACE(
+                "CollectionScheme does not have matching DM ID. Current DM ID: " + mCurrentDecoderManifestID +
+                " but collection scheme " + collectionScheme->getCollectionSchemeID() + " needs " +
+                collectionScheme->getDecoderManifestID() );
 
             cleanupCollectionSchemes();
             return false;
@@ -542,11 +545,11 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
     collectionSchemeList = mCollectionSchemeList->getCollectionSchemes();
     for ( auto const &collectionScheme : collectionSchemeList )
     {
-        if ( collectionScheme->getDecoderManifestID() != currentDecoderManifestID )
+        if ( collectionScheme->getDecoderManifestID() != mCurrentDecoderManifestID )
         {
             // Encounters a collectionScheme that does not have matching DM
             // Rebuild has to bail out. Call cleanupCollectionSchemes() before exiting.
-            FWE_LOG_TRACE( "CollectionScheme does not have matching DM ID: " + currentDecoderManifestID + " " +
+            FWE_LOG_TRACE( "CollectionScheme does not have matching DM ID: " + mCurrentDecoderManifestID + " " +
                            collectionScheme->getDecoderManifestID() );
 
             cleanupCollectionSchemes();

@@ -61,7 +61,7 @@ MemoryUsageInfo::reportMemoryUsageInfo()
     }
     else
     {
-        mMaxResidentMemorySize = static_cast<size_t>( selfMemoryUsage.ru_maxrss * 1024U );
+        mMaxResidentMemorySize = static_cast<size_t>( selfMemoryUsage.ru_maxrss ) * 1024U;
         return true;
     }
 }

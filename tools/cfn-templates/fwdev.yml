@@ -72,6 +72,83 @@ Resources:
     Properties:
       Roles:
         - !Ref Ec2ServiceRole
+  Ec2LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${AWS::StackName}-EC2-LaunchTemplate
+      LaunchTemplateData:
+        ImageId: !FindInMap [AMIRegionMap, !Ref "AWS::Region", AMIID]
+        KeyName: !Ref Ec2KeyPair
+        InstanceType: !Ref Ec2InstanceType
+        IamInstanceProfile:
+          Name: !Ref Ec2InstanceProfile
+        SecurityGroupIds: !Split [",", !GetAtt Ec2SecurityGroup.GroupId]
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub ${AWS::StackName}-Ec2-Instance
+        MetadataOptions:
+          HttpEndpoint: "enabled"
+          HttpTokens: "required"
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeSize: !Ref Ec2VolumeSize
+              DeleteOnTermination: true
+              Encrypted: true
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euo pipefail
+
+            # Wait for any existing package install to finish
+            i=0
+            while true; do
+              if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
+                i=0
+              else
+                i=`expr $i + 1`
+                if expr $i \>= 10 > /dev/null; then
+                  break
+                fi
+              fi
+              sleep 1
+            done
+
+            # Upgrade system and reboot if required
+            apt update && apt upgrade -y
+            if [ -f /var/run/reboot-required ]; then
+              # Delete the UserData info file so that we run again after reboot
+              rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
+              reboot
+              exit
+            fi
+
+            # Install helper scripts:
+            apt update && apt install -y python3-setuptools
+            mkdir -p /opt/aws/bin
+            wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+            python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
+            rm aws-cfn-bootstrap-py3-latest.tar.gz
+
+            # On error, signal back to cfn:
+            error_handler() {
+              /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+            }
+            trap error_handler ERR
+
+            # Install packages
+            apt update && apt install -y ec2-instance-connect htop jq unzip zip
+
+            # Install AWS CLI:
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            ./aws/install
+            rm awscliv2.zip
+
+            # Signal init complete:
+            /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
   Ec2Instance:
     Type: AWS::EC2::Instance
     CreationPolicy:
@@ -79,72 +156,9 @@ Resources:
         Count: 1
         Timeout: PT15M
     Properties:
-      ImageId: !FindInMap [AMIRegionMap, !Ref "AWS::Region", AMIID]
-      KeyName: !Ref Ec2KeyPair
-      InstanceType: !Ref Ec2InstanceType
-      IamInstanceProfile: !Ref Ec2InstanceProfile
-      SecurityGroupIds: !Split [",", !GetAtt Ec2SecurityGroup.GroupId]
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-Ec2-Instance
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          set -euo pipefail
-
-          # Wait for any existing package install to finish
-          i=0
-          while true; do
-            if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
-              i=0
-            else
-              i=`expr $i + 1`
-              if expr $i \>= 10 > /dev/null; then
-                break
-              fi
-            fi
-            sleep 1
-          done
-
-          # Upgrade system and reboot if required
-          apt update && apt upgrade -y
-          if [ -f /var/run/reboot-required ]; then
-            # Delete the UserData info file so that we run again after reboot
-            rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
-            reboot
-            exit
-          fi
-
-          # Install helper scripts:
-          apt update && apt install -y python3-setuptools
-          mkdir -p /opt/aws/bin
-          wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-          python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
-          rm aws-cfn-bootstrap-py3-latest.tar.gz
-
-          # On error, signal back to cfn:
-          error_handler() {
-            /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
-          }
-          trap error_handler ERR
-
-          # Install packages
-          apt update && apt install -y ec2-instance-connect htop jq unzip zip
-
-          # Install AWS CLI:
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
-          unzip -q awscliv2.zip
-          ./aws/install
-          rm awscliv2.zip
-
-          # Signal init complete:
-          /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
-      BlockDeviceMappings:
-        - DeviceName: /dev/sda1
-          Ebs:
-            VolumeSize: !Ref Ec2VolumeSize
-            DeleteOnTermination: "true"
-            Encrypted: "true"
+      LaunchTemplate:
+        LaunchTemplateId: !Ref Ec2LaunchTemplate
+        Version: !GetAtt Ec2LaunchTemplate.LatestVersionNumber
 Mappings:
   # Ubuntu 20.04 arm64 AMIs
   AMIRegionMap:

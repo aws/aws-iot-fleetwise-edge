@@ -146,29 +146,6 @@ public:
         mSchemaListenerPtr = collectionSchemeIngestionListenerPtr;
     }
 
-    /**
-     * @brief Used by the bootstrap to set the UseLocalDictionary Flag to ingore DM
-     * updates through MQTT connection
-     *
-     * @param useLocalDictionaryIn
-     */
-    inline void
-    setLocalDictionaryFlag( bool useLocalDictionaryIn )
-    {
-        mUseLocalDictionary = useLocalDictionaryIn;
-    }
-
-    /**
-     * @brief Used by the bootstrap to set the DecoderManifestID when using local Dictionary
-     *
-     * @param currentDecoderManifestIDIn
-     */
-    inline void
-    setDecoderManifestID( std::string currentDecoderManifestIDIn )
-    {
-        currentDecoderManifestID = std::move( currentDecoderManifestIDIn );
-    }
-
 private:
     using ThreadListeners<IActiveDecoderDictionaryListener>::notifyListeners;
     using ThreadListeners<IActiveConditionProcessor>::notifyListeners;
@@ -244,8 +221,7 @@ private:
      * @param collectionScheme the collectionScheme where the info is retrieved
      * @param conditionData object ConditionWithCollectedData to be filled
      */
-    void addConditionData( const ICollectionSchemePtr &collectionScheme,
-                           struct ConditionWithCollectedData &conditionData );
+    void addConditionData( const ICollectionSchemePtr &collectionScheme, ConditionWithCollectedData &conditionData );
 
     /**
      * @brief initialize in mTimeLine to send checkin message
@@ -307,9 +283,6 @@ private:
     static constexpr int RETRY_CHECKIN_INTERVAL_IN_MILLISECOND = 5000;
     // checkIn ID in parallel to collectionScheme IDs
     static const std::string CHECKIN;
-    // Supported Network Protocol. This list will expand when new protocol added
-    static constexpr std::array<VehicleDataSourceProtocol, 2> SUPPORTED_NETWORK_PROTOCOL = {
-        { VehicleDataSourceProtocol::RAW_SOCKET, VehicleDataSourceProtocol::OBD } };
 
     Thread mThread;
     // Atomic flag to signal the state of main thread. If true, we should stop
@@ -331,7 +304,7 @@ private:
     std::map<std::string, ICollectionSchemePtr> mEnabledCollectionSchemeMap;
 
     // ID for the decoder manifest currently in use
-    std::string currentDecoderManifestID;
+    std::string mCurrentDecoderManifestID;
 
     // Time interval in ms to send checkin message
     uint64_t mCheckinIntervalInMsec{ DEFAULT_CHECKIN_INTERVAL_IN_MILLISECOND };
@@ -383,8 +356,6 @@ protected:
     bool mProcessDecoderManifest{ false };
     // CacheAndPersist object passed from K-Engine
     std::shared_ptr<ICacheAndPersist> mSchemaPersistency;
-    // flag used to check if local dictionary is available
-    bool mUseLocalDictionary{ false };
 
     CANInterfaceIDTranslator mCANIDTranslator;
 };

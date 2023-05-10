@@ -26,6 +26,18 @@ using namespace Aws::IoTFleetWise::Platform::Linux;
 using namespace Aws::IoTFleetWise::VehicleNetwork;
 using namespace Aws::IoTFleetWise::DataManagement;
 
+// ECU IDs
+enum class ECUID
+{
+    INVALID_ECU_ID = 0,
+    BROADCAST_ID = 0x7DF,
+    BROADCAST_EXTENDED_ID = 0x18DB33F1,
+    LOWEST_ECU_EXTENDED_RX_ID = 0x18DAF100,
+    LOWEST_ECU_RX_ID = 0x7E8,
+    HIGHEST_ECU_EXTENDED_RX_ID = 0x18DAF1FF,
+    HIGHEST_ECU_RX_ID = 0x7EF,
+};
+
 /**
  * @brief This class is responsible for coordinating OBD requests on all ECUs
  */
@@ -86,7 +98,7 @@ public:
 
     // From IActiveConditionProcessor
     // We need this to know whether DTCs should be requested or not
-    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &activeConditions ) override;
+    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) override;
 
     /**
      * @brief Handle of the Signal Output Buffer. This buffer shared between Collection Engine
@@ -126,11 +138,11 @@ private:
     /**
      * @brief Initialize ECUs by detected CAN IDs
      * @param isExtendedID When true, 29-bit messages were detected, otherwise 11-bit
-     * @param canIDResponse Detected CAN ID via broadcast request
+     * @param canIDResponses Detected CAN ID via broadcast request
      * @param broadcastSocket Broadcast socket for sending request. Can be -1 to send using physical socket.
      * @return True if all OBDOverCANECU modules are initialized successfully for ECUs
      */
-    bool initECUs( bool isExtendedID, std::vector<uint32_t> &canIDResponse, int broadcastSocket );
+    bool initECUs( bool isExtendedID, std::vector<uint32_t> &canIDResponses, int broadcastSocket );
 
     // Start the  thread
     bool start();
@@ -152,10 +164,10 @@ private:
     void assignPIDsToECUs();
     /**
      * @brief Open an ISO-TP broadcast socket to send requests for all ECUs
-     * @param isExtendedId Whether the broadcast ID is in extended format (29-bit) or standard format (11 bit)
+     * @param isExtendedID Whether the broadcast ID is in extended format (29-bit) or standard format (11 bit)
      * @return Broadcast socket, or -1 on error
      */
-    int openISOTPBroadcastSocket( bool isExtendedId );
+    int openISOTPBroadcastSocket( bool isExtendedID );
     /**
      * @brief Flush ecus sockets to ignore received data from broadcast request. If mBroadcastRequests is false,
      *        no flushing will be performed.
