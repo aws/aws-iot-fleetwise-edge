@@ -78,7 +78,7 @@ protected:
     }
 
 private:
-    void matchDictionaryToFilter( const CANDecoderDictionary &dictionary,
+    void matchDictionaryToFilter( std::shared_ptr<const CANDecoderDictionary> &dictionary,
                                   CANChannelNumericID canChannel,
                                   CANRawFrameID canRawFrameId );
     // Main work function that runs in new thread
@@ -100,7 +100,7 @@ private:
     CANMessageFormat mUsedMessageFormat;
     mutable std::mutex mExtractionOngoing;
 
-    std::shared_ptr<const CANDecoderDictionary> lastReceivedDictionary;
+    std::shared_ptr<const CANDecoderDictionary> mLastReceivedDictionary;
 
     static const uint32_t DEFAULT_POLL_INTERVAL_MS = 50; // Default poll every 50ms data
 };

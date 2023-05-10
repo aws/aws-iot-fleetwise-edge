@@ -13,17 +13,17 @@ namespace DataInspection
 {
 
 bool
-CollectionInspectionWorkerThread::init( const std::shared_ptr<SignalBuffer> &inputSignalBufferIn,
-                                        const std::shared_ptr<CANBuffer> &inputCANBufferIn,
+CollectionInspectionWorkerThread::init( const std::shared_ptr<SignalBuffer> &inputSignalBuffer,
+                                        const std::shared_ptr<CANBuffer> &inputCANBuffer,
                                         const std::shared_ptr<ActiveDTCBuffer> &inputActiveDTCBuffer,
-                                        const std::shared_ptr<CollectedDataReadyToPublish> &outputCollectedDataIn,
+                                        const std::shared_ptr<CollectedDataReadyToPublish> &outputCollectedData,
                                         uint32_t idleTimeMs,
                                         bool dataReductionProbabilityDisabled )
 {
-    fInputSignalBuffer = inputSignalBufferIn;
-    fInputCANBuffer = inputCANBufferIn;
+    fInputSignalBuffer = inputSignalBuffer;
+    fInputCANBuffer = inputCANBuffer;
     fInputActiveDTCBuffer = inputActiveDTCBuffer;
-    fOutputCollectedData = outputCollectedDataIn;
+    fOutputCollectedData = outputCollectedData;
     if ( idleTimeMs != 0 )
     {
         fIdleTimeMs = idleTimeMs;
@@ -85,11 +85,11 @@ CollectionInspectionWorkerThread::shouldStop() const
 
 void
 CollectionInspectionWorkerThread::onChangeInspectionMatrix(
-    const std::shared_ptr<const InspectionMatrix> &activeConditions )
+    const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
 {
     {
         std::lock_guard<std::mutex> lock( fInspectionMatrixMutex );
-        fUpdatedInspectionMatrix = activeConditions;
+        fUpdatedInspectionMatrix = inspectionMatrix;
         fUpdatedInspectionMatrixAvailable = true;
         FWE_LOG_TRACE( "New inspection matrix handed over" );
         // Wake up the thread.
@@ -115,7 +115,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
     uint32_t statisticInputMessagesProcessed = 0;
     uint32_t statisticDataSentOut = 0;
     uint32_t activations = 0;
-    do
+    while ( true )
     {
         activations++;
         if ( consumer->fUpdatedInspectionMatrixAvailable )
@@ -298,7 +298,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                      ( lastTraceOutput + LoggingModule::LOG_AGGREGATION_TIME_MS ) )
                 {
                     FWE_LOG_TRACE( "Activations: " + std::to_string( activations ) +
-                                   ". Waiting for some data to come. Idling for :" + std::to_string( timeToWait ) +
+                                   ". Waiting for some data to come. Idling for: " + std::to_string( timeToWait ) +
                                    " ms or until notify. Since last idling processed " +
                                    std::to_string( statisticInputMessagesProcessed ) +
                                    " incoming data packages and sent out " + std::to_string( statisticDataSentOut ) +
@@ -316,7 +316,11 @@ CollectionInspectionWorkerThread::doWork( void *data )
             // No inspection Matrix available. Wait for it from the CollectionScheme manager
             consumer->fWait.wait( Platform::Linux::Signal::WaitWithPredicate );
         }
-    } while ( !consumer->shouldStop() );
+        if ( consumer->shouldStop() )
+        {
+            break;
+        }
+    }
 }
 
 TimePoint

@@ -113,7 +113,7 @@ private:
      */
     ExpressionNode *serializeNode( const CollectionSchemesMsg::ConditionNode &node,
                                    std::size_t &nextIndex,
-                                   const int depth );
+                                   int remainingDepth );
 
     /**
      * @brief Helper function that returns all nodes in the AST by doing a recursive traversal

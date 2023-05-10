@@ -69,7 +69,7 @@ private:
      * */
     const std::string &levelToColor( LogLevel level ) const;
 
-    bool mColorEnabled;
+    bool mColorEnabled{ false };
 };
 
 enum class LogColorOption

@@ -45,12 +45,12 @@ TEST( CANDecoderTest, CANDecoderTestSimpleMessage )
     msgFormat.mSignals.emplace_back( sigFormat2 );
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 7 };
-    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedMsg ) );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 2 );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mRawValue, 13 );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[1].mRawValue, 4084 );
+    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 2 );
+    ASSERT_EQ( decodedSignals[0].mRawValue, 13 );
+    ASSERT_EQ( decodedSignals[1].mRawValue, 4084 );
 }
 
 TEST( CANDecoderTest, CANDecoderTestSimpleMessage2 )
@@ -91,12 +91,12 @@ TEST( CANDecoderTest, CANDecoderTestSimpleMessage2 )
     msgFormat.mSignals.emplace_back( sigFormat2 );
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 7 };
-    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedMsg ) );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 2 );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mRawValue, 153638137 );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[1].mRawValue, -299667802 );
+    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 2 );
+    ASSERT_EQ( decodedSignals[0].mRawValue, 153638137 );
+    ASSERT_EQ( decodedSignals[1].mRawValue, -299667802 );
 }
 
 // Precision Test
@@ -141,18 +141,16 @@ TEST( CANDecoderTest, CANDecoderPrecisionTest )
     msgFormat.mSignals.emplace_back( sigFormat2 );
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 7 };
     ASSERT_TRUE(
-        decoder.decodeCANMessage( frameData.data(), msgSizeBytes, msgFormat, signalIDsToCollect, decodedMsg ) );
+        decoder.decodeCANMessage( frameData.data(), msgSizeBytes, msgFormat, signalIDsToCollect, decodedSignals ) );
 
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 2 );
-
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mSignalType, SignalType::UINT64 );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[1].mSignalType, SignalType::INT64 );
-
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mPhysicalValue.signalValue.uint64Val, maxUnSignedVal );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[1].mPhysicalValue.signalValue.int64Val, maxSignedVal );
+    ASSERT_EQ( decodedSignals.size(), 2 );
+    ASSERT_EQ( decodedSignals[0].mSignalType, SignalType::UINT64 );
+    ASSERT_EQ( decodedSignals[1].mSignalType, SignalType::INT64 );
+    ASSERT_EQ( decodedSignals[0].mPhysicalValue.signalValue.uint64Val, maxUnSignedVal );
+    ASSERT_EQ( decodedSignals[1].mPhysicalValue.signalValue.int64Val, maxSignedVal );
 }
 
 TEST( CANDecoderTest, CANDecoderPrecisionSignedTest )
@@ -185,16 +183,14 @@ TEST( CANDecoderTest, CANDecoderPrecisionSignedTest )
     msgFormat.mSignals.emplace_back( sigFormat1 );
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     std::unordered_set<SignalID> signalIDsToCollect = { 1 };
     ASSERT_TRUE(
-        decoder.decodeCANMessage( frameData.data(), msgSizeBytes, msgFormat, signalIDsToCollect, decodedMsg ) );
+        decoder.decodeCANMessage( frameData.data(), msgSizeBytes, msgFormat, signalIDsToCollect, decodedSignals ) );
 
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 1 );
-
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mSignalType, SignalType::INT64 );
-
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals[0].mPhysicalValue.signalValue.int64Val, minSignedVal );
+    ASSERT_EQ( decodedSignals.size(), 1 );
+    ASSERT_EQ( decodedSignals[0].mSignalType, SignalType::INT64 );
+    ASSERT_EQ( decodedSignals[0].mPhysicalValue.signalValue.int64Val, minSignedVal );
 }
 
 TEST( CANDecoderTest, CANDecoderTestSimpleMessage3 )
@@ -243,13 +239,13 @@ TEST( CANDecoderTest, CANDecoderTestSimpleMessage3 )
     msgFormat.mSignals.emplace_back( sigFormat3 );
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 2, 3 };
-    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedMsg ) );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 3 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[0].mRawValue, 0x2301 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[1].mRawValue, 0x4567 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[2].mRawValue, 0x89AB );
+    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 3 );
+    EXPECT_EQ( decodedSignals[0].mRawValue, 0x2301 );
+    EXPECT_EQ( decodedSignals[1].mRawValue, 0x4567 );
+    EXPECT_EQ( decodedSignals[2].mRawValue, 0x89AB );
 }
 TEST( CANDecoderTest, CANDecoderTestSimpleCanFdMessage )
 {
@@ -308,14 +304,14 @@ TEST( CANDecoderTest, CANDecoderTestSimpleCanFdMessage )
     msgFormat.mSignals.emplace_back( sigFormat4 );
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 2, 3, 4 };
-    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 64, msgFormat, signalIDsToCollect, decodedMsg ) );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 4 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[0].mRawValue, 0x2301 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[1].mRawValue, 0x70123456 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[2].mRawValue, 0x456701 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[3].mRawValue, 0x7012 );
+    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 64, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 4 );
+    EXPECT_EQ( decodedSignals[0].mRawValue, 0x2301 );
+    EXPECT_EQ( decodedSignals[1].mRawValue, 0x70123456 );
+    EXPECT_EQ( decodedSignals[2].mRawValue, 0x456701 );
+    EXPECT_EQ( decodedSignals[3].mRawValue, 0x7012 );
 }
 
 TEST( CANDecoderTest, CANDecoderTestOnlyDecodeSomeSignals )
@@ -364,13 +360,13 @@ TEST( CANDecoderTest, CANDecoderTestOnlyDecodeSomeSignals )
     msgFormat.mSignals.emplace_back( sigFormat3 );
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     // Only collect Signal ID 1 and 3. Do not collect and decode Signal ID 2
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 3 };
-    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedMsg ) );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 2 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[0].mRawValue, 0x2301 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[1].mRawValue, 0x89AB );
+    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 2 );
+    EXPECT_EQ( decodedSignals[0].mRawValue, 0x2301 );
+    EXPECT_EQ( decodedSignals[1].mRawValue, 0x89AB );
 }
 
 TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage1 )
@@ -441,15 +437,14 @@ TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage1 )
     msgFormat.mIsMultiplexed = true;
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     std::unordered_set<SignalID> signalIDsToCollect = { 50, 51, 52, 53 };
-    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedMsg ) );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 4 );
-
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[0].mRawValue, 0x05 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[1].mRawValue, 0x4B );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[2].mRawValue, 0x20B );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[3].mRawValue, 0xD3 );
+    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 4 );
+    EXPECT_EQ( decodedSignals[0].mRawValue, 0x05 );
+    EXPECT_EQ( decodedSignals[1].mRawValue, 0x4B );
+    EXPECT_EQ( decodedSignals[2].mRawValue, 0x20B );
+    EXPECT_EQ( decodedSignals[3].mRawValue, 0xD3 );
 }
 
 TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage2 )
@@ -534,15 +529,14 @@ TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage2 )
     msgFormat.mIsMultiplexed = true;
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     std::unordered_set<SignalID> signalIDsToCollect = { 54, 55, 56, 57, 58 };
-    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedMsg ) );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 4 );
-
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[0].mRawValue, 0x06 );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[1].mRawValue, 0x1B );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[2].mRawValue, 0x3EB );
-    EXPECT_EQ( decodedMsg.mFrameInfo.mSignals[3].mRawValue, 0xE3B );
+    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 4 );
+    EXPECT_EQ( decodedSignals[0].mRawValue, 0x06 );
+    EXPECT_EQ( decodedSignals[1].mRawValue, 0x1B );
+    EXPECT_EQ( decodedSignals[2].mRawValue, 0x3EB );
+    EXPECT_EQ( decodedSignals[3].mRawValue, 0xE3B );
 }
 
 TEST( CANDecoderTest, CANDecoderTestInvalidSignalLayout )
@@ -578,11 +572,12 @@ TEST( CANDecoderTest, CANDecoderTestInvalidSignalLayout )
     msgFormat.mSignals.emplace_back( sigFormat2 );
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     // Only collect Signal ID 1 and 2.
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 2 };
-    ASSERT_FALSE( decoder.decodeCANMessage( frameData.data(), frameSize, msgFormat, signalIDsToCollect, decodedMsg ) );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 1 ); // we are expecting the signal 1 only.
+    ASSERT_FALSE(
+        decoder.decodeCANMessage( frameData.data(), frameSize, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 1 ); // we are expecting the signal 1 only.
 }
 
 TEST( CANDecoderTest, CANDecoderTestSkippingOutOfBoundSignals1 )
@@ -619,10 +614,11 @@ TEST( CANDecoderTest, CANDecoderTestSkippingOutOfBoundSignals1 )
     msgFormat.mSignals.emplace_back( sigFormat2 );
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 2 };
-    ASSERT_FALSE( decoder.decodeCANMessage( frameData.data(), frameSize, msgFormat, signalIDsToCollect, decodedMsg ) );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 0 );
+    ASSERT_FALSE(
+        decoder.decodeCANMessage( frameData.data(), frameSize, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 0 );
 }
 
 TEST( CANDecoderTest, CANDecoderTestSkippingOutOfBoundSignals2 )
@@ -657,8 +653,9 @@ TEST( CANDecoderTest, CANDecoderTestSkippingOutOfBoundSignals2 )
     msgFormat.mSignals.emplace_back( sigFormat2 );
 
     CANDecoder decoder;
-    CANDecodedMessage decodedMsg;
+    std::vector<CANDecodedSignal> decodedSignals;
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 2 };
-    ASSERT_FALSE( decoder.decodeCANMessage( frameData.data(), frameSize, msgFormat, signalIDsToCollect, decodedMsg ) );
-    ASSERT_EQ( decodedMsg.mFrameInfo.mSignals.size(), 1 );
+    ASSERT_FALSE(
+        decoder.decodeCANMessage( frameData.data(), frameSize, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 1 );
 }

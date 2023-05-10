@@ -119,10 +119,6 @@
               "type": "integer",
               "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer. This is a single producer single consumer buffer."
             },
-            "socketCANBufferSize": {
-              "type": "integer",
-              "description": "Max size of the circular buffer associated with a network channel (CAN Bus) for data consumption from that channel. This is a single producer-single consumer buffer."
-            },
             "decodedSignalsBufferSize": {
               "type": "integer",
               "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer for OBD and CAN signals.This is a multiple producer single consumer buffer."
@@ -132,12 +128,7 @@
               "description": "Max size of the buffer shared between Network Channel Consumer and data collection module ( Collection Engine). This buffer stores raw CAN frames coming in from the CAN Bus. This is a lock-free multi-producer single consumer buffer. "
             }
           },
-          "required": [
-            "dtcBufferSize",
-            "socketCANBufferSize",
-            "decodedSignalsBufferSize",
-            "rawCANFrameBufferSize"
-          ]
+          "required": ["dtcBufferSize", "decodedSignalsBufferSize", "rawCANFrameBufferSize"]
         },
         "threadIdleTimes": {
           "type": "object",

@@ -13,6 +13,9 @@ namespace IoTFleetWise
 namespace DataManagement
 {
 
+/** @brief Number of bits in a byte */
+static constexpr uint8_t BYTE_SIZE = 8;
+
 /**
  * @brief CAN Raw Frame ID is the arbitration ID of a CAN frame found on a bus. Paired with a NodeID its unique.
  */

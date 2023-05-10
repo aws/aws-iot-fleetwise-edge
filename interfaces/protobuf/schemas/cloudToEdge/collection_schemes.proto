@@ -35,9 +35,9 @@ message CollectionScheme {
     string campaign_arn = 1;
 
     /*
-     * Amazon Resource Name of the required decoder manifest for this collectionScheme
+     * Synchronization ID of the required decoder manifest for this collectionScheme
      */
-    string decoder_manifest_arn = 2;
+    string decoder_manifest_sync_id = 2;
 
     /*
      * When collectionScheme should start in milliseconds since the Unix epoch

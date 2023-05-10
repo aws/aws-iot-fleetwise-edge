@@ -5,6 +5,7 @@
 
 // Includes
 #include "EnumUtility.h"
+#include "Timer.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -22,7 +23,6 @@ using namespace Aws::IoTFleetWise::Platform::Utility;
 /**
  * Different Variables defined at compile time used by all other modules
  * For verbose print to work it needs to be also added to getVariableName()
- * Only add items at the end and do not delete items
  * */
 enum class TraceVariable
 {
@@ -46,26 +46,6 @@ enum class TraceVariable
     READ_SOCKET_FRAMES_17,
     READ_SOCKET_FRAMES_18,
     READ_SOCKET_FRAMES_19, // If you add more, update references to this
-    QUEUE_SOCKET_TO_CONSUMER_0,
-    QUEUE_SOCKET_TO_CONSUMER_1,
-    QUEUE_SOCKET_TO_CONSUMER_2,
-    QUEUE_SOCKET_TO_CONSUMER_3,
-    QUEUE_SOCKET_TO_CONSUMER_4,
-    QUEUE_SOCKET_TO_CONSUMER_5,
-    QUEUE_SOCKET_TO_CONSUMER_6,
-    QUEUE_SOCKET_TO_CONSUMER_7,
-    QUEUE_SOCKET_TO_CONSUMER_8,
-    QUEUE_SOCKET_TO_CONSUMER_9,
-    QUEUE_SOCKET_TO_CONSUMER_10,
-    QUEUE_SOCKET_TO_CONSUMER_11,
-    QUEUE_SOCKET_TO_CONSUMER_12,
-    QUEUE_SOCKET_TO_CONSUMER_13,
-    QUEUE_SOCKET_TO_CONSUMER_14,
-    QUEUE_SOCKET_TO_CONSUMER_15,
-    QUEUE_SOCKET_TO_CONSUMER_16,
-    QUEUE_SOCKET_TO_CONSUMER_17,
-    QUEUE_SOCKET_TO_CONSUMER_18,
-    QUEUE_SOCKET_TO_CONSUMER_19, // If you add more, update references to this
     QUEUE_INSPECTION_TO_SENDER,
     MAX_SYSTEMTIME_KERNELTIME_DIFF,
     PM_MEMORY_NULL,
@@ -88,6 +68,8 @@ enum class TraceVariable
     CE_TRIGGERS,
     OBD_POSSIBLE_PRECISION_LOSS_UINT64,
     OBD_POSSIBLE_PRECISION_LOSS_INT64,
+
+    // If you add more, remember to add the name to TraceModule::getVariableName
     TRACE_VARIABLE_SIZE
 };
 
@@ -105,13 +87,14 @@ enum class TraceAtomicVariable
     CONNECTION_REJECTED,
     CONNECTION_INTERRUPTED,
     CONNECTION_RESUMED,
+    COLLECTION_SCHEME_ERROR,
+    // If you add more, remember to add the name to TraceModule::getAtomicVariableName
     TRACE_ATOMIC_VARIABLE_SIZE
 };
 
 /**
  * Different Sections defined at compile time used by all other modules
  * For verbose print to work it needs to be also added to getSectionName()
- * Only add items at the end and do not delete items
  * */
 enum class TraceSection
 {
@@ -141,6 +124,9 @@ enum class TraceSection
     CAN_DECODER_CYCLE_17,
     CAN_DECODER_CYCLE_18,
     CAN_DECODER_CYCLE_19, // If you add more, update references to this
+    COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA,
+
+    // If you add more, remember to add the name to TraceModule::getSectionName
     TRACE_SECTION_SIZE
 };
 /**
@@ -378,8 +364,10 @@ public:
      * of a traced variable for every second. Additionally the overall max is still saved.
      * It is independent of the startNewObservationWindow so at any time you know what was
      * the maximum since starting FWE.
+     * @param minimumObservationWindowTime if set higher than 0 the observation window will only be started if the
+     * current observation window is longer than the value
      */
-    void startNewObservationWindow();
+    void startNewObservationWindow( uint32_t minimumObservationWindowTime = 0 );
 
     /**
      * @brief prints all variables and section in a fixed format to stdout
@@ -437,6 +425,8 @@ private:
     struct AtomicVariableData mAtomicVariableData[toUType( TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE )];
 
     struct SectionData mSectionData[toUType( TraceSection::TRACE_SECTION_SIZE )];
+
+    Timer mTimeSinceLastObservationWindow;
 };
 } // namespace Linux
 } // namespace Platform

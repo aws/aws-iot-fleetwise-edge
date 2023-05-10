@@ -182,7 +182,7 @@ TEST( SchemaTest, DecoderManifestIngestion )
     // Create a Decoder manifest protocol buffer and pack it with the data
     DecoderManifestMsg::DecoderManifest protoDM;
 
-    protoDM.set_arn( "arn:aws:iam::123456789012:user/Development/product_1234/*" );
+    protoDM.set_sync_id( "arn:aws:iam::123456789012:user/Development/product_1234/*" );
 
     // Create a Proto CANSignal
     DecoderManifestMsg::CANSignal *protoCANSignalA = protoDM.add_can_signals();
@@ -268,7 +268,7 @@ TEST( SchemaTest, DecoderManifestIngestion )
     ASSERT_TRUE( testPIDM.build() );
     ASSERT_TRUE( testPIDM.isReady() );
 
-    ASSERT_EQ( testPIDM.getID(), protoDM.arn() );
+    ASSERT_EQ( testPIDM.getID(), protoDM.sync_id() );
 
     // Get a valid CANMessageFormat
     const CANMessageFormat &testCMF =
@@ -347,7 +347,7 @@ TEST( SchemaTest, SchemaInvalidDecoderManifestTest )
     // Create a Decoder manifest protocol buffer and pack it with the data
     DecoderManifestMsg::DecoderManifest protoDM;
 
-    protoDM.set_arn( "arn:aws:iam::123456789012:user/Development/product_1234/*" );
+    protoDM.set_sync_id( "arn:aws:iam::123456789012:user/Development/product_1234/*" );
 
     // Serialize the protocol buffer to a string to avoid malloc with cstyle arrays
     std::string protoSerializedBuffer;
@@ -435,7 +435,7 @@ TEST( SchemaTest, CollectionSchemeIngestionHeartBeat )
     // Create a  collection scheme Proto Message
     CollectionSchemesMsg::CollectionScheme collectionSchemeTestMessage;
     collectionSchemeTestMessage.set_campaign_arn( "arn:aws:iam::2.23606797749:user/Development/product_1234/*" );
-    collectionSchemeTestMessage.set_decoder_manifest_arn( "model_manifest_12" );
+    collectionSchemeTestMessage.set_decoder_manifest_sync_id( "model_manifest_12" );
     collectionSchemeTestMessage.set_start_time_ms_epoch( 1621448160000 );
     collectionSchemeTestMessage.set_expiry_time_ms_epoch( 2621448160000 );
 
@@ -579,7 +579,7 @@ TEST( SchemaTest, SchemaCollectionEventBased )
     // Create a  collection scheme Proto Message
     CollectionSchemesMsg::CollectionScheme collectionSchemeTestMessage;
     collectionSchemeTestMessage.set_campaign_arn( "arn:aws:iam::2.23606797749:user/Development/product_1235/*" );
-    collectionSchemeTestMessage.set_decoder_manifest_arn( "model_manifest_13" );
+    collectionSchemeTestMessage.set_decoder_manifest_sync_id( "model_manifest_13" );
     collectionSchemeTestMessage.set_start_time_ms_epoch( 162144816000 );
     collectionSchemeTestMessage.set_expiry_time_ms_epoch( 262144816000 );
 
@@ -821,7 +821,7 @@ TEST( SchemaTest, SchemaGeohashFunctionNode )
     // Create a  collection scheme Proto Message
     CollectionSchemesMsg::CollectionScheme collectionSchemeTestMessage;
     collectionSchemeTestMessage.set_campaign_arn( "arn:aws:iam::2.23606797749:user/Development/product_1235/*" );
-    collectionSchemeTestMessage.set_decoder_manifest_arn( "model_manifest_13" );
+    collectionSchemeTestMessage.set_decoder_manifest_sync_id( "model_manifest_13" );
     collectionSchemeTestMessage.set_start_time_ms_epoch( 162144816000 );
     collectionSchemeTestMessage.set_expiry_time_ms_epoch( 262144816000 );
 

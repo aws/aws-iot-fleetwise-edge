@@ -13,13 +13,11 @@
 using namespace Aws::IoTFleetWise::Platform::Linux::PersistencyManagement;
 
 CacheAndPersist::CacheAndPersist( const std::string &partitionPath, size_t maxPartitionSize )
+    : mDecoderManifestFile{ partitionPath + DECODER_MANIFEST_FILE }
+    , mCollectionSchemeListFile{ partitionPath + COLLECTION_SCHEME_LIST_FILE }
+    , mCollectedDataFile{ partitionPath + COLLECTED_DATA_FILE }
+    , mMaxPersistencePartitionSize{ maxPartitionSize }
 {
-    // Define the file paths
-    mDecoderManifestFile = partitionPath + DECODER_MANIFEST_FILE;
-    mCollectionSchemeListFile = partitionPath + COLLECTION_SCHEME_LIST_FILE;
-    mCollectedDataFile = partitionPath + COLLECTED_DATA_FILE;
-
-    mMaxPersistencePartitionSize = maxPartitionSize;
 }
 
 bool

@@ -6,9 +6,7 @@
 // Includes
 #include "SignalTypes.h"
 #include "TimeTypes.h"
-#include "datatypes/VehicleDataSourceTypes.h"
-#include <memory>
-#include <vector>
+#include <cstdint>
 
 namespace Aws
 {
@@ -16,7 +14,6 @@ namespace IoTFleetWise
 {
 namespace DataManagement
 {
-using namespace Aws::IoTFleetWise::VehicleNetwork;
 using namespace Aws::IoTFleetWise::Platform::Linux;
 
 union CANPhysicalValue {
@@ -71,26 +68,10 @@ struct CANDecodedSignal
     SignalType mSignalType{ SignalType::DOUBLE };
 };
 
-struct CANFrameInfo
-{
-    uint32_t mFrameID{ 0 };
-    std::string mFrameRawData;
-    std::vector<CANDecodedSignal> mSignals;
-};
 /**
  * @brief Cloud does not send information about each CAN message, so we set every CAN message size to the maximum.
  */
 static constexpr uint8_t MAX_CAN_FRAME_BYTE_SIZE = 64;
-
-struct CANDecodedMessage
-{
-    CANFrameInfo mFrameInfo;
-    Timestamp mReceptionTime{ 0 };
-    Timestamp mDecodingTime{ 0 };
-    VehicleDataSourceIfName mChannelIfName;
-    VehicleDataSourceType mChannelType;
-    VehicleDataSourceProtocol mChannelProtocol;
-};
 
 } // namespace DataManagement
 } // namespace IoTFleetWise

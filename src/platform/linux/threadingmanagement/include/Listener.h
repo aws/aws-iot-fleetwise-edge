@@ -105,17 +105,6 @@ public:
         }
     }
 
-    /**
-     * @brief Mutable size of the listeners count.
-     */
-    size_t
-    size() const
-    {
-        MutexLock lock( mMutex );
-
-        return mContainer.size();
-    }
-
 private:
     // Container to store the list of listeners to this thread
     using ListenerContainer = std::vector<ThreadListener *>;

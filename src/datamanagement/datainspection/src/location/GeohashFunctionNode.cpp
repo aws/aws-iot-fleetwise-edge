@@ -94,13 +94,13 @@ GeohashFunctionNode::convertToDecimalDegree( double value, GeohashFunction::GPSU
         convertedValue = value;
         break;
     case GeohashFunction::GPSUnitType::MICROARCSECOND:
-        convertedValue = value / 3600000000.0f;
+        convertedValue = value / 3600000000.0F;
         break;
     case GeohashFunction::GPSUnitType::MILLIARCSECOND:
-        convertedValue = value / 3600000.0f;
+        convertedValue = value / 3600000.0F;
         break;
     case GeohashFunction::GPSUnitType::ARCSECOND:
-        convertedValue = value / 3600.0f;
+        convertedValue = value / 3600.0F;
         break;
     default:
         break;

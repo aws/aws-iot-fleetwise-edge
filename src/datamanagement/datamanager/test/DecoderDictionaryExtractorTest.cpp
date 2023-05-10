@@ -377,8 +377,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     // for OBD
     ASSERT_TRUE( decoderDictionaryMapNew.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMapNew.end() );
     decoderDictionary = decoderDictionaryMapNew[VehicleDataSourceProtocol::OBD];
-    ASSERT_EQ( decoderDictionary->signalIDsToCollect.size(), 0 );
-    ASSERT_EQ( decoderDictionary->canMessageDecoderMethod.size(), 0 );
+    ASSERT_EQ( decoderDictionary, nullptr );
 
     decoderDictionary = decoderDictionaryMapNew[VehicleDataSourceProtocol::RAW_SOCKET];
     // Now dictionary shall not contain anything for Node 10 as CollectionScheme1 is retired
@@ -438,42 +437,6 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     ASSERT_TRUE( decoderDictionaryMap2.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap2.end() );
 }
 
-/**  @brief
- * This test aims to test PM's functionality to invoke all Vehicle Data Consumer on Decoder Dictionary Update
- * step1:
- * Two Vehicle Data Consumer registered as listener
- * step2: Invoke Decoder Dictionary Update
- * check Both two network channel consumer has decoder dictionary updated
- */
-TEST( CollectionSchemeManagerTest, DecoderDictionaryUpdaterTest )
-{
-    auto testPtr = std::make_shared<CollectionSchemeManagerTest>();
-    CANInterfaceIDTranslator canIDTranslator;
-    testPtr->init( 0, nullptr, canIDTranslator );
-
-    // Mock the Vehicle Data Binder
-    std::shared_ptr<VehicleDataSourceBinderMock> binderMockPtr;
-    binderMockPtr = std::make_shared<VehicleDataSourceBinderMock>();
-
-    // Clear updater flag. Note this flag only exist in mock class for testing purpose
-    binderMockPtr->setUpdateFlag( false );
-    testPtr->subscribeListener( binderMockPtr.get() );
-
-    std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> decoderDictionaryMap;
-    decoderDictionaryMap.emplace( VehicleDataSourceProtocol::RAW_SOCKET, std::make_shared<CANDecoderDictionary>() );
-    // Invoke the updater and check that the binder received the notification
-    testPtr->decoderDictionaryUpdater( decoderDictionaryMap );
-    ASSERT_TRUE( binderMockPtr->getUpdateFlag() );
-
-    auto obdOverCANModulePtr = std::make_shared<OBDOverCANModuleMock>();
-    testPtr->subscribeListener( static_cast<IActiveDecoderDictionaryListener *>( obdOverCANModulePtr.get() ) );
-
-    obdOverCANModulePtr->setUpdateFlag( false );
-    decoderDictionaryMap.emplace( VehicleDataSourceProtocol::OBD, std::make_shared<CANDecoderDictionary>() );
-    testPtr->decoderDictionaryUpdater( decoderDictionaryMap );
-    // Verify OBD Module has received the decoder dictionary update
-    ASSERT_TRUE( obdOverCANModulePtr->getUpdateFlag() );
-}
 /**  @brief
  * This test aims to test CollectionScheme Manager's Decoder Dictionary Extractor functionality
  * when only a raw can frame is provided and no signals

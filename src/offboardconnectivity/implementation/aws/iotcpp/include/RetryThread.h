@@ -83,15 +83,11 @@ private:
     static void doWork( void *data );
 
     static std::atomic<int> fInstanceCounter;
-    int fInstance;
-
     IRetryable &fRetryable;
-
+    int fInstance;
     const uint32_t fStartBackoffMs;
     const uint32_t fMaxBackoffMs;
-
     uint32_t fCurrentWaitTime;
-
     Thread fThread;
     std::atomic<bool> fShouldStop;
     std::mutex fThreadMutex;

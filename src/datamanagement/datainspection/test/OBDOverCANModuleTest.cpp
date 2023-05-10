@@ -560,9 +560,8 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
     ASSERT_TRUE( obdModule.getSignalBufferPtr()->empty() );
 
     // Update Decoder Dictionary to collect no signals.
-    decoderDictPtr->signalIDsToCollect.clear();
     // publish the new decoder dictionary to OBD module
-    obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
+    obdModule.onChangeOfActiveDictionary( nullptr, VehicleDataSourceProtocol::OBD );
     std::this_thread::sleep_for( std::chrono::seconds( obdPIDRequestInterval ) );
     // wait for one cycle and clear out the signal buffer
     while ( !obdModule.getSignalBufferPtr()->empty() )

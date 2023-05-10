@@ -38,9 +38,9 @@ CollectionSchemeManager::sendCheckin()
     {
         checkinMsg.emplace_back( it->first );
     }
-    if ( !currentDecoderManifestID.empty() )
+    if ( !mCurrentDecoderManifestID.empty() )
     {
-        checkinMsg.emplace_back( currentDecoderManifestID );
+        checkinMsg.emplace_back( mCurrentDecoderManifestID );
     }
     std::string checkinLogStr;
     for ( size_t i = 0; i < checkinMsg.size(); i++ )
@@ -122,6 +122,8 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
     // currently this if will be always true as it can be only DECODER_MANIFEST or COLLECTION_SCHEME_LIST but for
     // readability leave it as else if instead of else
     // coverity[autosar_cpp14_m0_1_2_violation]
+    // coverity[autosar_cpp14_m0_1_9_violation]
+    // coverity[misra_cpp_2008_rule_0_1_9_violation]
     else if ( retrieveType == DataType::DECODER_MANIFEST )
     {
         // updating mDecoderManifest

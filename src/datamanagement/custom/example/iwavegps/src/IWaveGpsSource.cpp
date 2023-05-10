@@ -22,10 +22,8 @@ constexpr const char *IWaveGpsSource::CAN_RAW_FRAME_ID;    // NOLINT
 constexpr const char *IWaveGpsSource::LATITUDE_START_BIT;  // NOLINT
 constexpr const char *IWaveGpsSource::LONGITUDE_START_BIT; // NOLINT
 IWaveGpsSource::IWaveGpsSource( SignalBufferPtr signalBufferPtr )
+    : mSignalBufferPtr{ std::move( signalBufferPtr ) }
 {
-    mSignalBufferPtr = signalBufferPtr;
-    mCanChannel = INVALID_CAN_SOURCE_NUMERIC_ID;
-    mCanRawFrameId = 0;
 }
 
 bool
@@ -57,10 +55,8 @@ IWaveGpsSource::getThreadName()
 void
 IWaveGpsSource::pollData()
 {
-    char buffer[MAX_BYTES_READ_PER_POLL]{};
-
     // Read from NMEA formatted file
-    auto bytes = read( mFileHandle, buffer, MAX_BYTES_READ_PER_POLL - 1 );
+    auto bytes = read( mFileHandle, mBuffer, MAX_BYTES_READ_PER_POLL - 1 );
     if ( bytes < 0 )
     {
         FWE_LOG_ERROR( "Error reading from file" );
@@ -74,7 +70,7 @@ IWaveGpsSource::pollData()
     int i = 0;
     while ( i < bytes - 7 )
     {
-        if ( strncmp( "$GPGGA,", &buffer[i], 7 ) == 0 )
+        if ( strncmp( "$GPGGA,", &mBuffer[i], 7 ) == 0 )
         {
             mGpggaLineCounter++;
             double longitudeRaw = HUGE_VAL;
@@ -82,7 +78,7 @@ IWaveGpsSource::pollData()
             bool north = true;
             bool east = true;
             int processedBytes = extractLongAndLatitudeFromLine(
-                &buffer[i + 7], static_cast<int>( bytes ) - ( i + 7 ), longitudeRaw, latitudeRaw, north, east );
+                &mBuffer[i + 7], static_cast<int>( bytes ) - ( i + 7 ), longitudeRaw, latitudeRaw, north, east );
             i += processedBytes;
             double longitude = convertDmmToDdCoordinates( longitudeRaw, east );
             double latitude = convertDmmToDdCoordinates( latitudeRaw, north );
@@ -197,71 +193,6 @@ IWaveGpsSource::extractLongAndLatitudeFromLine(
     return i;
 }
 
-// compatibility with AbstractVehicleDataSource
-bool
-IWaveGpsSource::init( const std::vector<VehicleDataSourceConfig> &sourceConfigs )
-{
-    std::string pathToNmeaSource;
-    CANChannelNumericID canChannel = 0;
-    CANRawFrameID canRawFrameId = 0;
-    uint32_t latitudeStartBit = 0;
-    uint32_t longitudeStartBit = 0;
-
-    if ( ( sourceConfigs.size() > 1 ) || sourceConfigs.empty() )
-    {
-        FWE_LOG_ERROR( "Only one source config is supported" );
-        return false;
-    }
-    auto settingsIterator = sourceConfigs[0].transportProperties.find( std::string( PATH_TO_NMEA ) );
-    if ( settingsIterator == sourceConfigs[0].transportProperties.end() )
-    {
-        FWE_LOG_ERROR( "Could not find nmeaFilePath in the config" );
-        return false;
-    }
-    else
-    {
-        pathToNmeaSource = settingsIterator->second;
-    }
-
-    if ( extractIntegerFromConfig( sourceConfigs, CAN_CHANNEL_NUMBER, canChannel ) &&
-         extractIntegerFromConfig( sourceConfigs, CAN_RAW_FRAME_ID, canRawFrameId ) &&
-         extractIntegerFromConfig( sourceConfigs, LONGITUDE_START_BIT, longitudeStartBit ) &&
-         extractIntegerFromConfig( sourceConfigs, LATITUDE_START_BIT, latitudeStartBit ) )
-    {
-        return init( pathToNmeaSource,
-                     canChannel,
-                     canRawFrameId,
-                     static_cast<uint16_t>( latitudeStartBit ),
-                     static_cast<uint16_t>( longitudeStartBit ) );
-    }
-    return false;
-}
-
-bool
-IWaveGpsSource::extractIntegerFromConfig( const std::vector<VehicleDataSourceConfig> &sourceConfigs,
-                                          const std::string key,
-                                          uint32_t &extractedValue )
-{
-    auto settingsIterator = sourceConfigs[0].transportProperties.find( std::string( key ) );
-    if ( settingsIterator == sourceConfigs[0].transportProperties.end() )
-    {
-        FWE_LOG_ERROR( "Could not find " + key + " in the config" );
-        return false;
-    }
-    else
-    {
-        try
-        {
-            extractedValue = static_cast<uint32_t>( std::stoul( settingsIterator->second ) );
-        }
-        catch ( const std::exception &e )
-        {
-            FWE_LOG_ERROR( "Could not cast the " + key + ", invalid input: " + std::string( e.what() ) );
-            return false;
-        }
-    }
-    return true;
-}
 bool
 IWaveGpsSource::connect()
 {
@@ -277,22 +208,12 @@ IWaveGpsSource::connect()
 bool
 IWaveGpsSource::disconnect()
 {
-    return ( close( mFileHandle ) == 0 );
-}
-bool
-IWaveGpsSource::isAlive()
-{
-    return isRunning();
-}
-void
-IWaveGpsSource::suspendDataAcquisition()
-{
-    setFilter( INVALID_CAN_SOURCE_NUMERIC_ID, 0 );
-}
-void
-IWaveGpsSource::resumeDataAcquisition()
-{
-    setFilter( mCanChannel, mCanRawFrameId );
+    if ( close( mFileHandle ) != 0 )
+    {
+        return false;
+    }
+    mFileHandle = -1;
+    return true;
 }
 
 } // namespace DataManagement

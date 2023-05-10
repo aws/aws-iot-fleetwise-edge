@@ -26,10 +26,7 @@ namespace Linux
 class Signal
 {
 public:
-    Signal()
-    {
-        mNotify = false;
-    }
+    Signal() = default;
     ~Signal() = default;
 
     /**
@@ -56,8 +53,10 @@ public:
     void
     wait( uint32_t timeoutMs )
     {
-        // Predicate, returns true if the wakeup signal is set.
-        auto predicate = [this]() -> bool { return mNotify; };
+        auto predicate = [this]() -> bool {
+            // Predicate, returns true if the wakeup signal is set.
+            return mNotify;
+        };
         std::unique_lock<std::mutex> mWaitMutex( mMutex );
         if ( !predicate() )
         {
@@ -89,7 +88,7 @@ public:
 
 private:
     std::condition_variable mSignalCondition;
-    std::atomic<bool> mNotify;
+    std::atomic<bool> mNotify{ false };
     std::mutex mMutex;
 };
 

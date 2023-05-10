@@ -22,7 +22,7 @@ using Byte = unsigned char;
 // Note: This however does not work for over-aligned types
 // https://en.cppreference.com/w/cpp/language/object#Alignment
 // We are OK at the moment to not handled over-aligned types since we do not have any usage of "alignas"
-constexpr auto offset = alignof( std::max_align_t );
+constexpr auto ALIGN_OFFSET = alignof( std::max_align_t );
 
 } // namespace
 
@@ -51,9 +51,9 @@ AwsSDKMemoryManager::AllocateMemory( std::size_t blockSize, std::size_t alignmen
     (void)allocationTag;
 
     // Verify that the object fits into the memory block
-    static_assert( offset >= sizeof( std::size_t ), "too big memory size block" );
+    static_assert( ALIGN_OFFSET >= sizeof( std::size_t ), "too big memory size block" );
 
-    auto realSize = blockSize + offset;
+    auto realSize = blockSize + ALIGN_OFFSET;
     void *pMem = malloc( realSize ); // NOLINT(cppcoreguidelines-no-malloc)
 
     if ( pMem == nullptr )
@@ -66,7 +66,7 @@ AwsSDKMemoryManager::AllocateMemory( std::size_t blockSize, std::size_t alignmen
     mMemoryUsedAndReserved += realSize;
 
     // return a pointer to the block offset from the size storage location
-    return static_cast<Byte *>( pMem ) + offset;
+    return static_cast<Byte *>( pMem ) + ALIGN_OFFSET;
 }
 
 void
@@ -78,7 +78,7 @@ AwsSDKMemoryManager::FreeMemory( void *memoryPtr )
     }
 
     // go back to the memory location where stored the size
-    auto pMem = static_cast<void *>( static_cast<Byte *>( memoryPtr ) - offset );
+    auto pMem = static_cast<void *>( static_cast<Byte *>( memoryPtr ) - ALIGN_OFFSET );
     // read the size value
     auto realSize = *( static_cast<std::size_t *>( pMem ) );
 
@@ -92,14 +92,14 @@ AwsSDKMemoryManager::FreeMemory( void *memoryPtr )
 std::size_t
 AwsSDKMemoryManager::reserveMemory( std::size_t bytes )
 {
-    mMemoryUsedAndReserved += ( bytes + offset );
+    mMemoryUsedAndReserved += ( bytes + ALIGN_OFFSET );
     return mMemoryUsedAndReserved;
 }
 
 std::size_t
 AwsSDKMemoryManager::releaseReservedMemory( std::size_t bytes )
 {
-    mMemoryUsedAndReserved -= ( bytes + offset );
+    mMemoryUsedAndReserved -= ( bytes + ALIGN_OFFSET );
     return mMemoryUsedAndReserved;
 }
 

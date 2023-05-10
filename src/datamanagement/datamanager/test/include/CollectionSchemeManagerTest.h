@@ -11,7 +11,6 @@
 #include "DecoderManifestIngestion.h"
 #include "Listener.h"
 #include "OBDOverCANModule.h"
-#include "VehicleDataSourceBinder.h"
 #include <algorithm>
 #include <cstdlib>
 #include <deque>
@@ -251,44 +250,6 @@ public:
     ~CollectionSchemeManagerTestProducer()
     {
     }
-};
-
-/* mock the VehicleDataSourceBinder class that receive decoder dictionary update from PM */
-class VehicleDataSourceBinderMock : public VehicleDataSourceBinder
-{
-public:
-    VehicleDataSourceBinderMock()
-        : mUpdateFlag( false )
-    {
-    }
-
-    ~VehicleDataSourceBinderMock()
-    {
-    }
-
-    void
-    onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
-                                VehicleDataSourceProtocol networkProtocol ) override
-    {
-        VehicleDataSourceBinder::onChangeOfActiveDictionary( dictionary, networkProtocol );
-        mUpdateFlag = true;
-    }
-
-    void
-    setUpdateFlag( bool flag )
-    {
-        mUpdateFlag = flag;
-    }
-
-    bool
-    getUpdateFlag()
-    {
-        return mUpdateFlag;
-    }
-
-private:
-    // This flag is used for testing whether Vehicle Data Binder received the update
-    bool mUpdateFlag;
 };
 
 /* mock OBDOverCANModule class that receive decoder dictionary update from PM */

@@ -1,6 +1,6 @@
 AWS IoT FleetWise Edge includes the following third-party software/licensing:
 
-** AWS SDK for C++: v1.9.253 - https://github.com/aws/aws-sdk-cpp
+** AWS SDK for C++: v1.11.46 - https://github.com/aws/aws-sdk-cpp
 ** Fast-DDS: v2.3.3 - https://github.com/eProsima/Fast-DDS
 ** Fast-CDR: v1.0.21 - https://github.com/eProsima/Fast-CDR
 ** Foonathan Memory Vendor: v1.1.0 - https://github.com/eProsima/foonathan_memory_vendor
@@ -246,7 +246,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ----------------
 
-** Boost: v1.65.1 - https://github.com/boostorg/boost
+** Boost: v1.71.1 - https://github.com/boostorg/boost
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -274,7 +274,7 @@ DEALINGS IN THE SOFTWARE.
 
 ----------------
 
-** JsonCpp: v1.7.4 - https://github.com/open-source-parsers/jsoncpp
+** JsonCpp: v1.9.5 - https://github.com/open-source-parsers/jsoncpp
 
 The JsonCpp library's source code, including accompanying documentation,
 tests and demonstration applications, are licensed under the following

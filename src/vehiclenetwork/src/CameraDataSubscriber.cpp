@@ -18,7 +18,6 @@ namespace VehicleNetwork
 {
 CameraDataSubscriber::CameraDataSubscriber()
 {
-    mNetworkProtocol = VehicleDataSourceProtocol::DDS;
     mID = generateChannelID();
 }
 

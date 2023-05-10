@@ -30,7 +30,7 @@ DecoderManifestIngestion::getID() const
         return std::string();
     }
 
-    return mProtoDecoderManifest.arn();
+    return mProtoDecoderManifest.sync_id();
 }
 
 bool
@@ -183,7 +183,7 @@ DecoderManifestIngestion::build()
         return false;
     }
 
-    FWE_LOG_INFO( "Building Decoder Manifest with ID: " + mProtoDecoderManifest.arn() );
+    FWE_LOG_INFO( "Building Decoder Manifest with Sync ID: " + mProtoDecoderManifest.sync_id() );
 
     // Iterate over CAN Signals and build the mCANSignalFormatDictionary
     for ( int i = 0; i < mProtoDecoderManifest.can_signals_size(); i++ )
@@ -266,17 +266,24 @@ DecoderManifestIngestion::build()
     {
         // Get a reference to the OBD PID signal in the protobuf
         const DecoderManifestMsg::OBDPIDSignal &pidSignal = mProtoDecoderManifest.obd_pid_signals( i );
+        if ( ( pidSignal.service_mode() >= toUType( SID::MAX ) ) || ( pidSignal.pid() > UINT8_MAX ) ||
+             ( pidSignal.bit_right_shift() > UINT8_MAX ) || ( pidSignal.bit_mask_length() > UINT8_MAX ) )
+        {
+            FWE_LOG_WARN( "Invalid OBD PID signal" );
+            continue;
+        }
         mSignalToVehicleDataSourceProtocol[pidSignal.signal_id()] = VehicleDataSourceProtocol::OBD;
-        PIDSignalDecoderFormat obdPIDSignalDecoderFormat =
-            PIDSignalDecoderFormat( pidSignal.pid_response_length(),
-                                    static_cast<SID>( pidSignal.service_mode() ),
-                                    static_cast<PID>( pidSignal.pid() ),
-                                    pidSignal.scaling(),
-                                    pidSignal.offset(),
-                                    pidSignal.start_byte(),
-                                    pidSignal.byte_length(),
-                                    static_cast<uint8_t>( pidSignal.bit_right_shift() ),
-                                    static_cast<PID>( pidSignal.bit_mask_length() ) );
+        PIDSignalDecoderFormat obdPIDSignalDecoderFormat = PIDSignalDecoderFormat(
+            pidSignal.pid_response_length(),
+            // coverity[autosar_cpp14_a7_2_1_violation] The if-statement above checks the correct range
+            static_cast<SID>( pidSignal.service_mode() ),
+            static_cast<PID>( pidSignal.pid() ),
+            pidSignal.scaling(),
+            pidSignal.offset(),
+            pidSignal.start_byte(),
+            pidSignal.byte_length(),
+            static_cast<uint8_t>( pidSignal.bit_right_shift() ),
+            static_cast<uint8_t>( pidSignal.bit_mask_length() ) );
         mSignalToPIDDictionary[pidSignal.signal_id()] = obdPIDSignalDecoderFormat;
         // TODO :: Update the datatype from the DM after the schema update for the datatype support
         mSignalIDToTypeMap[pidSignal.signal_id()] = SignalType::DOUBLE; // using double as default

@@ -44,7 +44,7 @@ setLogForwarding( ILogger *logForwarder )
     gLogForwarder = logForwarder;
 }
 
-void
+static void
 forwardLog( LogLevel level,
             const std::string &filename,
             const uint32_t lineNumber,
@@ -73,10 +73,6 @@ ConsoleLogger::ConsoleLogger()
          ( ( gLogColorOption == LogColorOption::Auto ) && ( isatty( fileno( stdout ) ) != 0 ) ) )
     {
         mColorEnabled = true;
-    }
-    else
-    {
-        mColorEnabled = false;
     }
 }
 

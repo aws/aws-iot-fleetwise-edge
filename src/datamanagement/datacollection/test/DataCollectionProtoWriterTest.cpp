@@ -70,7 +70,7 @@ TEST_F( DataCollectionProtoWriterTest, TestVehicleData )
 
     /* Read and compare to written fields */
     ASSERT_EQ( "123", vehicleDataTest.campaign_arn() );
-    ASSERT_EQ( "456", vehicleDataTest.decoder_arn() );
+    ASSERT_EQ( "456", vehicleDataTest.decoder_sync_id() );
     ASSERT_EQ( collectionEventID, vehicleDataTest.collection_event_id() );
     ASSERT_EQ( testTriggerTime, vehicleDataTest.collection_event_time_ms_epoch() );
 }
@@ -122,7 +122,7 @@ TEST_F( DataCollectionProtoWriterTest, TestDTCData )
 
     /* Read and compare to written fields */
     ASSERT_EQ( "123", vehicleDataTest.campaign_arn() );
-    ASSERT_EQ( "456", vehicleDataTest.decoder_arn() );
+    ASSERT_EQ( "456", vehicleDataTest.decoder_sync_id() );
     ASSERT_EQ( collectionEventID, vehicleDataTest.collection_event_id() );
     ASSERT_EQ( testTriggerTime, vehicleDataTest.collection_event_time_ms_epoch() );
 
@@ -170,7 +170,7 @@ TEST_F( DataCollectionProtoWriterTest, TestGeohash )
 
     /* Read and compare to written fields */
     ASSERT_EQ( "123", vehicleDataTest.campaign_arn() );
-    ASSERT_EQ( "456", vehicleDataTest.decoder_arn() );
+    ASSERT_EQ( "456", vehicleDataTest.decoder_sync_id() );
     ASSERT_EQ( collectionEventID, vehicleDataTest.collection_event_id() );
     ASSERT_EQ( testTriggerTime, vehicleDataTest.collection_event_time_ms_epoch() );
 

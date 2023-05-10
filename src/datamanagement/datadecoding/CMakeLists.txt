@@ -17,7 +17,7 @@ target_include_directories(${libraryTargetName} PUBLIC
   include
 )
 
-find_package(Boost 1.65.1 REQUIRED COMPONENTS filesystem)
+find_package(Boost 1.71.0 REQUIRED COMPONENTS filesystem)
 
 target_link_libraries(
   ${libraryTargetName}

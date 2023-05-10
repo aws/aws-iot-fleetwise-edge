@@ -41,14 +41,17 @@ public:
      * specified as 5, the comparison would return EQUAL. If the precision is specified as 6, the comparison
      * would return NOT EQUAL.
      *
-     * @param lat: latitude from GPS
-     * @param lon: longitude from GPS
-     * @param precision: In Geohash, precision is the length of hash character.
-     * @param gpsUnitType: The GPS signal latitude / longitude unit type. The following unit type is supported:
+     * @param latitude latitude from GPS
+     * @param longitude longitude from GPS
+     * @param precision In Geohash, precision is the length of hash character.
+     * @param gpsUnitType The GPS signal latitude / longitude unit type. The following unit type is supported:
      * 1) DECIMAL DEGREE 2) MICROARCSECOND 3) MILLIARCSECOND 4) ARCSECOND
      * @return True if geohash has changed at given precision. False if geohash has not changed.
      */
-    bool evaluateGeohash( double lat, double lon, uint8_t precision, GeohashFunction::GPSUnitType gpsUnitType );
+    bool evaluateGeohash( double latitude,
+                          double longitude,
+                          uint8_t precision,
+                          GeohashFunction::GPSUnitType gpsUnitType );
 
     /**
      * @brief Consume the latest evaluated geohash info. This function will set the mIsGeohashNew
@@ -69,7 +72,7 @@ private:
      *
      * @return converted GPS signal in Decimal Degree
      */
-    static double convertToDecimalDegree( double val, GeohashFunction::GPSUnitType gpsUnitType );
+    static double convertToDecimalDegree( double value, GeohashFunction::GPSUnitType gpsUnitType );
 
     /**
      * @brief This is the Geohash in String format holding the latest calculated geohash

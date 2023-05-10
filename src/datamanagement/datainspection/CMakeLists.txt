@@ -11,7 +11,7 @@ set(SRCS
   src/diag/OBDOverCANModule.cpp
   src/diag/OBDOverCANECU.cpp
   src/location/GeohashFunctionNode.cpp
-  src/vehicledatasource/VehicleDataSourceBinder.cpp
+  src/vehicledatasource/CANDataSource.cpp
   src/vehicledatasource/CANDataConsumer.cpp
 )
 
@@ -54,12 +54,10 @@ install(
   include/IActiveConditionProcessor.h
   include/IDataReadyToPublishListener.h
   include/InspectionEventListener.h
-  include/IVehicleDataConsumer.h
+  include/CANDataSource.h
   include/CANDataConsumer.h
   include/OBDOverCANModule.h
   include/OBDOverCANECU.h
-  include/CANDataConsumer.h
-  include/VehicleDataSourceBinder.h
   DESTINATION include
 )
 
@@ -72,7 +70,7 @@ set(
   test/OBDOverCANModuleTest.cpp
   test/CollectionInspectionEngineTest.cpp
   test/CollectionInspectionWorkerThreadTest.cpp
-  test/VehicleDataSourceBinderTest.cpp
+  test/CANDataSourceTest.cpp
 )
 
 if(FWE_FEATURE_CAMERA)

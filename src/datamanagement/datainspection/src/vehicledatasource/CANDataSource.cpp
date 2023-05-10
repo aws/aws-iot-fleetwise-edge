@@ -3,14 +3,11 @@
 
 #if defined( IOTFLEETWISE_LINUX )
 // Includes
-#include "businterfaces/CANDataSource.h"
-#include "ClockHandler.h"
+#include "CANDataSource.h"
 #include "EnumUtility.h"
 #include "LoggingModule.h"
 #include "TraceModule.h"
-#include <boost/lockfree/spsc_queue.hpp>
 #include <cstring>
-#include <iostream>
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <linux/errqueue.h>
@@ -22,25 +19,23 @@ namespace Aws
 {
 namespace IoTFleetWise
 {
-namespace VehicleNetwork
+namespace DataInspection
 {
 using namespace Aws::IoTFleetWise::Platform::Utility;
-static const std::string INTERFACE_NAME_KEY = "interfaceName";
-static const std::string THREAD_IDLE_TIME_KEY = "threadIdleTimeMs";
-static const std::string PROTOCOL_NAME_KEY = "protocolName";
-CANDataSource::CANDataSource( CAN_TIMESTAMP_TYPE timestampTypeToUse )
-    : mTimestampTypeToUse{ timestampTypeToUse }
-{
-    mType = VehicleDataSourceType::CAN_SOURCE;
-    mNetworkProtocol = VehicleDataSourceProtocol::RAW_SOCKET;
-    mID = generateSourceID();
-}
 
-CANDataSource::CANDataSource()
+CANDataSource::CANDataSource( CANChannelNumericID channelId,
+                              CanTimestampType timestampTypeToUse,
+                              std::string interfaceName,
+                              bool forceCanFD,
+                              uint32_t threadIdleTimeMs,
+                              CANDataConsumer &consumer )
+    : mIdleTimeMs{ threadIdleTimeMs }
+    , mTimestampTypeToUse{ timestampTypeToUse }
+    , mForceCanFD{ forceCanFD }
+    , mChannelId{ channelId }
+    , mIfName{ std::move( interfaceName ) }
+    , mConsumer{ consumer }
 {
-    mType = VehicleDataSourceType::CAN_SOURCE;
-    mNetworkProtocol = VehicleDataSourceProtocol::RAW_SOCKET;
-    mID = generateSourceID();
 }
 
 CANDataSource::~CANDataSource()
@@ -48,65 +43,22 @@ CANDataSource::~CANDataSource()
     // To make sure the thread stops during teardown of tests.
     if ( isAlive() )
     {
-        stop();
+        disconnect();
     }
 }
 
 bool
-CANDataSource::init( const std::vector<VehicleDataSourceConfig> &sourceConfigs )
+CANDataSource::init()
 {
-    // Only one source config is supported on the CAN stack i.e. we manage one socket with
-    // one single thread.
-    if ( ( sourceConfigs.size() > 1 ) || sourceConfigs.empty() )
+    if ( mChannelId == INVALID_CAN_SOURCE_NUMERIC_ID )
     {
-        FWE_LOG_ERROR( "Only one source config is supported" );
+        FWE_LOG_ERROR( "Invalid can channel id" );
         return false;
-    }
-    auto settingsIterator = sourceConfigs[0].transportProperties.find( std::string( INTERFACE_NAME_KEY ) );
-    if ( settingsIterator == sourceConfigs[0].transportProperties.end() )
-    {
-        FWE_LOG_ERROR( "Could not find interfaceName in the config" );
-        return false;
-    }
-    else
-    {
-        mIfName = settingsIterator->second;
-    }
-
-    mCircularBuffPtr =
-        std::make_shared<VehicleMessageCircularBuffer>( sourceConfigs[0].maxNumberOfVehicleDataMessages );
-    settingsIterator = sourceConfigs[0].transportProperties.find( std::string( THREAD_IDLE_TIME_KEY ) );
-    if ( settingsIterator == sourceConfigs[0].transportProperties.end() )
-    {
-        FWE_LOG_ERROR( "Could not find threadIdleTimeMs in the config" );
-        return false;
-    }
-    else
-    {
-        try
-        {
-            mIdleTimeMs = static_cast<uint32_t>( std::stoul( settingsIterator->second ) );
-        }
-        catch ( const std::exception &e )
-        {
-            FWE_LOG_ERROR( "Could not cast the threadIdleTimeMs, invalid input: " + std::string( e.what() ) );
-            return false;
-        }
-    }
-
-    settingsIterator = sourceConfigs[0].transportProperties.find( std::string( PROTOCOL_NAME_KEY ) );
-    if ( settingsIterator == sourceConfigs[0].transportProperties.end() )
-    {
-        FWE_LOG_ERROR( "Could not find protocolName in the config" );
-        return false;
-    }
-    else
-    {
-        mForceCanFD = settingsIterator->second == "CAN-FD";
     }
 
     mTimer.reset();
-    return true;
+
+    return connect();
 }
 
 bool
@@ -117,9 +69,6 @@ CANDataSource::start()
     // On multi core systems the shared variable mShouldStop must be updated for
     // all cores before starting the thread otherwise thread will directly end
     mShouldStop.store( false );
-    // Make sure the thread goes into sleep immediately to wait for
-    // the manifest to be available
-    mShouldSleep.store( true );
     if ( !mThread.create( doWork, this ) )
     {
         FWE_LOG_TRACE( "CAN Data Source Thread failed to start" );
@@ -127,29 +76,10 @@ CANDataSource::start()
     else
     {
         FWE_LOG_TRACE( "CAN Data Source Thread started" );
-        mThread.setThreadName( "fwVNLinuxCAN" + std::to_string( mID ) );
+        // Thread name has channelID+1 to match legacy naming of threads in dashboards
+        mThread.setThreadName( "fwVNLinuxCAN" + std::to_string( mChannelId + 1 ) );
     }
     return mThread.isActive() && mThread.isValid();
-}
-
-void
-CANDataSource::suspendDataAcquisition()
-{
-    // Go back to sleep
-    FWE_LOG_TRACE( "Going to sleep until a the resume signal. CAN Data Source: " + std::to_string( mID ) );
-    mShouldSleep.store( true, std::memory_order_relaxed );
-}
-
-void
-CANDataSource::resumeDataAcquisition()
-{
-
-    FWE_LOG_TRACE( "Resuming Network data acquisition on Data Source: " + std::to_string( mID ) );
-    // Make sure the thread does not sleep anymore
-    mResumeTime = mClock->systemTimeSinceEpochMs();
-    mShouldSleep.store( false );
-    // Wake up the worker thread.
-    mWait.notify();
 }
 
 bool
@@ -170,12 +100,6 @@ CANDataSource::shouldStop() const
     return mShouldStop.load( std::memory_order_relaxed );
 }
 
-bool
-CANDataSource::shouldSleep() const
-{
-    return mShouldSleep.load( std::memory_order_relaxed );
-}
-
 Timestamp
 CANDataSource::extractTimestamp( struct msghdr *msgHeader )
 {
@@ -185,7 +109,7 @@ CANDataSource::extractTimestamp( struct msghdr *msgHeader )
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
     struct cmsghdr *currentHeader = CMSG_FIRSTHDR( msgHeader );
     Timestamp timestamp = 0;
-    if ( mTimestampTypeToUse != CAN_TIMESTAMP_TYPE::POLLING_TIME )
+    if ( mTimestampTypeToUse != CanTimestampType::POLLING_TIME )
     {
         while ( currentHeader != nullptr )
         {
@@ -196,13 +120,13 @@ CANDataSource::extractTimestamp( struct msghdr *msgHeader )
                 scm_timestamping *timestampArray = (scm_timestamping *)( CMSG_DATA( currentHeader ) );
                 // From https://www.kernel.org/doc/Documentation/networking/timestamping.txt
                 // Most timestamps are passed in ts[0]. Hardware timestamps are passed in ts[2].
-                if ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_HARDWARE_TIMESTAMP )
+                if ( mTimestampTypeToUse == CanTimestampType::KERNEL_HARDWARE_TIMESTAMP )
                 {
                     timestamp =
                         static_cast<Timestamp>( ( static_cast<Timestamp>( timestampArray->ts[2].tv_sec ) * 1000 ) +
                                                 ( static_cast<Timestamp>( timestampArray->ts[2].tv_nsec ) / 1000000 ) );
                 }
-                else if ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP ) // default
+                else if ( mTimestampTypeToUse == CanTimestampType::KERNEL_SOFTWARE_TIMESTAMP ) // default
                 {
                     timestamp =
                         static_cast<Timestamp>( ( static_cast<Timestamp>( timestampArray->ts[0].tv_sec ) * 1000 ) +
@@ -235,10 +159,10 @@ CANDataSource::doWork( void *data )
         false; /**< This variable is true after the thread is woken up for example because a valid decoder manifest was
                   received until the thread sleeps for the next time when it is false again*/
     Timer logTimer;
-    do
+    while ( true )
     {
         activations++;
-        if ( dataSource->shouldSleep() )
+        if ( dataSource->mDecoderDictionary == nullptr )
         {
             // We either just started or there was a decoder manifest update that we can't use
             // We should sleep
@@ -268,67 +192,49 @@ CANDataSource::doWork( void *data )
             msg[i].msg_hdr.msg_controllen = sizeof( cmsgReturnBuffer[i] );
         }
         // In one syscall receive up to PARALLEL_RECEIVED_FRAMES_FROM_KERNEL frames in parallel
-        nmsgs = recvmmsg( dataSource->mSocket, msg, PARALLEL_RECEIVED_FRAMES_FROM_KERNEL, 0, nullptr );
+        nmsgs = recvmmsg( dataSource->mSocket, &msg[0], PARALLEL_RECEIVED_FRAMES_FROM_KERNEL, 0, nullptr );
         for ( int i = 0; i < nmsgs; i++ )
         {
-            VehicleDataMessage message;
-            const std::vector<boost::any> syntheticData{};
-            std::vector<std::uint8_t> rawData = {};
-            Timestamp timestamp = dataSource->extractTimestamp( &msg[i].msg_hdr );
-            if ( timestamp < lastFrameTime )
-            {
-                TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::NOT_TIME_MONOTONIC_FRAMES );
-            }
             // After waking up the Socket Can old messages in the kernel queue need to be ignored
             if ( !wokeUpFromSleep )
             {
+                Timestamp timestamp = dataSource->extractTimestamp( &msg[i].msg_hdr );
+                if ( timestamp < lastFrameTime )
+                {
+                    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::NOT_TIME_MONOTONIC_FRAMES );
+                }
                 lastFrameTime = timestamp;
-                dataSource->receivedMessages++;
-                TraceVariable traceFrames =
-                    static_cast<TraceVariable>( dataSource->mID + toUType( TraceVariable::READ_SOCKET_FRAMES_0 ) );
+                dataSource->mReceivedMessages++;
+                TraceVariable traceFrames = static_cast<TraceVariable>(
+                    dataSource->mChannelId + toUType( TraceVariable::READ_SOCKET_FRAMES_0 ) );
                 TraceModule::get().setVariable( ( traceFrames < TraceVariable::READ_SOCKET_FRAMES_19 )
                                                     ? traceFrames
                                                     : TraceVariable::READ_SOCKET_FRAMES_19,
-                                                dataSource->receivedMessages );
-                rawData.reserve( frame[i].len );
-                for ( size_t j = 0; j < frame[i].len; ++j )
-                {
-                    rawData.emplace_back( frame[i].data[j] );
-                }
-                message.setup( frame[i].can_id, rawData, syntheticData, timestamp );
-                if ( message.isValid() )
-                {
-                    if ( !dataSource->mCircularBuffPtr->push( message ) )
-                    {
-                        dataSource->discardedMessages++;
-                        TraceModule::get().setVariable( TraceVariable::DISCARDED_FRAMES,
-                                                        dataSource->discardedMessages );
-                        FWE_LOG_WARN( "Circular Buffer is full" );
-                    }
-                }
-                else
-                {
-                    FWE_LOG_WARN( "Message is not valid" );
-                }
+                                                dataSource->mReceivedMessages );
+                std::lock_guard<std::mutex> lock( dataSource->mDecoderDictMutex );
+                dataSource->mConsumer.processMessage( dataSource->mDecoderDictionary, frame[i], timestamp );
             }
         }
-        if ( nmsgs <= 0 )
+        if ( nmsgs < PARALLEL_RECEIVED_FRAMES_FROM_KERNEL )
         {
             if ( logTimer.getElapsedMs().count() > static_cast<int64_t>( LoggingModule::LOG_AGGREGATION_TIME_MS ) )
             {
                 // Nothing is in the ring buffer to consume. Go to idle mode for some time.
                 FWE_LOG_TRACE(
-
                     "Activations: " + std::to_string( activations ) +
-                    ". Waiting for some data to come. Idling for :" + std::to_string( dataSource->mIdleTimeMs ) +
-                    " ms, processed " + std::to_string( dataSource->receivedMessages ) + " frames" );
+                    ". Waiting for some data to come. Idling for: " + std::to_string( dataSource->mIdleTimeMs ) +
+                    " ms, processed " + std::to_string( dataSource->mReceivedMessages ) + " frames" );
                 activations = 0;
                 logTimer.reset();
             }
             dataSource->mWait.wait( static_cast<uint32_t>( dataSource->mIdleTimeMs ) );
             wokeUpFromSleep = false;
         }
-    } while ( !dataSource->shouldStop() );
+        if ( dataSource->shouldStop() )
+        {
+            break;
+        }
+    }
 }
 
 bool
@@ -373,8 +279,8 @@ CANDataSource::connect()
         close( mSocket );
         return false;
     }
-    if ( ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_SOFTWARE_TIMESTAMP ) ||
-         ( mTimestampTypeToUse == CAN_TIMESTAMP_TYPE::KERNEL_HARDWARE_TIMESTAMP ) )
+    if ( ( mTimestampTypeToUse == CanTimestampType::KERNEL_SOFTWARE_TIMESTAMP ) ||
+         ( mTimestampTypeToUse == CanTimestampType::KERNEL_HARDWARE_TIMESTAMP ) )
     {
         const int timestampFlags = ( SOF_TIMESTAMPING_RX_HARDWARE | SOF_TIMESTAMPING_RX_SOFTWARE |
                                      SOF_TIMESTAMPING_SOFTWARE | SOF_TIMESTAMPING_RAW_HARDWARE );
@@ -386,7 +292,6 @@ CANDataSource::connect()
         }
     }
 
-    memset( &interfaceAddress, 0, sizeof( interfaceAddress ) );
     interfaceAddress.can_family = AF_CAN;
     interfaceAddress.can_ifindex = interfaceRequest.ifr_ifindex;
 
@@ -397,8 +302,6 @@ CANDataSource::connect()
         close( mSocket );
         return false;
     }
-    // Notify on connection success
-    notifyListeners<const VehicleDataSourceID &>( &VehicleDataSourceListener::onVehicleDataSourceConnected, mID );
     // Start the main thread.
     return start();
 }
@@ -406,13 +309,7 @@ CANDataSource::connect()
 bool
 CANDataSource::disconnect()
 {
-    if ( ( !stop() ) && ( close( mSocket ) < 0 ) )
-    {
-        return false;
-    }
-    // Notify on connection closure
-    notifyListeners<const VehicleDataSourceID &>( &VehicleDataSourceListener::onVehicleDataSourceDisconnected, mID );
-    return true;
+    return stop() && ( close( mSocket ) == 0 );
 }
 
 bool
@@ -429,7 +326,29 @@ CANDataSource::isAlive()
     return true;
 }
 
-} // namespace VehicleNetwork
+void
+CANDataSource::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
+                                           VehicleDataSourceProtocol networkProtocol )
+{
+    if ( networkProtocol != VehicleDataSourceProtocol::RAW_SOCKET )
+    {
+        return;
+    }
+    std::lock_guard<std::mutex> lock( mDecoderDictMutex );
+    mDecoderDictionary = std::dynamic_pointer_cast<const CANDecoderDictionary>( dictionary );
+    if ( dictionary == nullptr )
+    {
+        FWE_LOG_TRACE( "Going to sleep until a the resume signal. CAN Data Source: " + std::to_string( mChannelId ) );
+    }
+    else
+    {
+        FWE_LOG_TRACE( "Resuming Network data acquisition on Data Source: " + std::to_string( mChannelId ) );
+        // Wake up the worker thread.
+        mWait.notify();
+    }
+}
+
+} // namespace DataInspection
 } // namespace IoTFleetWise
 } // namespace Aws
 #endif // IOTFLEETWISE_LINUX

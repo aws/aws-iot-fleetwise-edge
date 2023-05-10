@@ -73,9 +73,10 @@ struct CANDecoderDictionary : DecoderDictionary
     using CANMsgDecoderMethodType =
         std::unordered_map<CANChannelNumericID, std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>>;
     CANDecoderDictionary() = default;
-    CANDecoderDictionary( CANMsgDecoderMethodType canMsgDecoderMethod, std::unordered_set<SignalID> signalIDsToCollect )
-        : DecoderDictionary( std::move( signalIDsToCollect ) )
-        , canMessageDecoderMethod( std::move( canMsgDecoderMethod ) )
+    CANDecoderDictionary( CANMsgDecoderMethodType canMsgDecoderMethodIn,
+                          std::unordered_set<SignalID> signalIDsToCollectIn )
+        : DecoderDictionary( std::move( signalIDsToCollectIn ) )
+        , canMessageDecoderMethod( std::move( canMsgDecoderMethodIn ) )
     {
     }
     CANMsgDecoderMethodType canMessageDecoderMethod;

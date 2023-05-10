@@ -87,6 +87,143 @@ Resources:
     Properties:
       Roles:
         - !Ref Ec2ServiceRole
+  Ec2LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${AWS::StackName}-Ec2LaunchTemplate
+      LaunchTemplateData:
+        ImageId: !FindInMap [AMIRegionMap, !Ref "AWS::Region", AMIID]
+        KeyName: !If [KeyPairSpecifiedCondition, !Ref Ec2KeyPair, !Ref "AWS::NoValue"]
+        InstanceType: !FindInMap [FleetSizeEc2InstanceTypeMap, !Ref "FleetSize", InstanceType]
+        IamInstanceProfile:
+          Name: !Ref Ec2InstanceProfile
+        SecurityGroupIds: !Split [",", !GetAtt Ec2SecurityGroup.GroupId]
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub ${AWS::StackName}-Ec2-Instance
+        MetadataOptions:
+          HttpEndpoint: "enabled"
+          HttpTokens: "required"
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euo pipefail
+
+            # Wait for any existing package install to finish
+            i=0
+            while true; do
+              if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
+                i=0
+              else
+                i=`expr $i + 1`
+                if expr $i \>= 10 > /dev/null; then
+                  break
+                fi
+              fi
+              sleep 1
+            done
+
+            # Upgrade system and reboot if required
+            apt update && apt upgrade -y
+            if [ -f /var/run/reboot-required ]; then
+              # Delete the UserData info file so that we run again after reboot
+              rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
+              reboot
+              exit
+            fi
+
+            # Install helper scripts:
+            apt update && apt install -y python3-setuptools
+            mkdir -p /opt/aws/bin
+            wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+            python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
+            rm aws-cfn-bootstrap-py3-latest.tar.gz
+
+            # On error, signal back to cfn:
+            error_handler() {
+              /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+            }
+            trap error_handler ERR
+
+            # Increase pid_max:
+            echo 1048576 > /proc/sys/kernel/pid_max
+            # Disable syslog:
+            systemctl stop syslog.socket rsyslog.service
+            # Remove journald rate limiting and set max size:
+            printf "RateLimitBurst=0\nSystemMaxUse=1G\n" >> /etc/systemd/journald.conf
+
+            # Install packages
+            apt update && apt install -y wget ec2-instance-connect htop jq unzip
+
+            # Install AWS CLI:
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            ./aws/install
+            rm awscliv2.zip
+
+            # Download agent:
+            cd /home/ubuntu
+            if echo ${BinaryUrl} | grep -q 's3://'; then
+              sudo -u ubuntu aws s3 cp ${BinaryUrl} aws-iot-fleetwise-edge.tar.gz
+            else
+              sudo -u ubuntu wget ${BinaryUrl} -O aws-iot-fleetwise-edge.tar.gz
+            fi
+            sudo -u ubuntu mkdir dist && cd dist
+            sudo -u ubuntu tar -zxf ../aws-iot-fleetwise-edge.tar.gz
+            sudo -u ubuntu mkdir -p build/src/executionmanagement
+            sudo -u ubuntu mv aws-iot-fleetwise-edge build/src/executionmanagement
+
+            # Install SocketCAN modules:
+            ./tools/install-socketcan.sh --bus-count ${FleetSize}
+
+            # Install CAN Simulator
+            ./tools/install-cansim.sh --bus-count ${FleetSize}
+
+            # Install FWE credentials and config file
+            mkdir /etc/aws-iot-fleetwise
+            mkdir /var/aws-iot-fleetwise
+            echo -n "${IoTThing.certificatePem}" > /etc/aws-iot-fleetwise/certificate.pem
+            echo -n "${IoTThing.privateKey}" > /etc/aws-iot-fleetwise/private-key.key
+            if ((${FleetSize}==1)); then
+              echo "Configuring ${AWS::StackName}..."
+              ./tools/configure-fwe.sh \
+                --input-config-file "configuration/static-config.json" \
+                --output-config-file "/etc/aws-iot-fleetwise/config-0.json" \
+                --vehicle-name "${AWS::StackName}" \
+                --endpoint-url "${IoTThing.iotEndpoint}" \
+                --topic-prefix '${IoTMqttTopicPrefix}' \
+                --can-bus0 "vcan0"
+            else
+              BATCH_SIZE=$((`nproc`*4))
+              for ((i=0; i<${FleetSize}; i+=${!BATCH_SIZE})); do
+                for ((j=0; j<${!BATCH_SIZE} && i+j<${FleetSize}; j++)); do
+                  # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
+                  # to print stderr from the output group, but not info about the background process.
+                  { \
+                    echo "Configuring ${AWS::StackName}-$((i+j))..."; \
+                    mkdir /var/aws-iot-fleetwise/fwe$((i+j)); \
+                    ./tools/configure-fwe.sh \
+                      --input-config-file "configuration/static-config.json" \
+                      --output-config-file "/etc/aws-iot-fleetwise/config-$((i+j)).json" \
+                      --vehicle-name "${AWS::StackName}-$((i+j))" \
+                      --endpoint-url "${IoTThing.iotEndpoint}" \
+                      --topic-prefix '${IoTMqttTopicPrefix}' \
+                      --can-bus0 "vcan$((i+j))" \
+                      --persistency-path "/var/aws-iot-fleetwise/fwe$((i+j))"; \
+                  2>&3 &} 3>&2 2>/dev/null
+                done
+                # Wait for all background processes to finish
+                wait
+              done
+            fi
+
+            # Install FWE
+            ./tools/install-fwe.sh
+
+            # Signal init complete:
+            /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
   Ec2Instance:
     Type: AWS::EC2::Instance
     CreationPolicy:
@@ -94,132 +231,9 @@ Resources:
         Count: 1
         Timeout: PT30M
     Properties:
-      ImageId: !FindInMap [AMIRegionMap, !Ref "AWS::Region", AMIID]
-      KeyName: !If [KeyPairSpecifiedCondition, !Ref Ec2KeyPair, !Ref "AWS::NoValue"]
-      InstanceType: !FindInMap [FleetSizeEc2InstanceTypeMap, !Ref "FleetSize", InstanceType]
-      IamInstanceProfile: !Ref Ec2InstanceProfile
-      SecurityGroupIds: !Split [",", !GetAtt Ec2SecurityGroup.GroupId]
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-Ec2-Instance
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          set -euo pipefail
-
-          # Wait for any existing package install to finish
-          i=0
-          while true; do
-            if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
-              i=0
-            else
-              i=`expr $i + 1`
-              if expr $i \>= 10 > /dev/null; then
-                break
-              fi
-            fi
-            sleep 1
-          done
-
-          # Upgrade system and reboot if required
-          apt update && apt upgrade -y
-          if [ -f /var/run/reboot-required ]; then
-            # Delete the UserData info file so that we run again after reboot
-            rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
-            reboot
-            exit
-          fi
-
-          # Install helper scripts:
-          apt update && apt install -y python3-setuptools
-          mkdir -p /opt/aws/bin
-          wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-          python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
-          rm aws-cfn-bootstrap-py3-latest.tar.gz
-
-          # On error, signal back to cfn:
-          error_handler() {
-            /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
-          }
-          trap error_handler ERR
-
-          # Increase pid_max:
-          echo 1048576 > /proc/sys/kernel/pid_max
-          # Disable syslog:
-          systemctl stop syslog.socket rsyslog.service
-          # Remove journald rate limiting and set max size:
-          printf "RateLimitBurst=0\nSystemMaxUse=1G\n" >> /etc/systemd/journald.conf
-
-          # Install packages
-          apt update && apt install -y wget ec2-instance-connect htop jq unzip
-
-          # Install AWS CLI:
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
-          unzip -q awscliv2.zip
-          ./aws/install
-          rm awscliv2.zip
-
-          # Download agent:
-          cd /home/ubuntu
-          if echo ${BinaryUrl} | grep -q 's3://'; then
-            sudo -u ubuntu aws s3 cp ${BinaryUrl} aws-iot-fleetwise-edge.tar.gz
-          else
-            sudo -u ubuntu wget ${BinaryUrl} -O aws-iot-fleetwise-edge.tar.gz
-          fi
-          sudo -u ubuntu mkdir dist && cd dist
-          sudo -u ubuntu tar -zxf ../aws-iot-fleetwise-edge.tar.gz
-          sudo -u ubuntu mkdir -p build/src/executionmanagement
-          sudo -u ubuntu mv aws-iot-fleetwise-edge build/src/executionmanagement
-
-          # Install SocketCAN modules:
-          ./tools/install-socketcan.sh --bus-count ${FleetSize}
-
-          # Install CAN Simulator
-          ./tools/install-cansim.sh --bus-count ${FleetSize}
-
-          # Install FWE credentials and config file
-          mkdir /etc/aws-iot-fleetwise
-          mkdir /var/aws-iot-fleetwise
-          echo -n "${IoTThing.certificatePem}" > /etc/aws-iot-fleetwise/certificate.pem
-          echo -n "${IoTThing.privateKey}" > /etc/aws-iot-fleetwise/private-key.key
-          if ((${FleetSize}==1)); then
-            echo "Configuring ${AWS::StackName}..."
-            ./tools/configure-fwe.sh \
-              --input-config-file "configuration/static-config.json" \
-              --output-config-file "/etc/aws-iot-fleetwise/config-0.json" \
-              --vehicle-name "${AWS::StackName}" \
-              --endpoint-url "${IoTThing.iotEndpoint}" \
-              --topic-prefix '${IoTMqttTopicPrefix}' \
-              --can-bus0 "vcan0"
-          else
-            BATCH_SIZE=$((`nproc`*4))
-            for ((i=0; i<${FleetSize}; i+=${!BATCH_SIZE})); do
-              for ((j=0; j<${!BATCH_SIZE} && i+j<${FleetSize}; j++)); do
-                # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
-                # to print stderr from the output group, but not info about the background process.
-                { \
-                  echo "Configuring ${AWS::StackName}-$((i+j))..."; \
-                  mkdir /var/aws-iot-fleetwise/fwe$((i+j)); \
-                  ./tools/configure-fwe.sh \
-                    --input-config-file "configuration/static-config.json" \
-                    --output-config-file "/etc/aws-iot-fleetwise/config-$((i+j)).json" \
-                    --vehicle-name "${AWS::StackName}-$((i+j))" \
-                    --endpoint-url "${IoTThing.iotEndpoint}" \
-                    --topic-prefix '${IoTMqttTopicPrefix}' \
-                    --can-bus0 "vcan$((i+j))" \
-                    --persistency-path "/var/aws-iot-fleetwise/fwe$((i+j))"; \
-                2>&3 &} 3>&2 2>/dev/null
-              done
-              # Wait for all background processes to finish
-              wait
-            done
-          fi
-
-          # Install FWE
-          ./tools/install-fwe.sh
-
-          # Signal init complete:
-          /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+      LaunchTemplate:
+        LaunchTemplateId: !Ref Ec2LaunchTemplate
+        Version: !GetAtt Ec2LaunchTemplate.LatestVersionNumber
   IoTThing:
     Type: Custom::IoTThing
     Properties:

@@ -39,7 +39,7 @@ CollectionSchemeIngestion::build()
 {
     // Check if Collection collectionScheme has an ID and a Decoder Manifest ID
     if ( mProtoCollectionSchemeMessagePtr->campaign_arn().empty() ||
-         mProtoCollectionSchemeMessagePtr->decoder_manifest_arn().empty() )
+         mProtoCollectionSchemeMessagePtr->decoder_manifest_sync_id().empty() )
     {
         FWE_LOG_ERROR( "CollectionScheme does not have ID or DM ID" );
         return false;
@@ -346,28 +346,36 @@ CollectionSchemeIngestion::serializeNode( const CollectionSchemesMsg::ConditionN
         else if ( node.node_function().functionType_case() ==
                   CollectionSchemesMsg::ConditionNode_NodeFunction::kGeohashFunction )
         {
-            currentNode->nodeType = ExpressionNodeType::GEOHASHFUNCTION; // geohash
-            currentNode->function.geohashFunction.latitudeSignalID =
-                node.node_function().geohash_function().latitude_signal_id();
-            currentNode->function.geohashFunction.longitudeSignalID =
-                node.node_function().geohash_function().longitude_signal_id();
-            currentNode->function.geohashFunction.precision =
-                static_cast<uint8_t>( node.node_function().geohash_function().geohash_precision() );
-            currentNode->function.geohashFunction.gpsUnitType =
-                static_cast<GeohashFunction::GPSUnitType>( node.node_function().geohash_function().gps_unit() );
-            FWE_LOG_TRACE(
-
-                "Creating Geohash FUNCTION node: Lat SignalID: " +
-                std::to_string( currentNode->function.geohashFunction.latitudeSignalID ) +
-                "; Lon SignalID: " + std::to_string( currentNode->function.geohashFunction.longitudeSignalID ) +
-                "; precision: " + std::to_string( currentNode->function.geohashFunction.precision ) +
-                "; GPS Unit Type: " +
-                std::to_string( static_cast<uint8_t>( currentNode->function.geohashFunction.gpsUnitType ) ) );
-            return currentNode;
+            if ( ( node.node_function().geohash_function().geohash_precision() > UINT8_MAX ) ||
+                 ( node.node_function().geohash_function().gps_unit() >=
+                   toUType( GeohashFunction::GPSUnitType::MAX ) ) )
+            {
+                FWE_LOG_WARN( "Invalid Geohash function arguments" );
+            }
+            else
+            {
+                currentNode->nodeType = ExpressionNodeType::GEOHASHFUNCTION; // geohash
+                currentNode->function.geohashFunction.latitudeSignalID =
+                    node.node_function().geohash_function().latitude_signal_id();
+                currentNode->function.geohashFunction.longitudeSignalID =
+                    node.node_function().geohash_function().longitude_signal_id();
+                currentNode->function.geohashFunction.precision =
+                    static_cast<uint8_t>( node.node_function().geohash_function().geohash_precision() );
+                // coverity[autosar_cpp14_a7_2_1_violation] Range is checked by the if-statement above
+                currentNode->function.geohashFunction.gpsUnitType =
+                    static_cast<GeohashFunction::GPSUnitType>( node.node_function().geohash_function().gps_unit() );
+                FWE_LOG_TRACE(
+                    "Creating Geohash FUNCTION node: Lat SignalID: " +
+                    std::to_string( currentNode->function.geohashFunction.latitudeSignalID ) +
+                    "; Lon SignalID: " + std::to_string( currentNode->function.geohashFunction.longitudeSignalID ) +
+                    "; precision: " + std::to_string( currentNode->function.geohashFunction.precision ) +
+                    "; GPS Unit Type: " +
+                    std::to_string( static_cast<uint8_t>( currentNode->function.geohashFunction.gpsUnitType ) ) );
+                return currentNode;
+            }
         }
         else
         {
-            // unsupported function type
             FWE_LOG_WARN( "Unsupported Function Node Type" );
         }
     }
@@ -429,7 +437,7 @@ CollectionSchemeIngestion::getDecoderManifestID() const
         return INVALID_DECODER_MANIFEST_ID;
     }
 
-    return mProtoCollectionSchemeMessagePtr->decoder_manifest_arn();
+    return mProtoCollectionSchemeMessagePtr->decoder_manifest_sync_id();
 }
 
 uint64_t

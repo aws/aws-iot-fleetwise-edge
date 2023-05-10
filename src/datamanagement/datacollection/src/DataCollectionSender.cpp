@@ -4,6 +4,7 @@
 // Includes
 #include "DataCollectionSender.h"
 #include "LoggingModule.h"
+#include "TraceModule.h"
 #include <boost/filesystem.hpp>
 #include <snappy.h>
 #include <sstream>
@@ -19,10 +20,9 @@ DataCollectionSender::DataCollectionSender( std::shared_ptr<ISender> sender,
                                             unsigned maxMessageCount,
                                             CANInterfaceIDTranslator &canIDTranslator )
     : mSender( std::move( sender ) )
+    , mTransmitThreshold{ ( maxMessageCount > 0U ) ? maxMessageCount : UINT_MAX }
     , mProtoWriter( canIDTranslator )
 {
-    mTransmitThreshold = ( maxMessageCount > 0U ) ? maxMessageCount : UINT_MAX;
-    mCollectionEventID = 0U;
 }
 
 void
@@ -37,7 +37,7 @@ DataCollectionSender::send( const TriggeredCollectionSchemeDataPtr triggeredColl
     // Assign a unique event id to the edge to cloud payload
     mCollectionEventID = triggeredCollectionSchemeDataPtr->eventID;
 
-    setCollectionSchemeParameters( triggeredCollectionSchemeDataPtr );
+    setCollectionSchemeParameters( *triggeredCollectionSchemeDataPtr );
 
     if ( mSendDestination == SendDestination::MQTT )
     {
@@ -140,7 +140,7 @@ DataCollectionSender::transmit()
     if ( mCollectionSchemeParams.compression )
     {
         FWE_LOG_TRACE( "Compress the payload before transmitting since compression flag is true" );
-        if ( snappy::Compress( mProtoOutput.data(), mProtoOutput.size(), &payloadData ) == 0u )
+        if ( snappy::Compress( mProtoOutput.data(), mProtoOutput.size(), &payloadData ) == 0U )
         {
             FWE_LOG_TRACE( "Error in compressing the payload" );
             return ConnectivityError::WrongInputData;
@@ -160,6 +160,7 @@ DataCollectionSender::transmit()
     }
     else
     {
+        TraceModule::get().sectionEnd( TraceSection::COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA );
         FWE_LOG_INFO( "A Payload of size: " + std::to_string( payloadData.length() ) +
                       " bytes has been unloaded to AWS IoT Core" );
     }
@@ -211,11 +212,11 @@ DataCollectionSender::serializeAndTransmit()
 
 void
 DataCollectionSender::setCollectionSchemeParameters(
-    const TriggeredCollectionSchemeDataPtr &triggeredCollectionSchemeDataPtr )
+    const TriggeredCollectionSchemeData &triggeredCollectionSchemeDataPtr )
 {
-    mCollectionSchemeParams.persist = triggeredCollectionSchemeDataPtr->metaData.persist;
-    mCollectionSchemeParams.compression = triggeredCollectionSchemeDataPtr->metaData.compress;
-    mCollectionSchemeParams.priority = triggeredCollectionSchemeDataPtr->metaData.priority;
+    mCollectionSchemeParams.persist = triggeredCollectionSchemeDataPtr.metaData.persist;
+    mCollectionSchemeParams.compression = triggeredCollectionSchemeDataPtr.metaData.compress;
+    mCollectionSchemeParams.priority = triggeredCollectionSchemeDataPtr.metaData.priority;
 }
 
 } // namespace DataManagement

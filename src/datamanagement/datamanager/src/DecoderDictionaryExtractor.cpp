@@ -15,12 +15,17 @@ namespace IoTFleetWise
 namespace DataManagement
 {
 
-// NOLINT below due to C++17 warning of redundant declarations that are required to maintain C++14 compatibility
-constexpr std::array<VehicleDataSourceProtocol, 2> CollectionSchemeManager::SUPPORTED_NETWORK_PROTOCOL; // NOLINT
 void
 CollectionSchemeManager::decoderDictionaryExtractor(
     std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> &decoderDictionaryMap )
 {
+    // Initialize the dictionary map with nullptr for each protocol, so that protocols are disabled if
+    // none of the collection schemes collect data for that protocol
+    decoderDictionaryMap.clear();
+    for ( auto protocol : SUPPORTED_NETWORK_PROTOCOL )
+    {
+        decoderDictionaryMap[protocol] = nullptr;
+    }
     // Iterate through enabled collectionScheme lists to locate the signals and CAN frames to be collected
     for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); ++it )
     {
@@ -37,10 +42,10 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                 continue;
             }
             // Firstly we need to check if we already have dictionary created for this network
-            if ( decoderDictionaryMap.find( networkType ) == decoderDictionaryMap.end() )
+            if ( decoderDictionaryMap[networkType] == nullptr )
             {
                 // Currently we don't have decoder dictionary for this type of network protocol, create one
-                decoderDictionaryMap.emplace( networkType, std::make_shared<CANDecoderDictionary>() );
+                decoderDictionaryMap[networkType] = std::make_shared<CANDecoderDictionary>();
             }
 
             if ( networkType == VehicleDataSourceProtocol::RAW_SOCKET )
@@ -140,11 +145,10 @@ CollectionSchemeManager::decoderDictionaryExtractor(
         // If some CAN Frame has signals to be decoded, we will set its collectType as RAW_AND_DECODE.
         if ( !collectionSchemePtr->getCollectRawCanFrames().empty() )
         {
-            if ( decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET ) == decoderDictionaryMap.end() )
+            if ( decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] == nullptr )
             {
                 // Currently we don't have decoder dictionary for this type of network protocol, create one
-                decoderDictionaryMap.emplace( VehicleDataSourceProtocol::RAW_SOCKET,
-                                              std::make_shared<CANDecoderDictionary>() );
+                decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] = std::make_shared<CANDecoderDictionary>();
             }
             auto &canDecoderDictionaryPtr = decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET];
             for ( const auto &canFrameInfo : collectionSchemePtr->getCollectRawCanFrames() )
@@ -186,16 +190,6 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                     }
                 }
             }
-        }
-    }
-    for ( VehicleDataSourceProtocol networkType : SUPPORTED_NETWORK_PROTOCOL )
-    {
-        // check if the decoder dictionary has been created for this network type. If not, we need to explicity create
-        // an empty one to shutdown the decoding if it's on-going
-        if ( decoderDictionaryMap.find( networkType ) == decoderDictionaryMap.end() )
-        {
-            // Currently we don't have decoder dictionary for this type of network protocol, create one
-            decoderDictionaryMap.emplace( networkType, std::make_shared<CANDecoderDictionary>() );
         }
     }
 }

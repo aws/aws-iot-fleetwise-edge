@@ -32,7 +32,7 @@ public:
     CollectionInspectionWorkerThread &operator=( CollectionInspectionWorkerThread && ) = delete;
 
     // Inherited from IActiveConditionProcessor
-    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &activeConditions ) override;
+    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) override;
 
     /**
      * @brief As soon as new data is available in any input queue call this to wakeup the thread
@@ -46,7 +46,7 @@ public:
      * @param inputActiveDTCBuffer OBDModule DTC Circular buffer
      * @param outputCollectedData this thread will put data that should be sent to cloud into this queue
      * @param idleTimeMs if no new data is available sleep for this amount of milliseconds
-     * @param dataReductionProbability set to true to disable data reduction using probability
+     * @param dataReductionProbabilityDisabled set to true to disable data reduction using probability
      *
      * @return true if initialization was successful
      * */
@@ -55,7 +55,7 @@ public:
                const std::shared_ptr<ActiveDTCBuffer> &inputActiveDTCBuffer,
                const std::shared_ptr<CollectedDataReadyToPublish> &outputCollectedData,
                uint32_t idleTimeMs,
-               bool dataReductionProbability = false );
+               bool dataReductionProbabilityDisabled = false );
 
     /**
      * @brief stops the internal thread if started and wait until it finishes

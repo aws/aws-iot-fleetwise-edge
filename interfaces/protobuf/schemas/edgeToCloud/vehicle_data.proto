@@ -18,9 +18,9 @@ message VehicleData {
     string campaign_arn = 1;
 
     /*
-     * Amazon Resource Name of the decoder manifest used to decode the signals in this message
+     * Synchronization ID of the decoder manifest used to decode the signals in this message
      */
-    string decoder_arn = 2;
+    string decoder_sync_id = 2;
 
     /*
      * A unique ID that FWE generates each time a collectionScheme condition is triggered.

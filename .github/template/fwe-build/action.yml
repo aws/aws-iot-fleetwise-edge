@@ -38,7 +38,11 @@ runs:
 
     - name: build
       shell: bash
-      run: ./tools/build-fwe-${{ inputs.build-arch }}.sh
+      run: |
+        ./tools/build-fwe-${{ inputs.build-arch }}.sh
+        ./tools/build-dist.sh build/src/executionmanagement/aws-iot-fleetwise-edge
+        # If the output file changes, make sure to update the upload-asset job below
+        mv build/aws-iot-fleetwise-edge.tar.gz aws-iot-fleetwise-edge-${{ inputs.upload-arch }}.tar.gz
 
     - name: unit-test
       shell: bash
@@ -61,7 +65,4 @@ runs:
       shell: bash
       run: |
         RELEASE_VERSION="${GITHUB_REF/refs\/tags\//}"
-        ASSET_FILENAME="aws-iot-fleetwise-edge-${{ inputs.upload-arch }}.tar.gz"
-        ./tools/build-dist.sh build/src/executionmanagement/aws-iot-fleetwise-edge
-        mv build/aws-iot-fleetwise-edge.tar.gz ${ASSET_FILENAME}
-        gh release upload ${RELEASE_VERSION} ${ASSET_FILENAME}
+        gh release upload ${RELEASE_VERSION} aws-iot-fleetwise-edge-${{ inputs.upload-arch }}.tar.gz

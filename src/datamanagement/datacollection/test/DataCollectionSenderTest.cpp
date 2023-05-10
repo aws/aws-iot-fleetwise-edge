@@ -60,7 +60,7 @@ public:
 
         /* Read and compare to written fields */
         ASSERT_EQ( "123", vehicleDataTest.campaign_arn() );
-        ASSERT_EQ( "456", vehicleDataTest.decoder_arn() );
+        ASSERT_EQ( "456", vehicleDataTest.decoder_sync_id() );
         ASSERT_EQ( 800, vehicleDataTest.collection_event_time_ms_epoch() );
         ASSERT_EQ( vehicleDataTest.captured_signals_size(), 3 );
         ASSERT_EQ( vehicleDataTest.can_frames_size(), 3 );
@@ -86,7 +86,7 @@ public:
 
         /* Read and compare to written fields */
         ASSERT_EQ( "123", vehicleDataTest.campaign_arn() );
-        ASSERT_EQ( "456", vehicleDataTest.decoder_arn() );
+        ASSERT_EQ( "456", vehicleDataTest.decoder_sync_id() );
         ASSERT_EQ( 800, vehicleDataTest.collection_event_time_ms_epoch() );
         // Number of messages should always be less than or equal to the transmit threshold specified in config
         auto dtcData = vehicleDataTest.mutable_dtc_data();

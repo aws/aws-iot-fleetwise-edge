@@ -6,6 +6,7 @@
 // Includes
 #include "AwsIotChannel.h"
 #include "AwsIotConnectivityModule.h"
+#include "CANDataSource.h"
 #include "CacheAndPersist.h"
 #include "ClockHandler.h"
 #include "CollectionInspectionWorkerThread.h"
@@ -24,8 +25,6 @@
 #include "Signal.h"
 #include "Thread.h"
 #include "Timer.h"
-#include "VehicleDataSourceBinder.h"
-#include "businterfaces/AbstractVehicleDataSource.h"
 #include <atomic>
 #include <json/json.h>
 #include <map>
@@ -114,9 +113,10 @@ private:
     uint64_t mPrintMetricsCyclicPeriodMs{ 0 }; // default to 0 which means no cyclic printing
 
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
-    std::unique_ptr<VehicleDataSourceBinder> mVehicleDataSourceBinder;
 
     std::shared_ptr<OBDOverCANModule> mOBDOverCANModule;
+    std::vector<std::unique_ptr<CANDataSource>> mCANDataSources;
+    std::vector<std::unique_ptr<CANDataConsumer>> mCANDataConsumers;
     std::shared_ptr<DataCollectionSender> mDataCollectionSender;
 
     std::shared_ptr<AwsIotConnectivityModule> mAwsIotModule;
@@ -134,7 +134,6 @@ private:
     std::unique_ptr<RemoteProfiler> mRemoteProfiler;
     std::shared_ptr<AwsIotChannel> mAwsIotChannelMetricsUpload;
     std::shared_ptr<AwsIotChannel> mAwsIotChannelLogsUpload;
-    VehicleDataSourcePtr mVehicleDataSource;
 #ifdef FWE_FEATURE_CAMERA
     // DDS Module
     std::shared_ptr<DataOverDDSModule> mDataOverDDSModule;

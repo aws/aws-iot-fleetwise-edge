@@ -127,12 +127,12 @@ struct CollectedCanRawFrame
     CollectedCanRawFrame() = default;
     CollectedCanRawFrame( CANRawFrameID frameIDIn,
                           CANChannelNumericID channelIdIn,
-                          Timestamp receiveTime,
+                          Timestamp receiveTimeIn,
                           std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> &dataIn,
                           uint8_t sizeIn )
         : frameID( frameIDIn )
         , channelId( channelIdIn )
-        , receiveTime( receiveTime )
+        , receiveTime( receiveTimeIn )
         , data( dataIn )
         , size( sizeIn )
     {
@@ -243,12 +243,6 @@ struct SignalValueWrapper
     SignalValueWrapper( SignalValueWrapper && ) = default;
     SignalValueWrapper &operator=( SignalValueWrapper && ) = default;
 
-    template <typename T>
-    SignalValueWrapper( T sigValue, SignalType sigType )
-    {
-        setVal<T>( sigValue, sigType );
-    }
-
     // For Backward Compatibility
     SignalValueWrapper &
     operator=( const double sigValue )
@@ -283,17 +277,17 @@ struct CollectedSignal
 
     // Backward Compatibility
     template <typename T>
-    CollectedSignal( SignalID signalIDIn, Timestamp receiveTime, T sigValue )
+    CollectedSignal( SignalID signalIDIn, Timestamp receiveTimeIn, T sigValue )
         : signalID( signalIDIn )
-        , receiveTime( receiveTime )
+        , receiveTime( receiveTimeIn )
     {
         value.setVal<double>( static_cast<double>( sigValue ), SignalType::DOUBLE );
     }
 
     template <typename T>
-    CollectedSignal( SignalID signalIDIn, Timestamp receiveTime, T sigValue, SignalType sigType )
+    CollectedSignal( SignalID signalIDIn, Timestamp receiveTimeIn, T sigValue, SignalType sigType )
         : signalID( signalIDIn )
-        , receiveTime( receiveTime )
+        , receiveTime( receiveTimeIn )
     {
         switch ( sigType )
         {

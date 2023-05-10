@@ -127,26 +127,29 @@ CustomDataSource::setFilter( CANChannelNumericID canChannel, CANRawFrameID canRa
         std::lock_guard<std::mutex> lock( mExtractionOngoing );
         mCanChannel = canChannel;
         mCanRawFrameId = canRawFrameId;
-        canDecoderDictionary = lastReceivedDictionary;
+        canDecoderDictionary = mLastReceivedDictionary;
     }
-    if ( canDecoderDictionary != nullptr )
-    {
-        matchDictionaryToFilter( *canDecoderDictionary, canChannel, canRawFrameId );
-    }
+    matchDictionaryToFilter( canDecoderDictionary, canChannel, canRawFrameId );
 }
 
 void
-CustomDataSource::matchDictionaryToFilter( const CANDecoderDictionary &dictionary,
+CustomDataSource::matchDictionaryToFilter( std::shared_ptr<const CANDecoderDictionary> &dictionary,
                                            CANChannelNumericID canChannel,
                                            CANRawFrameID canRawFrameId )
 {
-    if ( mCanChannel == INVALID_CAN_SOURCE_NUMERIC_ID )
+    if ( canChannel == INVALID_CAN_SOURCE_NUMERIC_ID )
     {
-        FWE_LOG_TRACE( "No Valid CAN so requesting sleep" );
-        mShouldSleep = true; // Nothing found
+        FWE_LOG_TRACE( "CAN channel invalid, so requesting sleep" );
+        mShouldSleep = true;
         return;
     }
-    for ( auto &channel : dictionary.canMessageDecoderMethod )
+    if ( dictionary == nullptr )
+    {
+        FWE_LOG_TRACE( "No decoder dictionary, so requesting sleep" );
+        mShouldSleep = true;
+        return;
+    }
+    for ( auto &channel : dictionary->canMessageDecoderMethod )
     {
         if ( channel.first == canChannel )
         {
@@ -185,15 +188,13 @@ CustomDataSource::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &di
     auto canDecoderDictionary = std::dynamic_pointer_cast<const CANDecoderDictionary>( dictionary );
     {
         std::lock_guard<std::mutex> lock( mExtractionOngoing );
-        lastReceivedDictionary = canDecoderDictionary;
+        mLastReceivedDictionary = canDecoderDictionary;
         canChannel = mCanChannel;
         canRawFrameId = mCanRawFrameId;
     }
-    if ( canDecoderDictionary != nullptr )
-    {
-        matchDictionaryToFilter( *canDecoderDictionary, canChannel, canRawFrameId );
-    }
+    matchDictionaryToFilter( canDecoderDictionary, canChannel, canRawFrameId );
 }
+
 CustomDataSource::~CustomDataSource()
 {
     if ( isRunning() )
@@ -201,6 +202,7 @@ CustomDataSource::~CustomDataSource()
         stop();
     }
 }
+
 } // namespace DataManagement
 } // namespace IoTFleetWise
 } // namespace Aws

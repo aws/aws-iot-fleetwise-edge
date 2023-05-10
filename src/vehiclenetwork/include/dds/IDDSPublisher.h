@@ -80,24 +80,6 @@ public:
     virtual void publishDataRequest( const DDSDataRequest &dataRequest ) = 0;
 
     /**
-     * @return the unique ID of the channel.
-     */
-    inline VehicleDataSourceID
-    getChannelID() const
-    {
-        return mID;
-    }
-
-    /**
-     * @return the Network Protocol Type
-     */
-    inline VehicleDataSourceProtocol
-    getChannelProtocol() const
-    {
-        return mNetworkProtocol;
-    }
-
-    /**
      * @return the DDS Domain ID
      */
     inline DDSDomainID
@@ -141,16 +123,15 @@ protected:
     static uint32_t
     generateChannelID()
     {
-        static std::atomic<uint32_t> channelID( INVALID_DATA_SOURCE_ID );
+        static std::atomic<uint32_t> channelID{ 0 };
         return ++channelID;
     }
 
     SensorSourceType mType;
-    VehicleDataSourceID mID;
+    uint32_t mID;
     DDSDomainID mDDSDomainID;
     DDSTopicName mDDSTopic;
     DDSWriterName mDDSwriterName;
-    VehicleDataSourceProtocol mNetworkProtocol;
 };
 using DDSPublisherPtr = std::unique_ptr<IDDSPublisher>;
 } // namespace VehicleNetwork

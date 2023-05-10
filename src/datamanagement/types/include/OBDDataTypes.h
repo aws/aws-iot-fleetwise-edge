@@ -55,7 +55,7 @@ struct OBDSignal
 };
 
 // List of OBD Service IDs/ Modes
-enum class SIDs : uint32_t
+enum class SID : uint32_t
 {
     INVALID_SERVICE_MODE = 0x00,      // invalid service mode
     CURRENT_STATS = 0x01,             // Current Stats
@@ -66,10 +66,10 @@ enum class SIDs : uint32_t
     OXGEN_SENSOR_MODE = 0x06,         // Request Oxygen Sensor Monitoring
     PENDING_DTC = 0x07,               // Request Pending DTCs
     TESTING = 0x08,                   // Testing related SID
-    VEHICLE_INFO = 0x09               // Request Vehicle Information
+    VEHICLE_INFO = 0x09,              // Request Vehicle Information
+    MAX = 0x0A
 };
 
-using SID = SIDs;
 using PID = uint8_t;
 using SupportedPIDs = std::vector<PID>;
 constexpr PID INVALID_PID = UINT8_MAX;

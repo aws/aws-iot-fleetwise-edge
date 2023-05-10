@@ -82,7 +82,7 @@ private:
 
     unsigned long getThreadID() const;
 
-    pthread_t mThread{ 0 };
+    pthread_t mThread{ 0U };
     ThreadSettings mExecParams;
 
     unsigned long mThreadId{};

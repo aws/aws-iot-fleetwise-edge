@@ -24,7 +24,6 @@
   "staticConfig": {
     "bufferSizes": {
       "dtcBufferSize": 100,
-      "socketCANBufferSize": 10000,
       "decodedSignalsBufferSize": 10000,
       "rawCANFrameBufferSize": 10000
     },

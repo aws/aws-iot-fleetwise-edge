@@ -85,7 +85,7 @@ private:
     // frames again/Split the file into frames. We want to do this correctly in future versions
     // of this code, where we would store as a metadata the frame size and/or store the frames
     // in separate artifacts.
-    static bool persistToStorage( const std::vector<CameraFrame> &buffer, const std::string &fileName );
+    static bool persistToStorage( const std::vector<CameraFrame> &frameBuffer, const std::string &fileName );
 
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };

@@ -1,5 +1,24 @@
 # Change Log
 
+## v1.0.5 (2023-05-11)
+
+Bugfixes:
+
+- RemoteProfiler not always uploading logs
+
+Improvements:
+
+- Refactor Producer/Consumer architecture, removing the buffer and thread between the
+  `CANDataSource` and the `CANDataConsumer`. The static config option `socketCANBufferSize` was
+  therefore removed.
+- Add documentation on [how to use edge specific metrics](docs/metrics.md).
+- Change from `arn` to `sync_id` for all decoder manifest Protobuf fields, the `sync_id` being the
+  ARN followed by the timestamp of the last update. The change is backwards compatible with older
+  versions of the edge agent.
+- Improve MISRA C++ 2008, and AUTOSAR C++ compliance.
+- Updated CloudFormation templates to use
+  [IMDSv2](https://aws.amazon.com/blogs/security/defense-in-depth-open-firewalls-reverse-proxies-ssrf-vulnerabilities-ec2-instance-metadata-service/).
+
 ## v1.0.4 (2023-03-02)
 
 Bugfixes:

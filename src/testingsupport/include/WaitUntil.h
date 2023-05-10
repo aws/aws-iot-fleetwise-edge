@@ -14,8 +14,14 @@
   The following WAIT_ASSERT_* are adding extra retrial capability above the GoogleTest framework.
   Some test cases need longer time to process before get expected outcome, so we need to wait and retry.
 */
-#define WAIT_ASSERT_TRUE( val ) ASSERT_TRUE( waitUntil( [&] { return ( val ); } ) )
-#define WAIT_ASSERT_FALSE( val ) ASSERT_TRUE( waitUntil( [&] { return !( val ); } ) )
+#define WAIT_ASSERT_TRUE( val )                                                                                        \
+    ASSERT_TRUE( waitUntil( [&] {                                                                                      \
+        return ( val );                                                                                                \
+    } ) )
+#define WAIT_ASSERT_FALSE( val )                                                                                       \
+    ASSERT_TRUE( waitUntil( [&] {                                                                                      \
+        return !( val );                                                                                               \
+    } ) )
 
 #define WAIT_ASSERT_EQ( val1, val2 )                                                                                   \
     auto WAIT_VAR( val1_, __LINE__ ) = val1;                                                                           \
@@ -60,8 +66,14 @@
   The following DELAYED_ASSERT_* are adding extra retrial capability above the GoogleTest framework.
   Some test cases need to be continuously evaluated, and asserted only after the timeout occurs.
 */
-#define DELAY_ASSERT_TRUE( val ) ASSERT_TRUE( waitDelay( [&] { return ( val ); } ) )
-#define DELAY_ASSERT_FALSE( val ) ASSERT_FALSE( waitDelay( [&] { return ( val ); } ) )
+#define DELAY_ASSERT_TRUE( val )                                                                                       \
+    ASSERT_TRUE( waitDelay( [&] {                                                                                      \
+        return ( val );                                                                                                \
+    } ) )
+#define DELAY_ASSERT_FALSE( val )                                                                                      \
+    ASSERT_FALSE( waitDelay( [&] {                                                                                     \
+        return ( val );                                                                                                \
+    } ) )
 
 namespace Aws
 {

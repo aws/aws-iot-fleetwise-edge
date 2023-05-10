@@ -29,10 +29,10 @@ public:
      * This function should be called as rarely as possible.
      * All condition should fulfill the restriction like max signal id or equation depth.
      * After this call all cached signal values that were not published are deleted
-     * @param activeConditions all currently active Conditions
+     * @param inspectionMatrix all currently active Conditions
      * @return true if valid conditions were handed over
      * */
-    virtual void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &activeConditions ) = 0;
+    virtual void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) = 0;
 
     virtual ~IActiveConditionProcessor() = default;
 };
