@@ -99,17 +99,31 @@ collect data from it.
 
 1. Open the AWS CloudShell: [Launch CloudShell](https://console.aws.amazon.com/cloudshell/home)
 1. Copy and paste the following commands to clone the latest AWS IoT FleetWise Edge Agent software
-   from GitHub and install the dependencies of the cloud demo script.
+   from GitHub, install the dependencies of the cloud demo script and enable latest IoT FleetWise
+   commands in the AWS CLI.
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
        && cd ~/aws-iot-fleetwise-edge/tools/cloud \
-       && pip3 install wrapt==1.10.0 plotly==5.3.1 pandas==1.3.4 cantools==36.4.0
+       && pip3 install wrapt==1.10.0 plotly==5.3.1 pandas==1.5.0 cantools==36.4.0 boto3==1.18.60 fastparquet=2023.4.0
+   ```
+
+   If you are using the AWS CLI v<2.11.24, update the CLI by running:
+
+   ```bash
+   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+   unzip awscliv2.zip
+   sudo ./aws/install --update
+   rm -rf ./aws*
    ```
 
    The AWS IoT FleetWise Cloud demo script performs the following:
 
    - Registers your AWS account with AWS IoT FleetWise, if not already registered
+   - Creates Timestream database and table for collected data for Timestream campaigns, if not
+     already created
+   - Creates S3 bucket for collected data for S3 campaigns, if not already created
+   - Creates IAM role and policy required for the service to write data to the Timestream resources
    - Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and
      secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list
    - Creates a model manifest that references the signal catalog with all of the OBD and DBC signals
@@ -118,23 +132,41 @@ collect data from it.
      OBD signals from the network interfaces defined in `network-interfaces.json`
    - Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest
    - Updates the decoder manifest to set the status as `ACTIVE`
-   - Creates a vehicle with an ID equal to `fwdemo` which is the same as the name given to the
+   - Creates a vehicle with a name equal to `fwdemo` which is the same as the name given to the
      CloudFormation Stack name in the previous section
    - Creates a fleet
    - Associates the vehicle with the fleet
    - Creates a campaign from `campaign-brake-event.json` that contains a condition-based collection
      scheme to capture the engine torque and the brake pressure when the brake pressure is above
-     7000, and targets the campaign at the fleet
-   - Approves the campaign
+     7000, and targets the campaign at the fleet.
+   - Approves created campaign
    - Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to the
      fleet
    - Waits 30 seconds and then downloads the collected data from Timestream
    - Saves the data to an HTML file
 
+   You can enable S3 upload destination by passing the option `--enable-s3-upload`. You can pass
+   your bucket name as option `--bucket-name`. The demo script will additionally:
+
+   - Create S3 bucket for collected data for S3 campaigns, if not already created
+   - Create IAM roles and policies required for the service to write data to the S3 resources
+   - Creates 2 additional campaigns from `campaign-brake-event.json`. One campaign will upload data
+     to to S3 in JSON format, one to S3 in parquet format
+   - Wait 20 minutes for the data to propagate to S3 and then downloads it
+   - Save the data to an HTML file
+
+   This script will not delete Timestream and S3 resources.
+
 1. Run the demo script:
 
    ```bash
    ./demo.sh --vehicle-name fwdemo
+   ```
+
+   1. (Optional) To enable S3 upload, append the option `--enable-s3-upload`
+
+   ```bash
+   ./demo.sh --vehicle-name fwdemo --enable-s3-upload
    ```
 
    1. (Optional) If you selected a `FleetSize` of greater than one above, append the option
@@ -156,6 +188,10 @@ collect data from it.
    click on the Actions drop down menu in the top-right corner of the CloudShell window and choose
    **Download file**. Paste the path to the file, choose **Download**, and open the downloaded file
    in your browser.
+
+   If you enabled S3 upload, results are stored in
+   `/home/cloudshell-user/aws-iot-fleetwise-cloud/fwdemo-<TIMESTAMP>-s3-json-result.html` and
+   `/home/cloudshell-user/aws-iot-fleetwise-cloud/fwdemo-<TIMESTAMP>-s3-parquet-result.html`
 
 ## Explore collected data
 
@@ -268,7 +304,8 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
       following: `can-isotp`. It also installs a systemd service called `setup-socketcan` that
       brings up the virtual SocketCAN interface `vcan0` at startup.
    1. Install the following Ubuntu packages: `python3 python3-pip`. It then installs the following
-      PIP packages: `wrapt cantools prompt_toolkit python-can can-isotp matplotlib`. It also
+      PIP packages:
+      `wrapt cantools prompt_toolkit python-can can-isotp matplotlib boto3 fastparquet`. It also
       installs a systemd service called `cansim` that periodically transmits data on the virtual
       SocketCAN bus `vcan0` to simulate vehicle data.
 
@@ -335,11 +372,20 @@ collect data from it.
    FleetWise Cloud demo script:
 
    1. Following command installs the following Ubuntu packages: `python3 python3-pip`. It then
-      installs the following PIP packages: `wrapt plotly pandas cantools`
+      installs the following PIP packages: `wrapt plotly pandas cantools boto3 fastparquet`
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
        && sudo -H ./install-deps.sh
+   ```
+
+   1. If you are using the AWS CLI v<2.11.24, update the CLI by running:
+
+   ```bash
+   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+   unzip awscliv2.zip
+   sudo ./aws/install --update
+   rm -rf ./aws*
    ```
 
 1. Run the following to explore the AWS IoT FleetWise CLI:
@@ -354,6 +400,13 @@ collect data from it.
    ./demo.sh --vehicle-name fwdemo-ec2
    ```
 
+   1. (Optional) To enable S3 upload, append the option `--enable-s3-upload`. You can pass your
+      bucket name as option `--bucket-name`.
+
+   ```bash
+   ./demo.sh --vehicle-name fwdemo-ec2 --enable-s3-upload
+   ```
+
    1. (Optional) If you changed the `--region` option to `provision.sh` above, append the option
       `--region <REGION>`, where `<REGION>` is the selected region. For example, if you chose to
       create the AWS IoT thing in Europe (Frankfurt), you must configure `--region` to
@@ -365,27 +418,41 @@ collect data from it.
 
    1. The demo script:
       1. Registers your AWS account with AWS IoT FleetWise, if not already registered
+      1. Creates Timestream database and table for collected data for Timestream campaigns, if not
+         already created
+      1. Creates IAM roles and policies required for the service to write data to the Timestream
       1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals,
          and secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list
-      1. Creates a vehicle model (model manifest) that references the signal catalog with all of the
-         OBD and DBC signals
-      1. Activates the vehicle model
-      1. Creates a decoder manifest linked to the vehicle model using `obd-decoders.json` for
+      1. Creates a model manifest that references the signal catalog with all of the OBD and DBC
+         signals
+      1. Activates the model manifest
+      1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for
          decoding OBD signals from the network interfaces defined in `network-interfaces.json`
       1. Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest
       1. Updates the decoder manifest to set the status as `ACTIVE`
-      1. Creates a vehicle with an ID equal to `fwdemo-ec2` which is the same as the name passed to
-         `provision.sh` above
+      1. Creates a vehicle with a name equal to `fwdemo-ec2` which is the same as the name given to
+         the CloudFormation Stack name in the previous section
       1. Creates a fleet
       1. Associates the vehicle with the fleet
-      1. Creates a campaign from `campaign-brake-event.json` that contains a condition-based
+      1. Create a campaign from `campaign-brake-event.json` that contain a condition1.based
          collection scheme to capture the engine torque and the brake pressure when the brake
-         pressure is above 7000, and targets the campaign at the fleet
-      1. Approves the campaign
+         pressure is above 7000, and targets the campaign at the fleet.
+      1. Approves created campaign
       1. Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to
          the fleet
-      1. Waits 30 seconds and then downloads the collected data from Amazon Timestream
+      1. Waits 30 seconds and then downloads the collected data from Timestream
       1. Saves the data to an HTML file
+
+   If you enabled S3 upload destination, the demo script will additionally:
+
+   - Create S3 bucket for collected data for S3 campaigns, if not already created
+   - Create IAM roles and policies required for the service to write data to the S3 resources
+   - Creates 2 additional campaigns from `campaign-brake-event.json`. One campaign will upload data
+     to to S3 in JSON format, one to S3 in parquet format
+   - Wait 20 minutes for the data to propagate to S3 and then downloads it
+   - Save the data to an HTML file
+
+   This script will not delete Timestream and S3 resources
 
 1. When the script completes, the path to the output HTML file is given. _On your local machine_,
    use `scp` to download it, then open it in your web browser:

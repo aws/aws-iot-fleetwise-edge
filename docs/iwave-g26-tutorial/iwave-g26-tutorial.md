@@ -475,6 +475,16 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
    1. Saves the data to an HTML file.
 
+   If you enabled S3 upload destination by passing the option `--enable-s3-upload`, the demo script
+   will additionally:
+
+   - Create S3 bucket for collected data for S3 campaigns, if not already created
+   - Create IAM roles and policies required for the service to write data to the S3 resources
+   - Creates 2 additional campaigns from `campaign-brake-event.json`. One campaign will upload data
+     to to S3 in JSON format, one to S3 in parquet format
+   - Wait 20 minutes for the data to propagate to S3 and then downloads it
+   - Save the data to an HTML file
+
    When the script completes, you receive the path to the output HTML file on your local machine. To
    download it, use `scp`, and then open it in your web browser:
 
