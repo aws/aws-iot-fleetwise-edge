@@ -9,6 +9,9 @@ ENDPOINT_URL_OPTION=""
 REGION="us-east-1"
 VEHICLE_NAME=""
 TIMESTAMP=""
+ACCOUNT_ID=`aws sts get-caller-identity --query "Account" --output text`
+SERVICE_ROLE="IoTFleetWiseServiceRole"
+SERVICE_ROLE_POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/"
 FLEET_SIZE=1
 BATCH_SIZE=$((`nproc`*4))
 
@@ -70,6 +73,8 @@ echo "======================================="
 parse_args "$@"
 
 NAME="${VEHICLE_NAME}-${TIMESTAMP}"
+SERVICE_ROLE="${SERVICE_ROLE}-${REGION}-${TIMESTAMP}"
+SERVICE_ROLE_POLICY_ARN="${SERVICE_ROLE_POLICY_ARN}${SERVICE_ROLE}-policy"
 
 echo -n "Date: "
 date --rfc-3339=seconds
@@ -78,16 +83,23 @@ echo "Timestamp: ${TIMESTAMP}"
 echo "Vehicle name: ${VEHICLE_NAME}"
 echo "Fleet size: ${FLEET_SIZE}"
 
-echo "Suspending campaign..."
-aws iotfleetwise update-campaign \
-    ${ENDPOINT_URL_OPTION} --region ${REGION} \
-    --name ${NAME}-campaign \
-    --action SUSPEND 2> /dev/null | jq -r .arn || true
+# $1 is the campaign name
+suspend_and_delete_campaign(){
+    echo "Suspending campaign..."
+    aws iotfleetwise update-campaign \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name $1 \
+        --action SUSPEND 2> /dev/null | jq -r .arn || true
 
-echo "Deleting campaign..."
-aws iotfleetwise delete-campaign \
-    ${ENDPOINT_URL_OPTION} --region ${REGION} \
-    --name ${NAME}-campaign 2> /dev/null | jq -r .arn || true
+    echo "Deleting campaign..."
+    aws iotfleetwise delete-campaign \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name $1 2> /dev/null | jq -r .arn || true
+}
+
+suspend_and_delete_campaign ${NAME}-campaign
+suspend_and_delete_campaign ${NAME}-campaign-s3-json
+suspend_and_delete_campaign ${NAME}-campaign-s3-parquet
 
 if ((FLEET_SIZE==1)); then
     echo "Disassociating vehicle ${VEHICLE_NAME}..."
@@ -149,6 +161,11 @@ echo "Deleting model manifest..."
 aws iotfleetwise delete-model-manifest \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
     --name ${NAME}-model-manifest 2> /dev/null || true
+
+echo "Deleting service role and policy..."
+aws iam detach-role-policy --role-name ${SERVICE_ROLE} --policy-arn ${SERVICE_ROLE_POLICY_ARN} --region ${REGION} || true
+aws iam delete-policy --policy-arn ${SERVICE_ROLE_POLICY_ARN} --region ${REGION} || true
+aws iam delete-role --role-name ${SERVICE_ROLE} --region ${REGION} || true
 
 # Note: As the service currently only supports one signal catalog, do not delete it
 # echo "Deleting signal catalog..."

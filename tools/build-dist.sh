@@ -19,4 +19,5 @@ cp -r ${OUTPUT_BINARY} \
     ../../configuration \
     ../../tools \
     .
+
 tar -zcf ../aws-iot-fleetwise-edge.tar.gz *

@@ -13,16 +13,24 @@ DEFAULT_VEHICLE_NAME="fwdemo"
 VEHICLE_NAME=""
 TIMESTREAM_DB_NAME="IoTFleetWiseDB-${TIMESTAMP}"
 TIMESTREAM_TABLE_NAME="VehicleDataTable"
+SERVICE_ROLE="IoTFleetWiseServiceRole"
+SERVICE_ROLE_POLICY_ARN=""
+SERVICE_PRINCIPAL="iotfleetwise.amazonaws.com"
+RANDOM_HASH="$(cat /proc/sys/kernel/random/uuid)"
+BUCKET_NAME=""
+SKIP_S3_POLICY=true
 CAMPAIGN_FILE=""
 DEFAULT_CAMPAIGN_FILE="campaign-brake-event.json"
 DBC_FILE=""
 DEFAULT_DBC_FILE="hscan.dbc"
 CLEAN_UP=false
+S3_UPLOAD=false
 FLEET_SIZE=1
 BATCH_SIZE=$((`nproc`*4))
 HEALTH_CHECK_RETRIES=360 # About 30mins
 MAX_ATTEMPTS_ON_REGISTRATION_FAILURE=5
 FORCE_REGISTRATION=false
+MIN_CLI_VERSION="aws-cli/2.11.24"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -38,12 +46,23 @@ parse_args() {
         --clean-up)
             CLEAN_UP=true
             ;;
+        --enable-s3-upload)
+            S3_UPLOAD=true
+            ;;
         --campaign-file)
             CAMPAIGN_FILE=$2
             shift
             ;;
         --dbc-file)
             DBC_FILE=$2
+            shift
+            ;;
+        --bucket-name)
+            BUCKET_NAME=$2
+            shift
+            ;;
+        --service-principal)
+            SERVICE_PRINCIPAL=$2
             shift
             ;;
         --endpoint-url)
@@ -54,9 +73,6 @@ parse_args() {
             REGION=$2
             shift
             ;;
-        --force-registration)
-            FORCE_REGISTRATION=true
-            ;;
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --vehicle-name <NAME>   Vehicle name"
@@ -65,10 +81,12 @@ parse_args() {
             echo "                          Vehicle name after a '-', e.g. ${DEFAULT_VEHICLE_NAME}-42"
             echo "  --campaign-file <FILE>  Campaign JSON file, default: ${DEFAULT_CAMPAIGN_FILE}"
             echo "  --dbc-file <FILE>       DBC file, default: ${DEFAULT_DBC_FILE}"
+            echo "  --bucket-name <NAME>    S3 bucket name, default: iot-fleetwise-demo-<RANDOM_HASH>"
             echo "  --clean-up              Delete created resources"
+            echo "  --enable-s3-upload      Create campaigns to upload data to S3"
             echo "  --endpoint-url <URL>    The endpoint URL used for AWS CLI calls"
+            echo "  --service-principal <PRINCIPAL>    AWS service principal for policies, default: ${SERVICE_PRINCIPAL}"
             echo "  --region <REGION>       The region used for AWS CLI calls, default: ${REGION}"
-            echo "  --force-registration    Force account registration"
             exit 0
             ;;
         esac
@@ -111,7 +129,13 @@ if [ "${CAMPAIGN_FILE}" == "" ]; then
     CAMPAIGN_FILE=${DEFAULT_CAMPAIGN_FILE}
 fi
 
+if [ "${BUCKET_NAME}" == "" ]; then
+    BUCKET_NAME="iot-fleetwise-demo-${RANDOM_HASH}"
+    SKIP_S3_POLICY=false
+fi
+
 NAME="${VEHICLE_NAME}-${TIMESTAMP}"
+SERVICE_ROLE="${SERVICE_ROLE}-${REGION}-${TIMESTAMP}"
 
 echo -n "Date: "
 date +%Y-%m-%dT%H:%M:%S%z
@@ -121,10 +145,11 @@ echo "Fleet Size: ${FLEET_SIZE}"
 
 # AWS CLI v1.x has a double base64 encoding issue
 echo "Checking AWS CLI version..."
-CLI_VERSION=`aws --version`
-echo ${CLI_VERSION}
-if echo "${CLI_VERSION}" | grep -q "aws-cli/1."; then
-    echo "Error: Please update AWS CLI to v2.x" >&2
+CLI_VERSION=`aws --version | grep -Eo "aws-cli/[[:digit:]]+.[[:digit:]]+.[[:digit:]]+"`
+echo "${CLI_VERSION}"
+
+if [[ "${CLI_VERSION}" < "${MIN_CLI_VERSION}" ]]; then
+    echo "Error: Please update AWS CLI to ${MIN_CLI_VERSION} or newer" >&2
     exit -1
 fi
 
@@ -135,21 +160,43 @@ error_handler() {
             --fleet-size ${FLEET_SIZE} \
             --timestamp ${TIMESTAMP} \
             ${ENDPOINT_URL_OPTION} \
-            --region ${REGION}
+            --region ${REGION} \
+            --service-role ${SERVICE_ROLE} \
+            --service-role-policy-arn ${SERVICE_ROLE_POLICY_ARN}
     fi
 }
 
 register_account() {
     echo "Registering account..."
     aws iotfleetwise register-account \
-        ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --timestream-resources "{\"timestreamDatabaseName\":\"${TIMESTREAM_DB_NAME}\", \
-            \"timestreamTableName\":\"${TIMESTREAM_TABLE_NAME}\"}" | jq -r .registerAccountStatus
+        ${ENDPOINT_URL_OPTION} --region ${REGION} | jq -r .registerAccountStatus
     echo "Waiting for account to be registered..."
 }
 
 get_account_status() {
     aws iotfleetwise get-register-account-status ${ENDPOINT_URL_OPTION} --region ${REGION}
+}
+
+# $1 is the campaign name
+approve_campaign() {
+    echo "Waiting for campaign to become ready for approval..."
+    while true; do
+        sleep 5
+        SIGNAL_CATALOG_COUNT=`echo ${SIGNAL_CATALOG_LIST} | jq '.summaries|length'`
+        CAMPAIGN_STATUS=`aws iotfleetwise get-campaign \
+            ${ENDPOINT_URL_OPTION} --region ${REGION} \
+            --name $1`
+        echo ${CAMPAIGN_STATUS} | jq -r .arn
+        if [ `echo ${CAMPAIGN_STATUS} | jq -r .status` == "WAITING_FOR_APPROVAL" ]; then
+            break
+        fi
+    done
+
+    echo "Approving campaign..."
+    aws iotfleetwise update-campaign \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name $1 \
+        --action APPROVE | jq -r .arn
 }
 
 trap error_handler ERR
@@ -167,41 +214,11 @@ else
     ACCOUNT_STATUS="NOT_REGISTERED"
 fi
 echo ${ACCOUNT_STATUS}
-if ${FORCE_REGISTRATION}; then
-    echo "Forcing registration..."
-    ACCOUNT_STATUS="FORCE_REGISTRATION"
-fi
 if [ "${ACCOUNT_STATUS}" == "REGISTRATION_SUCCESS" ]; then
     echo "Account is already registered"
-    TIMESTREAM_DB_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamDatabaseName`
-
-    echo "Checking if Timestream database exists..."
-    if TIMESTREAM_INFO=`aws timestream-write describe-database \
-        --region ${REGION} --database-name ${TIMESTREAM_DB_NAME} 2>&1`; then
-        echo ${TIMESTREAM_INFO} | jq -r .Database.Arn
-    elif ! echo ${TIMESTREAM_INFO} | grep -q "ResourceNotFoundException"; then
-        echo ${TIMESTREAM_INFO} >&2
-        exit -1
-    else
-        echo "Error: Timestream database no longer exists. Try running script again with option --force-registration" >&2
-        exit -1
-    fi
 elif [ "${ACCOUNT_STATUS}" == "REGISTRATION_PENDING" ]; then
     echo "Waiting for account to be registered..."
 else
-    echo "Creating Timestream database..."
-    aws timestream-write create-database \
-        --region ${REGION} \
-        --database-name ${TIMESTREAM_DB_NAME} | jq -r .Database.Arn
-
-    echo "Creating Timestream table..."
-    aws timestream-write create-table \
-        --region ${REGION} \
-        --database-name ${TIMESTREAM_DB_NAME} \
-        --table-name ${TIMESTREAM_TABLE_NAME} \
-        --retention-properties "{\"MemoryStoreRetentionPeriodInHours\":2, \
-            \"MagneticStoreRetentionPeriodInDays\":2}" | jq -r .Table.Arn
-
     register_account
 fi
 
@@ -224,8 +241,87 @@ while [ "${ACCOUNT_STATUS}" != "REGISTRATION_SUCCESS" ]; do
         fi
     fi
 done
-TIMESTREAM_DB_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamDatabaseName`
-TIMESTREAM_TABLE_NAME=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .timestreamRegistrationResponse.timestreamTableName`
+
+echo "Creating Timestream database..." >&2
+aws timestream-write create-database \
+    --region ${REGION} \
+    --database-name ${TIMESTREAM_DB_NAME} | jq -r .Database.Arn
+
+echo "Creating Timestream table..."
+TIMESTREAM_TABLE_ARN=$( aws timestream-write create-table \
+    --region ${REGION} \
+    --database-name ${TIMESTREAM_DB_NAME} \
+    --table-name ${TIMESTREAM_TABLE_NAME} \
+    --retention-properties "{\"MemoryStoreRetentionPeriodInHours\":2, \
+        \"MagneticStoreRetentionPeriodInDays\":2}" | jq -r .Table.Arn )
+
+echo "Creating service role..."
+SERVICE_ROLE_TRUST_POLICY=$(cat << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": [
+            "$SERVICE_PRINCIPAL"
+        ]
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+)
+SERVICE_ROLE_ARN=`aws iam create-role \
+    --role-name "${SERVICE_ROLE}" \
+    --assume-role-policy-document "${SERVICE_ROLE_TRUST_POLICY}" | jq -r .Role.Arn`
+echo ${SERVICE_ROLE_ARN}
+
+echo "Waiting for role to be created..."
+aws iam wait role-exists \
+    --role-name "${SERVICE_ROLE}"
+
+echo "Creating service role policy..."
+SERVICE_ROLE_POLICY=$(cat <<'EOF'
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "timestreamIngestion",
+            "Effect": "Allow",
+            "Action": [
+                "timestream:WriteRecords",
+                "timestream:Select"
+            ]
+        },
+        {
+            "Sid": "timestreamDescribeEndpoint",
+            "Effect": "Allow",
+            "Action": [
+                "timestream:DescribeEndpoints"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+EOF
+)
+SERVICE_ROLE_POLICY=`echo "${SERVICE_ROLE_POLICY}" \
+    | jq ".Statement[0].Resource=\"arn:aws:timestream:${REGION}:${ACCOUNT_ID}:database/${TIMESTREAM_DB_NAME}/*\""`
+SERVICE_ROLE_POLICY_ARN=`aws iam create-policy \
+    --policy-name ${SERVICE_ROLE}-policy \
+    --policy-document "${SERVICE_ROLE_POLICY}" | jq -r .Policy.Arn`
+echo ${SERVICE_ROLE_POLICY_ARN}
+
+echo "Waiting for policy to be created..."
+aws iam wait policy-exists \
+    --policy-arn "${SERVICE_ROLE_POLICY_ARN}"
+
+echo "Attaching policy to service role..."
+aws iam attach-role-policy \
+    --policy-arn ${SERVICE_ROLE_POLICY_ARN} \
+    --role-name "${SERVICE_ROLE}"
 
 if ((FLEET_SIZE==1)); then
     echo "Deleting vehicle ${VEHICLE_NAME} if it already exists..."
@@ -247,6 +343,45 @@ else
         # Wait for all background processes to finish
         wait
     done
+fi
+
+if [ ${S3_UPLOAD} == true ]; then
+    echo "S3 upload is enabled"
+    echo "Checking if S3 bucket exists..."
+
+    BUCKET_LIST=$( aws s3 ls )
+    if grep -q "$BUCKET_NAME" <<< "$BUCKET_LIST"; then
+        echo "S3 bucket already exists"
+    else
+        echo "Creating S3 bucket..."
+        aws s3 mb s3://$BUCKET_NAME --region $REGION
+    fi
+    if [ ${SKIP_S3_POLICY} == false ]; then
+        echo "Adding S3 bucket policy..."
+        cat << EOF > s3-bucket-policy.json
+{
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "${SERVICE_PRINCIPAL}"
+            },
+            "Action": "s3:ListBucket",
+            "Resource": "arn:aws:s3:::${BUCKET_NAME}"
+        },
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "${SERVICE_PRINCIPAL}"
+            },
+            "Action": ["s3:GetObject", "s3:PutObject"],
+            "Resource": "arn:aws:s3:::${BUCKET_NAME}/*"
+        }
+    ]
+}
+EOF
+        aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file://s3-bucket-policy.json
+    fi
 fi
 
 VEHICLE_NODE=`cat vehicle-node.json`
@@ -498,24 +633,33 @@ CAMPAIGN=`cat ${CAMPAIGN_FILE} \
     | jq .targetArn=\"${FLEET_ARN}\"`
 aws iotfleetwise create-campaign \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
-    --cli-input-json "${CAMPAIGN}" | jq -r .arn
+    --cli-input-json "${CAMPAIGN}" --data-destination-configs "[{\"timestreamConfig\":{\"timestreamTableArn\":\"${TIMESTREAM_TABLE_ARN}\",\"executionRoleArn\":\"${SERVICE_ROLE_ARN}\"}}]"| jq -r .arn
 
-echo "Waiting for campaign to become ready for approval..."
-while true; do
-    sleep 5
-    CAMPAIGN_STATUS=`aws iotfleetwise get-campaign \
+approve_campaign ${NAME}-campaign
+
+if [ ${S3_UPLOAD} == true ]; then
+    echo "Creating campaign from ${CAMPAIGN_FILE} for S3..."
+    CAMPAIGN=`cat ${CAMPAIGN_FILE} \
+        | jq .name=\"${NAME}-campaign-s3-json\" \
+        | jq .signalCatalogArn=\"${SIGNAL_CATALOG_ARN}\" \
+        | jq .targetArn=\"${FLEET_ARN}\"`
+    aws iotfleetwise create-campaign \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --name ${NAME}-campaign | jq -r .status`
-    if [ "${CAMPAIGN_STATUS}" == "WAITING_FOR_APPROVAL" ]; then
-        break
-    fi
-done
+        --cli-input-json "${CAMPAIGN}" --data-destination-configs "[{\"s3Config\":{\"bucketArn\":\"arn:aws:s3:::${BUCKET_NAME}\",\"prefix\":\"${NAME}-campaign-s3-${RANDOM_HASH}\",\"dataFormat\":\"JSON\",\"storageCompressionFormat\":\"NONE\"}}]"| jq -r .arn
 
-echo "Approving campaign..."
-aws iotfleetwise update-campaign \
-    ${ENDPOINT_URL_OPTION} --region ${REGION} \
-    --name ${NAME}-campaign \
-    --action APPROVE | jq -r .arn
+    approve_campaign ${NAME}-campaign-s3-json
+
+    echo "Creating campaign from ${CAMPAIGN_FILE} for S3..."
+    CAMPAIGN=`cat ${CAMPAIGN_FILE} \
+        | jq .name=\"${NAME}-campaign-s3-parquet\" \
+        | jq .signalCatalogArn=\"${SIGNAL_CATALOG_ARN}\" \
+        | jq .targetArn=\"${FLEET_ARN}\"`
+    aws iotfleetwise create-campaign \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --cli-input-json "${CAMPAIGN}" --data-destination-configs "[{\"s3Config\":{\"bucketArn\":\"arn:aws:s3:::${BUCKET_NAME}\",\"prefix\":\"${NAME}-campaign-s3-${RANDOM_HASH}\",\"dataFormat\":\"PARQUET\",\"storageCompressionFormat\":\"NONE\"}}]"| jq -r .arn
+
+    approve_campaign ${NAME}-campaign-s3-parquet
+fi
 
 # The following two actions(Suspending, Resuming) are only for demo purpose, it won't affect the campaign status
 sleep 2
@@ -603,6 +747,24 @@ if [ "${DBC_FILE}" == "" ]; then
     echo "| Collected data in HTML format: |"
     echo "----------------------------------"
     echo `pwd`/${OUTPUT_FILE_HTML}
+fi
+
+if [ ${S3_UPLOAD} == true ]; then
+    DELAY=1200
+    echo "Waiting 20 minutes for data to be collected and uploaded to S3..."
+    sleep ${DELAY}
+
+    if [ "${DBC_FILE}" == "" ]; then
+        echo "Converting data from S3 to HTML..."
+        OUTPUT_FILE_HTML="${NAME}.html"
+        python3 s3-to-html.py --bucket ${BUCKET_NAME} --prefix ${NAME}-campaign-s3-${RANDOM_HASH} --json-output-filename ${NAME}-s3-json-result.html --parquet-output-filename ${NAME}-s3-parquet-result.html
+
+        echo "You can now view the collected data."
+        echo "-------------------------------------"
+        echo "| Collected S3 data in HTML format: |"
+        echo "-------------------------------------"
+        echo `pwd`/${NAME}-s3-json-result.html "and" `pwd`/${NAME}-s3-parquet-result.html
+    fi
 fi
 
 if [ ${CLEAN_UP} == true ]; then

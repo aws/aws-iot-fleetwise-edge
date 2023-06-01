@@ -1,2 +1,4 @@
 *-timestream-result.json
 *.html
+part-*
+s3-bucket-policy.json

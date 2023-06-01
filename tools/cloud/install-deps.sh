@@ -11,5 +11,7 @@ apt update && apt install -y python3 python3-pip
 pip3 install \
     wrapt==1.10.0 \
     plotly==5.3.1 \
-    pandas==1.3.4 \
-    cantools==36.4.0
+    pandas==1.5.0 \
+    cantools==36.4.0 \
+    boto3==1.18.60 \
+    fastparquet==2023.4.0
