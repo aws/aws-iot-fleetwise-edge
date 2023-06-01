@@ -105,7 +105,7 @@ collect data from it.
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
        && cd ~/aws-iot-fleetwise-edge/tools/cloud \
-       && pip3 install wrapt==1.10.0 plotly==5.3.1 pandas==1.5.0 cantools==36.4.0 boto3==1.18.60 fastparquet=2023.4.0
+       && pip3 install wrapt==1.10.0 plotly==5.3.1 pandas==1.3.5 cantools==36.4.0 boto3==1.18.60 fastparquet==0.8.1
    ```
 
    If you are using the AWS CLI v<2.11.24, update the CLI by running:
