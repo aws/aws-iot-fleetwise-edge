@@ -5,6 +5,7 @@
 
 // Includes
 #include "LogLevel.h"
+#include <cstdint>
 #include <functional>
 #include <string>
 

@@ -5,6 +5,7 @@
 #include "AwsIotChannel.h"
 #include "AwsIotSdkMock.h"
 #include "AwsSDKMemoryManager.h"
+#include <array>
 #include <cstddef>
 #include <gtest/gtest.h>
 #include <linux/can.h>
