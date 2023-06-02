@@ -5,6 +5,7 @@
 
 // Includes
 
+#include <cstdint>
 #include <string>
 
 namespace Aws
