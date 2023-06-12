@@ -1,4 +1,3 @@
-# -Werror will be eventually added when target toolchain is decided
 add_compile_options(-Wconversion -Wall -Wextra -pedantic -ffunction-sections -fdata-sections)
 link_libraries(
   -Wl,--gc-sections # Remove all unreferenced sections
@@ -14,6 +13,12 @@ endif()
 if(FWE_CODE_COVERAGE)
   add_compile_options("-fprofile-arcs" "-ftest-coverage")
   link_libraries("-lgcov" "--coverage")
+endif()
+
+# Only add -Werror when explicitly asked to avoid compilation errors when someone tries a compiler
+# different from the ones we use on CI.
+if(FWE_WERROR)
+  add_compile_options(-Werror)
 endif()
 
 # optimization -O3 is added by default by CMake when build type is RELEASE

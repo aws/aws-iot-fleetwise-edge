@@ -225,7 +225,7 @@
           "properties": {
             "endpointUrl": {
               "type": "string",
-              "description": "AWS account’s IoT device endpoint"
+              "description": "AWS account's IoT device endpoint"
             },
             "clientId": {
               "type": "string",
@@ -249,11 +249,27 @@
             },
             "certificateFilename": {
               "type": "string",
-              "description": "The path to the device’s certificate file"
+              "description": "The path to the device's certificate file"
+            },
+            "certificate": {
+              "type": "string",
+              "description": "The device's certificate"
             },
             "privateKeyFilename": {
               "type": "string",
-              "description": "The path to the device’s private key file that was created with its certificate file"
+              "description": "The path to the device's private key file that was created with its certificate file"
+            },
+            "privateKey": {
+              "type": "string",
+              "description": "The device's private key that was created with its certificate"
+            },
+            "rootCAFilename": {
+              "type": "string",
+              "description": "The path to the root CA certificate file (optional)"
+            },
+            "rootCA": {
+              "type": "string",
+              "description": "The root CA certificate (optional)"
             }
           },
           "required": [
@@ -262,9 +278,15 @@
             "collectionSchemeListTopic",
             "decoderManifestTopic",
             "canDataTopic",
-            "checkinTopic",
-            "certificateFilename",
-            "privateKeyFilename"
+            "checkinTopic"
+          ],
+          "oneOf": [
+            {
+              "required": ["certificateFilename", "privateKeyFilename"]
+            },
+            {
+              "required": ["certificate", "privateKey"]
+            }
           ]
         }
       },

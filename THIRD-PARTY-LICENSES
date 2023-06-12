@@ -1,6 +1,6 @@
 AWS IoT FleetWise Edge includes the following third-party software/licensing:
 
-** AWS SDK for C++: v1.11.46 - https://github.com/aws/aws-sdk-cpp
+** AWS SDK for C++: v1.11.94 - https://github.com/aws/aws-sdk-cpp
 ** Fast-DDS: v2.3.3 - https://github.com/eProsima/Fast-DDS
 ** Fast-CDR: v1.0.21 - https://github.com/eProsima/Fast-CDR
 ** Foonathan Memory Vendor: v1.1.0 - https://github.com/eProsima/foonathan_memory_vendor
@@ -213,7 +213,7 @@ AWS IoT FleetWise Edge includes the following third-party software/licensing:
 ----------------
 
 ** GoogleTest: v1.10.0 - https://github.com/google/googletest
-** Protobuf: v3.21.7 - https://github.com/protocolbuffers/protobuf
+** Protobuf: v3.21.12 - https://github.com/protocolbuffers/protobuf
 
 Copyright 2008, Google Inc.
 All rights reserved.

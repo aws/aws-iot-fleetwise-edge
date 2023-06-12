@@ -1,0 +1,53 @@
+{
+  "version": "1.0",
+  "networkInterfaces": [
+    {
+      "obdInterface": {
+        "interfaceName": "vcan0",
+        "obdStandard": "J1979",
+        "pidRequestIntervalSeconds": 0,
+        "dtcRequestIntervalSeconds": 0,
+        "broadcastRequests": false
+      },
+      "interfaceId": "0",
+      "type": "obdInterface"
+    }
+  ],
+  "staticConfig": {
+    "bufferSizes": {
+      "dtcBufferSize": 100,
+      "decodedSignalsBufferSize": 10000,
+      "rawCANFrameBufferSize": 10000
+    },
+    "threadIdleTimes": {
+      "inspectionThreadIdleTimeMs": 50,
+      "socketCANThreadIdleTimeMs": 50,
+      "canDecoderThreadIdleTimeMs": 50
+    },
+    "persistency": {
+      "persistencyPath": ".",
+      "persistencyPartitionMaxSize": 524288,
+      "persistencyUploadRetryIntervalMs": 10000
+    },
+    "internalParameters": {
+      "readyToPublishDataBufferSize": 10000,
+      "systemWideLogLevel": "Trace",
+      "dataReductionProbabilityDisabled": false
+    },
+    "publishToCloudParameters": {
+      "maxPublishMessageCount": 1000,
+      "collectionSchemeManagementCheckinIntervalMs": 5000
+    },
+    "mqttConnection": {
+      "endpointUrl": "MQTT_ENDPOINT_GOES_HERE",
+      "clientId": "VEHICLE_ID_GOES_HERE",
+      "collectionSchemeListTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/collection_schemes",
+      "decoderManifestTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/decoder_manifests",
+      "canDataTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/signals",
+      "checkinTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/checkins",
+      "certificate": "CERTIFICATE_GOES_HERE",
+      "privateKey": "PRIVATE_KEY_GOES_HERE",
+      "rootCA": "ROOT_CA_GOES_HERE"
+    }
+  }
+}

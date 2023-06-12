@@ -11,7 +11,7 @@ RUN apt-get update \
         ca-certificates \
         iproute2 \
         jq \
-    && apt-get clean
+    && rm -rf /var/lib/apt/lists/*
 
 COPY ${TARGETPLATFORM}/src/executionmanagement/aws-iot-fleetwise-edge /usr/bin/
 COPY tools/container/start-fwe.sh                                     /usr/bin

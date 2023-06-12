@@ -74,6 +74,19 @@ public:
     size_t requestReceiveEmissionPIDs( const SID sid );
 
     /**
+     * @brief Push PIDs to the signal buffer
+     *
+     * @param info PID vaues to push
+     * @param receptionTime Timestamp of reception
+     * @param signalBufferPtr Signal Buffer shared pointer
+     * @param streamRxID CAN Receive ID
+     */
+    static void pushPIDs( const EmissionInfo &info,
+                          Timestamp receptionTime,
+                          SignalBufferPtr &signalBufferPtr,
+                          const std::string &streamRxID );
+
+    /**
      * @brief get DTC from ECU
      *
      * @param dtcInfo DTCInfo is a structure contains a list of DTC codes

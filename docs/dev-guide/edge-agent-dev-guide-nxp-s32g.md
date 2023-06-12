@@ -65,16 +65,16 @@ required by AWS IoT FleetWise Edge Agent, an updated version of the `canutils` p
 ## Flash the SD-Card Image
 
 1. Download and install Balena Etcher _on your local machine_: https://www.balena.io/etcher/
-1. Run Balena Etcher, choose ‘Select image’ and select the compressed SD-card image
+1. Run Balena Etcher, choose 'Select image' and select the compressed SD-card image
    `fsl-image-ubuntu-s32g274ardb2.sdcard.gz`
-1. Insert the SD-card supplied with the S32G-VNP-RDB2 into your local machine’s SD-card reader
-1. Choose ‘Select target’ and select the SD-card
-1. Choose ‘Flash!’
+1. Insert the SD-card supplied with the S32G-VNP-RDB2 into your local machine's SD-card reader
+1. Choose 'Select target' and select the SD-card
+1. Choose 'Flash!'
 
 ## Specify Initial Board Configuration
 
-1. Insert the SD-card into the S32G-VNP-RDB2’s SD-card slot.
-1. Connect the S32G-VNP-RDB2’s power supply.
+1. Insert the SD-card into the S32G-VNP-RDB2's SD-card slot.
+1. Connect the S32G-VNP-RDB2's power supply.
 1. Connect an Ethernet cable from port P3A of the S32G-VNP-RDB2 to the internet router.
 
    ![](./images/s32g_golden_box.png)
@@ -82,11 +82,11 @@ required by AWS IoT FleetWise Edge Agent, an updated version of the `canutils` p
 1. Connect your local machine to the internet router, for example via WiFi or via Ethernet.
 1. Connect to the S32G-VNP-RDB2 via SSH, entering password `bluebox`:
    `ssh bluebox@ubuntu-s32g274ardb2`
-   1. If you can’t connect using the hostname `ubuntu-s32g274ardb2`, you will need to connect to the
+   1. If you can't connect using the hostname `ubuntu-s32g274ardb2`, you will need to connect to the
       administration webpage of the internet router to obtain the IP address assigned to the
       S32G-VNP-RDB2. Use this IP address in place of `ubuntu-s32g274ardb2` used throughout this
       guide.
-1. Once connected via SSH, check the board’s internet connection by running: `ping amazon.com`.
+1. Once connected via SSH, check the board's internet connection by running: `ping amazon.com`.
    There should be 0% packet loss.
 
 ## Provision AWS IoT Credentials
@@ -156,7 +156,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
 ## Collect OBD Data
 
-1. Run the following _on the development machine_ to deploy a ‘heartbeat’ campaign that periodically
+1. Run the following _on the development machine_ to deploy a 'heartbeat' campaign that periodically
    collects OBD data:
 
    ```bash

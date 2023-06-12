@@ -212,7 +212,12 @@ CANDataSource::doWork( void *data )
                                                     : TraceVariable::READ_SOCKET_FRAMES_19,
                                                 dataSource->mReceivedMessages );
                 std::lock_guard<std::mutex> lock( dataSource->mDecoderDictMutex );
-                dataSource->mConsumer.processMessage( dataSource->mDecoderDictionary, frame[i], timestamp );
+                dataSource->mConsumer.processMessage( dataSource->mChannelId,
+                                                      dataSource->mDecoderDictionary,
+                                                      frame[i].can_id,
+                                                      frame[i].data,
+                                                      frame[i].len,
+                                                      timestamp );
             }
         }
         if ( nmsgs < PARALLEL_RECEIVED_FRAMES_FROM_KERNEL )

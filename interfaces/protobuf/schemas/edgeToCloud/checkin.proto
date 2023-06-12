@@ -8,10 +8,10 @@ package Aws.IoTFleetWise.Schemas.CheckinMsg;
 
 message Checkin {
     /*
-     * List of document arn's the Edge currently has enacted including collectionSchemes (both idle and active) and
+     * List of document synchronization IDs the Edge currently has enacted including collectionSchemes (both idle and active) and
      * decoder manifest.
      */
-    repeated string document_arns = 1;
+    repeated string document_sync_ids = 1;
 
     /*
      * Timestamp of when check in was generated in milliseconds since the Unix epoch

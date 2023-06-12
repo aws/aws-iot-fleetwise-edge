@@ -13,9 +13,9 @@ package Aws.IoTFleetWise.Schemas.VehicleDataMsg;
 message VehicleData {
 
     /*
-     * Amazon Resource Name of the campaign that triggered the collection of the data in this message
+     * Synchronization ID of the campaign that triggered the collection of the data in this message
      */
-    string campaign_arn = 1;
+    string campaign_sync_id = 1;
 
     /*
      * Synchronization ID of the decoder manifest used to decode the signals in this message

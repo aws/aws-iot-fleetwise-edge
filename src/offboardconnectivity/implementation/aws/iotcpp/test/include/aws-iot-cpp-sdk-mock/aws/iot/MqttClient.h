@@ -103,6 +103,7 @@ public:
     }
 
     MqttClientConnectionConfigBuilder &WithEndpoint( const Crt::String &endpoint );
+    MqttClientConnectionConfigBuilder &WithCertificateAuthority( const Crt::ByteCursor &rootCA );
     MqttClientConnectionConfig Build() noexcept;
 };
 class MqttClient

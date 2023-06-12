@@ -18,8 +18,8 @@ using namespace Aws::IoTFleetWise::TestingSupport;
 class OBDDataDecoderTest : public ::testing::Test
 {
 protected:
-    OBDDataDecoder decoder;
     std::shared_ptr<OBDDecoderDictionary> decoderDictPtr;
+    OBDDataDecoder decoder{ decoderDictPtr };
     void
     SetUp() override
     {
@@ -48,7 +48,6 @@ protected:
             }
             decoderDictPtr->emplace( pid, format );
         }
-        decoder.setDecoderDictionary( decoderDictPtr );
     }
 
     void
@@ -1082,7 +1081,6 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderCorruptFormulaTest )
     const auto &originalFormula = decoderDictPtr->at( pid ).mSignals[0];
     // corrupt mFirstBitPosition to out of bound
     decoderDictPtr->at( pid ).mSignals[0].mFirstBitPosition = 80;
-    decoder.setDecoderDictionary( decoderDictPtr );
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0x99 };
     EmissionInfo info;
 
@@ -1108,7 +1106,6 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderCorruptFormulaTest )
 // We shall expect decodeEmissionPIDs not decode this invalid ECU response.
 TEST_F( OBDDataDecoderTest, OBDDataDecoderWithECUResponseMismatchWithDecoderManifest )
 {
-    decoder.setDecoderDictionary( decoderDictPtr );
     // Below ECU response contains PID 107 which has mismatched response than decoder manifest
     std::vector<uint8_t> txPDUData = { 0x41, 107, 0, 108, 0, 109, 0, 13, 102, 12, 252, 110, 0, 111, 0, 112, 0 };
     EmissionInfo info;
@@ -1120,7 +1117,7 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineLoadCorruptDecoderDiction
 {
     PID pid = 0x04;
     // corrupt decoder dictionary pointer to nullptr
-    decoder.setDecoderDictionary( nullptr );
+    decoderDictPtr = nullptr;
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0x99 };
     EmissionInfo info;
 

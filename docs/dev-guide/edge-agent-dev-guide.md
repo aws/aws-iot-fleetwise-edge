@@ -19,7 +19,7 @@ data from your vehicles to AWS Cloud.
 
 **AWS IoT FleetWise Edge Agent** software provides C++ libraries that enable you to run the
 application on your vehicle. You can use AWS IoT FleetWise pre-configured analytic capabilities to
-process collected data, gain insights about vehicle health, and use the service’s visual interface
+process collected data, gain insights about vehicle health, and use the service's visual interface
 to help diagnose and troubleshoot potential issues with the vehicle.
 
 AWS IoT FleetWise's capability to collect ECU data and store them on cloud databases enables you to
@@ -80,10 +80,10 @@ instance.
 1. (Optional) You can increase the number of simulated vehicles by updating the `FleetSize`
    parameter. You can also specify the region IoT Things are created in by updating the
    `IoTCoreRegion` parameter.
-1. Select the checkbox next to _‘I acknowledge that AWS CloudFormation might create IAM resources
-   with custom names.’_
+1. Select the checkbox next to _'I acknowledge that AWS CloudFormation might create IAM resources
+   with custom names.'_
 1. Choose **Create stack**.
-1. Wait until the status of the Stack is ‘CREATE_COMPLETE’, this will take approximately 10 minutes.
+1. Wait until the status of the Stack is 'CREATE_COMPLETE', this will take approximately 10 minutes.
 
 AWS IoT FleetWise Edge Agent software has been deployed to an AWS EC2 Graviton (ARM64) Instance
 along with credentials that allow it to connect to AWS IoT Core. CAN data is also being generated on
@@ -269,8 +269,8 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
    1. Do not include the file suffix `.pem`.
    1. If you do not have an SSH key pair, you will need to create one and download the corresponding
       `.pem` file. Be sure to update the file permissions: `chmod 400 <PATH_TO_PEM>`
-1. **Select the checkbox** next to _‘I acknowledge that AWS CloudFormation might create IAM
-   resources with custom names.’_
+1. **Select the checkbox** next to _'I acknowledge that AWS CloudFormation might create IAM
+   resources with custom names.'_
 1. Choose **Create stack**.
 1. Wait until the status of the Stack is **CREATE_COMPLETE**; this can take up to five minutes.
 1. Select the **Outputs** tab, copy the EC2 IP address, and connect via SSH from your local machine
@@ -347,7 +347,7 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
        && sudo ./tools/install-fwe.sh
    ```
 
-   1. At this point AWS IoT FleetWise Edge Agent is running and periodically sending ‘checkins’ to
+   1. At this point AWS IoT FleetWise Edge Agent is running and periodically sending 'checkins' to
       AWS IoT FleetWise, in order to announce its current list of campaigns (which at this stage
       will be an empty list). CAN data is also being generated on the development machine to
       simulate periodic hard-braking events. The AWS IoT FleetWise Cloud demo script in the
@@ -470,14 +470,14 @@ collect data from it.
 
    ![](./images/collected_data_plot.png)
 
-1. Run the following _on the development machine_ to deploy a ‘heartbeat’ campaign that collects OBD
+1. Run the following _on the development machine_ to deploy a 'heartbeat' campaign that collects OBD
    data from the vehicle. Repeat the process above to view the collected data.
 
    ```bash
    ./demo.sh --vehicle-name fwdemo-ec2 --campaign-file campaign-obd-heartbeat.json
    ```
 
-   Similarly, if you chose to deploy the ‘heartbeat’ campaign that collects OBD data from an AWS IoT
+   Similarly, if you chose to deploy the 'heartbeat' campaign that collects OBD data from an AWS IoT
    thing created in in Europe (Frankfurt), you must configure `--region`:
 
    ```bash
@@ -492,7 +492,7 @@ collect data from it.
    ./demo.sh --vehicle-name fwdemo-ec2 --dbc-file <DBC_FILE> --campaign-file <CAMPAIGN_FILE>
    ```
 
-   Similarly, if you chose to deploy the ‘heartbeat’ campaign that collects OBD data from an AWS IoT
+   Similarly, if you chose to deploy the 'heartbeat' campaign that collects OBD data from an AWS IoT
    thing created in in Europe (Frankfurt), you must configure `--region`:
 
    ```bash
@@ -540,9 +540,6 @@ Agent software.
   - [Best practices and recommendation](#best-practices-and-recommendation)
 - [Supported platforms](#supported-platforms)
 - [Disclaimer](#disclaimer)
-- [Appendix](#appendix)
-  - [Decoder manifest example](#decoder-manifest-example)
-  - [Campaign example](#campaign-example)
 
 ## Terminology
 
@@ -594,7 +591,7 @@ AWS IoT FleetWise enables you to create campaigns that can be deployed to a flee
 a campaign is active, it is deployed from the cloud to the target vehicles via a push mechanism. AWS
 IoT FleetWise Edge Agent software uses the underlying collection schemes to acquire sensor data from
 the vehicle network. It applies the inspection rules and uploads the data back to AWS IoT FleetWise
-data plane. The data plane persists collected data in the OEM’s AWS Account; the account can then be
+data plane. The data plane persists collected data in the OEM's AWS Account; the account can then be
 used to analyse the data.
 
 ### Software Layers
@@ -722,7 +719,7 @@ This library implements a software module for each of the following:
 - Cache of the needed signals in a signal history buffer.
 
 Upon fulfillment of one or more trigger conditions, this library extracts from the signal history
-buffer a data snapshot that’s shared with the Off-board connectivity library for further processing.
+buffer a data snapshot that's shared with the Off-board connectivity library for further processing.
 Again here a circular buffer is used as a transport mechanism of the data between the two libraries.
 
 **Connectivity Library**
@@ -807,164 +804,15 @@ The device software sends two artifacts with the Cloud services:
 
 This check-in information consists of data collection schemes and decoder manifest Amazon Resource
 Name (ARN) that are active in the device software at a given time point. This check-in message is
-send regularly at a configurable frequency to the cloud services.
-
-```protobuf
-syntax = "proto3";
-message Checkin {
-    /*
-    * List of document ARNs the Edge Agent software currently
-    * has enacted including collection schemes (both idle and active)
-    * and decoder manifest.
-    */
-    repeated string document_arns = 1;
-    /*
-     * Timestamp of when check in was generated in milliseconds since
-     * the Unix epoch
-     */
-    uint64 timestamp_ms_epoch = 2;
-}
-```
+send regularly at a configurable frequency to the cloud services. Refer to
+[checkin.proto](../../interfaces/protobuf/schemas/edgeToCloud/checkin.proto).
 
 **Data Snapshot Information**
 
 This message is send conditionally to the cloud data plane services once one or more inspection rule
 is met. Depending on the configuration of the software, (e.g. send decoded and raw data), the device
-software sends one or more instance of this message in an MQTT packet to the cloud:
-
-```protobuf
-syntax = "proto3";
-message VehicleData {
-
-    /*
-     * Amazon Resource Name of the campaign that triggered the collection of the
-     * data in this message
-     */
-    string campaign_arn = 1;
-
-    /*
-     * Amazon Resource Name of the decoder manifest used to decode the signals
-     * in this message
-     */
-    string decoder_arn = 2;
-
-    /*
-     * A unique ID that FWE generates each time a Scheme condition is triggered.
-     */
-    uint32 collection_event_id = 3;
-
-    /*
-     * The absolute timestamp in milliseconds since Unix Epoch of when
-     * the event happened.
-     */
-    uint64 collection_event_time_ms_epoch = 4;
-
-    /*
-     * Captured signals, which includes both OBD PIDs and signals decoded
-     * from normal CAN traffic
-     */
-    repeated CapturedSignal captured_signals = 5;
-
-    /*
-     * Captured DTC Information if specified by the collection Scheme
-     */
-    DtcData dtc_data = 6;
-
-    /*
-     * Captured raw CAN frames if specified by the Scheme
-     */
-    repeated CanFrame can_frames = 7;
-
-    /*
-     * Captured Geohash which reflect which geohash tile the vehicle is currently
-     * located.
-     */
-    Geohash geohash = 8;
-}
-
-/*
- * Represents all signals for CAN and OBDII signals
- */
-message CapturedSignal {
-
-    /*
-     * Milliseconds relative to the event_time_ms_epoch of when the signal
-     * arrived on the bus
-     */
-    sint64 relative_time_ms = 1;
-
-    /*
-     * The signal id of the physical value of a signal that was captured. This maps
-     * directly to signal IDs provided in the collection schemes and decoder
-     * manifest. Signals can come from normal CAN traffic or OBD-II PIDs. In the
-     * case of OBD-II PIDs, Signal ID will only map to one of those signals, as per
-     * the decoder manifest.
-     */
-    uint32 signal_id = 2;
-
-    /*
-     * Datatypes of physical signal values. This can be extended to add other
-     * dataypes.
-     */
-    oneof SignalValue {
-
-        /*
-         * A double value of a decoded physical value. For Alpha, PID data will be
-         * calculated using a PID formula and directly cast to a double.
-         */
-        double double_value = 3;
-    }
-}
-
-/*
- * A raw CAN2.0 A or B frame
- */
-message CanFrame {
-
-   /*
-    * Milliseconds relative to the event_time_ms_epoch. Can be negative or positive.
-    */
-   sint64 relative_time_ms = 1;
-
-   /*
-    * CAN Message Arbitration ID
-    */
-   uint32 message_id = 2;
-
-   /*
-    * VSS node_id of the CAN node as per the decoder manifest.
-    */
-   uint32 node_id = 3;
-
-   /*
-    * Array of bytes from the CAN Frame
-    */
-   bytes byte_values = 4;
-}
-
-message DtcData {
-
-   /*
-    * Milliseconds relative to the event_time_ms_epoch. Can be negative or positive.
-    */
-   sint64 relative_time_ms = 1;
-
-   /*
-    * Strings of active DTC codes
-    */
-   repeated string active_dtc_codes = 2;
-}
-
-message Geohash {
-
-    /*
-     * Geohash in string format. It's encoded in base 32 format.
-     * Currently we always upload the maximum resolution of geohash.
-     * The string is always 9 characters long.
-     */
-    string geohash_string = 1;
-}
-```
+software sends one or more instance of this message in an MQTT packet to the cloud. Refer to
+[vehicle_data.proto](../../interfaces/protobuf/schemas/edgeToCloud/vehicle_data.proto).
 
 ### Cloud to Device communication
 
@@ -973,626 +821,15 @@ two artifacts:
 
 **Decoder Manifest** — This artifact describes the Vehicle Network Interfaces that the user defined.
 The description includes the semantics of each of the Network interface traffic to be inspected
-including the signal decoding rules:
-
-```protobuf
-syntax = "proto3";
-
-message DecoderManifest {
-
-  /*
-   * Amazon Resource Name and version of the decoder manifest
-   */
-  string arn = 1;
-
-  /*
-   * List of signals that are sent and received on the CAN BUS in the vehicle
-   */
-  repeated CANSignal can_signals = 2;
-
-  /*
-   * List of OBDII-PID signals and corresponding decoding rules
-   */
-  repeated OBDPIDSignal obd_pid_signals = 3;
-}
-
-message CANSignal {
-
-  /*
-   * Unique integer identifier of the signal generated by Cloud Designer
-   */
-  uint32 signal_id = 1;
-
-  /*
-   * Interface ID for CAN network interface this signal is found on.
-   * The CAN network interface details are provided as a part of the edge static
-   * configuration file.
-   */
-  string interface_id = 2;
-
-  /*
-   * CAN Message Id
-   */
-  uint32 message_id = 3;
-
-  /*
-   * True when signal is encoded in Big Endian
-   */
-  bool is_big_endian = 4;
-
-  /*
-   * True when signal is signed
-   */
-  bool is_signed = 5;
-
-  /*
-   * Start bit position of the signal in the message
-   */
-  uint32 start_bit = 6;
-
-  /*
-   * physical_signal_value = raw_value * factor + offset
-   */
-  double offset = 7;
-
-  /*
-   * physical_signal_value = raw_value * factor + offset
-   */
-  double factor = 8;
-
-  /*
-   * Length of the CAN signal
-   */
-  uint32 length = 9;
-}
-
-/*
- * This is the OBDII-PID signal decoding rule. One OBDII-PID could contain
- * multiple signals. Below section is the decoder rule per signal, not per PID
- */
-message OBDPIDSignal {
-
-  /*
-   * Unique numeric identifier for the OBDII-PID signal
-   */
-  uint32 signal_id = 1;
-
-  /*
-   * Interface ID for CAN network interface this signal is found on.
-   * The CAN network interface details are provided as a part of the Edge Agent
-   * static configuration file.
-   */
-  string interface_id = 2;
-
-  /*
-   * Length of the PID response. Note this is not the signal byte length as PID
-   * might contain multiple signals
-   */
-  uint32 pid_response_length = 3;
-
-  /*
-   * OBDII-PID Service Mode for the signal in decimal
-   */
-  uint32 service_mode = 4;
-
-  /*
-   * OBD request PID in decimal
-   */
-  uint32 pid = 5;
-
-  /*
-   * scaling to decode OBD from raw bytes to double value
-   * e.g. A * 0.0125 - 40. scaling is 0.01
-   */
-  double scaling = 6;
-
-  /*
-   * offset to decode OBD from raw bytes to double value
-   * e.g. A * 0.0125 - 40. offset is -40.0
-   */
-  double offset = 7;
-
-  /*
-   * the start byte order (starting from 0th) for this signal in its PID query
-   * response e.g. PID 0x14 contains two signals. SHRFT is the second byte. Its
-   * startByte is 1
-   */
-  uint32 start_byte = 8;
-
-  /*
-   * number of bytes for this signal in its PID query response
-   * e.g. PID 0x14 contains two signals. SHRFT is one byte. Its byteLength is 1
-   */
-  uint32 byte_length = 9;
-
-  /*
-   * Right shift on bits to decode this signal from raw bytes. Note the bit
-   * manipulation is only performed when byteLength is 1. e.g. Boost Pressure B
-   * Control Status is bit 2, 3 on byte J. The right shift shall be two For
-   * non-bitmask signals, the right shift shall always be 0
-   */
-  uint32 bit_right_shift = 10;
-
-  /*
-   * bit Mask Length to be applied to decode this signal from raw byte. Note the
-   * bit manipulation is only performed when byteLength is 1. e.g. Boost
-   * Pressure B Control Status is bit 2, 3 on byte J. The bit Mask Length would
-   * be 2 For non-bitmask signals, the bit Mask Length shall always be 8.
-   */
-  uint32 bit_mask_length = 11;
-}
-```
+including the signal decoding rules. Refer to
+[decoder_manifest.proto](../../interfaces/protobuf/schemas/cloudToEdge/decoder_manifest.proto).
 
 **Collection Scheme**
 
 This artifact describes effectively the inspection rules, that the device software will apply on the
 network traffic it receives. Using the decoder manifest, the Inspection module will apply the rules
-defined in the collection schemes to generate data snapshots.
-
-```protobuf
-message CollectionSchemes {
-
-    /*
-     * List of collectionSchemes. On receipt of this, Edge Agent will discard
-     * all collectionSchemes it currently has and enact these.
-     */
-    repeated CollectionScheme collection_schemes = 1;
-
-    /*
-     * Timestamp of when the collectionScheme list was created.
-     */
-    uint64 timestamp_ms_epoch = 2;
-}
-
-/*
- * A definition of an individual collectionScheme containing what/when/how
- * to send vehicle data to cloud. A collectionScheme can be condition based,
- * where data is sent whenever a condition evaluates to true, or it
- * can be time based, where data is sent up at periodic intervals.
- */
-message CollectionScheme {
-
-    /*
-     * Amazon Resource Name of the campaign this collectionScheme is part of
-     */
-    string campaign_arn = 1;
-
-    /*
-     * Amazon Resource Name of the required decoder manifest for this
-     * collectionScheme
-     */
-    string decoder_manifest_arn = 2;
-
-    /*
-     * When collectionScheme should start in milliseconds since the Unix epoch
-     */
-    uint64 start_time_ms_epoch = 3;
-
-    /*
-     * When collectionScheme should expire in milliseconds since the Unix epoch.
-     * This collectionScheme expiration date is meant to serve as an end
-     * date for a collectionScheme so it does not keep running forever in the case
-     * that the vehicle permanently loses internet connection to the cloud
-     */
-    uint64 expiry_time_ms_epoch = 4;
-
-    /*
-     * A collectionScheme type containing attributes that are specific to that
-     * collectionScheme type. Currently support time based (such as a heartbeat)
-     *  and condition based collectionSchemes.
-     */
-    oneof collection_scheme_type {
-        TimeBasedCollectionScheme time_based_collection_scheme = 5;
-        ConditionBasedCollectionScheme condition_based_collection_scheme = 6;
-    }
-
-    /*
-     * This specifies how much time to spend collecting data after a condition
-     * evaluates to true. When after_duration_ms elapses whatever data
-     * collected up to that point ( if any was present on the vehicle ) is sent
-     * to the cloud.
-     */
-    uint32 after_duration_ms = 7;
-
-    /*
-     * All active DTCs including the time they were first seen active will
-     * be sent when the collectionScheme triggers.
-     */
-    bool include_active_dtcs = 8;
-
-    /*
-     * List of signal ids to collect or have attribute(s) required by a condition
-     * function node
-     */
-    repeated SignalInformation signal_information = 9;
-
-    /*
-     * List of Raw CAN Frame(s) to be collected and sent to cloud
-     */
-    repeated RawCanFrame raw_can_frames_to_collect = 10;
-
-    /*
-     * When true all data will be written to persistant storage when vehicle
-     * doesn't not have an internet connection
-     */
-    bool persist_all_collected_data = 11;
-
-    /*
-     * When true, collected data will be compressed and then sent to cloud.
-     */
-    bool compress_collected_data = 12;
-
-    /*
-     * An integer between describing the priority for the data collection.
-     * CollectionSchemes with low priority numbers will have higher priority
-     * and will be processed first.
-     */
-    uint32 priority = 13;
-
-    Probabilities probabilities = 14;
-
-    /*
-     * Image Data to collect as part of this collectionScheme.
-     */
-    repeated ImageData image_data = 15;
-}
-
-message Probabilities{
-    /*
-     * Double between 0 and 1 giving the probability after the condition is met
-     * and the minimum interval is over that the message should be actually be
-     * sent out 0 send never, 1: send always. A uniform random number (0-1) is
-     * generated before sending the data to cloud and compared to this
-     * probability. If lower then data will be sent out. The minimum interval will
-     * start again even when the random number decides to not sent out the data.
-     * It is both useable for condition and time based collectionSchemes.
-     */
-     double probability_to_send = 1;
-}
-
-/*
- * Contains time based specific parameters necessary for time based
- * collectionSchemes such as a heartbeat.
- */
-message TimeBasedCollectionScheme {
-
-    /*
-     * Time in milliseconds that will be interval of a time based collectionScheme
-     * if is_time_based_collection_scheme is set to true. This is not used if
-     * is_time_based_collection_scheme is set false.
-     */
-    uint32 time_based_collection_scheme_period_ms = 1;
-}
-
-/*
- * Contains condition based specific attributes necessary for condition based
- * collectionSchemes
- */
-message ConditionBasedCollectionScheme {
-
-    /*
-     * The minimum time in milliseconds required to elapse between conditions
-     * that evaluate to truefor data to be sent to the cloud.
-     */
-    uint32 condition_minimum_interval_ms = 1;
-
-    /*
-     * The version number associated with the event condition language used in the
-     * abstract syntax tree. We are starting at 0 for alpha and we will increment
-     * as we add features
-     */
-    uint32 condition_language_version = 2;
-
-    /*
-     * Root condition node for the Abstract Syntax Tree.
-     */
-    ConditionNode condition_tree = 3;
-
-    /*
-     * Edge Agent can monitor the previous state of a condition and use this
-     * information to allow the customer to set a trigger mode similar to an
-     * oscillascope trigger.
-     */
-    enum ConditionTriggerMode {
-
-        /*
-         * Condition will evaluate to true regardless of previous state
-         */
-        TRIGGER_ALWAYS = 0;
-
-        /*
-         * Condition will evaluate to true only when it previously evaulated to false
-         */
-        TRIGGER_ONLY_ON_RISING_EDGE = 1;
-
-    }
-
-    /*
-     * A triggering mode can be applied to the condition to take in account the
-     * previous state of the condition.
-     */
-    ConditionTriggerMode condition_trigger_mode = 4;
-}
-
-/*
- * This message contains information of signals that are to be collected and sent to
- * cloud, or are part of the condition logic and require attribute information.
- */
-message SignalInformation {
-
-    /*
-     * Unique identifier of a Signal. Maps directly to a signal defined in the
-     * decoder manifest.
-     * Signal can also be an OBD PID.
-     */
-    uint32 signal_id = 1;
-
-    /*
-     * The size of the ring buffer that will contain the data points for this signal
-     */
-    uint32 sample_buffer_size = 2;
-
-    /*
-     * Minimum time period in milliseconds that must elapse between collecting
-     * samples. Samples arriving faster than this period will be dropped.
-     * A value of 0 will collect samples as fast
-     * as they arrive.
-     */
-    uint32 minimum_sample_period_ms = 3;
-
-    /*
-     * The size of a fixed window in milliseconds which will be used by aggregate
-     * condition functions to calculate min/max/avg etc.
-     */
-    uint32 fixed_window_period_ms = 4;
-
-    /*
-     * When true, this signal will not be collected and sent to cloud. It will only
-     * be used in the condition logic with its associated fixed_window_period_ms.
-     * Default is false.
-     */
-    bool condition_only_signal = 5;
-}
-
-/*
- * A node of the condition Abstract Syntax Tree
- */
-message ConditionNode {
-
-    /*
-     * Each Abstract Syntax Tree node can be one of the following types
-     */
-    oneof node {
-        /*
-         * An operator node can perform an operation or comparisons on its child
-         * node(s)
-         */
-        NodeOperator node_operator = 1;
-
-        /*
-         * Function node is a self-contained module that accomplish a specific task.
-         */
-        NodeFunction node_function = 2;
-
-        /*
-         * A node containing a floating point constant which can be used as a
-         * child node to operator nodes.
-         */
-        double node_double_value = 3;
-
-        /*
-         * A node containing a signal id, whose value will be evaluated every
-         * time that signal is received on the vehicle network bus.
-         */
-        uint32 node_signal_id = 4;
-
-        /*
-         * A node containing a boolean constant which can be used as a child node
-         * to an operator node.
-         */
-        bool node_boolean_value = 5;
-    }
-
-    /*
-     * Operator node types contain one or two children. If they are unary operator
-     * type nodes, only the left child will be used
-     */
-    message NodeOperator{
-
-        /*
-         * Left child node
-         */
-        ConditionNode left_child = 1;
-
-        /*
-         * Right child node
-         */
-        ConditionNode right_child = 2;
-
-        /*
-         * Operator type used in this node
-         */
-        Operator operator = 3;
-
-        /*
-         * Enum of an operator which can be an binary or unary operator
-         */
-        enum Operator {
-
-            /*
-             * COMPARE operators return a bool and their children must return a
-             * double
-             */
-            COMPARE_SMALLER = 0;
-            COMPARE_BIGGER = 1;
-            COMPARE_SMALLER_EQUAL = 2;
-            COMPARE_BIGGER_EQUAL = 3;
-            COMPARE_EQUAL = 4;
-            COMPARE_NOT_EQUAL = 5;
-
-            /*
-             * LOGICAL operators return a bool and their children must return a bool
-             */
-            LOGICAL_AND = 6;
-            LOGICAL_OR = 7;
-            LOGICAL_NOT = 8; // Unary operator that will only have a left child.
-
-            /*
-             * ARITHMETIC operators return a double and their children must return a
-             * double
-             *
-             *
-            ARITHMETIC_PLUS = 9;
-            ARITHMETIC_MINUS = 10;
-            ARITHMETIC_MULTIPLY = 11;
-            ARITHMETIC_DIVIDE = 12;
-        }
-    }
-
-    /*
-     * Function node is a self-contained module that accomplish a specific task.
-     * It takes inputs provided here and output based on specific logic
-     */
-    message NodeFunction{
-
-        /*
-         * The function node could be one of the following funtion types.
-         */
-        oneof functionType {
-
-            /*
-             * A Window function node will sample a signal for the duration specifed
-             * by fixed_window_period_ms and then run an aggregation funcion over the
-             * samples and evaluate to a double.
-             */
-            WindowFunction window_function = 1;
-
-            /*
-             * Geohash function Node that evaluates whether Edge Agent has changed
-             * Geohash
-             * It returns true if the Geohash has changed at given precision.
-             * Otherwise return false
-             */
-            GeohashFunction geohash_function = 2;
-        }
-
-        /*
-         * Geohash function evaluates whether Edge Agent has changed Geohash at given
-         * precision. It will firstly calculate Geohash with latitude and longitude
-         * It returns true if the Geohash has changed at given precision.
-         * Otherwise return false
-         */
-        message GeohashFunction{
-
-            /*
-             * signal id for latitude
-             */
-            uint32 latitude_signal_id = 1;
-
-            /*
-             * signal id for longitude
-             */
-            uint32 longitude_signal_id = 2;
-
-            /*
-             * The geohash precision for dynamic data collection
-             * Note geohash precision is defined as the length of hash characters
-             * (base 32 encoding). Longer hash will have higher precision than
-             * shorter hash.
-             */
-            uint32 geohash_precision = 3;
-
-            /*
-             * The unit for decoded latitude / longitude signal. GPS Signal might
-             * be decoded into different unit according to the DBC file.
-             */
-            GPSUnitType gps_unit = 4;
-
-            /*
-             * The unit type for decoded latitude / longitude signal. This list
-             * might be extended in future to accommodate different vehicle models.
-             */
-            enum GPSUnitType {
-                DECIMAL_DEGREE = 0;
-                MICROARCSECOND = 1;
-                MILLIARCSECOND = 2;
-                ARCSECOND = 3;
-            }
-        }
-
-        /*
-         * Function node that will evaluate a function on a signal_id within a
-         * fixed window
-         */
-        message WindowFunction{
-
-            /*
-             * signal id of value to run a function on. The fixed_window_period_ms
-             * associated signal Information will be used.
-             */
-            uint32 signal_id = 1;
-
-            /*
-             * Function used over fixed window to evaluate value of physical value
-             * of signal_id
-             */
-             WindowType window_type = 2;
-
-            /*
-             * Function to be used to aggregate data in a fixed window
-             */
-            enum WindowType {
-
-                /*
-                 * LAST_WINDOW is the most recently evaluated fixed window
-                 */
-                LAST_WINDOW_MIN = 0;
-                LAST_WINDOW_MAX = 1;
-                LAST_WINDOW_AVG = 2;
-                /*
-                 * PREV_LAST_WINDOW is the fixed window previous to LAST_WINDOW
-                 */
-                PREV_LAST_WINDOW_MIN = 3;
-                PREV_LAST_WINDOW_MAX = 4;
-                PREV_LAST_WINDOW_AVG = 5;
-            }
-        }
-    }
-}
-
-/*
- * A raw CAN frame specified to be collected and sent to the cloud.
- */
-message RawCanFrame {
-
-    /*
-     * The interface ID speficied by the Decoder Manifest. This will contain the
-     * physical channel id of the hardware CAN Bus the frame is present on.
-     */
-
-    string can_interface_id = 1;
-
-    /*
-     * CAN Message ID to collect. This Raw CAN message will be collected.
-     * Whatever number of bytes present on the bus for this message ID will be
-     * collected.
-     */
-    uint32 can_message_id = 2;
-
-    /*
-     * Ring buffer size used to store these sampled CAN frames. One CAN Frame
-     * is a sample.
-     */
-    uint32 sample_buffer_size = 3;
-
-    /*
-     * Minimum time period in milliseconds that must elapse between collecting
-     * samples. Samples arriving faster than this period will be dropped.
-     * A value of 0 will collect samples as fast as they arrive.
-     */
-    uint32 minimum_sample_period_ms = 4;
-}
-```
+defined in the collection schemes to generate data snapshots. Refer to
+[collection_schemes.proto](../../interfaces/protobuf/schemas/cloudToEdge/collection_schemes.proto).
 
 ## Data Persistency
 
@@ -1679,14 +916,18 @@ described below in the configuration section. Each log entry includes the follow
 |                             | metricsCyclicPrintIntervalMs                | Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never                                                                                                                                                                                                                                                          | string   |
 | publishToCloudParameters    | maxPublishMessageCount                      | Maximum messages that can be published to the cloud in one payload                                                                                                                                                                                                                                                                                                              | integer  |
 |                             | collectionSchemeManagementCheckinIntervalMs | Time interval between collection schemes checkins(in milliseconds)                                                                                                                                                                                                                                                                                                              | integer  |
-| mqttConnection              | endpointUrl                                 | AWS account’s IoT device endpoint                                                                                                                                                                                                                                                                                                                                               | string   |
+| mqttConnection              | endpointUrl                                 | AWS account's IoT device endpoint                                                                                                                                                                                                                                                                                                                                               | string   |
 |                             | clientId                                    | The ID that uniquely identifies this device in the AWS Region                                                                                                                                                                                                                                                                                                                   | string   |
 |                             | collectionSchemeListTopic                   | Topic for subscribing to Collection Scheme                                                                                                                                                                                                                                                                                                                                      | string   |
 |                             | decoderManifestTopic                        | Topic for subscribing to Decoder Manifest                                                                                                                                                                                                                                                                                                                                       | string   |
 |                             | canDataTopic                                | Topic for sending collected data to cloud                                                                                                                                                                                                                                                                                                                                       | string   |
 |                             | checkinTopic                                | Topic for sending checkins to the cloud                                                                                                                                                                                                                                                                                                                                         | string   |
-|                             | certificateFilename                         | The path to the device’s certificate file                                                                                                                                                                                                                                                                                                                                       | string   |
-|                             | privateKeyFilename                          | The path to the device’s private key file.                                                                                                                                                                                                                                                                                                                                      | string   |
+|                             | certificateFilename                         | The path to the device's certificate file (either `certificateFilename` or `certificate` must be provided)                                                                                                                                                                                                                                                                      | string   |
+|                             | privateKeyFilename                          | The path to the device's private key file (either `privateKeyFilename` or `privateKey` must be provided)                                                                                                                                                                                                                                                                        | string   |
+|                             | rootCAFilename                              | The path to the root CA certificate file (optional, either `rootCAFilename` or `rootCA` can be provided)                                                                                                                                                                                                                                                                        | string   |
+|                             | certificate                                 | The path to the device's certificate file (either `certificateFilename` or `certificate` must be provided)                                                                                                                                                                                                                                                                      | string   |
+|                             | privateKey                                  | The path to the device's private key file (either `privateKeyFilename` or `privateKey` must be provided)                                                                                                                                                                                                                                                                        | string   |
+|                             | rootCA                                      | The path to the root CA certificate file (optional, either `rootCAFilename` or `rootCA` can be provided)                                                                                                                                                                                                                                                                        | string   |
 |                             | metricsUploadTopic                          | Topic used to upload application metrics in plain json. Only used if `remoteProfilerDefaultValues` section is configured                                                                                                                                                                                                                                                        | string   |
 |                             | loggingUploadTopic                          | Topic used to upload log messages in plain json. Only used if `remoteProfilerDefaultValues` section is configured                                                                                                                                                                                                                                                               | string   |
 | remoteProfilerDefaultValues | loggingUploadLevelThreshold                 | Only log messages with this or higher severity will be uploaded                                                                                                                                                                                                                                                                                                                 | integer  |
@@ -1706,7 +947,7 @@ incorporated into four main domains:
   for further details.
 - Data in transit: All the data exchanged with the AWS IoT services is encrypted in transit.
 - Data at rest: the current version of the software does not encrypt the data at rest i.e. during
-  persistency. It’s assumed that the software operates in a secure partition that the OEM puts in
+  persistency. It's assumed that the software operates in a secure partition that the OEM puts in
   place and rely on the OEM secure storage infrastructure that is applied for all IO operations
   happening in the gateway e.g. via HSM, OEM crypto stack.
 - Access to vehicle CAN data: the device software assumes that the software operates in a secure
@@ -1773,165 +1014,3 @@ The following documents or websites provide more information about AWS IoT Fleet
    resolved and known issues.
 2. [AWS IoT FleetWise Edge Agent Offboarding](../AWS-IoTFleetWiseOffboarding.md) provides a summary
    of the steps needed on the Client side to off board from the service.
-
-## Appendix
-
-### Decoder Manifest Example
-
-```json
-{
-  "modelManifestArn": "arn:aws:iotfleetwise:us-east-1:111111111111:model-manifest/my-model-manifest",
-  "name": "my-decoder-manifest",
-  "networkInterfaces": [
-    {
-      "interfaceId": "0",
-      "type": "OBD_INTERFACE",
-      "obdInterface": {
-        "name": "can0",
-        "requestMessageId": 2015,
-        "obdStandard": "J1979",
-        "pidRequestIntervalSeconds": 5,
-        "dtcRequestIntervalSeconds": 5
-      }
-    },
-    {
-      "interfaceId": "1",
-      "type": "CAN_INTERFACE",
-      "canInterface": {
-        "name": "can0",
-        "protocolName": "CAN",
-        "protocolVersion": "2.0B"
-      }
-    }
-  ],
-  "signalDecoders": [
-    {
-      "fullyQualifiedName": "Vehicle.myCanSignal",
-      "interfaceId": "1",
-      "type": "CAN_SIGNAL",
-      "canSignal": {
-        "name": "myCanSignal",
-        "factor": 1.0,
-        "isBigEndian": true,
-        "isSigned": true,
-        "length": 8,
-        "messageId": 1024,
-        "offset": 0,
-        "startBit": 0
-      }
-    },
-    {
-      "fullyQualifiedName": "Vehicle.OBD.CoolantTemperature",
-      "interfaceId": "0",
-      "type": "OBD_SIGNAL",
-      "obdSignal": {
-        "byteLength": 1,
-        "offset": -40,
-        "pid": 5,
-        "pidResponseLength": 1,
-        "scaling": 1,
-        "serviceMode": 1,
-        "startByte": 0,
-        "bitMaskLength": 8,
-        "bitRightShift": 0
-      }
-    }
-  ]
-}
-```
-
-### Campaign Example
-
-```json
-{
-  "name": "my-campaign",
-  "signalCatalogArn": "arn:aws:iotfleetwise:us-east-1:111111111111:signal-catalog/my-signal-catalog",
-  "targetArn": "arn:aws:iotfleetwise:us-east-1:111111111111:fleet/my-fleet",
-  "compression": "SNAPPY",
-  "diagnosticsMode": "OFF",
-  "spoolingMode": "TO_DISK",
-  "collectionScheme": {
-    "conditionBasedCollectionScheme": {
-      "conditionLanguageVersion": 1,
-      "expression": "$variable.`Vehicle.DemoBrakePedalPressure` > 7000",
-      "minimumTriggerIntervalMs": 1000,
-      "triggerMode": "ALWAYS"
-    }
-  },
-  "postTriggerCollectionDuration": 1000,
-  "signalsToCollect": [
-    {
-      "name": "Vehicle.DemoEngineTorque"
-    },
-    {
-      "name": "Vehicle.DemoBrakePedalPressure"
-    }
-  ]
-}
-```
-
----
-
-**Edge Configuration Example**
-
-```json
-{
-  "version": "1.0",
-  "networkInterfaces": [
-    {
-      "canInterface": {
-        "interfaceName": "vcan0",
-        "protocolName": "CAN",
-        "protocolVersion": "2.0B"
-      },
-      "interfaceId": "1",
-      "type": "canInterface"
-    },
-    {
-      "obdInterface": {
-        "interfaceName": "vcan0",
-        "obdStandard": "J1979",
-        "pidRequestIntervalSeconds": 0,
-        "dtcRequestIntervalSeconds": 0
-      },
-      "interfaceId": "2",
-      "type": "obdInterface"
-    }
-  ],
-  "staticConfig": {
-    "bufferSizes": {
-      "dtcBufferSize": 100,
-      "decodedSignalsBufferSize": 10000,
-      "rawCANFrameBufferSize": 10000
-    },
-    "threadIdleTimes": {
-      "inspectionThreadIdleTimeMs": 50,
-      "socketCANThreadIdleTimeMs": 50,
-      "canDecoderThreadIdleTimeMs": 50
-    },
-    "persistency": {
-      "persistencyPath": "/path/to/collection-scheme-and-data-persistency",
-      "persistencyPartitionMaxSize": 524288
-    },
-    "internalParameters": {
-      "readyToPublishDataBufferSize": 10000,
-      "systemWideLogLevel": "Trace",
-      "dataReductionProbabilityDisabled": false
-    },
-    "publishToCloudParameters": {
-      "maxPublishMessageCount": 1000,
-      "collectionSchemeManagementCheckinIntervalMs": 5000
-    },
-    "mqttConnection": {
-      "endpointUrl": "my-endpoint.my-region.amazonaws.com",
-      "clientId": "ClientId",
-      "collectionSchemeListTopic": "collection-scheme-list-topic",
-      "decoderManifestTopic": "decoder-manifest-topic",
-      "canDataTopic": "can-data",
-      "checkinTopic": "checkin",
-      "certificateFilename": "path/to/my-certificate.pem.crt",
-      "privateKeyFilename": "path/to/my-private.pem.key"
-    }
-  }
-}
-```

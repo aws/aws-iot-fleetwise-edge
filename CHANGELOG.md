@@ -1,5 +1,24 @@
 # Change Log
 
+## v1.0.6 (2023-06-12)
+
+Features:
+
+- Add Android support, including shared library and demonstration app.
+
+Improvements:
+
+- Change from `arn` to `sync_id` for campaign_arn and document_arns, the `sync_id` being the ARN
+  followed by the timestamp of the last update. The change is backwards compatible with older
+  versions of the edge agent.
+- Ubuntu package mirror from system used, rather than `ports.ubuntu.com`.
+- Add root CA and inline credentials support to static config file.
+- Add extra metrics for AWS SDK heap usage, used signal buffer, MQTT messages sent out.
+- Add support for in-process ingestion of external GPS, CAN and OBD PID values when FWE is compiled
+  as a shared library.
+- Fix compiler warnings for armhf build.
+- Update Protobuf to v3.21.12, AWS C++ SDK to v1.11.94.
+
 ## v1.0.5 (2023-05-11)
 
 Bugfixes:

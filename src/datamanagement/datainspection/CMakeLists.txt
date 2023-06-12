@@ -13,6 +13,7 @@ set(SRCS
   src/location/GeohashFunctionNode.cpp
   src/vehicledatasource/CANDataSource.cpp
   src/vehicledatasource/CANDataConsumer.cpp
+  src/vehicledatasource/ExternalCANDataSource.cpp
 )
 
 add_library(
@@ -71,6 +72,7 @@ set(
   test/CollectionInspectionEngineTest.cpp
   test/CollectionInspectionWorkerThreadTest.cpp
   test/CANDataSourceTest.cpp
+  test/ExternalCANDataSourceTest.cpp
 )
 
 if(FWE_FEATURE_CAMERA)

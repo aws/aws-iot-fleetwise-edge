@@ -40,7 +40,8 @@
     "internalParameters": {
       "readyToPublishDataBufferSize": 10000,
       "systemWideLogLevel": "Trace",
-      "dataReductionProbabilityDisabled": false
+      "dataReductionProbabilityDisabled": false,
+      "persistencyUploadRetryIntervalMs": 5000
     },
     "publishToCloudParameters": {
       "maxPublishMessageCount": 1000,
@@ -51,10 +52,13 @@
       "clientId": "ClientId",
       "collectionSchemeListTopic": "collection-scheme-list-topic",
       "decoderManifestTopic": "decoder-manifest-topic",
+      "metricsUploadTopic": "aws-iot-fleetwise-metrics-upload",
+      "loggingUploadTopic": "aws-iot-fleetwise-logging-upload",
       "canDataTopic": "can-data",
       "checkinTopic": "checkin",
       "certificateFilename": "path/to/my-certificate.pem.crt",
-      "privateKeyFilename": "path/to/my-private.pem.key"
+      "privateKeyFilename": "path/to/my-private.pem.key",
+      "rootCAFilename": "path/to/my-root-ca.pem.crt"
     },
     "iWaveGpsExample": {
       "nmeaFilePath": "/tmp/engineTestIWaveGPSfile.txt",
@@ -62,6 +66,12 @@
       "canFrameId": "1",
       "longitudeStartBit": "32",
       "latitudeStartBit": "0"
+    },
+    "remoteProfilerDefaultValues": {
+      "loggingUploadLevelThreshold": "Warning",
+      "metricsUploadIntervalMs": 60000,
+      "loggingUploadMaxWaitBeforeUploadMs": 60000,
+      "profilerPrefix": "TestVehicle1"
     }
   },
   "dds-nodes-configuration": [

@@ -79,6 +79,7 @@ class MqttClientConnectionConfigBuilderMock
 {
 public:
     MOCK_METHOD( (void), WithEndpoint, ( const Aws::Crt::String &endpoint ) );
+    MOCK_METHOD( (void), WithCertificateAuthority, ( const Crt::ByteCursor &rootCA ) );
     MOCK_METHOD( ( Aws::Iot::MqttClientConnectionConfig ), Build, () );
 };
 

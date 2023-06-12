@@ -29,7 +29,7 @@ public:
     }
 
     CANChannelNumericID
-    getChannelNumericID( CANInterfaceID iid )
+    getChannelNumericID( const CANInterfaceID &iid )
     {
         for ( auto l : mLookup )
         {

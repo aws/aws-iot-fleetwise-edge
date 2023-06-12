@@ -25,11 +25,6 @@ using namespace Aws::IoTFleetWise::Platform::Linux;
 using OBDDecoderDictionary = std::unordered_map<PID, CANMessageFormat>;
 
 /**
- * @brief define shared pointer type for OBD-II PID decoder dictionary
- */
-using ConstOBDDecoderDictionaryConstPtr = const std::shared_ptr<const OBDDecoderDictionary>;
-
-/**
  * @brief OBD Data Decoder. Decodes OBD ECU responses according
  * to the J1979 specifications
  */
@@ -38,7 +33,7 @@ class OBDDataDecoder
 {
 
 public:
-    OBDDataDecoder();
+    OBDDataDecoder( std::shared_ptr<OBDDecoderDictionary> &decoderDictionary );
     ~OBDDataDecoder() = default;
 
     OBDDataDecoder( const OBDDataDecoder & ) = delete;
@@ -55,7 +50,7 @@ public:
      * @return True if we received a positive response and extracted the PIDs.
      * needed.
      */
-    static bool decodeSupportedPIDs( const SID &sid,
+    static bool decodeSupportedPIDs( const SID sid,
                                      const std::vector<uint8_t> &inputData,
                                      SupportedPIDs &supportedPIDs );
 
@@ -69,7 +64,7 @@ public:
      * @return True if we received a positive response and decoded at least one supported PID.
      * needed.
      */
-    bool decodeEmissionPIDs( const SID &sid,
+    bool decodeEmissionPIDs( const SID sid,
                              const std::vector<PID> &pids,
                              const std::vector<uint8_t> &inputData,
                              EmissionInfo &info );
@@ -83,7 +78,7 @@ public:
      * @return True if we received a positive response and decoded the DTCs.
      * A positive response also can mean that no DTCs were reported by the ECU.
      */
-    static bool decodeDTCs( const SID &sid, const std::vector<uint8_t> &inputData, DTCInfo &info );
+    static bool decodeDTCs( const SID sid, const std::vector<uint8_t> &inputData, DTCInfo &info );
 
     /**
      * @brief Decodes VIN from the ECU response,
@@ -96,19 +91,11 @@ public:
 
     static bool extractDTCString( const uint8_t &firstByte, const uint8_t &secondByte, std::string &dtcString );
 
-    /**
-     * @brief Update OBD Data Decoder module with decoder dictionary
-     *
-     * @param dictionary Const shared pointer to Const OBD Decoder Dictionary
-     * @return None
-     */
-    void setDecoderDictionary( ConstOBDDecoderDictionaryConstPtr &dictionary );
-
 private:
     Timer mTimer;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     // shared pointer to decoder dictionary
-    std::shared_ptr<const OBDDecoderDictionary> mDecoderDictionaryConstPtr;
+    std::shared_ptr<OBDDecoderDictionary> &mDecoderDictionary;
 
     /**
      * @brief Uses the given formula to transform the raw data and add the results to info

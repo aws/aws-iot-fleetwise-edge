@@ -48,7 +48,7 @@ Schema::sendCheckin( const std::vector<std::string> &documentARNs )
     for ( auto const &doc : documentARNs )
     {
         // Note: a class member is used to store the serialized proto output to avoid heap fragmentation
-        mProtoCheckinMsg.add_document_arns( doc );
+        mProtoCheckinMsg.add_document_sync_ids( doc );
     }
 
     // Add the timestamp
@@ -86,15 +86,15 @@ Schema::transmitCheckin()
         // Trace log for more verbose Checkin Info
         std::string checkinDebugString;
         checkinDebugString = "Checkin data: timestamp: " + std::to_string( mProtoCheckinMsg.timestamp_ms_epoch() );
-        checkinDebugString += " with " + std::to_string( mProtoCheckinMsg.document_arns_size() ) + " documents: [";
+        checkinDebugString += " with " + std::to_string( mProtoCheckinMsg.document_sync_ids_size() ) + " documents: [";
 
-        for ( int i = 0; i < mProtoCheckinMsg.document_arns_size(); i++ )
+        for ( int i = 0; i < mProtoCheckinMsg.document_sync_ids_size(); i++ )
         {
             if ( i > 0 )
             {
                 checkinDebugString += ", ";
             }
-            checkinDebugString += mProtoCheckinMsg.document_arns( i );
+            checkinDebugString += mProtoCheckinMsg.document_sync_ids( i );
         }
         checkinDebugString += "]";
 

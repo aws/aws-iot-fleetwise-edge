@@ -122,6 +122,19 @@ public:
         return mActiveDTCBufferPtr;
     }
 
+    /**
+     * @brief Gets a list of PIDs to request externally
+     * @return List of PIDs
+     */
+    std::vector<PID> getExternalPIDsToRequest();
+
+    /**
+     * @brief Sets the response for the given PID
+     * @param pid The PID
+     * @param response The response
+     */
+    void setExternalPIDResponse( PID pid, std::vector<uint8_t> response );
+
 private:
     /**
      * @brief Automatically detect all ECUs on a vehicle by sending broadcast request.

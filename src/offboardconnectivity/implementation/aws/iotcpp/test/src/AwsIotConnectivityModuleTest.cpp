@@ -112,7 +112,7 @@ protected:
 TEST_F( AwsIotConnectivityModuleTest, disconnectAfterFailedConnect )
 {
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    ASSERT_FALSE( m->connect( "", "", "", "", bootstrap ) );
+    ASSERT_FALSE( m->connect( "", "", "", "", "", bootstrap ) );
     // disconnect must only disconnect when connection is available so this should not seg fault
     m->disconnect();
 }
@@ -128,7 +128,7 @@ TEST_F( AwsIotConnectivityModuleTest, connectSuccessfull )
 
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
 
-    ASSERT_TRUE( m->connect( "key", "cert", endpoint, "clientIdTest", bootstrap ) );
+    ASSERT_TRUE( m->connect( "key", "cert", "rootca", endpoint, "clientIdTest", bootstrap ) );
 
     con->OnDisconnect( *con );
 
@@ -144,7 +144,7 @@ TEST_F( AwsIotConnectivityModuleTest, connectFailsOnClientBootstrapCreation )
     auto con = setupValidConnection();
 
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    ASSERT_FALSE( m->connect( "key", "cert", "endpoint", "clientIdTest", nullptr ) );
+    ASSERT_FALSE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", nullptr ) );
 }
 
 /** @brief Test trying to connect, where creation of the client fails */
@@ -154,7 +154,7 @@ TEST_F( AwsIotConnectivityModuleTest, connectFailsOnClientCreation )
     EXPECT_CALL( clientMock, operatorBool() ).Times( AtLeast( 1 ) ).WillRepeatedly( Return( false ) );
 
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    ASSERT_FALSE( m->connect( "key", "cert", "endpoint", "clientIdTest", bootstrap ) );
+    ASSERT_FALSE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
 }
 
 /** @brief Test opening a connection, then interrupting it and resuming it */
@@ -163,7 +163,7 @@ TEST_F( AwsIotConnectivityModuleTest, connectionInterrupted )
     auto con = setupValidConnection();
 
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    ASSERT_TRUE( m->connect( "key", "cert", "endpoint", "clientIdTest", bootstrap ) );
+    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
 
     con->OnConnectionInterrupted( *con, 10 );
     con->OnConnectionResumed( *con, ReturnCode::AWS_MQTT_CONNECT_ACCEPTED, true );
@@ -203,7 +203,7 @@ TEST_F( AwsIotConnectivityModuleTest, connectFailsServerUnavailableWithDelay )
     // We want to see exactly one call to disconnect
     EXPECT_CALL( *con, Disconnect() ).Times( 1 ).WillRepeatedly( Return( true ) );
 
-    ASSERT_FALSE( m->connect( "key", "cert", "endpoint", "clientIdTest", bootstrap ) );
+    ASSERT_FALSE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
     std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
     killAllThread = true;
     completeThread.join();
@@ -237,7 +237,7 @@ TEST_F( AwsIotConnectivityModuleTest, subscribeSuccessfully )
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
     AwsIotChannel c( m.get(), nullptr );
 
-    ASSERT_TRUE( m->connect( "key", "cert", "endpoint", "clientIdTest", bootstrap ) );
+    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
     c.setTopic( "topic" );
     EXPECT_CALL( *con, Subscribe( _, _, _, _ ) )
         .Times( 1 )
@@ -290,7 +290,7 @@ TEST_F( AwsIotConnectivityModuleTest, sendWrongInput )
     auto con = setupValidConnection();
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
     AwsIotChannel c( m.get(), nullptr );
-    ASSERT_TRUE( m->connect( "key", "cert", "endpoint", "clientIdTest", bootstrap ) );
+    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
     c.setTopic( "topic" );
     ASSERT_EQ( c.sendBuffer( nullptr, 10 ), ConnectivityError::WrongInputData );
     con->OnDisconnect( *con );
@@ -303,7 +303,7 @@ TEST_F( AwsIotConnectivityModuleTest, sendTooBig )
     auto con = setupValidConnection();
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
     AwsIotChannel c( m.get(), nullptr );
-    ASSERT_TRUE( m->connect( "key", "cert", "endpoint", "clientIdTest", bootstrap ) );
+    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
     c.setTopic( "topic" );
     std::vector<uint8_t> a;
     a.resize( c.getMaxSendSize() + 1U );
@@ -320,7 +320,7 @@ TEST_F( AwsIotConnectivityModuleTest, sendMultiple )
     auto con = setupValidConnection();
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
     AwsIotChannel c( m.get(), nullptr );
-    ASSERT_TRUE( m->connect( "key", "cert", "endpoint", "clientIdTest", bootstrap ) );
+    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
     std::uint8_t input[] = { 0xca, 0xfe };
     c.setTopic( "topic" );
     std::list<MqttConnection::OnOperationCompleteHandler> completeHandlers;
@@ -354,6 +354,8 @@ TEST_F( AwsIotConnectivityModuleTest, sendMultiple )
     completeHandlers.front().operator()( *con, 0, 0 );
     completeHandlers.pop_front();
 
+    ASSERT_EQ( c.getPayloadCountSent(), 2 );
+
     con->OnDisconnect( *con );
     c.invalidateConnection();
 }
@@ -364,7 +366,7 @@ TEST_F( AwsIotConnectivityModuleTest, sdkRAMExceeded )
     auto con = setupValidConnection();
 
     std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    ASSERT_TRUE( m->connect( "key", "cert", "endpoint", "clientIdTest", bootstrap ) );
+    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
 
     auto &memMgr = AwsSDKMemoryManager::getInstance();
     void *alloc1 = memMgr.AllocateMemory( 600000000, alignof( std::size_t ) );
@@ -438,7 +440,7 @@ TEST_F( AwsIotConnectivityModuleTest, asyncConnect )
 
     EXPECT_CALL( *con, Connect( _, _, _, _ ) ).Times( 1 ).WillOnce( Return( true ) );
 
-    ASSERT_TRUE( m->connect( "key", "cert", "endpoint", "clientIdTest", bootstrap, true ) );
+    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap, true ) );
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) ); // first attempt should come immediately
 

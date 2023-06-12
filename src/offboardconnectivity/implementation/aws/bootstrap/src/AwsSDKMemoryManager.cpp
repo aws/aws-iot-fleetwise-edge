@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "AwsSDKMemoryManager.h"
+#include "TraceModule.h"
 #include <aws/core/utils/memory/AWSMemory.h>
 #include <cstddef>
 
@@ -11,9 +12,10 @@ namespace IoTFleetWise
 {
 namespace OffboardConnectivityAwsIot
 {
-
 namespace
 {
+
+using namespace Aws::IoTFleetWise::Platform::Linux;
 using Byte = unsigned char;
 
 // offset to store value of memory size allocated
@@ -64,6 +66,7 @@ AwsSDKMemoryManager::AllocateMemory( std::size_t blockSize, std::size_t alignmen
     // store the allocated memory's size
     *( static_cast<std::size_t *>( pMem ) ) = realSize;
     mMemoryUsedAndReserved += realSize;
+    TraceModule::get().setVariable( TraceVariable::MQTT_HEAP_USAGE, mMemoryUsedAndReserved );
 
     // return a pointer to the block offset from the size storage location
     return static_cast<Byte *>( pMem ) + ALIGN_OFFSET;
@@ -87,12 +90,14 @@ AwsSDKMemoryManager::FreeMemory( void *memoryPtr )
 
     // update the stats
     mMemoryUsedAndReserved -= realSize;
+    TraceModule::get().setVariable( TraceVariable::MQTT_HEAP_USAGE, mMemoryUsedAndReserved );
 }
 
 std::size_t
 AwsSDKMemoryManager::reserveMemory( std::size_t bytes )
 {
     mMemoryUsedAndReserved += ( bytes + ALIGN_OFFSET );
+    TraceModule::get().setVariable( TraceVariable::MQTT_HEAP_USAGE, mMemoryUsedAndReserved );
     return mMemoryUsedAndReserved;
 }
 
@@ -100,6 +105,7 @@ std::size_t
 AwsSDKMemoryManager::releaseReservedMemory( std::size_t bytes )
 {
     mMemoryUsedAndReserved -= ( bytes + ALIGN_OFFSET );
+    TraceModule::get().setVariable( TraceVariable::MQTT_HEAP_USAGE, mMemoryUsedAndReserved );
     return mMemoryUsedAndReserved;
 }
 

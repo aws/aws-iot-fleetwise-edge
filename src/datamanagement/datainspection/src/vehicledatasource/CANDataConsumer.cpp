@@ -6,6 +6,7 @@
 #include "CANDecoder.h"
 #include "LoggingModule.h"
 #include "TraceModule.h"
+#include <linux/can.h>
 
 namespace Aws
 {
@@ -14,22 +15,19 @@ namespace IoTFleetWise
 namespace DataInspection
 {
 
-CANDataConsumer::CANDataConsumer( CANChannelNumericID channelId,
-                                  SignalBufferPtr signalBufferPtr,
-                                  CANBufferPtr canBufferPtr )
+CANDataConsumer::CANDataConsumer( SignalBufferPtr signalBufferPtr, CANBufferPtr canBufferPtr )
     : mCANBufferPtr{ std::move( canBufferPtr ) }
     , mSignalBufferPtr{ std::move( signalBufferPtr ) }
-    , mChannelId{ channelId }
 {
-    FWE_LOG_TRACE( "Init Network channel consumer with id: " + std::to_string( channelId ) );
 }
 
 bool
-CANDataConsumer::findDecoderMethod( uint32_t &messageId,
+CANDataConsumer::findDecoderMethod( CANChannelNumericID channelId,
+                                    uint32_t &messageId,
                                     const CANDecoderDictionary::CANMsgDecoderMethodType &decoderMethod,
-                                    CANMessageDecoderMethod &currentMessageDecoderMethod ) const
+                                    CANMessageDecoderMethod &currentMessageDecoderMethod )
 {
-    auto outerMapIt = decoderMethod.find( mChannelId );
+    auto outerMapIt = decoderMethod.find( channelId );
     if ( outerMapIt != decoderMethod.cend() )
     {
         auto it = outerMapIt->second.find( messageId );
@@ -52,8 +50,11 @@ CANDataConsumer::findDecoderMethod( uint32_t &messageId,
 }
 
 void
-CANDataConsumer::processMessage( std::shared_ptr<const CANDecoderDictionary> &dictionary,
-                                 const struct canfd_frame &message,
+CANDataConsumer::processMessage( CANChannelNumericID channelId,
+                                 std::shared_ptr<const CANDecoderDictionary> &dictionary,
+                                 uint32_t messageId,
+                                 const uint8_t *data,
+                                 size_t dataLength,
                                  Timestamp timestamp )
 {
     // Skip if the dictionary was invalidated during message processing:
@@ -62,9 +63,9 @@ CANDataConsumer::processMessage( std::shared_ptr<const CANDecoderDictionary> &di
         return;
     }
     TraceSection traceSection =
-        ( ( mChannelId < static_cast<CANChannelNumericID>( toUType( TraceSection::CAN_DECODER_CYCLE_19 ) -
-                                                           toUType( TraceSection::CAN_DECODER_CYCLE_0 ) ) )
-              ? static_cast<TraceSection>( mChannelId + toUType( TraceSection::CAN_DECODER_CYCLE_0 ) )
+        ( ( channelId < static_cast<CANChannelNumericID>( toUType( TraceSection::CAN_DECODER_CYCLE_19 ) -
+                                                          toUType( TraceSection::CAN_DECODER_CYCLE_0 ) ) )
+              ? static_cast<TraceSection>( channelId + toUType( TraceSection::CAN_DECODER_CYCLE_0 ) )
               : TraceSection::CAN_DECODER_CYCLE_19 );
     TraceModule::get().sectionBegin( traceSection );
     // get decoderMethod from the decoder dictionary
@@ -72,14 +73,13 @@ CANDataConsumer::processMessage( std::shared_ptr<const CANDecoderDictionary> &di
     // a set of signalID specifying which signal to collect
     const auto &signalIDsToCollect = dictionary->signalIDsToCollect;
     // check if this CAN message ID on this CAN Channel has the decoder method
-    uint32_t messageId = message.can_id;
     CANMessageDecoderMethod currentMessageDecoderMethod;
     // The value of messageId may be changed by the findDecoderMethod function. This is a
     // workaround as the cloud as of now does not send extended id messages.
     // If the decoder method for this message is not found in
     // decoderMethod dictionary, we check for the same id without the MSB set.
     // The message id which has a decoderMethod gets passed into messageId
-    if ( findDecoderMethod( messageId, decoderMethod, currentMessageDecoderMethod ) )
+    if ( findDecoderMethod( channelId, messageId, decoderMethod, currentMessageDecoderMethod ) )
     {
         // format to be used for decoding
         const auto &format = currentMessageDecoderMethod.format;
@@ -92,11 +92,11 @@ CANDataConsumer::processMessage( std::shared_ptr<const CANDecoderDictionary> &di
             // prepare the raw CAN Frame
             struct CollectedCanRawFrame canRawFrame;
             canRawFrame.frameID = messageId;
-            canRawFrame.channelId = mChannelId;
+            canRawFrame.channelId = channelId;
             canRawFrame.receiveTime = timestamp;
             // CollectedCanRawFrame receive up to 64 CAN Raw Bytes
-            canRawFrame.size = std::min( static_cast<uint8_t>( message.len ), MAX_CAN_FRAME_BYTE_SIZE );
-            std::copy( message.data, message.data + canRawFrame.size, canRawFrame.data.begin() );
+            canRawFrame.size = std::min( static_cast<uint8_t>( dataLength ), MAX_CAN_FRAME_BYTE_SIZE );
+            std::copy( data, data + canRawFrame.size, canRawFrame.data.begin() );
             // Push raw CAN Frame to the Buffer for next stage to consume
             // Note buffer is lock_free buffer and multiple Vehicle Data Source Instance could push
             // data to it.
@@ -120,8 +120,7 @@ CANDataConsumer::processMessage( std::shared_ptr<const CANDecoderDictionary> &di
             if ( format.isValid() )
             {
                 std::vector<CANDecodedSignal> decodedSignals;
-                if ( CANDecoder::decodeCANMessage(
-                         message.data, message.len, format, signalIDsToCollect, decodedSignals ) )
+                if ( CANDecoder::decodeCANMessage( data, dataLength, format, signalIDsToCollect, decodedSignals ) )
                 {
                     for ( auto const &signal : decodedSignals )
                     {
@@ -178,7 +177,7 @@ CANDataConsumer::processMessage( std::shared_ptr<const CANDecoderDictionary> &di
                 // The CAN Message format is not valid, report as warning
                 FWE_LOG_WARN( "CANMessageFormat Invalid for format message id: " + std::to_string( format.mMessageID ) +
                               " can message id: " + std::to_string( messageId ) +
-                              " on CAN Channel Id: " + std::to_string( mChannelId ) );
+                              " on CAN Channel Id: " + std::to_string( channelId ) );
             }
             TraceModule::get().sectionEnd( traceSection );
         }

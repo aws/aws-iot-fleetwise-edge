@@ -29,8 +29,9 @@ change the parameters without recompiling AWS IoT FleetWise Edge:
 }
 ```
 
-When configure AWS IoT FleetWise use the `cmake` with the flag `-DFWE_EXAMPLE_IWAVEGPS=On` and then
-compile using `make` as usual.
+When configure AWS IoT FleetWise use the `cmake` with the flags
+`-DFWE_FEATURE_CUSTOM_DATA_SOURCE=On -DFWE_FEATURE_IWAVE_GPS=On` and then compile using `make` as
+usual.
 
 # Debug
 

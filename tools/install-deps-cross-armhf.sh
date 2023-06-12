@@ -40,9 +40,11 @@ if [ "${ARCH}" == "armhf" ]; then
     exit -1
 fi
 
-cp ${SCRIPT_DIR}/armhf.list /etc/apt/sources.list.d/
-dpkg --add-architecture armhf
 sed -i "s/deb http/deb [arch=${ARCH}] http/g" /etc/apt/sources.list
+cp /etc/apt/sources.list /etc/apt/sources.list.d/armhf.list
+sed -i "s/deb \[arch=${ARCH}\] http/deb [arch=armhf] http/g" /etc/apt/sources.list.d/armhf.list
+sed -i "s#archive.ubuntu.com/ubuntu#ports.ubuntu.com/ubuntu-ports#g" /etc/apt/sources.list.d/armhf.list
+dpkg --add-architecture armhf
 apt update
 apt install -y \
     build-essential \

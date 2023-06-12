@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <Preference
+        android:key="bluetooth_device"
+        android:title="@string/bluetooth_device" />
+
+    <Preference
+        android:key="vehicle_name"
+        android:title="@string/vehicle_configuration" />
+
+    <EditTextPreference
+            android:key="update_time"
+            android:inputType="number"
+            android:title="@string/update_time"
+            android:defaultValue="@string/default_update_time" />
+
+    <com.aws.iotfleetwise.StatusEditTextPreference
+        android:selectable="false"
+        android:key="debug_status"
+        android:title="@string/status" />
+</PreferenceScreen>

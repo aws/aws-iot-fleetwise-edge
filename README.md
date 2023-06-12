@@ -1,7 +1,8 @@
 # Reference Implementation for AWS IoT FleetWise
 
 > :information_source: To quickly get started, jump to the
-> [Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md) or the
+> [Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md), the
+> [Android Guide](./tools/android-app/README.md), or the
 > [Raspberry Pi Tutorial](./docs/rpi-tutorial/raspberry-pi-tutorial.md)
 
 AWS IoT FleetWise is a service that makes it easy for Automotive OEMs, Fleet operators, Independent
@@ -10,7 +11,7 @@ Agent Reference Implementation for AWS IoT FleetWise (the “Reference Implement
 libraries that can be run with simulated vehicle data on certain supported vehicle hardware or that
 can help you develop an Edge Agent to run an application on your vehicle that integrates with AWS
 IoT FleetWise. You can then use AWS IoT FleetWise's to process the collected data, gain insights
-about the vehicle's health and use the service’s visual interface to help diagnose and troubleshoot
+about the vehicle's health and use the service's visual interface to help diagnose and troubleshoot
 potential issues with your vehicles. Furthermore, AWS IoT FleetWise's capability to collect ECU data
 and store them on cloud databases enables you to utilize different AWS services (Analytics Services,
 ML, etc.) to develop novel use-cases that augment your existing vehicle functionality. In
@@ -70,7 +71,7 @@ where they can deploy their Edge Agent binary. Possible options include (if pres
    and
    [Renesas R-Car S4](https://www.renesas.com/jp/en/products/automotive-products/automotive-system-chips-socs/rtp8a779f0askb0sp2s-r-car-s4-reference-boardspider)
 2. Vehicle Head-Unit
-3. Vehicle’s High Performance Computer
+3. Vehicle's High Performance Computer
 4. Telecommunication Control Unit
 
 Edge Agent Reference Implementation for AWS IoT FleetWise was built and tested on 64-bit
@@ -109,13 +110,13 @@ See [SECURITY](./SECURITY.md) for more information
 Edge Agent Reference Implementation for AWS IoT FleetWise depends on the following open source
 libraries. Refer to the corresponding links for more information.
 
-- [AWS SDK for C++: v1.11.46](https://github.com/aws/aws-sdk-cpp)
+- [AWS SDK for C++: v1.11.94](https://github.com/aws/aws-sdk-cpp)
   - [Curl: v7.58.0](https://github.com/curl/curl)
   - [OpenSSL: v1.1.1](https://github.com/openssl/openssl)
   - [zlib: v1.2.11](https://github.com/madler/zlib)
 - [GoogleTest: v1.10.0](https://github.com/google/googletest)
 - [Google Benchmark: v1.6.1](https://github.com/google/benchmark)
-- [Protobuf: v3.21.7](https://github.com/protocolbuffers/protobuf)
+- [Protobuf: v3.21.12](https://github.com/protocolbuffers/protobuf)
 - [Boost: v1.71.1](https://github.com/boostorg/boost)
 - [JsonCpp: v1.9.5](https://github.com/open-source-parsers/jsoncpp)
 - [Snappy: v1.1.8](https://github.com/google/snappy)

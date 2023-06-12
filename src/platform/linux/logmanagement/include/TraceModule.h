@@ -68,7 +68,9 @@ enum class TraceVariable
     CE_TRIGGERS,
     OBD_POSSIBLE_PRECISION_LOSS_UINT64,
     OBD_POSSIBLE_PRECISION_LOSS_INT64,
-
+    MQTT_SIGNAL_MESSAGES_SENT_OUT, // Can be multiple messages per event id
+    MQTT_HEAP_USAGE,
+    SIGNAL_BUFFER_SIZE,
     // If you add more, remember to add the name to TraceModule::getVariableName
     TRACE_VARIABLE_SIZE
 };

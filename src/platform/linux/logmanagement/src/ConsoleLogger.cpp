@@ -6,6 +6,9 @@
 
 #include "ConsoleLogger.h"
 #include "ClockHandler.h"
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 #include <chrono>
 #include <cinttypes>
 #include <iomanip>
@@ -76,6 +79,25 @@ ConsoleLogger::ConsoleLogger()
     }
 }
 
+#ifdef __ANDROID__
+static android_LogPriority
+levelToAndroidLevel( LogLevel level )
+{
+    switch ( level )
+    {
+    case LogLevel::Error:
+        return ANDROID_LOG_ERROR;
+    case LogLevel::Warning:
+        return ANDROID_LOG_WARN;
+    case LogLevel::Trace:
+        return ANDROID_LOG_DEBUG;
+    case LogLevel::Info:
+    default:
+        return ANDROID_LOG_INFO;
+    }
+}
+#endif
+
 void
 ConsoleLogger::logMessage( LogLevel level,
                            const std::string &filename,
@@ -85,6 +107,17 @@ ConsoleLogger::logMessage( LogLevel level,
 {
     if ( level >= gSystemWideLogLevel )
     {
+#ifdef __ANDROID__
+        __android_log_print( levelToAndroidLevel( level ),
+                             "FWE",
+                             "[Thread: %" PRIu64 "] [%s] [%s:%i] [%s()]: [%s]",
+                             currentThreadId(),
+                             timeAsString().c_str(),
+                             filename.c_str(),
+                             lineNumber,
+                             function.c_str(),
+                             logEntry.c_str() );
+#else
         std::printf( "%s[Thread: %" PRIu64 "] [%s] [%s] [%s:%i] [%s()]: [%s]%s\n",
                      levelToColor( level ).c_str(),
                      currentThreadId(),
@@ -95,6 +128,7 @@ ConsoleLogger::logMessage( LogLevel level,
                      function.c_str(),
                      logEntry.c_str(),
                      mColorEnabled ? Color::reset.c_str() : "" );
+#endif
         forwardLog( level, filename, lineNumber, function, logEntry );
     }
 }

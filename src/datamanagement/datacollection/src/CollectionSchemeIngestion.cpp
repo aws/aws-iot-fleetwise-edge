@@ -38,7 +38,7 @@ bool
 CollectionSchemeIngestion::build()
 {
     // Check if Collection collectionScheme has an ID and a Decoder Manifest ID
-    if ( mProtoCollectionSchemeMessagePtr->campaign_arn().empty() ||
+    if ( mProtoCollectionSchemeMessagePtr->campaign_sync_id().empty() ||
          mProtoCollectionSchemeMessagePtr->decoder_manifest_sync_id().empty() )
     {
         FWE_LOG_ERROR( "CollectionScheme does not have ID or DM ID" );
@@ -53,7 +53,7 @@ CollectionSchemeIngestion::build()
         return false;
     }
 
-    FWE_LOG_TRACE( "Building CollectionScheme with ID: " + mProtoCollectionSchemeMessagePtr->campaign_arn() );
+    FWE_LOG_TRACE( "Building CollectionScheme with ID: " + mProtoCollectionSchemeMessagePtr->campaign_sync_id() );
 
     // Build Collected Signals
     for ( int signalIndex = 0; signalIndex < mProtoCollectionSchemeMessagePtr->signal_information_size();
@@ -168,7 +168,7 @@ CollectionSchemeIngestion::build()
         }
     }
 
-    FWE_LOG_INFO( "Successfully built CollectionScheme ID: " + mProtoCollectionSchemeMessagePtr->campaign_arn() );
+    FWE_LOG_INFO( "Successfully built CollectionScheme ID: " + mProtoCollectionSchemeMessagePtr->campaign_sync_id() );
 
     // Set ready flag to true
     mReady = true;
@@ -426,7 +426,7 @@ CollectionSchemeIngestion::getCollectionSchemeID() const
         return INVALID_COLLECTION_SCHEME_ID;
     }
 
-    return mProtoCollectionSchemeMessagePtr->campaign_arn();
+    return mProtoCollectionSchemeMessagePtr->campaign_sync_id();
 }
 
 const std::string &
