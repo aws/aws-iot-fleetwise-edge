@@ -146,6 +146,12 @@ public:
         mSchemaListenerPtr = collectionSchemeIngestionListenerPtr;
     }
 
+    /**
+     * @brief Returns the current list of collection scheme ARNs
+     * @return List of collection scheme ARNs
+     */
+    std::vector<std::string> getCollectionSchemeArns();
+
 private:
     using ThreadListeners<IActiveDecoderDictionaryListener>::notifyListeners;
     using ThreadListeners<IActiveConditionProcessor>::notifyListeners;

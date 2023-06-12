@@ -1,0 +1,22 @@
+[
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle.CurrentLocation",
+      "description": "CurrentLocation"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.CurrentLocation.Latitude",
+      "description": "Latitude"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.CurrentLocation.Longitude",
+      "description": "Longitude"
+    }
+  }
+]

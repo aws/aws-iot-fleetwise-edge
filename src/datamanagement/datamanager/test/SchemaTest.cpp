@@ -101,14 +101,14 @@ public:
         ASSERT_TRUE( sentCheckin.ParseFromArray( buf, (int)size ) );
 
         // Make sure the size of the documents is the same
-        ASSERT_EQ( sentCheckin.document_arns_size(), sampleDocList.size() );
+        ASSERT_EQ( sentCheckin.document_sync_ids_size(), sampleDocList.size() );
 
         // Iterate over all the documents found in the checkin
-        for ( int i = 0; i < sentCheckin.document_arns_size(); i++ )
+        for ( int i = 0; i < sentCheckin.document_sync_ids_size(); i++ )
         {
-            ASSERT_GE( documentSet.count( sentCheckin.document_arns( i ) ), 1 );
+            ASSERT_GE( documentSet.count( sentCheckin.document_sync_ids( i ) ), 1 );
             // Erase the entry from the multiset
-            documentSet.erase( documentSet.find( sentCheckin.document_arns( i ) ) );
+            documentSet.erase( documentSet.find( sentCheckin.document_sync_ids( i ) ) );
         }
 
         // Make sure we have erased all the elements from our set
@@ -404,9 +404,9 @@ TEST( SchemaTest, CollectionSchemeIngestionList )
     // Make a list of collectionScheme ARNs
     std::vector<std::string> collectionSchemeARNs = { "P1", "P2", "P3" };
 
-    p1->set_campaign_arn( collectionSchemeARNs[0] );
-    p2->set_campaign_arn( collectionSchemeARNs[1] );
-    p3->set_campaign_arn( collectionSchemeARNs[2] );
+    p1->set_campaign_sync_id( collectionSchemeARNs[0] );
+    p2->set_campaign_sync_id( collectionSchemeARNs[1] );
+    p3->set_campaign_sync_id( collectionSchemeARNs[2] );
 
     // Serialize the protobuffer to a string to avoid malloc with cstyle arrays
     std::string protoSerializedBuffer;
@@ -434,7 +434,7 @@ TEST( SchemaTest, CollectionSchemeIngestionHeartBeat )
 {
     // Create a  collection scheme Proto Message
     CollectionSchemesMsg::CollectionScheme collectionSchemeTestMessage;
-    collectionSchemeTestMessage.set_campaign_arn( "arn:aws:iam::2.23606797749:user/Development/product_1234/*" );
+    collectionSchemeTestMessage.set_campaign_sync_id( "arn:aws:iam::2.23606797749:user/Development/product_1234/*" );
     collectionSchemeTestMessage.set_decoder_manifest_sync_id( "model_manifest_12" );
     collectionSchemeTestMessage.set_start_time_ms_epoch( 1621448160000 );
     collectionSchemeTestMessage.set_expiry_time_ms_epoch( 2621448160000 );
@@ -578,7 +578,7 @@ TEST( SchemaTest, SchemaCollectionEventBased )
 {
     // Create a  collection scheme Proto Message
     CollectionSchemesMsg::CollectionScheme collectionSchemeTestMessage;
-    collectionSchemeTestMessage.set_campaign_arn( "arn:aws:iam::2.23606797749:user/Development/product_1235/*" );
+    collectionSchemeTestMessage.set_campaign_sync_id( "arn:aws:iam::2.23606797749:user/Development/product_1235/*" );
     collectionSchemeTestMessage.set_decoder_manifest_sync_id( "model_manifest_13" );
     collectionSchemeTestMessage.set_start_time_ms_epoch( 162144816000 );
     collectionSchemeTestMessage.set_expiry_time_ms_epoch( 262144816000 );
@@ -820,7 +820,7 @@ TEST( SchemaTest, SchemaGeohashFunctionNode )
 {
     // Create a  collection scheme Proto Message
     CollectionSchemesMsg::CollectionScheme collectionSchemeTestMessage;
-    collectionSchemeTestMessage.set_campaign_arn( "arn:aws:iam::2.23606797749:user/Development/product_1235/*" );
+    collectionSchemeTestMessage.set_campaign_sync_id( "arn:aws:iam::2.23606797749:user/Development/product_1235/*" );
     collectionSchemeTestMessage.set_decoder_manifest_sync_id( "model_manifest_13" );
     collectionSchemeTestMessage.set_start_time_ms_epoch( 162144816000 );
     collectionSchemeTestMessage.set_expiry_time_ms_epoch( 262144816000 );

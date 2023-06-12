@@ -20,13 +20,14 @@ namespace IoTFleetWise
 namespace DataManagement
 {
 
-OBDDataDecoder::OBDDataDecoder()
+OBDDataDecoder::OBDDataDecoder( std::shared_ptr<OBDDecoderDictionary> &decoderDictionary )
+    : mDecoderDictionary{ decoderDictionary }
 {
     mTimer.reset();
 }
 
 bool
-OBDDataDecoder::decodeSupportedPIDs( const SID &sid,
+OBDDataDecoder::decodeSupportedPIDs( const SID sid,
                                      const std::vector<uint8_t> &inputData,
                                      SupportedPIDs &supportedPIDs )
 {
@@ -96,15 +97,8 @@ OBDDataDecoder::decodeSupportedPIDs( const SID &sid,
     return !supportedPIDs.empty();
 }
 
-void
-OBDDataDecoder::setDecoderDictionary( ConstOBDDecoderDictionaryConstPtr &dictionary )
-{
-    // OBDDataDecoder is running in one thread, hence we don't need mutext to prevent race condition
-    mDecoderDictionaryConstPtr = dictionary;
-}
-
 bool
-OBDDataDecoder::decodeEmissionPIDs( const SID &sid,
+OBDDataDecoder::decodeEmissionPIDs( const SID sid,
                                     const std::vector<PID> &pids,
                                     const std::vector<uint8_t> &inputData,
                                     EmissionInfo &info )
@@ -119,7 +113,7 @@ OBDDataDecoder::decodeEmissionPIDs( const SID &sid,
         FWE_LOG_WARN( "Invalid response to PID request" );
         return false;
     }
-    if ( mDecoderDictionaryConstPtr == nullptr )
+    if ( mDecoderDictionary == nullptr )
     {
         FWE_LOG_WARN( "Invalid Decoder Dictionary" );
         return false;
@@ -140,11 +134,11 @@ OBDDataDecoder::decodeEmissionPIDs( const SID &sid,
         auto pid = inputData[byteCounter];
         byteCounter++;
         // first check whether the decoder dictionary contains this PID
-        if ( mDecoderDictionaryConstPtr->find( pid ) != mDecoderDictionaryConstPtr->end() )
+        if ( mDecoderDictionary->find( pid ) != mDecoderDictionary->end() )
         {
             // The expected number of bytes returned from PID
-            auto expectedResponseLength = mDecoderDictionaryConstPtr->at( pid ).mSizeInBytes;
-            auto formulas = mDecoderDictionaryConstPtr->at( pid ).mSignals;
+            auto expectedResponseLength = mDecoderDictionary->at( pid ).mSizeInBytes;
+            auto formulas = mDecoderDictionary->at( pid ).mSignals;
             // first check whether we have received enough bytes for this PID
             if ( byteCounter + expectedResponseLength <= inputData.size() )
             {
@@ -173,7 +167,7 @@ OBDDataDecoder::decodeEmissionPIDs( const SID &sid,
 }
 
 bool
-OBDDataDecoder::decodeDTCs( const SID &sid, const std::vector<uint8_t> &inputData, DTCInfo &info )
+OBDDataDecoder::decodeDTCs( const SID sid, const std::vector<uint8_t> &inputData, DTCInfo &info )
 {
     // First look at whether we received a positive response
     // The positive response can be identified by 0x40 + SID.
@@ -292,10 +286,10 @@ OBDDataDecoder::isPIDResponseValid( const std::vector<PID> &pids, const std::vec
             return false;
         }
         *foundPid = INVALID_PID; // for every time a PID is requested only one response is expected
-        if ( mDecoderDictionaryConstPtr->find( pid ) != mDecoderDictionaryConstPtr->end() )
+        if ( mDecoderDictionary->find( pid ) != mDecoderDictionary->end() )
         {
             // Move Index into the next PID
-            responseByteIndex += ( mDecoderDictionaryConstPtr->at( pid ).mSizeInBytes + 1 );
+            responseByteIndex += ( mDecoderDictionary->at( pid ).mSizeInBytes + 1 );
         }
         else
         {
@@ -427,10 +421,10 @@ OBDDataDecoder::isFormulaValid( PID pid, const CANSignalFormat &formula )
     // 2. Last Bit Position (first bit + sizeInBits) has to be less than or equal to last bit position of PID response
     // length
     // 3. If mSizeInBits are greater or equal than 8, both mSizeInBits and first bit position has to be multiple of 8
-    if ( ( mDecoderDictionaryConstPtr->find( pid ) != mDecoderDictionaryConstPtr->end() ) &&
-         ( formula.mFirstBitPosition < mDecoderDictionaryConstPtr->at( pid ).mSizeInBytes * BYTE_SIZE ) &&
+    if ( ( mDecoderDictionary->find( pid ) != mDecoderDictionary->end() ) &&
+         ( formula.mFirstBitPosition < mDecoderDictionary->at( pid ).mSizeInBytes * BYTE_SIZE ) &&
          ( formula.mSizeInBits + formula.mFirstBitPosition <=
-           mDecoderDictionaryConstPtr->at( pid ).mSizeInBytes * BYTE_SIZE ) &&
+           mDecoderDictionary->at( pid ).mSizeInBytes * BYTE_SIZE ) &&
          ( ( formula.mSizeInBits < 8 ) ||
            ( ( ( formula.mSizeInBits & 0x7 ) == 0 ) && ( ( formula.mFirstBitPosition & 0x7 ) == 0 ) ) ) )
     {

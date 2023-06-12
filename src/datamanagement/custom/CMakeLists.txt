@@ -4,9 +4,15 @@ set(libraryTargetName iotfleetwise.customdata)
 # The alias name is what other targets will use as a dependency
 set(libraryAliasName IoTFleetWise::CustomDataSource)
 
+if(FWE_FEATURE_IWAVE_GPS)
+  set(EXTRA_SOURCE_FILES ${EXTRA_SOURCE_FILES} example/iwavegps/src/IWaveGpsSource.cpp)
+endif()
+if(FWE_FEATURE_EXTERNAL_GPS)
+  set(EXTRA_SOURCE_FILES ${EXTRA_SOURCE_FILES} example/externalgps/src/ExternalGpsSource.cpp)
+endif()
 set(SRCS
   generic/src/CustomDataSource.cpp
-  example/iwavegps/src/IWaveGpsSource.cpp
+  ${EXTRA_SOURCE_FILES}
 )
 
 add_library(
@@ -15,7 +21,16 @@ add_library(
   ${SRCS}
 )
 
-target_include_directories(${libraryTargetName} PUBLIC generic/include example/iwavegps/include)
+if(FWE_FEATURE_IWAVE_GPS)
+  set(EXTRA_INCLUDE_DIRS ${EXTRA_INCLUDE_DIRS} example/iwavegps/include)
+endif()
+if(FWE_FEATURE_EXTERNAL_GPS)
+  set(EXTRA_INCLUDE_DIRS ${EXTRA_INCLUDE_DIRS} example/externalgps/include)
+endif()
+target_include_directories(${libraryTargetName} PUBLIC
+  generic/include
+  ${EXTRA_INCLUDE_DIRS}
+)
 
 target_link_libraries(
   ${libraryTargetName}
@@ -34,10 +49,16 @@ add_library(${libraryAliasName} ALIAS ${libraryTargetName})
 
 install(TARGETS ${libraryTargetName} DESTINATION lib)
 
+if(FWE_FEATURE_IWAVE_GPS)
+  set(EXTRA_INSTALL_FILES ${EXTRA_INSTALL_FILES} example/iwavegps/include/IWaveGpsSource.h)
+endif()
+if(FWE_FEATURE_EXTERNAL_GPS)
+  set(EXTRA_INSTALL_FILES ${EXTRA_INSTALL_FILES} example/externalgps/include/ExternalGpsSource.h)
+endif()
 install(
   FILES
   generic/include/CustomDataSource.h
-  example/iwavegps/include/IWaveGpsSource.h
+  ${EXTRA_INSTALL_FILES}
   DESTINATION include
 )
 
@@ -57,11 +78,16 @@ if(${BUILD_TESTING})
   NAMES
     gmock_main)
 
-
+  if(FWE_FEATURE_IWAVE_GPS)
+    set(EXTRA_TEST_FILES ${EXTRA_TEST_FILES} example/iwavegps/test/IWaveGpsSourceTest.cpp)
+  endif()
+  if(FWE_FEATURE_EXTERNAL_GPS)
+    set(EXTRA_TEST_FILES ${EXTRA_TEST_FILES} example/externalgps/test/ExternalGpsSourceTest.cpp)
+  endif()
   set(
     testSources
-    example/iwavegps/test/IWaveGpsSourceTest.cpp
     generic/test/CustomDataSourceTest.cpp
+    ${EXTRA_TEST_FILES}
   )
   # Add the executable targets
   foreach(testSource ${testSources})
@@ -85,7 +111,7 @@ if(${BUILD_TESTING})
     )
 
     add_test(NAME ${testName} COMMAND ${testName} --gtest_output=xml:report-${testName}.xml)
-    add_valgrind_test(${testName} ${CMAKE_CURRENT_SOURCE_DIR}/example/iwavegps/test/valgrind.supp)
+    add_valgrind_test(${testName} ${CMAKE_CURRENT_SOURCE_DIR}/generic/test/valgrind.supp)
     install(TARGETS ${testName} RUNTIME DESTINATION bin/tests)
 
   endforeach()

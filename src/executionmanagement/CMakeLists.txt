@@ -24,22 +24,36 @@ target_link_libraries(
   IoTFleetWise::DataDecoding
   IoTFleetWise::Platform::Linux
   IoTFleetWise::OffboardConnectivityAwsIot
-  $<$<BOOL:${FWE_EXAMPLE_IWAVEGPS}>:IoTFleetWise::CustomDataSource>
+  $<$<BOOL:${FWE_FEATURE_CUSTOM_DATA_SOURCE}>:IoTFleetWise::CustomDataSource>
 )
 
 add_library(${libraryAliasName} ALIAS ${libraryTargetName})
 
 ### AWS IoT FleetWise Edge Executable ###
 
-add_executable(aws-iot-fleetwise-edge src/main.cpp)
+if(FWE_BUILD_EXECUTABLE)
+  add_executable(aws-iot-fleetwise-edge src/main.cpp)
+  target_link_libraries(
+    aws-iot-fleetwise-edge
+    ${libraryTargetName}
+    IoTFleetWise::Platform::Linux
+    -Xlinker
+    -Map=aws-iot-fleetwise-edge.map
+  )
+endif()
 
-target_link_libraries(
-  aws-iot-fleetwise-edge
-  ${libraryTargetName}
-  IoTFleetWise::Platform::Linux
-  -Xlinker
-  -Map=aws-iot-fleetwise-edge.map
-)
+if(FWE_BUILD_ANDROID_SHARED_LIBRARY)
+  add_library(aws-iot-fleetwise-edge SHARED src/android_shared_library.cpp)
+  target_link_libraries(
+    aws-iot-fleetwise-edge
+    ${libraryTargetName}
+    IoTFleetWise::Platform::Linux
+    log
+    android
+    -Xlinker
+    -Map=aws-iot-fleetwise-edge.map
+  )
+endif()
 
 ### Version ###
 
@@ -80,6 +94,9 @@ if(${BUILD_TESTING})
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/em-example-config-corrupt.json
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/em-example-config-inline-creds.json
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
   set(

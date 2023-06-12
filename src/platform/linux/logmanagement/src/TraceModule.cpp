@@ -145,6 +145,12 @@ TraceModule::getVariableName( TraceVariable variable )
         return "ObdPrecU64_id60";
     case TraceVariable::OBD_POSSIBLE_PRECISION_LOSS_INT64:
         return "ObdPrecI64_id61";
+    case TraceVariable::MQTT_SIGNAL_MESSAGES_SENT_OUT: // Can be multiple messages per event id
+        return "MqttSignalMessages";
+    case TraceVariable::MQTT_HEAP_USAGE:
+        return "MqttHeapSize";
+    case TraceVariable::SIGNAL_BUFFER_SIZE:
+        return "SigBufSize";
     default:
         return nullptr;
     }

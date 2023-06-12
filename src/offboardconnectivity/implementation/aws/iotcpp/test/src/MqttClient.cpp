@@ -45,6 +45,13 @@ Aws::Iot::MqttClientConnectionConfigBuilder::WithEndpoint( const Aws::Crt::Strin
     return *this;
 }
 
+Aws::Iot::MqttClientConnectionConfigBuilder &
+Aws::Iot::MqttClientConnectionConfigBuilder::WithCertificateAuthority( const Crt::ByteCursor &rootCA )
+{
+    getConfBuilderMock()->WithCertificateAuthority( rootCA );
+    return *this;
+}
+
 Aws::Iot::MqttClientConnectionConfig
 Aws::Iot::MqttClientConnectionConfigBuilder::Build() noexcept
 {

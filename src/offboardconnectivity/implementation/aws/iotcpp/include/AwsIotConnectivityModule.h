@@ -57,6 +57,7 @@ public:
      *                      Iot Thing.
      * @param certificate The certificate .crt.txt file provided during setup
      *                      of the AWS Iot Thing.
+     * @param rootCA The Root CA for the certificate
      * @param endpointUrl the endpoint URL normally in the format like
      *                          "[YOUR-THING]-ats.iot.us-west-2.amazonaws.com"
      * @param clientId the id that is used to identify this connection instance
@@ -68,6 +69,7 @@ public:
      */
     bool connect( const std::string &privateKey,
                   const std::string &certificate,
+                  const std::string &rootCA,
                   const std::string &endpointUrl,
                   const std::string &clientId,
                   Aws::Crt::Io::ClientBootstrap *clientBootstrap,
@@ -128,6 +130,7 @@ private:
     Aws::Crt::ByteCursor mCertificate{ 0, nullptr };
     Aws::Crt::String mEndpointUrl;
     Aws::Crt::ByteCursor mPrivateKey{ 0, nullptr };
+    Aws::Crt::ByteCursor mRootCA{ 0, nullptr };
     Aws::Crt::String mClientId;
     std::shared_ptr<Aws::Crt::Mqtt::MqttConnection> mConnection;
     std::unique_ptr<Aws::Iot::MqttClient> mMqttClient;

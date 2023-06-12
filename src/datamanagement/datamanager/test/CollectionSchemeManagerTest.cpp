@@ -218,3 +218,42 @@ TEST( CollectionSchemeManagerTest, MockProducerTest )
 
     WAIT_ASSERT_TRUE( test.disconnect() );
 }
+
+TEST( CollectionSchemeManagerTest, getCollectionSchemeArns )
+{
+    CANInterfaceIDTranslator canIDTranslator;
+    CollectionSchemeManagerTest test;
+    test.init( 50, nullptr, canIDTranslator );
+    test.myRegisterListener();
+    ASSERT_TRUE( test.connect() );
+
+    ASSERT_EQ( test.getCollectionSchemeArns(), std::vector<std::string>() );
+
+    /* build DMs */
+    IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    std::vector<ICollectionSchemePtr> testList1;
+
+    /* build collectionScheme list1 */
+    std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
+    /* mock currTime, and 3 collectionSchemes */
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startTime = currTime.systemTimeMs + SECOND_TO_MILLISECOND( 1 );
+    Timestamp stopTime = startTime + SECOND_TO_MILLISECOND( 25 );
+    ICollectionSchemePtr collectionScheme =
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startTime, stopTime );
+    testList1.emplace_back( collectionScheme );
+
+    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+    /* create ICollectionSchemeList */
+    test.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList1 );
+    /* sending lists and dm to PM */
+    test.mDmTest = testDM1;
+    test.myInvokeDecoderManifest();
+    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+    test.myInvokeCollectionScheme();
+
+    WAIT_ASSERT_EQ( test.getCollectionSchemeArns(), std::vector<std::string>( { "COLLECTIONSCHEME1" } ) );
+
+    /* stopping main thread servicing a collectionScheme ending in 25 seconds */
+    WAIT_ASSERT_TRUE( test.disconnect() );
+}

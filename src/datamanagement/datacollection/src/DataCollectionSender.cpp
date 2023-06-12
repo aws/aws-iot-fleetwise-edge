@@ -161,8 +161,9 @@ DataCollectionSender::transmit()
     else
     {
         TraceModule::get().sectionEnd( TraceSection::COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA );
+        TraceModule::get().incrementVariable( TraceVariable::MQTT_SIGNAL_MESSAGES_SENT_OUT );
         FWE_LOG_INFO( "A Payload of size: " + std::to_string( payloadData.length() ) +
-                      " bytes has been unloaded to AWS IoT Core" );
+                      " bytes has been uploaded to AWS IoT Core" );
     }
     return ret;
 }

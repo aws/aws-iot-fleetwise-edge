@@ -31,7 +31,7 @@ Amazon.
 
 - A Raspberry Pi, version 3 or later, (64-bit)
 - An SD-card, with a minimum of 4 GB storage
-- A CAN ‘Hat’ for Raspberry Pi with an MCP2515 CAN controller such as the
+- A CAN 'Hat' for Raspberry Pi with an MCP2515 CAN controller such as the
   [XYGStudy 2-Channel Isolated CAN Bus Expansion HAT](https://www.amazon.com/Raspberry-2-Channel-SN65HVD230-Protection-XYGStudy/dp/B087PWBFV8?th=1),
   [Coolwell Waveshare 2-Channel Isolated CAN Bus Expansion Hat](https://www.amazon.de/-/en/Waveshare-CAN-HAT-SN65HVD230-Protection/dp/B087PWNMM8/?th=1),
   or the
@@ -51,7 +51,7 @@ Amazon.
 1. Insert the SD card into your Raspberry Pi, attach the CAN hat, connect the Raspberry Pi to your
    internet router via an Ethernet cable, and turn on the power.
 1. SSH to Raspberry Pi, using the initial password `ubuntu`: (Note: If connecting to the hostname
-   `ubuntu` doesn’t work, find the IP address from your internet router instead.)
+   `ubuntu` doesn't work, find the IP address from your internet router instead.)
    ```bash
    ssh ubuntu@ubuntu
    ```

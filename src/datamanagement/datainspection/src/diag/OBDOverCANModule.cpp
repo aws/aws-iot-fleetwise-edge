@@ -50,27 +50,15 @@ OBDOverCANModule::init( SignalBufferPtr signalBufferPtr,
                         uint32_t dtcRequestIntervalSeconds,
                         bool broadcastRequests )
 {
-    // Sanity check
-    if ( ( pidRequestIntervalSeconds == 0 ) && ( dtcRequestIntervalSeconds == 0 ) )
-    {
-        FWE_LOG_TRACE( "Both PID and DTC interval seconds are set to 0. OBD module will not be initialized" );
-        // We should not start the module if both intervals are zero
-        return false;
-    }
-
     if ( ( signalBufferPtr.get() == nullptr ) || ( activeDTCBufferPtr.get() == nullptr ) )
     {
         FWE_LOG_ERROR( "Received Buffer nullptr" );
         return false;
     }
-    else
-    {
-        mSignalBufferPtr = signalBufferPtr;
-        mActiveDTCBufferPtr = activeDTCBufferPtr;
-    }
 
-    // Init the OBD Decoder
-    mOBDDataDecoder = std::make_shared<OBDDataDecoder>();
+    mSignalBufferPtr = signalBufferPtr;
+    mActiveDTCBufferPtr = activeDTCBufferPtr;
+    mOBDDataDecoder = std::make_shared<OBDDataDecoder>( mDecoderDictionaryPtr );
     mGatewayCanInterfaceName = gatewayCanInterfaceName;
     mPIDRequestIntervalSeconds = pidRequestIntervalSeconds;
     mDTCRequestIntervalSeconds = dtcRequestIntervalSeconds;
@@ -202,7 +190,6 @@ OBDOverCANModule::doWork( void *data )
         {
             // A new decoder manifest arrived. Pass it over to the OBD decoder.
             std::lock_guard<std::mutex> lock( obdModule->mDecoderDictMutex );
-            obdModule->mOBDDataDecoder->setDecoderDictionary( obdModule->mDecoderDictionaryPtr );
             FWE_LOG_TRACE( "Decoder Manifest set on the OBD Decoder " );
             // Reset the atomic state
             obdModule->mDecoderManifestAvailable.store( false, std::memory_order_relaxed );
@@ -538,6 +525,11 @@ OBDOverCANModule::assignPIDsToECUs()
 bool
 OBDOverCANModule::connect()
 {
+    if ( ( mPIDRequestIntervalSeconds == 0 ) && ( mDTCRequestIntervalSeconds == 0 ) )
+    {
+        FWE_LOG_TRACE( "Both PID and DTC interval seconds are set to 0. Thread will not be started." );
+        return true;
+    }
     return start();
 }
 
@@ -562,6 +554,50 @@ OBDOverCANModule::isAlive()
         }
     }
     return true;
+}
+
+std::vector<PID>
+OBDOverCANModule::getExternalPIDsToRequest()
+{
+    std::lock_guard<std::mutex> lock( mDecoderDictMutex );
+    std::vector<PID> pids;
+    if ( mDecoderDictionaryPtr != nullptr )
+    {
+        for ( const auto &decoder : *mDecoderDictionaryPtr )
+        {
+            pids.push_back( decoder.first );
+        }
+    }
+    return pids;
+}
+
+void
+OBDOverCANModule::setExternalPIDResponse( PID pid, std::vector<uint8_t> response )
+{
+    std::lock_guard<std::mutex> lock( mDecoderDictMutex );
+    if ( mDecoderDictionaryPtr == nullptr )
+    {
+        return;
+    }
+    if ( mDecoderDictionaryPtr->find( pid ) == mDecoderDictionaryPtr->end() )
+    {
+        FWE_LOG_WARN( "Unexpected PID response: " + std::to_string( pid ) );
+        return;
+    }
+    EmissionInfo info;
+    std::vector<PID> pids = { pid };
+    size_t expectedResponseSize = 2 + mDecoderDictionaryPtr->at( pid ).mSizeInBytes;
+    if ( response.size() < expectedResponseSize )
+    {
+        FWE_LOG_WARN( "Unexpected PID response length: " + std::to_string( pid ) );
+        return;
+    }
+    response.resize( expectedResponseSize );
+    if ( !mOBDDataDecoder->decodeEmissionPIDs( SID::CURRENT_STATS, pids, response, info ) )
+    {
+        return;
+    }
+    OBDOverCANECU::pushPIDs( info, mClock->systemTimeSinceEpochMs(), mSignalBufferPtr, "" );
 }
 
 void

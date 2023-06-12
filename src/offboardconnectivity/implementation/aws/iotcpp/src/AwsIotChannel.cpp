@@ -225,6 +225,7 @@ AwsIotChannel::sendBuffer( const std::uint8_t *buf, size_t size, struct Collecti
             if ( ( packetId != 0U ) && ( errorCode == 0 ) )
             {
                 FWE_LOG_TRACE( "Operation on packetId  " + std::to_string( packetId ) + " Succeeded" );
+                mPayloadCountSent++;
             }
             else
             {

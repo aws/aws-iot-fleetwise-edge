@@ -410,6 +410,7 @@ CollectionInspectionEngine::preAllocateBuffers()
         // reserve the size like new[]
         buf.mBuffer.resize( buf.mSize );
     }
+    TraceModule::get().setVariable( TraceVariable::SIGNAL_BUFFER_SIZE, usedBytes );
     return true;
 }
 

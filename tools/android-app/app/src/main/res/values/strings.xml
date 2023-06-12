@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">AWS IoT FleetWise Edge</string>
+    <string name="configure_vehicle">Configure vehicle</string>
+    <string name="provisioning_help">Use your QR code scanner app to scan a provisioning QR code.\n\nAlternatively paste a provisioning link below:</string>
+    <string name="provisioning_link">Provisioning link</string>
+    <string name="bluetooth_device_list">Bluetooth device list</string>
+    <string name="vehicle_configuration">Vehicle configuration</string>
+    <string name="update_time">Update time [seconds]</string>
+    <string name="status">Status</string>
+    <string name="bluetooth_device">Bluetooth device</string>
+    <string name="default_update_time">5</string>
+    <string name="about">About</string>
+    <string name="open_source_licenses">Open source licenses:</string>
+    <string name="github_link">Learn more about AWS IoT FleetWise Edge at:\n<a href="https://github.com/aws/aws-iot-fleetwise-edge">https://github.com/aws/aws-iot-fleetwise-edge</a></string>
+</resources>

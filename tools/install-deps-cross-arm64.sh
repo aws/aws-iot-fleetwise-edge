@@ -40,9 +40,11 @@ if [ "${ARCH}" == "arm64" ]; then
     exit -1
 fi
 
-cp ${SCRIPT_DIR}/arm64.list /etc/apt/sources.list.d/
-dpkg --add-architecture arm64
 sed -i "s/deb http/deb [arch=${ARCH}] http/g" /etc/apt/sources.list
+cp /etc/apt/sources.list /etc/apt/sources.list.d/arm64.list
+sed -i "s/deb \[arch=${ARCH}\] http/deb [arch=arm64] http/g" /etc/apt/sources.list.d/arm64.list
+sed -i "s#archive.ubuntu.com/ubuntu#ports.ubuntu.com/ubuntu-ports#g" /etc/apt/sources.list.d/arm64.list
+dpkg --add-architecture arm64
 apt update
 apt install -y \
     build-essential \

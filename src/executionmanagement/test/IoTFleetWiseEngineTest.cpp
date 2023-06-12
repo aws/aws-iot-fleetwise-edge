@@ -43,7 +43,7 @@ protected:
         {
             GTEST_SKIP() << "Skipping test fixture due to unavailability of socket";
         }
-#ifdef FWE_EXAMPLE_IWAVEGPS
+#ifdef FWE_FEATURE_IWAVE_GPS
         std::ofstream iWaveGpsFile( "/tmp/engineTestIWaveGPSfile.txt" );
         iWaveGpsFile << "NO valid NMEA data";
         iWaveGpsFile.close();
@@ -55,6 +55,20 @@ TEST_F( IoTFleetWiseEngineTest, InitAndStartEngine )
 {
     Json::Value config;
     ASSERT_TRUE( IoTFleetWiseConfig::read( "em-example-config.json", config ) );
+    IoTFleetWiseEngine engine;
+
+    ASSERT_TRUE( engine.connect( config ) );
+
+    ASSERT_TRUE( engine.start() );
+    ASSERT_TRUE( engine.isAlive() );
+    ASSERT_TRUE( engine.disconnect() );
+    ASSERT_TRUE( engine.stop() );
+}
+
+TEST_F( IoTFleetWiseEngineTest, InitAndStartEngineInlineCreds )
+{
+    Json::Value config;
+    ASSERT_TRUE( IoTFleetWiseConfig::read( "em-example-config-inline-creds.json", config ) );
     IoTFleetWiseEngine engine;
 
     ASSERT_TRUE( engine.connect( config ) );

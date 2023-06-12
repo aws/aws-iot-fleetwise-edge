@@ -521,6 +521,21 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
     return ret;
 }
 
+std::vector<std::string>
+CollectionSchemeManager::getCollectionSchemeArns()
+{
+    std::lock_guard<std::mutex> lock( mSchemaUpdateMutex );
+    std::vector<std::string> collectionSchemeArns;
+    if ( mCollectionSchemeList != nullptr )
+    {
+        for ( auto &collectionScheme : mCollectionSchemeList->getCollectionSchemes() )
+        {
+            collectionSchemeArns.push_back( collectionScheme->getCollectionSchemeID() );
+        }
+    }
+    return collectionSchemeArns;
+}
+
 /*
  * This function goes through collectionSchemeList and updates mIdleCollectionSchemeMap, mEnabledCollectionSchemeMap
  * and mTimeLine;

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GridLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:columnCount="2"
+    android:rowCount="3">
+
+    <ImageView
+        android:layout_gravity="start"
+        android:layout_column="0"
+        android:layout_row="0"
+        android:layout_rowSpan="2"
+        android:src="@mipmap/ic_launcher"
+        android:onClick="onAboutClick"
+        android:clickable="true"
+        android:contentDescription="@string/about" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:textAppearance="@style/TextAppearance.AppCompat.Large"
+        android:layout_column="1"
+        android:layout_row="0"
+        android:layout_gravity="end|top"
+        android:paddingLeft="10dp"
+        android:onClick="onAboutClick"
+        android:clickable="true"
+        tools:ignore="RtlHardcoded,RtlSymmetry" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start|bottom"
+        android:layout_column="1"
+        android:layout_row="1"
+        android:paddingLeft="11dp"
+        android:onClick="onAboutClick"
+        android:clickable="true"
+        android:id="@+id/version"
+        tools:ignore="RtlHardcoded,RtlSymmetry"/>
+
+    <ListView android:id="@android:id/list"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_columnSpan="2"
+        android:layout_column="0"
+        android:layout_row="2"/>
+</GridLayout>

@@ -1,0 +1,22 @@
+[
+  {
+    "interfaceId": "0",
+    "type": "OBD_INTERFACE",
+    "obdInterface": {
+      "name": "can0",
+      "requestMessageId": 2015,
+      "obdStandard": "J1979",
+      "pidRequestIntervalSeconds": 5,
+      "dtcRequestIntervalSeconds": 5
+    }
+  },
+  {
+    "interfaceId": "EXTERNAL-GPS-CAN",
+    "type": "CAN_INTERFACE",
+    "canInterface": {
+      "name": "can0",
+      "protocolName": "CAN",
+      "protocolVersion": "2.0B"
+    }
+  }
+]

@@ -9,7 +9,7 @@
 #include "TraceModule.h"
 #include <boost/lockfree/spsc_queue.hpp>
 #include <fstream>
-
+#include <iomanip>
 namespace Aws
 {
 namespace IoTFleetWise
@@ -26,6 +26,7 @@ const uint64_t IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 100
 const uint64_t IoTFleetWiseEngine::DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 10000;
 
 static const std::string CAN_INTERFACE_TYPE = "canInterface";
+static const std::string EXTERNAL_CAN_INTERFACE_TYPE = "externalCanInterface";
 static const std::string OBD_INTERFACE_TYPE = "obdInterface";
 
 namespace
@@ -54,7 +55,7 @@ getFileContents( const std::string &p )
     return ret;
 }
 
-#ifdef FWE_EXAMPLE_IWAVEGPS
+#if defined( FWE_FEATURE_IWAVE_GPS ) || defined( FWE_FEATURE_EXTERNAL_GPS )
 uint32_t
 stringToU32( const std::string &value )
 {
@@ -118,25 +119,34 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         /*************************Payload Manager and Persistency library bootstrap end************/
 
         /*************************CAN InterfaceID to InternalID Translator begin*********/
-        CANInterfaceIDTranslator canIDTranslator;
-
-        // Initialize
         for ( const auto &interfaceName : config["networkInterfaces"] )
         {
-            if ( interfaceName["type"].asString() == CAN_INTERFACE_TYPE )
+            if ( ( interfaceName["type"].asString() == CAN_INTERFACE_TYPE ) ||
+                 ( interfaceName["type"].asString() == EXTERNAL_CAN_INTERFACE_TYPE ) )
             {
-                canIDTranslator.add( interfaceName["interfaceId"].asString() );
+                mCANIDTranslator.add( interfaceName["interfaceId"].asString() );
             }
         }
-#ifdef FWE_EXAMPLE_IWAVEGPS
+#ifdef FWE_FEATURE_IWAVE_GPS
         if ( config["staticConfig"].isMember( "iWaveGpsExample" ) )
         {
-            canIDTranslator.add(
+            mCANIDTranslator.add(
                 config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::CAN_CHANNEL_NUMBER].asString() );
         }
         else
         {
-            canIDTranslator.add( "IWAVE-GPS-CAN" );
+            mCANIDTranslator.add( "IWAVE-GPS-CAN" );
+        }
+#endif
+#ifdef FWE_FEATURE_EXTERNAL_GPS
+        if ( config["staticConfig"].isMember( "externalGpsExample" ) )
+        {
+            mCANIDTranslator.add(
+                config["staticConfig"]["externalGpsExample"][ExternalGpsSource::CAN_CHANNEL_NUMBER].asString() );
+        }
+        else
+        {
+            mCANIDTranslator.add( "EXTERNAL-GPS-CAN" );
         }
 #endif
         /*************************CAN InterfaceID to InternalID Translator end*********/
@@ -187,18 +197,42 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         mDataCollectionSender = std::make_shared<DataCollectionSender>(
             mAwsIotChannelSendCanData,
             config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asUInt(),
-            canIDTranslator );
+            mCANIDTranslator );
 
         // Pass on the AWS SDK Bootstrap handle to the IoTModule.
         auto bootstrapPtr = AwsBootstrap::getInstance().getClientBootStrap();
 
-        const auto privateKey =
-            getFileContents( config["staticConfig"]["mqttConnection"]["privateKeyFilename"].asString() );
-        const auto certificate =
-            getFileContents( config["staticConfig"]["mqttConnection"]["certificateFilename"].asString() );
+        std::string privateKey;
+        std::string certificate;
+        std::string rootCA;
+        if ( config["staticConfig"]["mqttConnection"].isMember( "privateKey" ) )
+        {
+            privateKey = config["staticConfig"]["mqttConnection"]["privateKey"].asString();
+        }
+        else if ( config["staticConfig"]["mqttConnection"].isMember( "privateKeyFilename" ) )
+        {
+            privateKey = getFileContents( config["staticConfig"]["mqttConnection"]["privateKeyFilename"].asString() );
+        }
+        if ( config["staticConfig"]["mqttConnection"].isMember( "certificate" ) )
+        {
+            certificate = config["staticConfig"]["mqttConnection"]["certificate"].asString();
+        }
+        else if ( config["staticConfig"]["mqttConnection"].isMember( "certificateFilename" ) )
+        {
+            certificate = getFileContents( config["staticConfig"]["mqttConnection"]["certificateFilename"].asString() );
+        }
+        if ( config["staticConfig"]["mqttConnection"].isMember( "rootCA" ) )
+        {
+            rootCA = config["staticConfig"]["mqttConnection"]["rootCA"].asString();
+        }
+        else if ( config["staticConfig"]["mqttConnection"].isMember( "rootCAFilename" ) )
+        {
+            rootCA = getFileContents( config["staticConfig"]["mqttConnection"]["rootCAFilename"].asString() );
+        }
         // For asynchronous connect the call needs to be done after all channels created and setTopic calls
         mAwsIotModule->connect( privateKey,
                                 certificate,
+                                rootCA,
                                 config["staticConfig"]["mqttConnection"]["endpointUrl"].asString(),
                                 config["staticConfig"]["mqttConnection"]["clientId"].asString(),
                                 bootstrapPtr,
@@ -309,7 +343,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                  config["staticConfig"]["publishToCloudParameters"]["collectionSchemeManagementCheckinIntervalMs"]
                      .asUInt(),
                  mPersistDecoderManifestCollectionSchemesAndData,
-                 canIDTranslator ) )
+                 mCANIDTranslator ) )
         {
             FWE_LOG_ERROR( "Failed to init the CollectionScheme Manager" );
             return false;
@@ -339,6 +373,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         /********************************Data source bootstrap start*******************************/
 
         auto obdOverCANModuleInit = false;
+        mCANDataConsumer = std::make_unique<CANDataConsumer>( signalBufferPtr, canRawBufferPtr );
         for ( const auto &interfaceName : config["networkInterfaces"] )
         {
             const auto &interfaceType = interfaceName["type"].asString();
@@ -356,16 +391,14 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                                       " so default to Software" );
                     }
                 }
-                auto canChannelId = canIDTranslator.getChannelNumericID( interfaceName["interfaceId"].asString() );
-                auto canConsumerPtr =
-                    std::make_unique<CANDataConsumer>( canChannelId, signalBufferPtr, canRawBufferPtr );
+                auto canChannelId = mCANIDTranslator.getChannelNumericID( interfaceName["interfaceId"].asString() );
                 auto canSourcePtr = std::make_unique<CANDataSource>(
                     canChannelId,
                     canTimestampType,
                     interfaceName[CAN_INTERFACE_TYPE]["interfaceName"].asString(),
                     interfaceName[CAN_INTERFACE_TYPE]["protocolName"].asString() == "CAN-FD",
                     config["staticConfig"]["threadIdleTimes"]["socketCANThreadIdleTimeMs"].asUInt(),
-                    *canConsumerPtr );
+                    *mCANDataConsumer );
                 if ( !canSourcePtr->init() )
                 {
                     FWE_LOG_ERROR( "Failed to initialize CANDataSource" );
@@ -377,7 +410,6 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                     FWE_LOG_ERROR( "Failed to register the CANDataSource to the CollectionScheme Manager" );
                     return false;
                 }
-                mCANDataConsumers.push_back( std::move( canConsumerPtr ) );
                 mCANDataSources.push_back( std::move( canSourcePtr ) );
             }
             else if ( interfaceType == OBD_INTERFACE_TYPE )
@@ -387,7 +419,6 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                     auto obdOverCANModule = std::make_shared<OBDOverCANModule>();
                     obdOverCANModuleInit = true;
                     const auto &broadcastRequests = interfaceName[OBD_INTERFACE_TYPE]["broadcastRequests"];
-                    // Init returns false if no collection is configured:
                     if ( obdOverCANModule->init(
                              signalBufferPtr,
                              activeDTCBufferPtr,
@@ -422,6 +453,19 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 else
                 {
                     FWE_LOG_ERROR( "obdOverCANModule already initialised" );
+                }
+            }
+            else if ( interfaceType == EXTERNAL_CAN_INTERFACE_TYPE )
+            {
+                if ( mExternalCANDataSource == nullptr )
+                {
+                    mExternalCANDataSource = std::make_unique<ExternalCANDataSource>( *mCANDataConsumer );
+                    if ( !mCollectionSchemeManagerPtr->subscribeListener(
+                             static_cast<IActiveDecoderDictionaryListener *>( mExternalCANDataSource.get() ) ) )
+                    {
+                        FWE_LOG_ERROR( "Failed to register the ExternalCANDataSource to the CollectionScheme Manager" );
+                        return false;
+                    }
                 }
             }
             else
@@ -524,7 +568,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         /********************************DDS Module bootstrap end*********************************/
 #endif // FWE_FEATURE_CAMERA
 
-#ifdef FWE_EXAMPLE_IWAVEGPS
+#ifdef FWE_FEATURE_IWAVE_GPS
         /********************************IWave GPS Example NMEA reader *********************************/
         mIWaveGpsSource = std::make_shared<IWaveGpsSource>( signalBufferPtr );
         bool iWaveInitSuccessful = false;
@@ -533,7 +577,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             FWE_LOG_TRACE( "Found 'iWaveGpsExample' section in config file" );
             iWaveInitSuccessful = mIWaveGpsSource->init(
                 config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::PATH_TO_NMEA].asString(),
-                canIDTranslator.getChannelNumericID(
+                mCANIDTranslator.getChannelNumericID(
                     config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::CAN_CHANNEL_NUMBER].asString() ),
                 stringToU32( config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::CAN_RAW_FRAME_ID].asString() ),
                 static_cast<uint16_t>( stringToU32(
@@ -545,7 +589,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         {
             // If not config available default to this values
             iWaveInitSuccessful = mIWaveGpsSource->init(
-                "/dev/ttyUSB1", canIDTranslator.getChannelNumericID( "IWAVE-GPS-CAN" ), 1, 32, 0 );
+                "/dev/ttyUSB1", mCANIDTranslator.getChannelNumericID( "IWAVE-GPS-CAN" ), 1, 32, 0 );
         }
         if ( iWaveInitSuccessful && mIWaveGpsSource->connect() )
         {
@@ -565,6 +609,48 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         /********************************IWave GPS Example NMEA reader end******************************/
 #endif
 
+#ifdef FWE_FEATURE_EXTERNAL_GPS
+        /********************************External GPS Example NMEA reader *********************************/
+        mExternalGpsSource = std::make_shared<ExternalGpsSource>( signalBufferPtr );
+        bool externalGpsInitSuccessful = false;
+        if ( config["staticConfig"].isMember( "externalGpsExample" ) )
+        {
+            FWE_LOG_TRACE( "Found 'externalGpsExample' section in config file" );
+            externalGpsInitSuccessful = mExternalGpsSource->init(
+                mCANIDTranslator.getChannelNumericID(
+                    config["staticConfig"]["externalGpsExample"][ExternalGpsSource::CAN_CHANNEL_NUMBER].asString() ),
+                stringToU32(
+                    config["staticConfig"]["externalGpsExample"][ExternalGpsSource::CAN_RAW_FRAME_ID].asString() ),
+                static_cast<uint16_t>( stringToU32(
+                    config["staticConfig"]["externalGpsExample"][ExternalGpsSource::LATITUDE_START_BIT].asString() ) ),
+                static_cast<uint16_t>(
+                    stringToU32( config["staticConfig"]["externalGpsExample"][ExternalGpsSource::LONGITUDE_START_BIT]
+                                     .asString() ) ) );
+        }
+        else
+        {
+            // If not config available default to this values
+            externalGpsInitSuccessful =
+                mExternalGpsSource->init( mCANIDTranslator.getChannelNumericID( "EXTERNAL-GPS-CAN" ), 1, 32, 0 );
+        }
+        if ( externalGpsInitSuccessful )
+        {
+            if ( !mCollectionSchemeManagerPtr->subscribeListener(
+                     static_cast<IActiveDecoderDictionaryListener *>( mExternalGpsSource.get() ) ) )
+            {
+                FWE_LOG_ERROR( "Failed to register the ExternalGpsSource to the CollectionScheme Manager" );
+                return false;
+            }
+            mExternalGpsSource->start();
+        }
+        else
+        {
+            FWE_LOG_ERROR( "ExternalGpsSource initialization failed" );
+            return false;
+        }
+        /********************************External GPS Example NMEA reader end******************************/
+#endif
+
         mPrintMetricsCyclicPeriodMs =
             config["staticConfig"]["internalParameters"]["metricsCyclicPrintIntervalMs"].asUInt(); // default to 0
     }
@@ -582,7 +668,13 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 bool
 IoTFleetWiseEngine::disconnect()
 {
-#ifdef FWE_EXAMPLE_IWAVEGPS
+#ifdef FWE_FEATURE_EXTERNAL_GPS
+    if ( mExternalGpsSource )
+    {
+        mExternalGpsSource->stop();
+    }
+#endif
+#ifdef FWE_FEATURE_IWAVE_GPS
     if ( mIWaveGpsSource )
     {
         mIWaveGpsSource->stop();
@@ -934,6 +1026,94 @@ IoTFleetWiseEngine::checkAndSendRetrievedData()
         FWE_LOG_ERROR( "Payload Retrieval Failed" );
         return false;
     }
+}
+
+std::vector<uint8_t>
+IoTFleetWiseEngine::getExternalOBDPIDsToRequest()
+{
+    std::vector<uint8_t> pids;
+    if ( mOBDOverCANModule != nullptr )
+    {
+        pids = mOBDOverCANModule->getExternalPIDsToRequest();
+    }
+    return pids;
+}
+
+void
+IoTFleetWiseEngine::setExternalOBDPIDResponse( PID pid, const std::vector<uint8_t> &response )
+{
+    if ( mOBDOverCANModule == nullptr )
+    {
+        return;
+    }
+    mOBDOverCANModule->setExternalPIDResponse( pid, response );
+}
+
+void
+IoTFleetWiseEngine::ingestExternalCANMessage( const std::string &interfaceId,
+                                              Timestamp timestamp,
+                                              uint32_t messageId,
+                                              const std::vector<uint8_t> &data )
+{
+    auto canChannelId = mCANIDTranslator.getChannelNumericID( interfaceId );
+    if ( canChannelId == INVALID_CAN_SOURCE_NUMERIC_ID )
+    {
+        FWE_LOG_ERROR( "Unknown interface ID: " + interfaceId );
+        return;
+    }
+    if ( mExternalCANDataSource == nullptr )
+    {
+        FWE_LOG_ERROR( "No external CAN interface present" );
+        return;
+    }
+    mExternalCANDataSource->ingestMessage( canChannelId, timestamp, messageId, data );
+}
+
+#ifdef FWE_FEATURE_EXTERNAL_GPS
+void
+IoTFleetWiseEngine::setExternalGpsLocation( double latitude, double longitude )
+{
+    if ( mExternalGpsSource == nullptr )
+    {
+        return;
+    }
+    mExternalGpsSource->setLocation( latitude, longitude );
+}
+#endif
+
+std::string
+IoTFleetWiseEngine::getStatusSummary()
+{
+    if ( mAwsIotModule == nullptr || mCollectionSchemeManagerPtr == nullptr || mAwsIotChannelSendCanData == nullptr ||
+         mOBDOverCANModule == nullptr
+#ifdef FWE_FEATURE_EXTERNAL_GPS
+         || mExternalGpsSource == nullptr
+#endif
+    )
+    {
+        return "";
+    }
+    std::string status;
+    status +=
+        std::string( "MQTT connection: " ) + ( mAwsIotModule->isAlive() ? "CONNECTED" : "NOT CONNECTED" ) + "\n\n";
+
+    status += "Campaign ARNs:\n";
+    auto collectionSchemeArns = mCollectionSchemeManagerPtr->getCollectionSchemeArns();
+    if ( collectionSchemeArns.empty() )
+    {
+        status += "NONE\n";
+    }
+    else
+    {
+        for ( auto &collectionSchemeArn : collectionSchemeArns )
+        {
+            status += collectionSchemeArn + "\n";
+        }
+    }
+    status += "\n";
+
+    status += "Payloads sent: " + std::to_string( mAwsIotChannelSendCanData->getPayloadCountSent() ) + "\n\n";
+    return status;
 }
 
 } // namespace ExecutionManagement

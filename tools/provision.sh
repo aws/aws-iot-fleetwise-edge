@@ -14,6 +14,7 @@ CERT_OUT_FILE="certificate.pem"
 PRIVATE_KEY_OUT_FILE="private-key.key"
 ENDPOINT_URL_OUT_FILE=""
 VEHICLE_NAME_OUT_FILE=""
+THING_POLICY_OUT_FILE=""
 ONLY_CLEAN_UP=false
 
 parse_args() {
@@ -39,6 +40,10 @@ parse_args() {
             VEHICLE_NAME_OUT_FILE=$2
             shift
             ;;
+        --thing-policy-outfile)
+            THING_POLICY_OUT_FILE=$2
+            shift
+            ;;
         --endpoint-url)
             ENDPOINT_URL=$2
             shift
@@ -57,6 +62,7 @@ parse_args() {
             echo "  --private-key-outfile <FILENAME>      Private key output file, default: ${PRIVATE_KEY_OUT_FILE}"
             echo "  --endpoint-url-outfile <FILENAME>     Endpoint URL for MQTT connections output file"
             echo "  --vehicle-name-outfile <FILENAME>     Vehicle name output file"
+            echo "  --thing-policy-outfile <FILENAME>     Thing policy output file"
             echo "  --endpoint-url <URL>                  The endpoint URL used for AWS CLI calls"
             echo "  --region                              The region used for AWS CLI calls, default: ${REGION}"
             echo "  --only-clean-up                       Clean up resources created by previous runs of this script"
@@ -202,4 +208,8 @@ fi
 
 if [ "${VEHICLE_NAME_OUT_FILE}" != "" ]; then
     echo -n $VEHICLE_NAME > ${VEHICLE_NAME_OUT_FILE}
+fi
+
+if [ "${THING_POLICY_OUT_FILE}" != "" ]; then
+    echo -n ${NAME}-IoT-Policy > ${THING_POLICY_OUT_FILE}
 fi

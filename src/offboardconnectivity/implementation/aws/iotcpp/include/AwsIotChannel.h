@@ -135,6 +135,16 @@ public:
         return mSubscribeAsynchronously;
     }
 
+    /**
+     * @brief Returns the number of payloads successfully passed to the AWS IoT SDK
+     * @return Number of payloads
+     */
+    unsigned
+    getPayloadCountSent() const
+    {
+        return mPayloadCountSent;
+    }
+
 private:
     bool isAliveNotThreadSafe();
 
@@ -151,6 +161,7 @@ private:
     std::shared_ptr<PayloadManager> mPayloadManager;
     std::string mTopicName;
     std::atomic<bool> mSubscribed;
+    std::atomic<unsigned> mPayloadCountSent{};
 
     bool mSubscribeAsynchronously;
 };

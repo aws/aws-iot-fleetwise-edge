@@ -21,6 +21,9 @@ for block in compile_commands:
     if "command" in block:
         if re.search(r".+iotcpp\/test\/include.+", block["command"]):
             continue
+        # If we keep -Werror, we will get compiler errors from clang that don't happen with GCC.
+        # Since clang is currently not one of our supported compilers, we will ignore the warnings.
+        block["command"] = block["command"].replace("-Werror", "")
     output_compile_commands.append(block)
 
 # re-write the db file for clang-tidy

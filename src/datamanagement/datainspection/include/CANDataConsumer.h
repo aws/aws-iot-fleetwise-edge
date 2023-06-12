@@ -11,7 +11,6 @@
 #include "SignalTypes.h"
 #include "TimeTypes.h"
 #include <cstdint>
-#include <linux/can.h>
 #include <memory>
 
 namespace Aws
@@ -28,7 +27,7 @@ using namespace Aws::IoTFleetWise::Platform::Linux;
 class CANDataConsumer
 {
 public:
-    CANDataConsumer( CANChannelNumericID channelId, SignalBufferPtr signalBufferPtr, CANBufferPtr canBufferPtr );
+    CANDataConsumer( SignalBufferPtr signalBufferPtr, CANBufferPtr canBufferPtr );
     ~CANDataConsumer() = default;
 
     CANDataConsumer( const CANDataConsumer & ) = delete;
@@ -36,8 +35,11 @@ public:
     CANDataConsumer( CANDataConsumer && ) = delete;
     CANDataConsumer &operator=( CANDataConsumer && ) = delete;
 
-    void processMessage( std::shared_ptr<const CANDecoderDictionary> &dictionary,
-                         const struct canfd_frame &message,
+    void processMessage( CANChannelNumericID channelId,
+                         std::shared_ptr<const CANDecoderDictionary> &dictionary,
+                         uint32_t messageId,
+                         const uint8_t *data,
+                         size_t dataLength,
                          Timestamp timestamp );
 
 private:
@@ -47,13 +49,13 @@ private:
      * messageId is an input-output parameter that has the correct value
      * for the current message's id with either the MSB set or unset
      */
-    bool findDecoderMethod( uint32_t &messageId,
-                            const CANDecoderDictionary::CANMsgDecoderMethodType &decoderMethod,
-                            CANMessageDecoderMethod &currentMessageDecoderMethod ) const;
+    static bool findDecoderMethod( CANChannelNumericID channelId,
+                                   uint32_t &messageId,
+                                   const CANDecoderDictionary::CANMsgDecoderMethodType &decoderMethod,
+                                   CANMessageDecoderMethod &currentMessageDecoderMethod );
 
     CANBufferPtr mCANBufferPtr;
     SignalBufferPtr mSignalBufferPtr;
-    CANChannelNumericID mChannelId{ INVALID_CAN_SOURCE_NUMERIC_ID };
 };
 } // namespace DataInspection
 } // namespace IoTFleetWise

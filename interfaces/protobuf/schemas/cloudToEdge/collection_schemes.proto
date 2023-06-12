@@ -30,9 +30,9 @@ message CollectionSchemes {
 message CollectionScheme {
 
     /*
-     * Amazon Resource Name of the campaign this collectionScheme is part of
+     * Synchronization ID of the campaign this collectionScheme is part of
      */
-    string campaign_arn = 1;
+    string campaign_sync_id = 1;
 
     /*
      * Synchronization ID of the required decoder manifest for this collectionScheme

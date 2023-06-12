@@ -55,6 +55,7 @@ AwsIotConnectivityModule::releaseMemoryUsage( std::size_t bytes )
 bool
 AwsIotConnectivityModule::connect( const std::string &privateKey,
                                    const std::string &certificate,
+                                   const std::string &rootCA,
                                    const std::string &endpointUrl,
                                    const std::string &clientId,
                                    Aws::Crt::Io::ClientBootstrap *clientBootstrap,
@@ -66,6 +67,7 @@ AwsIotConnectivityModule::connect( const std::string &privateKey,
     mCertificate = Crt::ByteCursorFromCString( certificate.c_str() );
     mEndpointUrl = endpointUrl.c_str() != nullptr ? endpointUrl.c_str() : "";
     mPrivateKey = Crt::ByteCursorFromCString( privateKey.c_str() );
+    mRootCA = Crt::ByteCursorFromCString( rootCA.c_str() );
 
     if ( !createMqttConnection( clientBootstrap ) )
     {
@@ -253,7 +255,10 @@ AwsIotConnectivityModule::createMqttConnection( Aws::Crt::Io::ClientBootstrap *c
     Aws::Iot::MqttClientConnectionConfigBuilder builder;
 
     builder = Aws::Iot::MqttClientConnectionConfigBuilder( mCertificate, mPrivateKey );
-
+    if ( mRootCA.len > 0 )
+    {
+        builder.WithCertificateAuthority( mRootCA );
+    }
     builder.WithEndpoint( mEndpointUrl );
 
     TraceModule::get().sectionBegin( TraceSection::BUILD_MQTT );

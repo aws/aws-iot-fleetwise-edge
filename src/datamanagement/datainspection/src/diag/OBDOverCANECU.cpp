@@ -125,50 +125,52 @@ OBDOverCANECU::requestReceiveEmissionPIDs( const SID sid )
             requestReceivePIDs( pidItr, sid, pids, info );
         }
 
-        if ( !info.mPIDsToValues.empty() )
-        {
-            auto receptionTime = mClock->systemTimeSinceEpochMs();
-            for ( auto const &signals : info.mPIDsToValues )
-            {
-                // Note Signal buffer is a multi producer single consumer queue. Besides current thread,
-                // Vehicle Data Consumer will also push signals onto this buffer
-                TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-                struct CollectedSignal collectedSignal;
-                const auto signalType = signals.second.signalType;
-                switch ( signalType )
-                {
-                case SignalType::UINT64:
-                    collectedSignal = CollectedSignal{
-                        signals.first, receptionTime, signals.second.signalValue.uint64Val, signalType };
-                    FWE_LOG_TRACE( "Received Signal " + std::to_string( signals.first ) + " : " +
-                                   std::to_string( signals.second.signalValue.uint64Val ) +
-                                   " for ECU: " + mStreamRxID );
-                    break;
-                case SignalType::INT64:
-                    collectedSignal = CollectedSignal{
-                        signals.first, receptionTime, signals.second.signalValue.int64Val, signalType };
-                    FWE_LOG_TRACE( "Received Signal " + std::to_string( signals.first ) + " : " +
-                                   std::to_string( signals.second.signalValue.int64Val ) + " for ECU: " + mStreamRxID );
-                    break;
-                default:
-                    collectedSignal = CollectedSignal{
-                        signals.first, receptionTime, signals.second.signalValue.doubleVal, signalType };
-                    FWE_LOG_TRACE( "Received Signal " + std::to_string( signals.first ) + " : " +
-                                   std::to_string( signals.second.signalValue.doubleVal ) +
-                                   " for ECU: " + mStreamRxID );
-                    break;
-                }
-
-                if ( !mSignalBufferPtr->push( collectedSignal ) )
-                {
-                    TraceModule::get().decrementAtomicVariable(
-                        TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-                    FWE_LOG_WARN( "Signal Buffer full with ECU " + mStreamRxID );
-                }
-            }
-        }
+        pushPIDs( info, mClock->systemTimeSinceEpochMs(), mSignalBufferPtr, mStreamRxID );
     }
     return numRequests;
+}
+
+void
+OBDOverCANECU::pushPIDs( const EmissionInfo &info,
+                         Timestamp receptionTime,
+                         SignalBufferPtr &signalBufferPtr,
+                         const std::string &streamRxID )
+{
+    for ( auto const &signals : info.mPIDsToValues )
+    {
+        // Note Signal buffer is a multi producer single consumer queue. Besides current thread,
+        // Vehicle Data Consumer will also push signals onto this buffer
+        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+        struct CollectedSignal collectedSignal;
+        const auto signalType = signals.second.signalType;
+        switch ( signalType )
+        {
+        case SignalType::UINT64:
+            collectedSignal =
+                CollectedSignal{ signals.first, receptionTime, signals.second.signalValue.uint64Val, signalType };
+            FWE_LOG_TRACE( "Received Signal " + std::to_string( signals.first ) + " : " +
+                           std::to_string( signals.second.signalValue.uint64Val ) + " for ECU: " + streamRxID );
+            break;
+        case SignalType::INT64:
+            collectedSignal =
+                CollectedSignal{ signals.first, receptionTime, signals.second.signalValue.int64Val, signalType };
+            FWE_LOG_TRACE( "Received Signal " + std::to_string( signals.first ) + " : " +
+                           std::to_string( signals.second.signalValue.int64Val ) + " for ECU: " + streamRxID );
+            break;
+        default:
+            collectedSignal =
+                CollectedSignal{ signals.first, receptionTime, signals.second.signalValue.doubleVal, signalType };
+            FWE_LOG_TRACE( "Received Signal " + std::to_string( signals.first ) + " : " +
+                           std::to_string( signals.second.signalValue.doubleVal ) + " for ECU: " + streamRxID );
+            break;
+        }
+
+        if ( !signalBufferPtr->push( collectedSignal ) )
+        {
+            TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+            FWE_LOG_WARN( "Signal Buffer full with ECU " + streamRxID );
+        }
+    }
 }
 
 bool

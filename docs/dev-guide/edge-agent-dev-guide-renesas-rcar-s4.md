@@ -62,7 +62,7 @@ on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 
 ## Specify Initial Board Configuration
 
-1. Insert the micro SD-card into the R-Car S4 Spider board’s micro SD-card slot.
+1. Insert the micro SD-card into the R-Car S4 Spider board's micro SD-card slot.
 1. Connect an Ethernet cable.
 1. Connect develop machine to R-Car S4 Spider board USB port.
 
@@ -95,7 +95,7 @@ on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 
 1. Connect to the R-Car S4 Spider board via SSH, entering password `rcar`:
    `ssh rcar@<R-Car Ip address>`
-1. Once connected via SSH, check the board’s internet connection by running: `ping amazon.com`.
+1. Once connected via SSH, check the board's internet connection by running: `ping amazon.com`.
    There should be 0% packet loss.
 
 ## Provision AWS IoT Credentials
@@ -168,7 +168,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
 ## Collect OBD Data
 
-1. Run the following _on the development machine_ to deploy a ‘heartbeat’ campaign that periodically
+1. Run the following _on the development machine_ to deploy a 'heartbeat' campaign that periodically
    collects OBD data:
 
    ```bash

@@ -180,7 +180,7 @@ TEST_F( CANDataSourceTest, invalidInit )
     auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
     auto canRawBufferPtr = std::make_shared<CANBuffer>( 10 );
 
-    CANDataConsumer consumer{ INVALID_CAN_SOURCE_NUMERIC_ID, signalBufferPtr, canRawBufferPtr };
+    CANDataConsumer consumer{ signalBufferPtr, canRawBufferPtr };
     CANDataSource dataSource{
         INVALID_CAN_SOURCE_NUMERIC_ID, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_FALSE( dataSource.init() );
@@ -192,7 +192,7 @@ TEST_F( CANDataSourceTest, testNoDecoderDictionary )
     auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
     auto canRawBufferPtr = std::make_shared<CANBuffer>( 10 );
 
-    CANDataConsumer consumer{ 0, signalBufferPtr, canRawBufferPtr };
+    CANDataConsumer consumer{ signalBufferPtr, canRawBufferPtr };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
@@ -209,7 +209,7 @@ TEST_F( CANDataSourceTest, testValidDecoderDictionary )
     auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
     auto canRawBufferPtr = std::make_shared<CANBuffer>( 10 );
 
-    CANDataConsumer consumer{ 0, signalBufferPtr, canRawBufferPtr };
+    CANDataConsumer consumer{ signalBufferPtr, canRawBufferPtr };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
@@ -256,7 +256,7 @@ TEST_F( CANDataSourceTest, testCanFDSocketMode )
     auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
     auto canRawBufferPtr = std::make_shared<CANBuffer>( 10 );
 
-    CANDataConsumer consumer{ 0, signalBufferPtr, canRawBufferPtr };
+    CANDataConsumer consumer{ signalBufferPtr, canRawBufferPtr };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_SOFTWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
@@ -290,7 +290,7 @@ TEST_F( CANDataSourceTest, testExtractExtendedID )
     auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
     auto canRawBufferPtr = std::make_shared<CANBuffer>( 10 );
 
-    CANDataConsumer consumer{ 0, signalBufferPtr, canRawBufferPtr };
+    CANDataConsumer consumer{ signalBufferPtr, canRawBufferPtr };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );

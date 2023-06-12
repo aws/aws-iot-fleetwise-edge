@@ -103,6 +103,60 @@ read from the static config as the example in `IoTFleetWiseEngine::connect()` sh
 optional section "iWaveGpsExample" under "staticConfig" will be used so the parameters can be
 changed without recompilation.
 
+## ExternalGpsSource
+
+The provided example `ExternalGpsSource` module can be enabled with the `FWE_FEATURE_EXTERNAL_GPS`
+build option. This allows the ingestion of GPS data using the custom data source interface from an
+in-process source, for example when the FWE code is built as a shared library. For example the
+decoder manifest for the latitude and longitude signals can be created as follows:
+
+```json
+{
+  "name": "ExternalGpsDecoderManifest",
+  "modelManifestArn": "arn:aws:iotfleetwise:us-east-1:748151249882:model-manifest/ExternalGPSModel",
+  "networkInterfaces": [
+    {
+      "interfaceId": "EXTERNAL-GPS-CAN",
+      "type": "CAN_INTERFACE",
+      "canInterface": {
+        "name": "externalgpscan",
+        "protocolName": "CAN"
+      }
+    }
+  ],
+  "signalDecoders": [
+    {
+      "fullyQualifiedName": "Vehicle.CurrentLocation.Longitude",
+      "type": "CAN_SIGNAL",
+      "interfaceId": "EXTERNAL-GPS-CAN",
+      "canSignal": {
+        "messageId": 1,
+        "isBigEndian": true,
+        "isSigned": true,
+        "startBit": 0,
+        "offset": -2000.0,
+        "factor": 0.001,
+        "length": 32
+      }
+    },
+    {
+      "fullyQualifiedName": "Vehicle.CurrentLocation.Latitude",
+      "type": "CAN_SIGNAL",
+      "interfaceId": "EXTERNAL-GPS-CAN",
+      "canSignal": {
+        "messageId": 1,
+        "isBigEndian": true,
+        "isSigned": true,
+        "startBit": 32,
+        "offset": -2000.0,
+        "factor": 0.001,
+        "length": 32
+      }
+    }
+  ]
+}
+```
+
 # Implementing a new CustomDataSource
 
 ## What to do in the init
