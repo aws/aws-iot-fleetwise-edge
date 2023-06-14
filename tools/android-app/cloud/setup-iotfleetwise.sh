@@ -209,22 +209,34 @@ DBC_NODES=`cat externalGpsNodes.json`
 echo "Checking for existing signal catalog..."
 SIGNAL_CATALOG_LIST=`aws iotfleetwise list-signal-catalogs \
     ${ENDPOINT_URL_OPTION} --region ${REGION}`
-SIGNAL_CATALOG_NAME=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].name`
-SIGNAL_CATALOG_ARN=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].arn`
-echo ${SIGNAL_CATALOG_ARN}
-
-echo "Updating Vehicle node in signal catalog..."
-if UPDATE_SIGNAL_CATALOG_STATUS=`aws iotfleetwise update-signal-catalog \
-    ${ENDPOINT_URL_OPTION} --region ${REGION} \
-    --name ${SIGNAL_CATALOG_NAME} \
-    --description "Vehicle node" \
-    --nodes-to-update "${VEHICLE_NODE}" 2>&1`; then
-    echo ${UPDATE_SIGNAL_CATALOG_STATUS} | jq -r .arn
-elif ! echo ${UPDATE_SIGNAL_CATALOG_STATUS} | grep -q "InvalidSignalsException"; then
-    echo ${UPDATE_SIGNAL_CATALOG_STATUS} >&2
-    exit -1
+SIGNAL_CATALOG_COUNT=`echo ${SIGNAL_CATALOG_LIST} | jq '.summaries|length'`
+# Currently only one signal catalog is supported by the service
+if [ ${SIGNAL_CATALOG_COUNT} == 0 ]; then
+    SIGNAL_CATALOG_NAME="${NAME}-signal-catalog"
+    echo "No existing signal catalog"
+    echo "Creating signal catalog with Vehicle node..."
+    SIGNAL_CATALOG_ARN=`aws iotfleetwise create-signal-catalog \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${SIGNAL_CATALOG_NAME} \
+        --nodes "${VEHICLE_NODE}" | jq -r .arn`
+    echo ${SIGNAL_CATALOG_ARN}
 else
-    echo "Node exists and is in use, continuing"
+    SIGNAL_CATALOG_NAME=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].name`
+    SIGNAL_CATALOG_ARN=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].arn`
+
+    echo "Updating Vehicle node in signal catalog..."
+    if UPDATE_SIGNAL_CATALOG_STATUS=`aws iotfleetwise update-signal-catalog \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${SIGNAL_CATALOG_NAME} \
+        --description "Vehicle node" \
+        --nodes-to-update "${VEHICLE_NODE}" 2>&1`; then
+        echo ${UPDATE_SIGNAL_CATALOG_STATUS} | jq -r .arn
+    elif ! echo ${UPDATE_SIGNAL_CATALOG_STATUS} | grep -q "InvalidSignalsException"; then
+        echo ${UPDATE_SIGNAL_CATALOG_STATUS} >&2
+        exit -1
+    else
+        echo "Node exists and is in use, continuing"
+    fi
 fi
 
 echo "Updating OBD signals in signal catalog..."
