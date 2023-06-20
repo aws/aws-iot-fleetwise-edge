@@ -73,6 +73,9 @@ fi
 
 echo "Getting S3 bucket region..."
 S3_BUCKET_REGION=`aws s3api get-bucket-location --bucket ${S3_BUCKET} | jq -r .LocationConstraint`
+if [ -z "${S3_BUCKET_REGION}" ] || [ "${S3_BUCKET_REGION}" == "null" ]; then
+    S3_BUCKET_REGION="us-east-1"
+fi
 echo ${S3_BUCKET_REGION}
 
 mkdir -p config
@@ -102,8 +105,6 @@ aws s3 cp --region ${REGION} config/creds.json ${S3_URL}
 echo "Creating S3 pre-signed URL..."
 S3_PRESIGNED_URL=`aws s3 presign --region ${S3_BUCKET_REGION} --expires-in ${S3_PRESIGNED_URL_EXPIRY} ${S3_URL}`
 PROVISIONING_LINK="https://fleetwise-app.automotive.iot.aws.dev/config#url=`echo ${S3_PRESIGNED_URL} | jq -s -R -r @uri`"
-echo "Provisioning link:"
-echo ${PROVISIONING_LINK}
 QR_CODE_FILENAME="config/provisioning-qr-code.png"
 segno --scale 5 --output ${QR_CODE_FILENAME} "${PROVISIONING_LINK}"
 
