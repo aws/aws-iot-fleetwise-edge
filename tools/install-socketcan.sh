@@ -81,7 +81,7 @@ done
 cat > /lib/systemd/system/setup-socketcan.service <<EOT
 [Unit]
 Description=Setup SocketCAN interfaces
-After=multi-user.target
+After=network.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
