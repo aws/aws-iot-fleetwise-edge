@@ -1,6 +1,6 @@
 [Unit]
 Description=AWS IoT FleetWise Edge #%i
-After=network-online.target
+After=network-online.target setup-socketcan.service
 Wants=network-online.target setup-socketcan.service
 
 [Service]

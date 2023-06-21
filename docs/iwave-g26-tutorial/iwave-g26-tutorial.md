@@ -112,7 +112,7 @@ the steps below to be executed first.
    ```ini
    [Unit]
    Description=Setup SocketCAN interfaces
-   After=multi-user.target
+   After=network.target
    [Service]
    Type=oneshot
    RemainAfterExit=yes
