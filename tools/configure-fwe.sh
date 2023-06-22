@@ -10,8 +10,14 @@ fi
 if [ -z "${OUTPUT_CONFIG_FILE+x}" ]; then
     OUTPUT_CONFIG_FILE=""
 fi
+if [ -z "${CERTIFICATE+x}" ]; then
+    CERTIFICATE=""
+fi
 if [ -z "${CERTIFICATE_FILE+x}" ]; then
     CERTIFICATE_FILE="/etc/aws-iot-fleetwise/certificate.pem"
+fi
+if [ -z "${PRIVATE_KEY+x}" ]; then
+    PRIVATE_KEY=""
 fi
 if [ -z "${PRIVATE_KEY_FILE+x}" ]; then
     PRIVATE_KEY_FILE="/etc/aws-iot-fleetwise/private-key.key"
@@ -57,8 +63,16 @@ parse_args() {
             ENDPOINT_URL=$2
             shift
             ;;
+        --certificate)
+            CERTIFICATE=$2
+            shift
+            ;;
         --certificate-file)
             CERTIFICATE_FILE=$2
+            shift
+            ;;
+        --private-key)
+            PRIVATE_KEY=$2
             shift
             ;;
         --private-key-file)
@@ -92,7 +106,9 @@ parse_args() {
             echo "  --vehicle-name <NAME>        Vehicle name"
             echo "  --endpoint-url <URL>         IoT Core MQTT endpoint URL"
             echo "  --can-bus0 <BUS>             CAN bus 0, default: ${CAN_BUS0}"
+            echo "  --certificate <CERTIFICATE>  Certificate"
             echo "  --certificate-file <FILE>    Certificate file, default: ${CERTIFICATE_FILE}"
+            echo "  --private-key <KEY>          Private key"
             echo "  --private-key-file <FILE>    Private key file, default: ${PRIVATE_KEY_FILE}"
             echo "  --persistency-path <PATH>    Persistency path, default: ${PERSISTENCY_PATH}"
             echo "  --topic-prefix <PREFIX>      IoT MQTT topic prefix, default: ${TOPIC_PREFIX}"
@@ -137,8 +153,14 @@ jq ".staticConfig.mqttConnection.endpointUrl=\"${ENDPOINT_URL}\"" ${INPUT_CONFIG
     | jq ".staticConfig.mqttConnection.decoderManifestTopic=\"${TOPIC_PREFIX}vehicles/${VEHICLE_NAME}/decoder_manifests\"" \
     | jq ".staticConfig.mqttConnection.canDataTopic=\"${TOPIC_PREFIX}vehicles/${VEHICLE_NAME}/signals\"" \
     | jq ".staticConfig.mqttConnection.checkinTopic=\"${TOPIC_PREFIX}vehicles/${VEHICLE_NAME}/checkins\"" \
-    | jq ".staticConfig.mqttConnection.certificateFilename=\"${CERTIFICATE_FILE}\"" \
-    | jq ".staticConfig.mqttConnection.privateKeyFilename=\"${PRIVATE_KEY_FILE}\"" \
+    | if [[ $CERTIFICATE ]]; \
+        then jq "del(.staticConfig.mqttConnection.certificateFilename)" | jq ".staticConfig.mqttConnection.certificate=\"${CERTIFICATE}\""; \
+        else jq ".staticConfig.mqttConnection.certificateFilename=\"${CERTIFICATE_FILE}\""; \
+        fi \
+    | if [[ $PRIVATE_KEY ]]; \
+        then jq "del(.staticConfig.mqttConnection.privateKeyFilename)" | jq ".staticConfig.mqttConnection.privateKey=\"${PRIVATE_KEY}\""; \
+        else jq ".staticConfig.mqttConnection.privateKeyFilename=\"${PRIVATE_KEY_FILE}\""; \
+        fi \
     | jq ".staticConfig.internalParameters.systemWideLogLevel=\"${LOG_LEVEL}\"" \
     | jq ".staticConfig.internalParameters.logColor=\"${LOG_COLOR}\"" \
     | jq ".staticConfig.persistency.persistencyPath=\"${PERSISTENCY_PATH}\"" \
