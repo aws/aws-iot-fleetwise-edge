@@ -28,3 +28,19 @@ docker run \
     --env CAN_BUS0=<CAN_BUS0> \
     public.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge
 ```
+
+3. Alternatively credentials can be directly passed as environment variables to the container:
+
+For example:
+
+```bash
+docker run \
+    -ti \
+    --network=host \
+    --env CERTIFICATE="-----BEGIN-----\nXXXXX\n-----END-----\n" \
+    --env PRIVATE_KEY="-----BEGIN-----\nXXXXX\n-----END-----\n" \
+    --env VEHICLE_NAME=<VEHICLE_NAME> \
+    --env ENDPOINT_URL=<ENDPOINT_URL> \
+    --env CAN_BUS0=<CAN_BUS0> \
+    public.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge
+```
