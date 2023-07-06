@@ -116,7 +116,7 @@ An Ubuntu 20.04 development machine with 200GB free disk space should be used.
     && cp -r build/dist/arm64-v8a build/dist/armeabi-v7a tools/android-app/app/src/main/jniLibs \
     && cp THIRD-PARTY-LICENSES tools/android-app/app/src/main/assets \
     && cd tools/android-app \
-    && export ANDROID_HOME=/usr/local/android_sdk ./gradlew assemble
+    && ANDROID_HOME=/usr/local/android_sdk ./gradlew assemble
    ```
 
 ### Shared library interface
