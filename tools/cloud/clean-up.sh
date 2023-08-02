@@ -8,7 +8,7 @@ ENDPOINT_URL=""
 ENDPOINT_URL_OPTION=""
 REGION="us-east-1"
 VEHICLE_NAME=""
-TIMESTAMP=""
+DISAMBIGUATOR=""
 ACCOUNT_ID=`aws sts get-caller-identity --query "Account" --output text`
 SERVICE_ROLE="IoTFleetWiseServiceRole"
 SERVICE_ROLE_POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/"
@@ -26,8 +26,8 @@ parse_args() {
             FLEET_SIZE=$2
             shift
             ;;
-        --timestamp)
-            TIMESTAMP=$2
+        --disambiguator)
+            DISAMBIGUATOR=$2
             shift
             ;;
         --endpoint-url)
@@ -40,13 +40,13 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --vehicle-name <NAME>  Vehicle name"
-            echo "  --fleet-size <SIZE>    Size of fleet, default: ${FLEET_SIZE}. When greater than 1,"
-            echo "                         the instance number will be appended to each"
-            echo "                         Vehicle name after a '-', e.g. fwdemo-42"
-            echo "  --timestamp <TS>       Timestamp of demo.sh script"
-            echo "  --endpoint-url <URL>   The endpoint URL used for AWS CLI calls"
-            echo "  --region <REGION>      The region used for AWS CLI calls, default: ${REGION}"
+            echo "  --vehicle-name <NAME>      Vehicle name"
+            echo "  --fleet-size <SIZE>        Size of fleet, default: ${FLEET_SIZE}. When greater than 1,"
+            echo "                             the instance number will be appended to each"
+            echo "                             Vehicle name after a '-', e.g. fwdemo-42"
+            echo "  --disambiguator <STRING>   The unique string used by the demo.sh script to avoid resource name conflicts"
+            echo "  --endpoint-url <URL>       The endpoint URL used for AWS CLI calls"
+            echo "  --region <REGION>          The region used for AWS CLI calls, default: ${REGION}"
             exit 0
             ;;
         esac
@@ -60,8 +60,8 @@ parse_args() {
         echo "Error: Vehicle name not provided"
         exit -1
     fi
-    if [ "${TIMESTAMP}" == "" ]; then
-        echo "Error: Timestamp not provided"
+    if [ "${DISAMBIGUATOR}" == "" ]; then
+        echo "Error: Disambiguator not provided"
         exit -1
     fi
 }
@@ -72,16 +72,23 @@ echo "======================================="
 
 parse_args "$@"
 
-NAME="${VEHICLE_NAME}-${TIMESTAMP}"
-SERVICE_ROLE="${SERVICE_ROLE}-${REGION}-${TIMESTAMP}"
+if [ ${FLEET_SIZE} -gt 1 ]; then
+    VEHICLES=( $(seq -f "${VEHICLE_NAME}-%g" 0 $((${FLEET_SIZE}-1))) )
+else
+    VEHICLES=( ${VEHICLE_NAME} )
+fi
+
+NAME="${VEHICLE_NAME}-${DISAMBIGUATOR}"
+SERVICE_ROLE="${SERVICE_ROLE}-${REGION}-${DISAMBIGUATOR}"
 SERVICE_ROLE_POLICY_ARN="${SERVICE_ROLE_POLICY_ARN}${SERVICE_ROLE}-policy"
 
 echo -n "Date: "
 date --rfc-3339=seconds
 
-echo "Timestamp: ${TIMESTAMP}"
+echo "Disambiguator: ${DISAMBIGUATOR}"
 echo "Vehicle name: ${VEHICLE_NAME}"
 echo "Fleet size: ${FLEET_SIZE}"
+echo "Vehicles: ${VEHICLES[@]}"
 
 # $1 is the campaign name
 suspend_and_delete_campaign(){
@@ -101,51 +108,38 @@ suspend_and_delete_campaign ${NAME}-campaign
 suspend_and_delete_campaign ${NAME}-campaign-s3-json
 suspend_and_delete_campaign ${NAME}-campaign-s3-parquet
 
-if ((FLEET_SIZE==1)); then
-    echo "Disassociating vehicle ${VEHICLE_NAME}..."
-    aws iotfleetwise disassociate-vehicle-fleet \
-        ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --fleet-id ${NAME}-fleet \
-        --vehicle-name "${VEHICLE_NAME}" 2> /dev/null || true
-else
-    echo "Disassociating vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1))..."
-    for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
-        for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
-            # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
-            # to print stderr from the output group, but not info about the background process.
-            { \
-                aws iotfleetwise disassociate-vehicle-fleet \
-                    ${ENDPOINT_URL_OPTION} --region ${REGION} \
-                    --fleet-id ${NAME}-fleet \
-                    --vehicle-name "${VEHICLE_NAME}-$((i+j))" 2> /dev/null || true \
-            2>&3 &} 3>&2 2>/dev/null
-        done
-        # Wait for all background processes to finish
-        wait
+for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
+    for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
+        vehicle=${VEHICLES[$((i+j))]}
+        echo "Disassociating vehicle ${vehicle}..."
+        # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
+        # to print stderr from the output group, but not info about the background process.
+        { \
+            aws iotfleetwise disassociate-vehicle-fleet \
+                ${ENDPOINT_URL_OPTION} --region ${REGION} \
+                --fleet-id ${NAME}-fleet \
+                --vehicle-name "${vehicle}" 2> /dev/null || true \
+        2>&3 &} 3>&2 2>/dev/null
     done
-fi
+    # Wait for all background processes to finish
+    wait
+done
 
-if ((FLEET_SIZE==1)); then
-    echo "Deleting vehicle ${VEHICLE_NAME}..."
-    aws iotfleetwise delete-vehicle \
-        ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --vehicle-name "${VEHICLE_NAME}" 2> /dev/null || true
-else
-    echo "Deleting vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1))..."
-    for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
-        for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
-            # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
-            # to print stderr from the output group, but not info about the background process.
-            { \
-                aws iotfleetwise delete-vehicle \
-                    ${ENDPOINT_URL_OPTION} --region ${REGION} \
-                    --vehicle-name "${VEHICLE_NAME}-$((i+j))" 2> /dev/null || true \
-            2>&3 &} 3>&2 2>/dev/null
-        done
-        # Wait for all background processes to finish
-        wait
+for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
+    for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
+        vehicle=${VEHICLES[$((i+j))]}
+        echo "Deleting vehicle ${vehicle}..."
+        # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
+        # to print stderr from the output group, but not info about the background process.
+        { \
+            aws iotfleetwise delete-vehicle \
+                ${ENDPOINT_URL_OPTION} --region ${REGION} \
+                --vehicle-name "${vehicle}" 2> /dev/null || true \
+        2>&3 &} 3>&2 2>/dev/null
     done
-fi
+    # Wait for all background processes to finish
+    wait
+done
 
 echo "Deleting fleet..."
 aws iotfleetwise delete-fleet \

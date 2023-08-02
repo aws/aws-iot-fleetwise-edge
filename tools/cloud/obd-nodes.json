@@ -488,28 +488,28 @@
     "sensor": {
       "dataType": "DOUBLE",
       "fullyQualifiedName": "Vehicle.OBD.MaxEquivalenceRatio",
-      "description": "Maximum value for Fuel–Air equivalence ratio,"
+      "description": "Maximum value for Fuel-Air equivalence ratio,"
     }
   },
   {
     "sensor": {
       "dataType": "DOUBLE",
       "fullyQualifiedName": "Vehicle.OBD.MaxOxygenSensorVoltage",
-      "description": "Maximum value for Fuel–Air equivalence ratio,"
+      "description": "Maximum value for Fuel-Air equivalence ratio,"
     }
   },
   {
     "sensor": {
       "dataType": "DOUBLE",
       "fullyQualifiedName": "Vehicle.OBD.MaxOxygenSensorCurrent",
-      "description": "Maximum value for Fuel–Air equivalence ratio,"
+      "description": "Maximum value for Fuel-Air equivalence ratio,"
     }
   },
   {
     "sensor": {
       "dataType": "DOUBLE",
       "fullyQualifiedName": "Vehicle.OBD.MaxIntakeMAP",
-      "description": "Maximum value for Fuel–Air equivalence ratio,"
+      "description": "Maximum value for Fuel-Air equivalence ratio,"
     }
   },
   {

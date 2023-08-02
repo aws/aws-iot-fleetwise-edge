@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "AwsIotChannel.h"
-#include "AwsIotConnectivityModule.h"
+#include "AwsSDKMemoryManager.h"
+#include "IConnectivityModule.h"
 #include "LoggingModule.h"
 #include "TraceModule.h"
 #include <sstream>
@@ -13,10 +14,10 @@ using namespace Aws::Crt;
 
 AwsIotChannel::AwsIotChannel( IConnectivityModule *connectivityModule,
                               std::shared_ptr<PayloadManager> payloadManager,
-                              std::size_t maximumIotSDKHeapMemoryBytes )
-    : mMaximumIotSDKHeapMemoryBytes( maximumIotSDKHeapMemoryBytes )
-    , mConnectivityModule( connectivityModule )
+                              std::shared_ptr<Aws::Crt::Mqtt::MqttConnection> &mqttConnection )
+    : mConnectivityModule( connectivityModule )
     , mPayloadManager( std::move( payloadManager ) )
+    , mConnection( mqttConnection )
     , mSubscribed( false )
     , mSubscribeAsynchronously( false )
 {
@@ -64,7 +65,6 @@ AwsIotChannel::subscribe()
         FWE_LOG_ERROR( "MQTT Connection not established, failed to subscribe" );
         return ConnectivityError::NoConnection;
     }
-    auto connection = mConnectivityModule->getConnection();
     /*
      * This is invoked upon the reception of a message on a subscribed topic.
      */
@@ -122,7 +122,7 @@ AwsIotChannel::subscribe()
     };
 
     FWE_LOG_TRACE( "Subscribing..." );
-    connection->Subscribe( mTopicName.c_str(), Mqtt::QOS::AWS_MQTT_QOS_AT_LEAST_ONCE, onMessage, onSubAck );
+    mConnection->Subscribe( mTopicName.c_str(), Mqtt::QOS::AWS_MQTT_QOS_AT_LEAST_ONCE, onMessage, onSubAck );
 
     // Blocked call until subscribe finished this call should quickly either fail or succeed but
     // depends on the network quality the Bootstrap needs to retry subscribing if failed.
@@ -168,44 +168,33 @@ AwsIotChannel::sendBuffer( const std::uint8_t *buf, size_t size, struct Collecti
     {
         if ( mPayloadManager != nullptr )
         {
-            bool isDataPersisted = mPayloadManager->storeData( buf, size, collectionSchemeParams );
-
-            if ( isDataPersisted )
+            if ( collectionSchemeParams.persist )
             {
-                FWE_LOG_TRACE( "Payload has persisted successfully on disk" );
+                mPayloadManager->storeData( buf, size, collectionSchemeParams );
             }
             else
             {
-                FWE_LOG_WARN( "Payload has not been persisted" );
+                FWE_LOG_TRACE( "CollectionScheme does not activate persistency on disk" );
             }
         }
         return ConnectivityError::NoConnection;
     }
 
-    uint64_t currentMemoryUsage = mConnectivityModule->reserveMemoryUsage( size );
-    if ( ( mMaximumIotSDKHeapMemoryBytes != 0 ) && ( currentMemoryUsage > mMaximumIotSDKHeapMemoryBytes ) )
+    if ( !AwsSDKMemoryManager::getInstance().reserveMemory( size ) )
     {
-        mConnectivityModule->releaseMemoryUsage( size );
         FWE_LOG_ERROR( "Not sending out the message  with size " + std::to_string( size ) +
-                       " because IoT device SDK allocated the maximum defined memory. Currently allocated " +
-                       std::to_string( currentMemoryUsage ) );
-        if ( mPayloadManager != nullptr )
-        {
-            bool isDataPersisted = mPayloadManager->storeData( buf, size, collectionSchemeParams );
+                       " because IoT device SDK allocated the maximum defined memory. Payload will be stored" );
 
-            if ( isDataPersisted )
-            {
-                FWE_LOG_TRACE( "Data was persisted successfully" );
-            }
-            else
-            {
-                FWE_LOG_WARN( "Data was not persisted and is lost" );
-            }
+        if ( collectionSchemeParams.persist )
+        {
+            mPayloadManager->storeData( buf, size, collectionSchemeParams );
+        }
+        else
+        {
+            FWE_LOG_TRACE( "CollectionScheme does not activate persistency on disk" );
         }
         return ConnectivityError::QuotaReached;
     }
-
-    auto connection = mConnectivityModule->getConnection();
 
     auto payload = ByteBufNewCopy( DefaultAllocator(), (const uint8_t *)buf, size );
 
@@ -217,10 +206,7 @@ AwsIotChannel::sendBuffer( const std::uint8_t *buf, size_t size, struct Collecti
             aws_byte_buf_clean_up( &payload );
             {
                 std::lock_guard<std::mutex> connectivityLambdaLock( mConnectivityLambdaMutex );
-                if ( mConnectivityModule != nullptr )
-                {
-                    mConnectivityModule->releaseMemoryUsage( size );
-                }
+                AwsSDKMemoryManager::getInstance().releaseReservedMemory( size );
             }
             if ( ( packetId != 0U ) && ( errorCode == 0 ) )
             {
@@ -234,7 +220,104 @@ AwsIotChannel::sendBuffer( const std::uint8_t *buf, size_t size, struct Collecti
                 FWE_LOG_ERROR( std::string( "Operation failed with error" ) + errLog );
             }
         };
-    connection->Publish( mTopicName.c_str(), Mqtt::QOS::AWS_MQTT_QOS_AT_MOST_ONCE, false, payload, onPublishComplete );
+    mConnection->Publish( mTopicName.c_str(), Mqtt::QOS::AWS_MQTT_QOS_AT_MOST_ONCE, false, payload, onPublishComplete );
+    return ConnectivityError::Success;
+}
+
+ConnectivityError
+AwsIotChannel::sendFile( const std::string &filePath,
+                         size_t size,
+                         struct CollectionSchemeParams collectionSchemeParams )
+{
+    std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
+    if ( !isTopicValid() )
+    {
+        FWE_LOG_WARN( "Invalid topic provided" );
+        return ConnectivityError::NotConfigured;
+    }
+
+    if ( mPayloadManager == nullptr )
+    {
+        FWE_LOG_WARN( "No payload manager provided" );
+        return ConnectivityError::NotConfigured;
+    }
+
+    if ( filePath.empty() )
+    {
+        FWE_LOG_WARN( "No valid file path provided" );
+        return ConnectivityError::WrongInputData;
+    }
+
+    if ( size > getMaxSendSize() )
+    {
+        FWE_LOG_WARN( "Payload provided is too long" );
+        return ConnectivityError::WrongInputData;
+    }
+
+    if ( !isAliveNotThreadSafe() )
+    {
+
+        if ( collectionSchemeParams.persist )
+        {
+            // Only store metadata, file is already written on the disk
+            mPayloadManager->storeMetadata( filePath, size, collectionSchemeParams );
+        }
+        else
+        {
+            FWE_LOG_TRACE( "CollectionScheme does not activate persistency on disk" );
+        }
+        return ConnectivityError::NoConnection;
+    }
+
+    if ( !AwsSDKMemoryManager::getInstance().reserveMemory( size ) )
+    {
+        FWE_LOG_ERROR( "Not sending out the message  with size " + std::to_string( size ) +
+                       " because IoT device SDK allocated the maximum defined memory. Currently allocated " );
+        {
+            if ( collectionSchemeParams.persist )
+            {
+                // Only store metadata, file is already written on the disk
+                mPayloadManager->storeMetadata( filePath, size, collectionSchemeParams );
+            }
+            else
+            {
+                FWE_LOG_TRACE( "CollectionScheme does not activate persistency on disk" );
+            }
+        }
+        return ConnectivityError::QuotaReached;
+    }
+
+    std::vector<uint8_t> payload( size );
+    if ( mPayloadManager->retrievePayload( payload.data(), payload.size(), filePath ) != ErrorCode::SUCCESS )
+    {
+        return ConnectivityError::WrongInputData;
+    }
+
+    auto payloadBuffer = ByteBufNewCopy( DefaultAllocator(), (const uint8_t *)payload.data(), payload.size() );
+
+    auto onPublishComplete =
+        [payloadBuffer, size, this]( Mqtt::MqttConnection &mqttConnection, uint16_t packetId, int errorCode ) mutable {
+            /* This call means that the data was handed over to some lower level in the stack but not
+                that the data is actually sent on the bus or removed from RAM */
+            (void)mqttConnection;
+            aws_byte_buf_clean_up( &payloadBuffer );
+            {
+                std::lock_guard<std::mutex> connectivityLambdaLock( mConnectivityLambdaMutex );
+                AwsSDKMemoryManager::getInstance().releaseReservedMemory( size );
+            }
+            if ( ( packetId != 0U ) && ( errorCode == 0 ) )
+            {
+                FWE_LOG_TRACE( "Operation on packetId  " + std::to_string( packetId ) + " Succeeded" );
+            }
+            else
+            {
+                auto errSting = aws_error_debug_str( errorCode );
+                std::string errLog = errSting != nullptr ? std::string( errSting ) : std::string( "Unknown error" );
+                FWE_LOG_ERROR( std::string( "Operation failed with error" ) + errLog );
+            }
+        };
+    mConnection->Publish(
+        mTopicName.c_str(), Mqtt::QOS::AWS_MQTT_QOS_AT_MOST_ONCE, false, payloadBuffer, onPublishComplete );
     return ConnectivityError::Success;
 }
 
@@ -244,19 +327,17 @@ AwsIotChannel::unsubscribe()
     std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
     if ( mSubscribed && isAliveNotThreadSafe() )
     {
-        auto connection = mConnectivityModule->getConnection();
-
         std::promise<void> unsubscribeFinishedPromise;
         FWE_LOG_TRACE( "Unsubscribing..." );
-        connection->Unsubscribe( mTopicName.c_str(),
-                                 [&]( Mqtt::MqttConnection &mqttConnection, uint16_t packetId, int errorCode ) {
-                                     (void)mqttConnection;
-                                     (void)packetId;
-                                     (void)errorCode;
-                                     FWE_LOG_TRACE( "Unsubscribed" );
-                                     mSubscribed = false;
-                                     unsubscribeFinishedPromise.set_value();
-                                 } );
+        mConnection->Unsubscribe( mTopicName.c_str(),
+                                  [&]( Mqtt::MqttConnection &mqttConnection, uint16_t packetId, int errorCode ) {
+                                      (void)mqttConnection;
+                                      (void)packetId;
+                                      (void)errorCode;
+                                      FWE_LOG_TRACE( "Unsubscribed" );
+                                      mSubscribed = false;
+                                      unsubscribeFinishedPromise.set_value();
+                                  } );
         // Blocked call until subscribe finished this call should quickly either fail or succeed but
         // depends on the network quality the Bootstrap needs to retry subscribing if failed.
         unsubscribeFinishedPromise.get_future().wait();

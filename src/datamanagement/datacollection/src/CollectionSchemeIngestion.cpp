@@ -137,37 +137,6 @@ CollectionSchemeIngestion::build()
         FWE_LOG_ERROR( "COLLECTION_SCHEME_TYPE_NOT_SET" );
     }
 
-    // Build Image capture collection info
-    for ( int imageDataIndex = 0; imageDataIndex < mProtoCollectionSchemeMessagePtr->image_data_size();
-          ++imageDataIndex )
-    {
-        // Get a reference to the RAW CAN Frame in the protobuf
-        const CollectionSchemesMsg::ImageData &imageData =
-            mProtoCollectionSchemeMessagePtr->image_data( imageDataIndex );
-
-        ImageCollectionInfo imageCaptureData;
-        // Read the Image capture settings
-        imageCaptureData.deviceID = imageData.image_source_node_id();
-        // We only support Time based image capture. We skip any other type.
-        if ( imageData.image_collection_method_case() ==
-             CollectionSchemesMsg::ImageData::ImageCollectionMethodCase::kTimeBasedImageData )
-        {
-            imageCaptureData.collectionType = ImageCollectionType::TIME_BASED;
-            // Timing constraints
-            imageCaptureData.beforeDurationMs = imageData.time_based_image_data().before_duration_ms();
-            // Image format
-            imageCaptureData.imageFormat = static_cast<uint32_t>( imageData.image_type() );
-            FWE_LOG_INFO( "Adding Image capture settings for DeviceID: " +
-                          std::to_string( imageCaptureData.deviceID ) );
-
-            mImagesCaptureData.emplace_back( imageCaptureData );
-        }
-        else
-        {
-            FWE_LOG_WARN( "Unsupported Image capture settings provided, skipping" );
-        }
-    }
-
     FWE_LOG_INFO( "Successfully built CollectionScheme ID: " + mProtoCollectionSchemeMessagePtr->campaign_sync_id() );
 
     // Set ready flag to true
@@ -384,8 +353,8 @@ CollectionSchemeIngestion::serializeNode( const CollectionSchemesMsg::ConditionN
         // If no left node this node_operator is invalid
         if ( node.node_operator().has_left_child() )
         {
-            FWE_LOG_TRACE( "Processing left child" );
             currentNode->nodeType = convertOperatorType( node.node_operator().operator_() );
+            FWE_LOG_TRACE( "Processing left child" );
             // If no valid function found return always false
             if ( currentNode->nodeType == ExpressionNodeType::BOOLEAN )
             {
@@ -564,17 +533,6 @@ CollectionSchemeIngestion::getCollectRawCanFrames() const
     }
 
     return mCollectedRawCAN;
-}
-
-const ICollectionScheme::ImagesDataType &
-CollectionSchemeIngestion::getImageCaptureData() const
-{
-    if ( !mReady )
-    {
-        return INVALID_IMAGE_DATA;
-    }
-
-    return mImagesCaptureData;
 }
 
 const struct ExpressionNode *

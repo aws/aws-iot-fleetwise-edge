@@ -22,6 +22,7 @@ target_link_libraries(
   IoTFleetWise::DataCollection
   IoTFleetWise::DataInspection
   IoTFleetWise::DataDecoding
+  IoTFleetWise::DataSender
   IoTFleetWise::Platform::Linux
   IoTFleetWise::OffboardConnectivityAwsIot
   $<$<BOOL:${FWE_FEATURE_CUSTOM_DATA_SOURCE}>:IoTFleetWise::CustomDataSource>
@@ -29,7 +30,7 @@ target_link_libraries(
 
 add_library(${libraryAliasName} ALIAS ${libraryTargetName})
 
-### AWS IoT FleetWise Edge Executable ###
+### FWE Executable ###
 
 if(FWE_BUILD_EXECUTABLE)
   add_executable(aws-iot-fleetwise-edge src/main.cpp)

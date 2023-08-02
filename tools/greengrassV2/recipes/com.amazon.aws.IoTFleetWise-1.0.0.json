@@ -1,0 +1,31 @@
+{
+  "RecipeFormatVersion": "2020-01-25",
+  "ComponentName": "com.amazon.aws.IoTFleetWise",
+  "ComponentVersion": "1.0.0",
+  "ComponentDescription": "Reference Implementation for AWS IoT FleetWise",
+  "ComponentPublisher": "Amazon",
+  "ComponentConfiguration": {
+    "DefaultConfiguration": {
+      "Message": "world",
+      "accessControl": {
+        "aws.greengrass.ipc.mqttproxy": {
+          "com.amazon.aws.IoTFleetWise:mqttproxy:1": {
+            "policyDescription": "Allows access to publish/subscribe to all topics.",
+            "operations": ["aws.greengrass#PublishToIoTCore", "aws.greengrass#SubscribeToIoTCore"],
+            "resources": ["*"]
+          }
+        }
+      }
+    }
+  },
+  "Manifests": [
+    {
+      "Platform": {
+        "os": "linux"
+      },
+      "Lifecycle": {
+        "Run": "{artifacts:path}/aws-iot-fleetwise-edge {artifacts:path}/config.json"
+      }
+    }
+  ]
+}

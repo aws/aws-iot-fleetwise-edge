@@ -4,26 +4,31 @@
 #pragma once
 
 // Includes
+#ifdef FWE_FEATURE_AAOS_VHAL
+#include "AaosVhalSource.h"
+#endif
+#ifdef FWE_FEATURE_GREENGRASSV2
+#include "AwsGGConnectivityModule.h"
+#endif
 #include "AwsIotChannel.h"
 #include "AwsIotConnectivityModule.h"
+#include "AwsSDKMemoryManager.h"
 #include "CANDataSource.h"
 #include "CANInterfaceIDTranslator.h"
 #include "CacheAndPersist.h"
 #include "ClockHandler.h"
 #include "CollectionInspectionWorkerThread.h"
 #include "CollectionSchemeManager.h"
-#include "DataCollectionSender.h"
-#ifdef FWE_FEATURE_CAMERA
-#include "DataOverDDSModule.h"
-#endif // FWE_FEATURE_CAMERA
-#ifdef FWE_FEATURE_IWAVE_GPS
-#include "IWaveGpsSource.h"
-#endif
+#include "DataSenderManagerWorkerThread.h"
 #ifdef FWE_FEATURE_EXTERNAL_GPS
 #include "ExternalGpsSource.h"
 #endif
 #include "ExternalCANDataSource.h"
-#include "IDataReadyToPublishListener.h"
+#include "IConnectivityChannel.h"
+#include "IConnectivityModule.h"
+#ifdef FWE_FEATURE_IWAVE_GPS
+#include "IWaveGpsSource.h"
+#endif
 #include "OBDOverCANModule.h"
 #include "RemoteProfiler.h"
 #include "Schema.h"
@@ -43,9 +48,11 @@ namespace ExecutionManagement
 {
 using namespace Aws::IoTFleetWise::DataManagement;
 using namespace Aws::IoTFleetWise::DataInspection;
+using namespace Aws::IoTFleetWise::DataSender;
 using namespace Aws::IoTFleetWise::Platform::Linux;
 using namespace Aws::IoTFleetWise::Platform::Linux::PersistencyManagement;
 using namespace Aws::IoTFleetWise::VehicleNetwork;
+using namespace Aws::IoTFleetWise::OffboardConnectivity;
 using namespace Aws::IoTFleetWise::OffboardConnectivityAwsIot;
 
 /**
@@ -54,19 +61,13 @@ using namespace Aws::IoTFleetWise::OffboardConnectivityAwsIot;
  * 2- Initializes the Inspection Engine
  * 3- Initializes the CollectionScheme Ingestion & Management modules
  * 5- Initializes the Vehicle Network module.
- * The bootstrap executes a worker thread that listens to the Inspection
- * Engine notification, upon which the offboardconnectivity module is invoked to
- * send the data to the cloud.
+ * 6- Initializes the DataSenderManager module.
  */
-class IoTFleetWiseEngine : public IDataReadyToPublishListener
+class IoTFleetWiseEngine
 {
 public:
-    static const uint32_t MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG;
-    static const uint64_t FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS;    // retry every second
-    static const uint64_t DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS; // retry every 10 second
-
     IoTFleetWiseEngine();
-    ~IoTFleetWiseEngine() override;
+    ~IoTFleetWiseEngine();
 
     IoTFleetWiseEngine( const IoTFleetWiseEngine & ) = delete;
     IoTFleetWiseEngine &operator=( const IoTFleetWiseEngine & ) = delete;
@@ -78,19 +79,6 @@ public:
     bool stop();
     bool disconnect();
     bool isAlive();
-
-    /**
-     * @brief Callback from the Inspection Engine to wake up this thread and
-     * publish the data to the cloud.
-     */
-    void onDataReadyToPublish() override;
-
-    /**
-     * @brief Check if the data was persisted in the last cycle due to no offboardconnectivity,
-     *        retrieve all the data and send
-     * @return true if either no data persisted or all persisted data was handed over to connectivity
-     */
-    bool checkAndSendRetrievedData();
 
     /**
      * @brief Gets a list of OBD PIDs to request externally
@@ -123,6 +111,26 @@ public:
     void setExternalGpsLocation( double latitude, double longitude );
 #endif
 
+#ifdef FWE_FEATURE_AAOS_VHAL
+    /**
+     * Returns a vector of vehicle property info
+     *
+     * @return Vehicle property info, with each member containing an array with 4 values:
+     * - Vehicle property ID
+     * - Area index
+     * - Result index
+     * - Signal ID
+     */
+    std::vector<std::array<uint32_t, 4>> getVehiclePropertyInfo();
+
+    /**
+     * @brief Sets an Android Automotive vehicle property
+     * @param signalId Signal ID
+     * @param value Vehicle property value
+     */
+    void setVehicleProperty( uint32_t signalId, double value );
+#endif
+
     /**
      * @brief Return a status summary, including the MQTT connection status, the campaign ARNs,
      *        and the number of payloads sent.
@@ -142,15 +150,14 @@ public:
     std::shared_ptr<CacheAndPersist> mPersistDecoderManifestCollectionSchemesAndData;
 
 private:
-    static constexpr uint64_t DEFAULT_PERSISTENCY_UPLOAD_RETRY_INTERVAL_MS = 0;
+    static constexpr uint64_t DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 10000;
+
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };
     mutable std::mutex mThreadMutex;
 
     Platform::Linux::Signal mWait;
     Timer mTimer;
-    Timer mRetrySendingPersistedDataTimer;
-    uint64_t mPersistencyUploadRetryIntervalMs{ DEFAULT_PERSISTENCY_UPLOAD_RETRY_INTERVAL_MS };
 
     Timer mPrintMetricsCyclicTimer;
     uint64_t mPrintMetricsCyclicPeriodMs{ 0 }; // default to 0 which means no cyclic printing
@@ -162,13 +169,12 @@ private:
     std::vector<std::unique_ptr<CANDataSource>> mCANDataSources;
     std::unique_ptr<ExternalCANDataSource> mExternalCANDataSource;
     std::unique_ptr<CANDataConsumer> mCANDataConsumer;
-    std::shared_ptr<DataCollectionSender> mDataCollectionSender;
 
-    std::shared_ptr<AwsIotConnectivityModule> mAwsIotModule;
-    std::shared_ptr<AwsIotChannel> mAwsIotChannelSendCanData;
-    std::shared_ptr<AwsIotChannel> mAwsIotChannelSendCheckin;
-    std::shared_ptr<AwsIotChannel> mAwsIotChannelReceiveCollectionSchemeList;
-    std::shared_ptr<AwsIotChannel> mAwsIotChannelReceiveDecoderManifest;
+    std::shared_ptr<IConnectivityModule> mConnectivityModule;
+    std::shared_ptr<IConnectivityChannel> mConnectivityChannelSendVehicleData;
+    std::shared_ptr<IConnectivityChannel> mConnectivityChannelSendCheckin;
+    std::shared_ptr<IConnectivityChannel> mConnectivityChannelReceiveCollectionSchemeList;
+    std::shared_ptr<IConnectivityChannel> mConnectivityChannelReceiveDecoderManifest;
     std::shared_ptr<PayloadManager> mPayloadManager;
 
     std::shared_ptr<Schema> mSchemaPtr;
@@ -176,18 +182,20 @@ private:
 
     std::shared_ptr<CollectionInspectionWorkerThread> mCollectionInspectionWorkerThread;
 
+    std::shared_ptr<DataSenderManagerWorkerThread> mDataSenderManagerWorkerThread;
+
     std::unique_ptr<RemoteProfiler> mRemoteProfiler;
-    std::shared_ptr<AwsIotChannel> mAwsIotChannelMetricsUpload;
-    std::shared_ptr<AwsIotChannel> mAwsIotChannelLogsUpload;
-#ifdef FWE_FEATURE_CAMERA
-    // DDS Module
-    std::shared_ptr<DataOverDDSModule> mDataOverDDSModule;
-#endif // FWE_FEATURE_CAMERA
+    std::shared_ptr<IConnectivityChannel> mConnectivityChannelMetricsUpload;
+    std::shared_ptr<IConnectivityChannel> mConnectivityChannelLogsUpload;
+
 #ifdef FWE_FEATURE_IWAVE_GPS
     std::shared_ptr<IWaveGpsSource> mIWaveGpsSource;
 #endif
 #ifdef FWE_FEATURE_EXTERNAL_GPS
     std::shared_ptr<ExternalGpsSource> mExternalGpsSource;
+#endif
+#ifdef FWE_FEATURE_AAOS_VHAL
+    std::shared_ptr<AaosVhalSource> mAaosVhalSource;
 #endif
 };
 } // namespace ExecutionManagement

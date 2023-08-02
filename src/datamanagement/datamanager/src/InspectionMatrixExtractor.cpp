@@ -60,35 +60,12 @@ CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectio
             conditionData.canFrames.emplace_back( CANFrame );
         }
     }
-    // Image capture data
-    const std::vector<ImageCollectionInfo> &imageCollectionInfos = collectionScheme->getImageCaptureData();
-    for ( const auto &imageInfo : imageCollectionInfos )
-    {
-        InspectionMatrixImageCollectionInfo imageSettings = {};
-        imageSettings.deviceID = imageInfo.deviceID;
-        switch ( imageInfo.collectionType )
-        {
-        case ImageCollectionType::TIME_BASED:
-            imageSettings.collectionType = InspectionMatrixImageCollectionType::TIME_BASED;
-            imageSettings.beforeDurationMs = imageInfo.beforeDurationMs;
-            break;
-        case ImageCollectionType::FRAME_BASED:
-            imageSettings.collectionType = InspectionMatrixImageCollectionType::FRAME_BASED;
-            break;
-
-        default:
-            break;
-        }
-        imageSettings.imageFormat = imageInfo.imageFormat;
-        conditionData.imageCollectionInfos.emplace_back( imageSettings );
-    }
-    conditionData.includeImageCapture = !conditionData.imageCollectionInfos.empty();
     // The rest
-    conditionData.metaData.compress = collectionScheme->isCompressionNeeded();
-    conditionData.metaData.persist = collectionScheme->isPersistNeeded();
-    conditionData.metaData.priority = collectionScheme->getPriority();
-    conditionData.metaData.decoderID = collectionScheme->getDecoderManifestID();
-    conditionData.metaData.collectionSchemeID = collectionScheme->getCollectionSchemeID();
+    conditionData.metadata.compress = collectionScheme->isCompressionNeeded();
+    conditionData.metadata.persist = collectionScheme->isPersistNeeded();
+    conditionData.metadata.priority = collectionScheme->getPriority();
+    conditionData.metadata.decoderID = collectionScheme->getDecoderManifestID();
+    conditionData.metadata.collectionSchemeID = collectionScheme->getCollectionSchemeID();
 }
 
 void

@@ -1,0 +1,4264 @@
+[
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle.VHAL",
+      "description": "Android Automotive OS VHAL"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_MODEL_YEAR",
+      "description": "INFO_MODEL_YEAR"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_CAPACITY",
+      "description": "INFO_FUEL_CAPACITY"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_TYPE_0",
+      "description": "INFO_FUEL_TYPE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_TYPE_1",
+      "description": "INFO_FUEL_TYPE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_TYPE_2",
+      "description": "INFO_FUEL_TYPE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_TYPE_3",
+      "description": "INFO_FUEL_TYPE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_BATTERY_CAPACITY",
+      "description": "INFO_EV_BATTERY_CAPACITY"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_CONNECTOR_TYPE_0",
+      "description": "INFO_EV_CONNECTOR_TYPE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_CONNECTOR_TYPE_1",
+      "description": "INFO_EV_CONNECTOR_TYPE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_CONNECTOR_TYPE_2",
+      "description": "INFO_EV_CONNECTOR_TYPE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_CONNECTOR_TYPE_3",
+      "description": "INFO_EV_CONNECTOR_TYPE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_DOOR_LOCATION",
+      "description": "INFO_FUEL_DOOR_LOCATION"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_PORT_LOCATION",
+      "description": "INFO_EV_PORT_LOCATION"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_DRIVER_SEAT",
+      "description": "INFO_DRIVER_SEAT"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_0",
+      "description": "INFO_EXTERIOR_DIMENSIONS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_1",
+      "description": "INFO_EXTERIOR_DIMENSIONS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_2",
+      "description": "INFO_EXTERIOR_DIMENSIONS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_3",
+      "description": "INFO_EXTERIOR_DIMENSIONS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_4",
+      "description": "INFO_EXTERIOR_DIMENSIONS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_5",
+      "description": "INFO_EXTERIOR_DIMENSIONS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_6",
+      "description": "INFO_EXTERIOR_DIMENSIONS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_7",
+      "description": "INFO_EXTERIOR_DIMENSIONS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_MULTI_EV_PORT_LOCATIONS_0",
+      "description": "INFO_MULTI_EV_PORT_LOCATIONS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.INFO_MULTI_EV_PORT_LOCATIONS_1",
+      "description": "INFO_MULTI_EV_PORT_LOCATIONS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.PERF_ODOMETER",
+      "description": "PERF_ODOMETER"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.PERF_VEHICLE_SPEED",
+      "description": "PERF_VEHICLE_SPEED"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.PERF_VEHICLE_SPEED_DISPLAY",
+      "description": "PERF_VEHICLE_SPEED_DISPLAY"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.PERF_STEERING_ANGLE",
+      "description": "PERF_STEERING_ANGLE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.PERF_REAR_STEERING_ANGLE",
+      "description": "PERF_REAR_STEERING_ANGLE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.ENGINE_COOLANT_TEMP",
+      "description": "ENGINE_COOLANT_TEMP"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.ENGINE_OIL_LEVEL",
+      "description": "ENGINE_OIL_LEVEL"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.ENGINE_OIL_TEMP",
+      "description": "ENGINE_OIL_TEMP"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.ENGINE_RPM",
+      "description": "ENGINE_RPM"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WHEEL_TICK_0",
+      "description": "WHEEL_TICK_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WHEEL_TICK_1",
+      "description": "WHEEL_TICK_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WHEEL_TICK_2",
+      "description": "WHEEL_TICK_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WHEEL_TICK_3",
+      "description": "WHEEL_TICK_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WHEEL_TICK_4",
+      "description": "WHEEL_TICK_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.FUEL_LEVEL",
+      "description": "FUEL_LEVEL"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.FUEL_DOOR_OPEN",
+      "description": "FUEL_DOOR_OPEN"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.EV_BATTERY_LEVEL",
+      "description": "EV_BATTERY_LEVEL"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.EV_CHARGE_PORT_OPEN",
+      "description": "EV_CHARGE_PORT_OPEN"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.EV_CHARGE_PORT_CONNECTED",
+      "description": "EV_CHARGE_PORT_CONNECTED"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.EV_BATTERY_INSTANTANEOUS_CHARGE_RATE",
+      "description": "EV_BATTERY_INSTANTANEOUS_CHARGE_RATE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.RANGE_REMAINING",
+      "description": "RANGE_REMAINING"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.TIRE_PRESSURE_0",
+      "description": "TIRE_PRESSURE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.TIRE_PRESSURE_1",
+      "description": "TIRE_PRESSURE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.TIRE_PRESSURE_2",
+      "description": "TIRE_PRESSURE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.TIRE_PRESSURE_3",
+      "description": "TIRE_PRESSURE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.GEAR_SELECTION",
+      "description": "GEAR_SELECTION"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.CURRENT_GEAR",
+      "description": "CURRENT_GEAR"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.PARKING_BRAKE_ON",
+      "description": "PARKING_BRAKE_ON"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.PARKING_BRAKE_AUTO_APPLY",
+      "description": "PARKING_BRAKE_AUTO_APPLY"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.FUEL_LEVEL_LOW",
+      "description": "FUEL_LEVEL_LOW"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.NIGHT_MODE",
+      "description": "NIGHT_MODE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.TURN_SIGNAL_STATE",
+      "description": "TURN_SIGNAL_STATE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.IGNITION_STATE",
+      "description": "IGNITION_STATE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.ABS_ACTIVE",
+      "description": "ABS_ACTIVE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.TRACTION_CONTROL_ACTIVE",
+      "description": "TRACTION_CONTROL_ACTIVE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_0",
+      "description": "HVAC_FAN_SPEED_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_1",
+      "description": "HVAC_FAN_SPEED_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_2",
+      "description": "HVAC_FAN_SPEED_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_3",
+      "description": "HVAC_FAN_SPEED_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_4",
+      "description": "HVAC_FAN_SPEED_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_5",
+      "description": "HVAC_FAN_SPEED_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_6",
+      "description": "HVAC_FAN_SPEED_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_7",
+      "description": "HVAC_FAN_SPEED_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_8",
+      "description": "HVAC_FAN_SPEED_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_0",
+      "description": "HVAC_FAN_DIRECTION_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_1",
+      "description": "HVAC_FAN_DIRECTION_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_2",
+      "description": "HVAC_FAN_DIRECTION_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_3",
+      "description": "HVAC_FAN_DIRECTION_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_4",
+      "description": "HVAC_FAN_DIRECTION_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_5",
+      "description": "HVAC_FAN_DIRECTION_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_6",
+      "description": "HVAC_FAN_DIRECTION_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_7",
+      "description": "HVAC_FAN_DIRECTION_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_8",
+      "description": "HVAC_FAN_DIRECTION_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_0",
+      "description": "HVAC_TEMPERATURE_CURRENT_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_1",
+      "description": "HVAC_TEMPERATURE_CURRENT_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_2",
+      "description": "HVAC_TEMPERATURE_CURRENT_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_3",
+      "description": "HVAC_TEMPERATURE_CURRENT_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_4",
+      "description": "HVAC_TEMPERATURE_CURRENT_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_5",
+      "description": "HVAC_TEMPERATURE_CURRENT_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_6",
+      "description": "HVAC_TEMPERATURE_CURRENT_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_7",
+      "description": "HVAC_TEMPERATURE_CURRENT_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_8",
+      "description": "HVAC_TEMPERATURE_CURRENT_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_0",
+      "description": "HVAC_TEMPERATURE_SET_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_1",
+      "description": "HVAC_TEMPERATURE_SET_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_2",
+      "description": "HVAC_TEMPERATURE_SET_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_3",
+      "description": "HVAC_TEMPERATURE_SET_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_4",
+      "description": "HVAC_TEMPERATURE_SET_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_5",
+      "description": "HVAC_TEMPERATURE_SET_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_6",
+      "description": "HVAC_TEMPERATURE_SET_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_7",
+      "description": "HVAC_TEMPERATURE_SET_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_8",
+      "description": "HVAC_TEMPERATURE_SET_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_0",
+      "description": "HVAC_DEFROSTER_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_1",
+      "description": "HVAC_DEFROSTER_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_2",
+      "description": "HVAC_DEFROSTER_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_3",
+      "description": "HVAC_DEFROSTER_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_4",
+      "description": "HVAC_DEFROSTER_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_5",
+      "description": "HVAC_DEFROSTER_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_6",
+      "description": "HVAC_DEFROSTER_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_7",
+      "description": "HVAC_DEFROSTER_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_8",
+      "description": "HVAC_DEFROSTER_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_9",
+      "description": "HVAC_DEFROSTER_9"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_0",
+      "description": "HVAC_AC_ON_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_1",
+      "description": "HVAC_AC_ON_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_2",
+      "description": "HVAC_AC_ON_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_3",
+      "description": "HVAC_AC_ON_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_4",
+      "description": "HVAC_AC_ON_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_5",
+      "description": "HVAC_AC_ON_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_6",
+      "description": "HVAC_AC_ON_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_7",
+      "description": "HVAC_AC_ON_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_8",
+      "description": "HVAC_AC_ON_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_0",
+      "description": "HVAC_MAX_AC_ON_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_1",
+      "description": "HVAC_MAX_AC_ON_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_2",
+      "description": "HVAC_MAX_AC_ON_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_3",
+      "description": "HVAC_MAX_AC_ON_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_4",
+      "description": "HVAC_MAX_AC_ON_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_5",
+      "description": "HVAC_MAX_AC_ON_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_6",
+      "description": "HVAC_MAX_AC_ON_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_7",
+      "description": "HVAC_MAX_AC_ON_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_8",
+      "description": "HVAC_MAX_AC_ON_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_0",
+      "description": "HVAC_MAX_DEFROST_ON_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_1",
+      "description": "HVAC_MAX_DEFROST_ON_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_2",
+      "description": "HVAC_MAX_DEFROST_ON_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_3",
+      "description": "HVAC_MAX_DEFROST_ON_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_4",
+      "description": "HVAC_MAX_DEFROST_ON_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_5",
+      "description": "HVAC_MAX_DEFROST_ON_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_6",
+      "description": "HVAC_MAX_DEFROST_ON_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_7",
+      "description": "HVAC_MAX_DEFROST_ON_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_8",
+      "description": "HVAC_MAX_DEFROST_ON_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_0",
+      "description": "HVAC_RECIRC_ON_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_1",
+      "description": "HVAC_RECIRC_ON_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_2",
+      "description": "HVAC_RECIRC_ON_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_3",
+      "description": "HVAC_RECIRC_ON_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_4",
+      "description": "HVAC_RECIRC_ON_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_5",
+      "description": "HVAC_RECIRC_ON_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_6",
+      "description": "HVAC_RECIRC_ON_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_7",
+      "description": "HVAC_RECIRC_ON_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_8",
+      "description": "HVAC_RECIRC_ON_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_0",
+      "description": "HVAC_DUAL_ON_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_1",
+      "description": "HVAC_DUAL_ON_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_2",
+      "description": "HVAC_DUAL_ON_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_3",
+      "description": "HVAC_DUAL_ON_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_4",
+      "description": "HVAC_DUAL_ON_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_5",
+      "description": "HVAC_DUAL_ON_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_6",
+      "description": "HVAC_DUAL_ON_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_7",
+      "description": "HVAC_DUAL_ON_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_8",
+      "description": "HVAC_DUAL_ON_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_0",
+      "description": "HVAC_AUTO_ON_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_1",
+      "description": "HVAC_AUTO_ON_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_2",
+      "description": "HVAC_AUTO_ON_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_3",
+      "description": "HVAC_AUTO_ON_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_4",
+      "description": "HVAC_AUTO_ON_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_5",
+      "description": "HVAC_AUTO_ON_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_6",
+      "description": "HVAC_AUTO_ON_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_7",
+      "description": "HVAC_AUTO_ON_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_8",
+      "description": "HVAC_AUTO_ON_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_0",
+      "description": "HVAC_SEAT_TEMPERATURE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_1",
+      "description": "HVAC_SEAT_TEMPERATURE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_2",
+      "description": "HVAC_SEAT_TEMPERATURE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_3",
+      "description": "HVAC_SEAT_TEMPERATURE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_4",
+      "description": "HVAC_SEAT_TEMPERATURE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_5",
+      "description": "HVAC_SEAT_TEMPERATURE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_6",
+      "description": "HVAC_SEAT_TEMPERATURE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_7",
+      "description": "HVAC_SEAT_TEMPERATURE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_8",
+      "description": "HVAC_SEAT_TEMPERATURE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SIDE_MIRROR_HEAT_0",
+      "description": "HVAC_SIDE_MIRROR_HEAT_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SIDE_MIRROR_HEAT_1",
+      "description": "HVAC_SIDE_MIRROR_HEAT_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SIDE_MIRROR_HEAT_2",
+      "description": "HVAC_SIDE_MIRROR_HEAT_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_STEERING_WHEEL_HEAT",
+      "description": "HVAC_STEERING_WHEEL_HEAT"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_DISPLAY_UNITS",
+      "description": "HVAC_TEMPERATURE_DISPLAY_UNITS"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_0",
+      "description": "HVAC_ACTUAL_FAN_SPEED_RPM_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_1",
+      "description": "HVAC_ACTUAL_FAN_SPEED_RPM_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_2",
+      "description": "HVAC_ACTUAL_FAN_SPEED_RPM_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_3",
+      "description": "HVAC_ACTUAL_FAN_SPEED_RPM_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_4",
+      "description": "HVAC_ACTUAL_FAN_SPEED_RPM_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_5",
+      "description": "HVAC_ACTUAL_FAN_SPEED_RPM_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_6",
+      "description": "HVAC_ACTUAL_FAN_SPEED_RPM_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_7",
+      "description": "HVAC_ACTUAL_FAN_SPEED_RPM_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_8",
+      "description": "HVAC_ACTUAL_FAN_SPEED_RPM_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_0",
+      "description": "HVAC_POWER_ON_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_1",
+      "description": "HVAC_POWER_ON_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_2",
+      "description": "HVAC_POWER_ON_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_3",
+      "description": "HVAC_POWER_ON_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_4",
+      "description": "HVAC_POWER_ON_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_5",
+      "description": "HVAC_POWER_ON_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_6",
+      "description": "HVAC_POWER_ON_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_7",
+      "description": "HVAC_POWER_ON_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_8",
+      "description": "HVAC_POWER_ON_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_0_0",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_0_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_0_1",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_0_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_0_2",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_0_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_0_3",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_0_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_1_0",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_1_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_1_1",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_1_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_1_2",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_1_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_1_3",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_1_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_2_0",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_2_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_2_1",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_2_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_2_2",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_2_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_2_3",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_2_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_3_0",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_3_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_3_1",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_3_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_3_2",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_3_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_3_3",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_3_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_4_0",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_4_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_4_1",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_4_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_4_2",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_4_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_4_3",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_4_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_5_0",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_5_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_5_1",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_5_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_5_2",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_5_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_5_3",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_5_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_6_0",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_6_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_6_1",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_6_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_6_2",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_6_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_6_3",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_6_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_7_0",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_7_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_7_1",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_7_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_7_2",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_7_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_7_3",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_7_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_8_0",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_8_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_8_1",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_8_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_8_2",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_8_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_8_3",
+      "description": "HVAC_FAN_DIRECTION_AVAILABLE_8_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_0",
+      "description": "HVAC_AUTO_RECIRC_ON_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_1",
+      "description": "HVAC_AUTO_RECIRC_ON_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_2",
+      "description": "HVAC_AUTO_RECIRC_ON_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_3",
+      "description": "HVAC_AUTO_RECIRC_ON_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_4",
+      "description": "HVAC_AUTO_RECIRC_ON_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_5",
+      "description": "HVAC_AUTO_RECIRC_ON_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_6",
+      "description": "HVAC_AUTO_RECIRC_ON_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_7",
+      "description": "HVAC_AUTO_RECIRC_ON_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_8",
+      "description": "HVAC_AUTO_RECIRC_ON_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_0",
+      "description": "HVAC_SEAT_VENTILATION_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_1",
+      "description": "HVAC_SEAT_VENTILATION_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_2",
+      "description": "HVAC_SEAT_VENTILATION_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_3",
+      "description": "HVAC_SEAT_VENTILATION_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_4",
+      "description": "HVAC_SEAT_VENTILATION_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_5",
+      "description": "HVAC_SEAT_VENTILATION_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_6",
+      "description": "HVAC_SEAT_VENTILATION_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_7",
+      "description": "HVAC_SEAT_VENTILATION_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_8",
+      "description": "HVAC_SEAT_VENTILATION_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_0",
+      "description": "HVAC_ELECTRIC_DEFROSTER_ON_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_1",
+      "description": "HVAC_ELECTRIC_DEFROSTER_ON_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_2",
+      "description": "HVAC_ELECTRIC_DEFROSTER_ON_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_3",
+      "description": "HVAC_ELECTRIC_DEFROSTER_ON_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_4",
+      "description": "HVAC_ELECTRIC_DEFROSTER_ON_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_5",
+      "description": "HVAC_ELECTRIC_DEFROSTER_ON_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_6",
+      "description": "HVAC_ELECTRIC_DEFROSTER_ON_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_7",
+      "description": "HVAC_ELECTRIC_DEFROSTER_ON_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_8",
+      "description": "HVAC_ELECTRIC_DEFROSTER_ON_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_9",
+      "description": "HVAC_ELECTRIC_DEFROSTER_ON_9"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DISTANCE_DISPLAY_UNITS",
+      "description": "DISTANCE_DISPLAY_UNITS"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.FUEL_VOLUME_DISPLAY_UNITS",
+      "description": "FUEL_VOLUME_DISPLAY_UNITS"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.TIRE_PRESSURE_DISPLAY_UNITS",
+      "description": "TIRE_PRESSURE_DISPLAY_UNITS"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.EV_BATTERY_DISPLAY_UNITS",
+      "description": "EV_BATTERY_DISPLAY_UNITS"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.FUEL_CONSUMPTION_UNITS_DISTANCE_OVER_VOLUME",
+      "description": "FUEL_CONSUMPTION_UNITS_DISTANCE_OVER_VOLUME"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.VEHICLE_SPEED_DISPLAY_UNITS",
+      "description": "VEHICLE_SPEED_DISPLAY_UNITS"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.ENV_OUTSIDE_TEMPERATURE",
+      "description": "ENV_OUTSIDE_TEMPERATURE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.AP_POWER_STATE_REQ_0",
+      "description": "AP_POWER_STATE_REQ_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.AP_POWER_STATE_REQ_1",
+      "description": "AP_POWER_STATE_REQ_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.AP_POWER_STATE_REPORT_0",
+      "description": "AP_POWER_STATE_REPORT_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.AP_POWER_STATE_REPORT_1",
+      "description": "AP_POWER_STATE_REPORT_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.AP_POWER_BOOTUP_REASON",
+      "description": "AP_POWER_BOOTUP_REASON"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DISPLAY_BRIGHTNESS",
+      "description": "DISPLAY_BRIGHTNESS"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_0",
+      "description": "DOOR_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_1",
+      "description": "DOOR_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_2",
+      "description": "DOOR_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_3",
+      "description": "DOOR_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_4",
+      "description": "DOOR_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_5",
+      "description": "DOOR_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_6",
+      "description": "DOOR_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_7",
+      "description": "DOOR_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_0",
+      "description": "DOOR_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_1",
+      "description": "DOOR_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_2",
+      "description": "DOOR_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_3",
+      "description": "DOOR_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_4",
+      "description": "DOOR_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_5",
+      "description": "DOOR_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_6",
+      "description": "DOOR_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_7",
+      "description": "DOOR_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_0",
+      "description": "DOOR_LOCK_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_1",
+      "description": "DOOR_LOCK_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_2",
+      "description": "DOOR_LOCK_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_3",
+      "description": "DOOR_LOCK_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_4",
+      "description": "DOOR_LOCK_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_5",
+      "description": "DOOR_LOCK_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_6",
+      "description": "DOOR_LOCK_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_7",
+      "description": "DOOR_LOCK_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_POS_0",
+      "description": "MIRROR_Z_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_POS_1",
+      "description": "MIRROR_Z_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_POS_2",
+      "description": "MIRROR_Z_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_MOVE_0",
+      "description": "MIRROR_Z_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_MOVE_1",
+      "description": "MIRROR_Z_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_MOVE_2",
+      "description": "MIRROR_Z_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_POS_0",
+      "description": "MIRROR_Y_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_POS_1",
+      "description": "MIRROR_Y_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_POS_2",
+      "description": "MIRROR_Y_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_MOVE_0",
+      "description": "MIRROR_Y_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_MOVE_1",
+      "description": "MIRROR_Y_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_MOVE_2",
+      "description": "MIRROR_Y_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_LOCK",
+      "description": "MIRROR_LOCK"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.MIRROR_FOLD",
+      "description": "MIRROR_FOLD"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_0",
+      "description": "SEAT_MEMORY_SELECT_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_1",
+      "description": "SEAT_MEMORY_SELECT_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_2",
+      "description": "SEAT_MEMORY_SELECT_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_3",
+      "description": "SEAT_MEMORY_SELECT_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_4",
+      "description": "SEAT_MEMORY_SELECT_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_5",
+      "description": "SEAT_MEMORY_SELECT_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_6",
+      "description": "SEAT_MEMORY_SELECT_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_7",
+      "description": "SEAT_MEMORY_SELECT_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_8",
+      "description": "SEAT_MEMORY_SELECT_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_0",
+      "description": "SEAT_MEMORY_SET_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_1",
+      "description": "SEAT_MEMORY_SET_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_2",
+      "description": "SEAT_MEMORY_SET_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_3",
+      "description": "SEAT_MEMORY_SET_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_4",
+      "description": "SEAT_MEMORY_SET_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_5",
+      "description": "SEAT_MEMORY_SET_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_6",
+      "description": "SEAT_MEMORY_SET_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_7",
+      "description": "SEAT_MEMORY_SET_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_8",
+      "description": "SEAT_MEMORY_SET_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_0",
+      "description": "SEAT_BELT_BUCKLED_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_1",
+      "description": "SEAT_BELT_BUCKLED_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_2",
+      "description": "SEAT_BELT_BUCKLED_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_3",
+      "description": "SEAT_BELT_BUCKLED_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_4",
+      "description": "SEAT_BELT_BUCKLED_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_5",
+      "description": "SEAT_BELT_BUCKLED_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_6",
+      "description": "SEAT_BELT_BUCKLED_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_7",
+      "description": "SEAT_BELT_BUCKLED_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_8",
+      "description": "SEAT_BELT_BUCKLED_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_0",
+      "description": "SEAT_BELT_HEIGHT_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_1",
+      "description": "SEAT_BELT_HEIGHT_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_2",
+      "description": "SEAT_BELT_HEIGHT_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_3",
+      "description": "SEAT_BELT_HEIGHT_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_4",
+      "description": "SEAT_BELT_HEIGHT_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_5",
+      "description": "SEAT_BELT_HEIGHT_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_6",
+      "description": "SEAT_BELT_HEIGHT_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_7",
+      "description": "SEAT_BELT_HEIGHT_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_8",
+      "description": "SEAT_BELT_HEIGHT_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_0",
+      "description": "SEAT_BELT_HEIGHT_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_1",
+      "description": "SEAT_BELT_HEIGHT_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_2",
+      "description": "SEAT_BELT_HEIGHT_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_3",
+      "description": "SEAT_BELT_HEIGHT_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_4",
+      "description": "SEAT_BELT_HEIGHT_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_5",
+      "description": "SEAT_BELT_HEIGHT_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_6",
+      "description": "SEAT_BELT_HEIGHT_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_7",
+      "description": "SEAT_BELT_HEIGHT_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_8",
+      "description": "SEAT_BELT_HEIGHT_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_0",
+      "description": "SEAT_FORE_AFT_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_1",
+      "description": "SEAT_FORE_AFT_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_2",
+      "description": "SEAT_FORE_AFT_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_3",
+      "description": "SEAT_FORE_AFT_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_4",
+      "description": "SEAT_FORE_AFT_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_5",
+      "description": "SEAT_FORE_AFT_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_6",
+      "description": "SEAT_FORE_AFT_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_7",
+      "description": "SEAT_FORE_AFT_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_8",
+      "description": "SEAT_FORE_AFT_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_0",
+      "description": "SEAT_FORE_AFT_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_1",
+      "description": "SEAT_FORE_AFT_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_2",
+      "description": "SEAT_FORE_AFT_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_3",
+      "description": "SEAT_FORE_AFT_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_4",
+      "description": "SEAT_FORE_AFT_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_5",
+      "description": "SEAT_FORE_AFT_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_6",
+      "description": "SEAT_FORE_AFT_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_7",
+      "description": "SEAT_FORE_AFT_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_8",
+      "description": "SEAT_FORE_AFT_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_0",
+      "description": "SEAT_BACKREST_ANGLE_1_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_1",
+      "description": "SEAT_BACKREST_ANGLE_1_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_2",
+      "description": "SEAT_BACKREST_ANGLE_1_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_3",
+      "description": "SEAT_BACKREST_ANGLE_1_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_4",
+      "description": "SEAT_BACKREST_ANGLE_1_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_5",
+      "description": "SEAT_BACKREST_ANGLE_1_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_6",
+      "description": "SEAT_BACKREST_ANGLE_1_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_7",
+      "description": "SEAT_BACKREST_ANGLE_1_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_8",
+      "description": "SEAT_BACKREST_ANGLE_1_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_0",
+      "description": "SEAT_BACKREST_ANGLE_1_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_1",
+      "description": "SEAT_BACKREST_ANGLE_1_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_2",
+      "description": "SEAT_BACKREST_ANGLE_1_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_3",
+      "description": "SEAT_BACKREST_ANGLE_1_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_4",
+      "description": "SEAT_BACKREST_ANGLE_1_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_5",
+      "description": "SEAT_BACKREST_ANGLE_1_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_6",
+      "description": "SEAT_BACKREST_ANGLE_1_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_7",
+      "description": "SEAT_BACKREST_ANGLE_1_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_8",
+      "description": "SEAT_BACKREST_ANGLE_1_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_0",
+      "description": "SEAT_BACKREST_ANGLE_2_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_1",
+      "description": "SEAT_BACKREST_ANGLE_2_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_2",
+      "description": "SEAT_BACKREST_ANGLE_2_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_3",
+      "description": "SEAT_BACKREST_ANGLE_2_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_4",
+      "description": "SEAT_BACKREST_ANGLE_2_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_5",
+      "description": "SEAT_BACKREST_ANGLE_2_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_6",
+      "description": "SEAT_BACKREST_ANGLE_2_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_7",
+      "description": "SEAT_BACKREST_ANGLE_2_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_8",
+      "description": "SEAT_BACKREST_ANGLE_2_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_0",
+      "description": "SEAT_BACKREST_ANGLE_2_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_1",
+      "description": "SEAT_BACKREST_ANGLE_2_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_2",
+      "description": "SEAT_BACKREST_ANGLE_2_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_3",
+      "description": "SEAT_BACKREST_ANGLE_2_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_4",
+      "description": "SEAT_BACKREST_ANGLE_2_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_5",
+      "description": "SEAT_BACKREST_ANGLE_2_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_6",
+      "description": "SEAT_BACKREST_ANGLE_2_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_7",
+      "description": "SEAT_BACKREST_ANGLE_2_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_8",
+      "description": "SEAT_BACKREST_ANGLE_2_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_0",
+      "description": "SEAT_HEIGHT_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_1",
+      "description": "SEAT_HEIGHT_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_2",
+      "description": "SEAT_HEIGHT_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_3",
+      "description": "SEAT_HEIGHT_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_4",
+      "description": "SEAT_HEIGHT_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_5",
+      "description": "SEAT_HEIGHT_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_6",
+      "description": "SEAT_HEIGHT_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_7",
+      "description": "SEAT_HEIGHT_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_8",
+      "description": "SEAT_HEIGHT_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_0",
+      "description": "SEAT_HEIGHT_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_1",
+      "description": "SEAT_HEIGHT_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_2",
+      "description": "SEAT_HEIGHT_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_3",
+      "description": "SEAT_HEIGHT_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_4",
+      "description": "SEAT_HEIGHT_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_5",
+      "description": "SEAT_HEIGHT_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_6",
+      "description": "SEAT_HEIGHT_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_7",
+      "description": "SEAT_HEIGHT_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_8",
+      "description": "SEAT_HEIGHT_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_0",
+      "description": "SEAT_DEPTH_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_1",
+      "description": "SEAT_DEPTH_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_2",
+      "description": "SEAT_DEPTH_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_3",
+      "description": "SEAT_DEPTH_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_4",
+      "description": "SEAT_DEPTH_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_5",
+      "description": "SEAT_DEPTH_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_6",
+      "description": "SEAT_DEPTH_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_7",
+      "description": "SEAT_DEPTH_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_8",
+      "description": "SEAT_DEPTH_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_0",
+      "description": "SEAT_DEPTH_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_1",
+      "description": "SEAT_DEPTH_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_2",
+      "description": "SEAT_DEPTH_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_3",
+      "description": "SEAT_DEPTH_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_4",
+      "description": "SEAT_DEPTH_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_5",
+      "description": "SEAT_DEPTH_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_6",
+      "description": "SEAT_DEPTH_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_7",
+      "description": "SEAT_DEPTH_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_8",
+      "description": "SEAT_DEPTH_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_0",
+      "description": "SEAT_TILT_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_1",
+      "description": "SEAT_TILT_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_2",
+      "description": "SEAT_TILT_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_3",
+      "description": "SEAT_TILT_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_4",
+      "description": "SEAT_TILT_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_5",
+      "description": "SEAT_TILT_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_6",
+      "description": "SEAT_TILT_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_7",
+      "description": "SEAT_TILT_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_8",
+      "description": "SEAT_TILT_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_0",
+      "description": "SEAT_TILT_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_1",
+      "description": "SEAT_TILT_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_2",
+      "description": "SEAT_TILT_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_3",
+      "description": "SEAT_TILT_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_4",
+      "description": "SEAT_TILT_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_5",
+      "description": "SEAT_TILT_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_6",
+      "description": "SEAT_TILT_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_7",
+      "description": "SEAT_TILT_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_8",
+      "description": "SEAT_TILT_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_0",
+      "description": "SEAT_LUMBAR_FORE_AFT_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_1",
+      "description": "SEAT_LUMBAR_FORE_AFT_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_2",
+      "description": "SEAT_LUMBAR_FORE_AFT_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_3",
+      "description": "SEAT_LUMBAR_FORE_AFT_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_4",
+      "description": "SEAT_LUMBAR_FORE_AFT_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_5",
+      "description": "SEAT_LUMBAR_FORE_AFT_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_6",
+      "description": "SEAT_LUMBAR_FORE_AFT_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_7",
+      "description": "SEAT_LUMBAR_FORE_AFT_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_8",
+      "description": "SEAT_LUMBAR_FORE_AFT_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_0",
+      "description": "SEAT_LUMBAR_FORE_AFT_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_1",
+      "description": "SEAT_LUMBAR_FORE_AFT_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_2",
+      "description": "SEAT_LUMBAR_FORE_AFT_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_3",
+      "description": "SEAT_LUMBAR_FORE_AFT_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_4",
+      "description": "SEAT_LUMBAR_FORE_AFT_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_5",
+      "description": "SEAT_LUMBAR_FORE_AFT_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_6",
+      "description": "SEAT_LUMBAR_FORE_AFT_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_7",
+      "description": "SEAT_LUMBAR_FORE_AFT_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_8",
+      "description": "SEAT_LUMBAR_FORE_AFT_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_0",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_1",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_2",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_3",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_4",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_5",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_6",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_7",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_8",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_0",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_1",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_2",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_3",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_4",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_5",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_6",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_7",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_8",
+      "description": "SEAT_LUMBAR_SIDE_SUPPORT_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_POS",
+      "description": "SEAT_HEADREST_HEIGHT_POS"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_0",
+      "description": "SEAT_HEADREST_HEIGHT_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_1",
+      "description": "SEAT_HEADREST_HEIGHT_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_2",
+      "description": "SEAT_HEADREST_HEIGHT_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_3",
+      "description": "SEAT_HEADREST_HEIGHT_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_4",
+      "description": "SEAT_HEADREST_HEIGHT_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_5",
+      "description": "SEAT_HEADREST_HEIGHT_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_6",
+      "description": "SEAT_HEADREST_HEIGHT_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_7",
+      "description": "SEAT_HEADREST_HEIGHT_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_8",
+      "description": "SEAT_HEADREST_HEIGHT_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_0",
+      "description": "SEAT_HEADREST_ANGLE_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_1",
+      "description": "SEAT_HEADREST_ANGLE_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_2",
+      "description": "SEAT_HEADREST_ANGLE_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_3",
+      "description": "SEAT_HEADREST_ANGLE_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_4",
+      "description": "SEAT_HEADREST_ANGLE_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_5",
+      "description": "SEAT_HEADREST_ANGLE_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_6",
+      "description": "SEAT_HEADREST_ANGLE_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_7",
+      "description": "SEAT_HEADREST_ANGLE_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_8",
+      "description": "SEAT_HEADREST_ANGLE_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_0",
+      "description": "SEAT_HEADREST_ANGLE_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_1",
+      "description": "SEAT_HEADREST_ANGLE_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_2",
+      "description": "SEAT_HEADREST_ANGLE_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_3",
+      "description": "SEAT_HEADREST_ANGLE_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_4",
+      "description": "SEAT_HEADREST_ANGLE_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_5",
+      "description": "SEAT_HEADREST_ANGLE_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_6",
+      "description": "SEAT_HEADREST_ANGLE_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_7",
+      "description": "SEAT_HEADREST_ANGLE_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_8",
+      "description": "SEAT_HEADREST_ANGLE_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_0",
+      "description": "SEAT_HEADREST_FORE_AFT_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_1",
+      "description": "SEAT_HEADREST_FORE_AFT_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_2",
+      "description": "SEAT_HEADREST_FORE_AFT_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_3",
+      "description": "SEAT_HEADREST_FORE_AFT_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_4",
+      "description": "SEAT_HEADREST_FORE_AFT_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_5",
+      "description": "SEAT_HEADREST_FORE_AFT_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_6",
+      "description": "SEAT_HEADREST_FORE_AFT_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_7",
+      "description": "SEAT_HEADREST_FORE_AFT_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_8",
+      "description": "SEAT_HEADREST_FORE_AFT_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_0",
+      "description": "SEAT_HEADREST_FORE_AFT_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_1",
+      "description": "SEAT_HEADREST_FORE_AFT_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_2",
+      "description": "SEAT_HEADREST_FORE_AFT_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_3",
+      "description": "SEAT_HEADREST_FORE_AFT_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_4",
+      "description": "SEAT_HEADREST_FORE_AFT_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_5",
+      "description": "SEAT_HEADREST_FORE_AFT_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_6",
+      "description": "SEAT_HEADREST_FORE_AFT_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_7",
+      "description": "SEAT_HEADREST_FORE_AFT_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_8",
+      "description": "SEAT_HEADREST_FORE_AFT_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_0",
+      "description": "SEAT_OCCUPANCY_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_1",
+      "description": "SEAT_OCCUPANCY_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_2",
+      "description": "SEAT_OCCUPANCY_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_3",
+      "description": "SEAT_OCCUPANCY_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_4",
+      "description": "SEAT_OCCUPANCY_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_5",
+      "description": "SEAT_OCCUPANCY_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_6",
+      "description": "SEAT_OCCUPANCY_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_7",
+      "description": "SEAT_OCCUPANCY_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_8",
+      "description": "SEAT_OCCUPANCY_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_0",
+      "description": "WINDOW_POS_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_1",
+      "description": "WINDOW_POS_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_2",
+      "description": "WINDOW_POS_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_3",
+      "description": "WINDOW_POS_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_4",
+      "description": "WINDOW_POS_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_5",
+      "description": "WINDOW_POS_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_6",
+      "description": "WINDOW_POS_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_7",
+      "description": "WINDOW_POS_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_8",
+      "description": "WINDOW_POS_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_9",
+      "description": "WINDOW_POS_9"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_0",
+      "description": "WINDOW_MOVE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_1",
+      "description": "WINDOW_MOVE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_2",
+      "description": "WINDOW_MOVE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_3",
+      "description": "WINDOW_MOVE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_4",
+      "description": "WINDOW_MOVE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_5",
+      "description": "WINDOW_MOVE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_6",
+      "description": "WINDOW_MOVE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_7",
+      "description": "WINDOW_MOVE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_8",
+      "description": "WINDOW_MOVE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_9",
+      "description": "WINDOW_MOVE_9"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_0",
+      "description": "WINDOW_LOCK_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_1",
+      "description": "WINDOW_LOCK_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_2",
+      "description": "WINDOW_LOCK_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_3",
+      "description": "WINDOW_LOCK_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_4",
+      "description": "WINDOW_LOCK_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_5",
+      "description": "WINDOW_LOCK_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_6",
+      "description": "WINDOW_LOCK_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_7",
+      "description": "WINDOW_LOCK_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_8",
+      "description": "WINDOW_LOCK_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_9",
+      "description": "WINDOW_LOCK_9"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HEADLIGHTS_STATE",
+      "description": "HEADLIGHTS_STATE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HIGH_BEAM_LIGHTS_STATE",
+      "description": "HIGH_BEAM_LIGHTS_STATE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.FOG_LIGHTS_STATE",
+      "description": "FOG_LIGHTS_STATE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HAZARD_LIGHTS_STATE",
+      "description": "HAZARD_LIGHTS_STATE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HEADLIGHTS_SWITCH",
+      "description": "HEADLIGHTS_SWITCH"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HIGH_BEAM_LIGHTS_SWITCH",
+      "description": "HIGH_BEAM_LIGHTS_SWITCH"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.FOG_LIGHTS_SWITCH",
+      "description": "FOG_LIGHTS_SWITCH"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.HAZARD_LIGHTS_SWITCH",
+      "description": "HAZARD_LIGHTS_SWITCH"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.CABIN_LIGHTS_STATE",
+      "description": "CABIN_LIGHTS_STATE"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.CABIN_LIGHTS_SWITCH",
+      "description": "CABIN_LIGHTS_SWITCH"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_0",
+      "description": "READING_LIGHTS_STATE_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_1",
+      "description": "READING_LIGHTS_STATE_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_2",
+      "description": "READING_LIGHTS_STATE_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_3",
+      "description": "READING_LIGHTS_STATE_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_4",
+      "description": "READING_LIGHTS_STATE_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_5",
+      "description": "READING_LIGHTS_STATE_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_6",
+      "description": "READING_LIGHTS_STATE_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_7",
+      "description": "READING_LIGHTS_STATE_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_8",
+      "description": "READING_LIGHTS_STATE_8"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_0",
+      "description": "READING_LIGHTS_SWITCH_0"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_1",
+      "description": "READING_LIGHTS_SWITCH_1"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_2",
+      "description": "READING_LIGHTS_SWITCH_2"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_3",
+      "description": "READING_LIGHTS_SWITCH_3"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_4",
+      "description": "READING_LIGHTS_SWITCH_4"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_5",
+      "description": "READING_LIGHTS_SWITCH_5"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_6",
+      "description": "READING_LIGHTS_SWITCH_6"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_7",
+      "description": "READING_LIGHTS_SWITCH_7"
+    }
+  },
+  {
+    "sensor": {
+      "dataType": "DOUBLE",
+      "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_8",
+      "description": "READING_LIGHTS_SWITCH_8"
+    }
+  }
+]

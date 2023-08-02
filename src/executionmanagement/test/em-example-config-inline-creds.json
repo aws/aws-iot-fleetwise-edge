@@ -64,19 +64,5 @@
       "longitudeStartBit": "32",
       "latitudeStartBit": "0"
     }
-  },
-  "dds-nodes-configuration": [
-    {
-      "dds-domain-id": 0,
-      "upstream-dds-topic-name": "testUpstreamTopic",
-      "downstream-dds-topic-name": "testDownstreamTopic",
-      "dds-topics-qos": "TOPIC_QOS_DEFAULT",
-      "dds-transport-protocol": "SHM",
-      "dds-device-id": 1,
-      "dds-device-type": "CAMERA",
-      "dds-tmp-cache-location": "/tmp/",
-      "dds-reader-name": "FWE-Reader",
-      "dds-writer-name": "FWE-Writer"
-    }
-  ]
+  }
 }

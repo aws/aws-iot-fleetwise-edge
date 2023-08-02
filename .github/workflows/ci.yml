@@ -72,12 +72,13 @@ jobs:
           upload-arch: "android"
           cache-paths: /usr/local/aarch64-linux-android:/usr/local/armv7a-linux-androideabi:/usr/local/x86_64-linux-gnu
           dist-files:
+            build/x86_64/src/executionmanagement/libaws-iot-fleetwise-edge.so:x86_64
             build/armeabi-v7a/src/executionmanagement/libaws-iot-fleetwise-edge.so:armeabi-v7a
             build/arm64-v8a/src/executionmanagement/libaws-iot-fleetwise-edge.so:arm64-v8a
       - name: build-app
         run: |
           mkdir -p tools/android-app/app/src/main/jniLibs
-          cp -r build/dist/arm64-v8a build/dist/armeabi-v7a tools/android-app/app/src/main/jniLibs
+          cp -r build/dist/x86_64 build/dist/arm64-v8a build/dist/armeabi-v7a tools/android-app/app/src/main/jniLibs
           cp THIRD-PARTY-LICENSES tools/android-app/app/src/main/assets
           if [ "${GITHUB_REPOSITORY}" == "aws/aws-iot-fleetwise-edge" ]; then
             curl -o tools/android-app/app/src/main/res/mipmap-xhdpi/ic_launcher.webp \
@@ -87,12 +88,12 @@ jobs:
           unset ANDROID_SDK_ROOT
           ANDROID_HOME=/usr/local/android_sdk ./gradlew assembleRelease
       - uses: aws-actions/configure-aws-credentials@v2
-        if: github.repository == 'aws/aws-iot-fleetwise-edge' && github.ref_type == 'tag'
+        if: github.repository == 'aws/aws-iot-fleetwise-edge' && github.event_name == 'push'
         with:
           role-to-assume: ${{ secrets.ANDROID_SIGNING_ROLE }}
           aws-region: us-east-1
       - name: sign-app
-        if: github.repository == 'aws/aws-iot-fleetwise-edge' && github.ref_type == 'tag'
+        if: github.repository == 'aws/aws-iot-fleetwise-edge' && github.event_name == 'push'
         run: |
           source tools/install-deps-versions.sh
           SIGNING_INFO=`aws secretsmanager get-secret-value --region us-east-1 --secret-id AndroidAppKeyStore | jq -r .SecretString`
@@ -109,7 +110,7 @@ jobs:
             app/build/outputs/apk/release/app-release-unsigned-aligned.apk
           shred -u ~/android-signing.jks
       - name: upload-artifacts
-        if: github.repository == 'aws/aws-iot-fleetwise-edge' && github.ref_type == 'tag'
+        if: github.repository == 'aws/aws-iot-fleetwise-edge' && github.event_name == 'push'
         uses: actions/upload-artifact@v3
         with:
           name: build-android-app
@@ -164,3 +165,29 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  copy-cfn-templates:
+    runs-on: ubuntu-20.04
+    if:
+      github.repository == 'aws/aws-iot-fleetwise-edge' && (github.ref_type == 'tag' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.CFN_TEMPLATES_COPY_ROLE }}
+          aws-region: us-east-1
+      - name: copy-to-s3
+        run: |
+          SRC_PATH="tools/cfn-templates/"
+          if [ "${GITHUB_REF_TYPE}" == "tag" ]; then
+            RELEASE_VERSION="${GITHUB_REF/refs\/tags\//}"
+            DEST_URL="s3://aws-iot-fleetwise/${RELEASE_VERSION}/cfn-templates/"
+            aws s3 cp --recursive --acl "authenticated-read" --exclude README.md ${SRC_PATH} ${DEST_URL}
+          fi
+          if [ "${GITHUB_EVENT_NAME}" == "push" ] && [ "${GITHUB_REF}" == "refs/heads/main" ]; then
+            LATEST_URL="s3://aws-iot-fleetwise/latest/"
+            aws s3 rm --recursive ${LATEST_URL}
+            DEST_URL="${LATEST_URL}cfn-templates/"
+            aws s3 cp --recursive --acl "authenticated-read" --exclude README.md ${SRC_PATH} ${DEST_URL}
+          fi

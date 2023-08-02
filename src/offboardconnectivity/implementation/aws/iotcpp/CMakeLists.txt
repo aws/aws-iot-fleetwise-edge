@@ -4,10 +4,19 @@ set(libraryTargetName iotfleetwise.offboardconnectivityawsiot)
 
 # The alias name is what other targets will use as a dependency
 set(libraryAliasName IoTFleetWise::OffboardConnectivityAwsIot)
+if(FWE_FEATURE_GREENGRASSV2)
+  set(EXTRA_SOURCE_FILES
+  ${EXTRA_SOURCE_FILES}
+  src/AwsGGConnectivityModule.cpp
+  src/AwsGGChannel.cpp)
+  find_package(GreengrassIpc-cpp REQUIRED)
+  set(GG_IPC_LIB_NAME AWS::GreengrassIpc-cpp)
+endif()
 
 set(librarySrc
   src/AwsIotChannel.cpp
   src/AwsIotConnectivityModule.cpp
+  ${EXTRA_SOURCE_FILES}
   src/RetryThread.cpp
   src/PayloadManager.cpp
   src/RemoteProfiler.cpp)
@@ -20,6 +29,8 @@ add_library(
 
 find_path(JSONCPP_INCLUDE_DIR "json/json.h" PATH_SUFFIXES "jsoncpp")
 find_library(JSONCPP_LIBRARY NAMES jsoncpp)
+find_package(aws-crt-cpp REQUIRED)
+
 
 set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 set(BUILD_SHARED_LIBS ${FWE_AWS_SDK_SHARED_LIBS})
@@ -36,6 +47,8 @@ target_link_libraries(
   IoTFleetWise::OffboardConnectivityAwsBootstrap
   IoTFleetWise::OffboardConnectivity
   IoTFleetWise::Platform::Linux
+  AWS::aws-crt-cpp
+  ${GG_IPC_LIB_NAME}
   ${AWSSDK_LINK_LIBRARIES}
   ${SNAPPY_LIBRARIES}
   ${JSONCPP_LIBRARY}
@@ -74,6 +87,8 @@ if(${BUILD_TESTING})
     IoTFleetWise::OffboardConnectivityAwsBootstrap
     IoTFleetWise::OffboardConnectivity
     IoTFleetWise::TestingSupport
+    AWS::aws-crt-cpp
+    ${GG_IPC_LIB_NAME}
     ${GMOCK_MAIN_LIBRARY}
     ${GMOCK_LIB}
     ${SNAPPY_LIBRARIES}

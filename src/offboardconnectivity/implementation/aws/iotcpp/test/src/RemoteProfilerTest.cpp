@@ -44,6 +44,17 @@ public:
         }
         return mCallback( buf, size );
     }
+
+    ConnectivityError
+    sendFile( const std::string &filePath,
+              size_t size,
+              struct CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) override
+    {
+        static_cast<void>( filePath );
+        static_cast<void>( size );
+        static_cast<void>( collectionSchemeParams );
+        return ConnectivityError::TypeNotSupported;
+    }
 };
 
 void

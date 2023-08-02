@@ -41,13 +41,15 @@
     "internalParameters": {
       "readyToPublishDataBufferSize": 10000,
       "systemWideLogLevel": "Trace",
-      "dataReductionProbabilityDisabled": false
+      "dataReductionProbabilityDisabled": false,
+      "maximumAwsSdkHeapMemoryBytes": 10000000
     },
     "publishToCloudParameters": {
       "maxPublishMessageCount": 1000,
       "collectionSchemeManagementCheckinIntervalMs": 120000
     },
     "mqttConnection": {
+      "connectionType": "iotCore",
       "endpointUrl": "my-endpoint.my-region.amazonaws.com",
       "clientId": "VEHICLE_ID_GOES_HERE",
       "collectionSchemeListTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/collection_schemes",

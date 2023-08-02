@@ -6,7 +6,6 @@
 #include "EventTypes.h"
 #include "MessageTypes.h"
 #include "OBDDataTypes.h"
-#include "SensorTypes.h"
 #include "SignalTypes.h"
 #include <cstdint>
 #include <string>

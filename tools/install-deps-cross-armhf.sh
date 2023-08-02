@@ -7,14 +7,14 @@ set -euo pipefail
 SCRIPT_DIR=$(dirname $(realpath "$0"))
 source ${SCRIPT_DIR}/install-deps-versions.sh
 
-WITH_CAMERA_SUPPORT="false"
 USE_CACHE="true"
+WITH_GREENGRASSV2_SUPPORT="false"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case $1 in
-        --with-camera-support)
-            WITH_CAMERA_SUPPORT="true"
+        --with-greengrassv2-support)
+            WITH_GREENGRASSV2_SUPPORT="true"
             ;;
         --native-prefix)
             NATIVE_PREFIX="$2"
@@ -23,8 +23,8 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --with-camera-support  Install dependencies for camera support"
-            echo "  --native-prefix        Native install prefix"
+            echo "  --with-greengrassv2-support  Install dependencies for Greengrass V2"
+            echo "  --native-prefix              Native install prefix"
             exit 0
             ;;
         esac
@@ -60,13 +60,6 @@ apt install -y \
     unzip \
     wget \
     zlib1g-dev:armhf
-
-if ${WITH_CAMERA_SUPPORT}; then
-    apt install -y \
-        default-jre \
-        libasio-dev \
-        qemu-user-binfmt
-fi
 
 if [ ! -f /usr/include/linux/can/isotp.h ]; then
     git clone https://github.com/hartkopp/can-isotp.git
@@ -142,71 +135,21 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
     make install -j`nproc`
     cd ../..
 
-    # AWS IoT FleetWise Edge camera support requires Fast-DDS and its dependencies:
-    if ${WITH_CAMERA_SUPPORT}; then
-        git clone -b ${VERSION_TINYXML2} https://github.com/leethomason/tinyxml2.git
-        cd tinyxml2
+    if ${WITH_GREENGRASSV2_SUPPORT}; then
+        git clone -b ${VERSION_AWS_IOT_DEVICE_SDK_CPP_V2} --recursive https://github.com/aws/aws-iot-device-sdk-cpp-v2.git
+        cd aws-iot-device-sdk-cpp-v2
         mkdir build && cd build
         cmake \
-            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
-            -DBUILD_STATIC_LIBS=ON \
-            -DBUILD_TESTS=OFF \
-            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -DBUILD_DEPS=ON \
+            -DBUILD_TESTING=OFF \
+            -DUSE_OPENSSL=ON \
+            -DBUILD_ONLY='greengrass_ipc' \
             -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
             -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
             ..
         make install -j`nproc`
         cd ../..
-
-        git clone -b ${VERSION_FOONATHAN_MEMORY_VENDOR} https://github.com/eProsima/foonathan_memory_vendor.git
-        cd foonathan_memory_vendor
-        mkdir build && cd build
-        cmake \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
-            -Dextra_cmake_args="-DCMAKE_CROSSCOMPILING_EMULATOR=qemu-arm" \
-            -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
-            -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
-            ..
-        make install -j`nproc`
-        cd ../..
-
-        git clone -b ${VERSION_FAST_CDR} https://github.com/eProsima/Fast-CDR.git
-        cd Fast-CDR
-        mkdir build && cd build
-        cmake \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
-            -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
-            -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
-            ..
-        make install -j`nproc`
-        cd ../..
-
-        git clone -b ${VERSION_FAST_DDS} https://github.com/eProsima/Fast-DDS.git
-        cd Fast-DDS
-        mkdir build && cd build
-        cmake \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCOMPILE_TOOLS=OFF \
-            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
-            -DCMAKE_CXX_FLAGS="-DUSE_FOONATHAN_NODE_SIZES=1" \
-            -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
-            -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
-            ..
-        make install -j`nproc`
-        cd ../..
-
-        git clone -b ${VERSION_FAST_DDS_GEN} --recursive https://github.com/eProsima/Fast-DDS-Gen.git
-        cd Fast-DDS-Gen
-        ./gradlew assemble
-        mkdir -p ${NATIVE_PREFIX}/share/fastddsgen/java
-        cp share/fastddsgen/java/fastddsgen.jar ${NATIVE_PREFIX}/share/fastddsgen/java
-        cp scripts/fastddsgen ${NATIVE_PREFIX}/bin
-        cd ..
     fi
 
     cd ..

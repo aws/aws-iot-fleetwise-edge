@@ -1,9 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-#if defined( IOTFLEETWISE_LINUX )
+
 // Includes
 #include "ExternalGpsSource.h"
 #include "LoggingModule.h"
+#include "TraceModule.h"
 
 namespace Aws
 {
@@ -61,8 +62,18 @@ ExternalGpsSource::setLocation( double latitude, double longitude )
         return;
     }
     auto timestamp = mClock->systemTimeSinceEpochMs();
-    mSignalBufferPtr->push( CollectedSignal( latitudeSignalId, timestamp, latitude ) );
-    mSignalBufferPtr->push( CollectedSignal( longitudeSignalId, timestamp, longitude ) );
+    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+    if ( !mSignalBufferPtr->push( CollectedSignal( latitudeSignalId, timestamp, latitude ) ) )
+    {
+        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+        FWE_LOG_WARN( "Signal buffer full" );
+    }
+    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+    if ( !mSignalBufferPtr->push( CollectedSignal( longitudeSignalId, timestamp, longitude ) ) )
+    {
+        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+        FWE_LOG_WARN( "Signal buffer full" );
+    }
 }
 
 void
@@ -84,4 +95,3 @@ ExternalGpsSource::validLongitude( double longitude )
 } // namespace DataManagement
 } // namespace IoTFleetWise
 } // namespace Aws
-#endif

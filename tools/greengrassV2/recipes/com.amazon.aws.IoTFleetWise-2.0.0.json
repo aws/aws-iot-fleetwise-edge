@@ -1,0 +1,48 @@
+{
+  "RecipeFormatVersion": "2020-01-25",
+  "ComponentName": "com.amazon.aws.IoTFleetWise",
+  "ComponentVersion": "2.0.0",
+  "ComponentDescription": "Reference Implementation for AWS IoT FleetWise",
+  "ComponentPublisher": "Amazon",
+  "ComponentConfiguration": {
+    "DefaultConfiguration": {
+      "Message": "world",
+      "accessControl": {
+        "aws.greengrass.ipc.mqttproxy": {
+          "com.amazon.aws.IoTFleetWise:mqttproxy:1": {
+            "policyDescription": "Allows access to publish/subscribe to all topics.",
+            "operations": ["aws.greengrass#PublishToIoTCore", "aws.greengrass#SubscribeToIoTCore"],
+            "resources": ["*"]
+          }
+        }
+      }
+    }
+  },
+  "Manifests": [
+    {
+      "Platform": {
+        "os": "linux"
+      },
+      "Lifecycle": {
+        "Run": "{artifacts:path}/aws-iot-fleetwise-edge {artifacts:path}/config.json",
+        "RequiresPrivilege": "true"
+      },
+      "Artifacts": [
+        {
+          "Uri": "s3://URI-TO-FWE-BINARY/com.amazon.aws.IoTFleetWise/2.0.0/aws-iot-fleetwise-edge",
+          "Permission": {
+            "Read": "ALL",
+            "Execute": "ALL"
+          }
+        },
+        {
+          "Uri": "s3://URI-TO-FWE-STATIC-CONFIG/com.amazon.aws.IoTFleetWise/2.0.0/config.json",
+          "Permission": {
+            "Read": "ALL",
+            "Execute": "ALL"
+          }
+        }
+      ]
+    }
+  ]
+}

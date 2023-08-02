@@ -62,11 +62,11 @@ signalToExitCode( int signalNumber )
     switch ( signalNumber )
     {
     case SIGUSR1:
-        std::cout << "Fatal error, stopping AWS IoT FleetWise Edge Service " << std::endl;
+        std::cout << "Fatal error, stopping" << std::endl;
         return -1;
     case SIGINT:
     case SIGTERM:
-        std::cout << "Stopping AWS IoT FleetWise Edge Service " << std::endl;
+        std::cout << "Stopping" << std::endl;
         return 0;
     default:
         std::cout << "Received unexpected signal " << signalNumber << std::endl;
@@ -82,7 +82,7 @@ main( int argc, char *argv[] )
         printVersion();
         if ( argc < 2 )
         {
-            std::cout << "error: no config file provided" << std::endl;
+            std::cout << "Error: no config file provided" << std::endl;
             return EXIT_FAILURE;
         }
 
@@ -93,7 +93,7 @@ main( int argc, char *argv[] )
         Json::Value config;
         if ( !IoTFleetWiseConfig::read( configFilename, config ) )
         {
-            std::cout << "AWS IoT FleetWise Edge Service failed to read config file: " + configFilename << std::endl;
+            std::cout << "Failed to read config file: " + configFilename << std::endl;
             return EXIT_FAILURE;
         }
         // Set system wide log level
@@ -103,7 +103,7 @@ main( int argc, char *argv[] )
         // Connect the Engine
         if ( engine.connect( config ) && engine.start() )
         {
-            std::cout << "AWS IoT FleetWise Edge Service Started successfully" << std::endl;
+            std::cout << "Started successfully" << std::endl;
         }
         else
         {
@@ -117,11 +117,11 @@ main( int argc, char *argv[] )
         int exitCode = signalToExitCode( mSignal );
         if ( engine.stop() && engine.disconnect() )
         {
-            std::cout << "AWS IoT FleetWise Edge Service Stopped successfully" << std::endl;
+            std::cout << "Stopped successfully" << std::endl;
             return exitCode;
         }
 
-        std::cout << "AWS IoT FleetWise Edge Service Stopped with errors" << std::endl;
+        std::cout << "Stopped with errors" << std::endl;
         return EXIT_FAILURE;
     }
     catch ( const std::exception &e )

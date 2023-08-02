@@ -7,7 +7,6 @@
 #include "GeohashInfo.h"
 #include "MessageTypes.h"
 #include "OBDDataTypes.h"
-#include "SensorTypes.h"
 #include "SignalTypes.h"
 // multi producer queue:
 #include <boost/lockfree/queue.hpp>
@@ -44,34 +43,13 @@ static constexpr double MAX_PROBABILITY = 1.0;
 
 // The following structs describe an inspection view on all active collection conditions
 // As a start these structs are mainly a copy of the data defined in ICollectionScheme
-struct PassThroughMetaData
+struct PassThroughMetadata
 {
     bool compress{ false };
     bool persist{ false };
     uint32_t priority{ 0 };
     std::string decoderID;
     std::string collectionSchemeID;
-};
-
-// Camera Data collection related types
-enum class InspectionMatrixImageCollectionType
-{
-    TIME_BASED,
-    FRAME_BASED,
-    NONE
-};
-
-struct InspectionMatrixImageCollectionInfo
-{
-    ImageDeviceID deviceID;                             // Unique Identifier of the image sensor in the system
-    uint32_t imageFormat;                               // Image format expected from the System e.g. PNG.
-                                                        // Exact ids of the type will end up in an enum in the
-                                                        // CollectionScheme decoder.
-    InspectionMatrixImageCollectionType collectionType; // Whether Images are collected from the device based on
-                                                        // a timewindow or based on frame number.
-    uint32_t beforeDurationMs;                          // Amount of time in ms to be collected from the
-                                                        // image sensor buffer. This time is counted before the
-                                                        // condition is met. This is not relevant when the
 };
 
 // As a start these structs are mainly a copy of the data defined in ICollectionScheme but as plain old data structures
@@ -107,9 +85,7 @@ struct ConditionWithCollectedData
     bool includeActiveDtcs;
     bool triggerOnlyOnRisingEdge;
     double probabilityToSend;
-    PassThroughMetaData metaData;
-    std::vector<InspectionMatrixImageCollectionInfo> imageCollectionInfos;
-    bool includeImageCapture;
+    PassThroughMetadata metadata;
 };
 
 struct InspectionMatrix
@@ -362,7 +338,7 @@ using ActiveDTCBufferPtr = std::shared_ptr<ActiveDTCBuffer>;
 
 struct TriggeredCollectionSchemeData
 {
-    PassThroughMetaData metaData;
+    PassThroughMetadata metadata;
     Timestamp triggerTime;
     std::vector<CollectedSignal> signals;
     std::vector<CollectedCanRawFrame> canFrames;

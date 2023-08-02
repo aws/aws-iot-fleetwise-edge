@@ -223,21 +223,30 @@ CollectionSchemeManager::doWork( void *data )
              *
              * the propagate the output to Vehicle Data Consumers
              */
-            std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> decoderDictionaryMap;
+            std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
             collectionSchemeManager->decoderDictionaryExtractor( decoderDictionaryMap );
             // Publish decoder dictionaries update to all listeners
             collectionSchemeManager->decoderDictionaryUpdater( decoderDictionaryMap );
             // coverity[check_return : SUPPRESS]
+            auto canDecoderDictionaryPtr = std::dynamic_pointer_cast<CANDecoderDictionary>(
+                decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] );
             std::string decoderCanChannels = std::to_string(
                 ( decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET ) != decoderDictionaryMap.end() &&
-                  decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] != nullptr )
-                    ? decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET]->canMessageDecoderMethod.size()
+                  std::dynamic_pointer_cast<CANDecoderDictionary>(
+                      decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] ) != nullptr )
+                    ? std::dynamic_pointer_cast<CANDecoderDictionary>(
+                          decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] )
+                          ->canMessageDecoderMethod.size()
                     : 0 );
             std::string obdPids = std::to_string(
                 ( ( decoderDictionaryMap.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap.end() ) &&
-                  ( decoderDictionaryMap[VehicleDataSourceProtocol::OBD] != nullptr ) &&
-                  ( !decoderDictionaryMap[VehicleDataSourceProtocol::OBD]->canMessageDecoderMethod.empty() ) )
-                    ? decoderDictionaryMap[VehicleDataSourceProtocol::OBD]
+                  ( std::dynamic_pointer_cast<CANDecoderDictionary>(
+                        decoderDictionaryMap[VehicleDataSourceProtocol::OBD] ) != nullptr ) &&
+                  ( !std::dynamic_pointer_cast<CANDecoderDictionary>(
+                         decoderDictionaryMap[VehicleDataSourceProtocol::OBD] )
+                         ->canMessageDecoderMethod.empty() ) )
+                    ? std::dynamic_pointer_cast<CANDecoderDictionary>(
+                          decoderDictionaryMap[VehicleDataSourceProtocol::OBD] )
                           ->canMessageDecoderMethod.cbegin()
                           ->second.size()
                     : 0 );
@@ -330,7 +339,7 @@ CollectionSchemeManager::updateAvailable()
  */
 bool
 CollectionSchemeManager::init( uint32_t checkinIntervalMsec,
-                               const std::shared_ptr<ICacheAndPersist> &schemaPersistencyPtr,
+                               const std::shared_ptr<CacheAndPersist> &schemaPersistencyPtr,
                                CANInterfaceIDTranslator &canIDTranslator )
 {
     mCANIDTranslator = canIDTranslator;
@@ -479,6 +488,10 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
     {
         return false;
     }
+    // Create vector of active collection schemes to notify interested components about new schemes
+    std::shared_ptr<ActiveCollectionSchemes> activeCollectionSchemesOutput =
+        std::make_shared<ActiveCollectionSchemes>();
+
     collectionSchemeList = mCollectionSchemeList->getCollectionSchemes();
     /* Separate collectionSchemes into Enabled and Idle bucket */
     for ( auto const &collectionScheme : collectionSchemeList )
@@ -512,8 +525,14 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
             mEnabledCollectionSchemeMap[id] = collectionScheme;
             mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
             ret = true;
+
+            activeCollectionSchemesOutput->activeCollectionSchemes.emplace_back( collectionScheme );
         }
     }
+
+    notifyListeners<const std::shared_ptr<const ActiveCollectionSchemes> &>(
+        &IActiveCollectionSchemesListener::onChangeCollectionSchemeList, activeCollectionSchemesOutput );
+
     std::string enableStr;
     std::string idleStr;
     printExistingCollectionSchemes( enableStr, idleStr );

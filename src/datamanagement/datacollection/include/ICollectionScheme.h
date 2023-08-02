@@ -19,37 +19,6 @@ namespace IoTFleetWise
 namespace DataManagement
 {
 
-// Camera Data collection related types
-enum class ImageCollectionType
-{
-    TIME_BASED,
-    FRAME_BASED,
-    NONE
-};
-
-struct ImageCollectionInfo
-{
-    ImageCollectionInfo() = default;
-    ImageCollectionInfo( ImageDeviceID id, uint32_t format, ImageCollectionType cType, uint32_t beforeDurationMsIn )
-        : deviceID( id )
-        , imageFormat( format )
-        , collectionType( cType )
-        , beforeDurationMs( beforeDurationMsIn )
-    {
-    }
-    ImageDeviceID deviceID{ 0 }; // Unique Identifier of the image sensor in the system
-    uint32_t imageFormat{ 0 };   // Image format expected from the System e.g. PNG.
-                                 // Exact ids of the type will end up in an enum in the
-                                 // CollectionScheme decoder.
-    ImageCollectionType collectionType{ ImageCollectionType::NONE }; // Whether Images are collected from the device
-                                                                     // based on a timewindow or based on frame number.
-    uint32_t beforeDurationMs{ 0 };                                  // Amount of time in ms to be collected from the
-                                    // image sensor buffer. This time is counted before a
-                                    // condition is met and thus can be used to create
-                                    // a time interval before and after a certain condition is
-                                    // met in the system.
-};
-
 struct SignalCollectionInfo
 {
     /**
@@ -235,12 +204,6 @@ public:
     const RawCanFrames_t INVALID_RAW_CAN_COLLECTED_SIGNALS = std::vector<CanFrameCollectionInfo>();
 
     /**
-     * @brief ImagesDataType is vector representing metadata for Image Capture.
-     */
-    using ImagesDataType = std::vector<ImageCollectionInfo>;
-    const ImagesDataType INVALID_IMAGE_DATA = std::vector<ImageCollectionInfo>();
-
-    /**
      * @brief Signals_t is a vector that represents the AST Expression Tree per collectionScheme provided.
      */
     using ExpressionNode_t = std::vector<ExpressionNode>;
@@ -375,13 +338,6 @@ public:
      * @return if not ready an empty vector
      */
     virtual const RawCanFrames_t &getCollectRawCanFrames() const = 0;
-
-    /**
-     * @brief Returns all Image Capture settings for this collectionScheme
-     *
-     * @return if not ready an empty vector
-     */
-    virtual const ImagesDataType &getImageCaptureData() const = 0;
 
     /**
      * @brief Returns all of the Expression Nodes

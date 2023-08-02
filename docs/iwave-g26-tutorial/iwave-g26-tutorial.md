@@ -1,6 +1,19 @@
-# Tutorial: Run AWS IoT FleetWise Edge Agent on iWave G26 TCU
+# iWave G26 TCU Tutorial
 
-**Copyright © Amazon Web Services, Inc. and/or its affiliates. All rights reserved.**
+**Topics**
+
+- [Introduction](#introduction)
+- [About this tutorial](#about-this-tutorial)
+- [Prerequisites](#prerequisites)
+- [Step 1: Set up the iWave Systems G26 TCU](#step-1-set-up-iwave-systems-g26-tcu)
+- [Step 2: Launch your development machine](#step-2-launch-your-development-machine)
+- [Step 3: Compile Edge Agent](#step-3-compile-edge-agent)
+- [Step 4: Provision AWS IoT credentials](#step-4-provision-aws-iot-credentials)
+- [Step 5: Deploy Edge Agent](#step-5-deploy-edge-agent)
+- [Step 6: Connect the iWave G26 TCU to the vehicle](#step-6-connect-the-tcu-to-the-vehicle)
+- [Step 7: Collect OBD Data](#step-7-collect-obd-data)
+
+**Copyright (C) Amazon Web Services, Inc. and/or its affiliates. All rights reserved.**
 
 Amazon's trademarks and trade dress may not be used in connection with any product or service that
 is not Amazon's, in any manner that is likely to cause confusion among customers, or in any manner
@@ -8,39 +21,71 @@ that disparages or discredits Amazon. All other trademarks not owned by Amazon a
 their respective owners, who may or may not be affiliated with, connected to, or sponsored by
 Amazon.
 
-**Note**
+## Introduction
 
-- AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
-- The AWS IoT FleetWise in-vehicle software component is licensed to you under the Apache License,
-  Version 2.0.
-- You are solely responsible for ensuring such software and any updates and modifications thereto
-  are deployed and maintained safely and securely in any vehicles and do not otherwise impact
-  vehicle safety.
+**AWS IoT FleetWise** provides a set of tools that enable automakers to collect, transform, and
+transfer vehicle data to the cloud at scale. With AWS IoT FleetWise you can build virtual
+representations of vehicle networks and define data collection rules to transfer only high-value
+data from your vehicles to AWS Cloud.
+
+**The Reference Implementation for AWS IoT FleetWise ("FWE")** provides C++ libraries that can be
+run with simulated vehicle data on certain supported vehicle hardware or that can help you develop
+an Edge Agent to run an application on your vehicle that integrates with AWS IoT FleetWise. You can
+use AWS IoT FleetWise pre-configured analytic capabilities to process collected data, gain insights
+about vehicle health, and use the service's visual interface to help diagnose and troubleshoot
+potential issues with the vehicle.
+
+AWS IoT FleetWise's capability to collect ECU data and store them on cloud databases enables you to
+utilize different AWS services, such as Analytics Services, and ML, to develop novel use-cases that
+augment and/or supplement your existing vehicle functionality. In particular, AWS IoT FleetWise can
+help utilize fleet data (Big Data) to create value. For example, you can develop use cases that
+optimize vehicle routing, improve electric vehicle range estimation, and optimize battery life
+charging. You can use the data ingested through AWS IoT FleetWise to develop applications for
+predictive diagnostics, and for outlier detection with an electric vehicle's battery cells.
+
+You can use the included sample C++ application to learn more about the Reference Implementation,
+develop an Edge Agent for your use case and test interactions before integration.
+
+This software is licensed under the
+[Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+
+### Disclaimer
+
+**_The Reference Implementation for AWS IoT FleetWise ("FWE") is intended to help you develop your
+Edge Agent for AWS IoT FleetWise and includes sample code that you may reference or modify so your
+Edge Agent meets your requirements. As provided in the AWS IoT FleetWise Service Terms, you are
+solely responsible for your Edge Agent, including ensuring that your Edge Agent and any updates and
+modifications thereto are deployed and maintained safely and securely in any vehicles._**
+
+**_This software code base includes modules that are still in development and are disabled by
+default. These modules are not intended for use in a production environment. This includes a Remote
+Profiler module that helps sending traces from the device to AWS Cloud Watch. FWE has been checked
+for any memory leaks and runtime errors such as type overflows using Valgrind. No issues have been
+detected during the load tests._**
+
+**_Note that vehicle data collected through your use of AWS IoT FleetWise is intended for
+informational purposes only (including to help you train cloud-based artificial intelligence and
+machine learning models), and you may not use AWS IoT FleetWise to control or operate vehicle
+functions. You are solely responsible for all liability that may arise in connection with any use
+outside of AWS IoT FleetWise's intended purpose and in any manner contrary to applicable vehicle
+regulations. Vehicle data collected through your use of AWS IoT FleetWise should be evaluated for
+accuracy as appropriate for your use case, including for purposes of meeting any compliance
+obligations you may have under applicable vehicle safety regulations (such as safety monitoring and
+reporting obligations). Such evaluation should include collecting and reviewing information through
+other industry standard means and sources (such as reports from drivers of vehicles). You and your
+End Users are solely responsible for all decisions made, advice given, actions taken, and failures
+to take action based on your use of AWS IoT FleetWise._**
 
 ## About this tutorial
 
-AWS IoT FleetWise provides a set of tools for automakers to collect, transform, and transfer vehicle
-data to the cloud at scale. With AWS IoT FleetWise, you can build virtual representations of vehicle
-networks and define data collection rules to transfer only high-value data from your vehicles to the
-AWS cloud. Follow the steps in this tutorial to set up and configure the iWave G26 TCU device
-hardware to work with the AWS IoT FleetWise vehicle agent software. You can then connect the device
-to a vehicle so that it collects vehicle J1979 OBD-II data and transfers it to the AWS IoT FleetWise
-service. To additionally also collected GPS data more steps described here
+Follow the steps in this tutorial to set up and configure the iWave G26 TCU device hardware to work
+with your Edge Agent compiled from the FWE source code. You can then connect the device to a vehicle
+so that it collects vehicle J1979 OBD-II data and transfers it to the AWS IoT FleetWise service. To
+additionally also collected GPS data more steps described here
 [iwavegps](../../src/datamanagement/custom/example/iwavegps/README.md) are required. They require
 the steps below to be executed first.
 
 **Estimated Time**: 60 minutes
-
-## Topics
-
-- [Prerequisites](#prerequisites)
-- [Step 1: Set up the iWave Systems G26 TCU](#step-1-set-up-iwave-systems-g26-tcu)
-- [Step 2: Launch your development machine](#step-2-launch-your-development-machine)
-- [Step 3: Compile AWS IoT FleetWise Edge Agent software](#step-3-compile-aws-iot-fleetwise-edge-agent-software)
-- [Step 4: Provision AWS IoT credentials](#step-4-provision-aws-iot-credentials)
-- [Step 5: Deploy Edge Agent](#step-5-deploy-edge-agent)
-- [Step 6: Connect the iWave G26 TCU to the vehicle](#step-6-connect-the-tcu-to-the-vehicle)
-- [Step 7: Collect OBD Data](#step-7-collect-obd-data)
 
 ## Prerequisites
 
@@ -48,7 +93,8 @@ the steps below to be executed first.
   device
 - Access to an AWS account with administrator permissions
 - To be signed in to the AWS Management Console with an account in your chosen Region
-  - Note: AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
+  - **Note:** AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe
+    (Frankfurt).
 - A SIM card
 - A local Linux or MacOS machine
 
@@ -288,8 +334,6 @@ you can use a local Intel x86_64 (amd64) machine. We recommended using the follo
 launch an AWS EC2 Graviton (arm64) instance. For more information about Amazon EC2 pricing, see
 [Amazon EC2 On-Demand Pricing](https://aws.amazon.com/ec2/pricing/on-demand/).
 
-### To launch an Amazon EC2 instance with administrator permissions
-
 1. Sign in to your [AWS account](https://aws.amazon.com/console/).
 1. Open the
    [**Launch CloudFormation Template**](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-iot-fleetwise.s3.us-west-2.amazonaws.com%2Flatest%2Fcfn-templates%2Ffwdev.yml&stackName=fwdev&param_Ec2VolumeSize=20).
@@ -310,33 +354,34 @@ launch an AWS EC2 Graviton (arm64) instance. For more information about Amazon E
    ssh -i <PATH_TO_PEM> ubuntu@<EC2_IP_ADDRESS>
    ```
 
-## Step 3: Compile AWS IoT FleetWise Edge Agent software
+## Step 3: Compile Edge Agent
 
-Next, compile the AWS IoT FleetWise Edge Agent software for the ARM 32-bit architecture of the i.MX6
-processor present in the G26 TCU device.
+Next, compile FWE for the ARM 32-bit architecture of the i.MX6 processor present in the G26 TCU
+device.
 
-### To compile the AWS IoT FleetWise Edge Agent software
-
-1. On your development machine, clone the latest AWS IoT FleetWise Edge Agent software from GitHub
-   by running the following:
+1. On your development machine, clone the latest FWE source code from GitHub by running the
+   following:
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
-     && cd ~/aws-iot-fleetwise-edge
+   && cd ~/aws-iot-fleetwise-edge
    ```
 
-2. Install the AWS IoT FleetWise Edge Agent dependencies. The command below installs the following
-   Ubuntu packages for cross-compiling the Edge Agent for ARM 32-bit:
+1. Review, modify and supplement [the FWE source code](../../src/) to ensure it meets your use case
+   and requirements.
 
-`libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`.
+1. Install the dependencies for FWE. The command below installs the following Ubuntu packages for
+   cross-compiling FWE for ARM 32-bit:
 
-Additionally, it installs the following: `jsoncpp protobuf aws-sdk-cpp`.
+   `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`.
 
-```bash
-sudo -H ./tools/install-deps-cross-armhf.sh
-```
+   Additionally, it installs the following: `jsoncpp protobuf aws-sdk-cpp`.
 
-3. To compile AWS IoT FleetWise Edge Agent software, run the following command:
+   ```bash
+   sudo -H ./tools/install-deps-cross-armhf.sh
+   ```
+
+1. To compile your Edge Agent, run the following command:
 
    ```bash
    ./tools/build-fwe-cross-armhf.sh
@@ -345,8 +390,8 @@ sudo -H ./tools/install-deps-cross-armhf.sh
 ## Step 4: Provision AWS IoT credentials
 
 On the development machine, create an IoT thing and provision its credentials by running the
-following command. The AWS IoT FleetWise Edge Agent binary and its configuration files are packaged
-into a ZIP file that is ready for deployment to the TCU.
+following command. Your Edge Agent binary and its configuration files are packaged into a ZIP file
+that is ready for deployment to the TCU.
 
 ```bash
 mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
@@ -373,8 +418,6 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
 ## Step 5: Deploy Edge Agent
 
-### To deploy AWS IoT FleetWise Edge Agent
-
 1. On your local machine, copy the deployment ZIP file from the machine with Amazon EC2 to your
    local machine by running the following command:
 
@@ -390,8 +433,8 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    ```
 
 1. As described in step 5 of [setting up the TCU](#step-1-set-up-iwave-systems-g26-tcu), connect
-   through SSH to the TCU. On the TCU, install AWS IoT FleetWise Edge Agent as a service by running
-   the following command:
+   through SSH to the TCU. On the TCU, install your Edge Agent as a service by running the following
+   command:
 
    ```bash
    mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
@@ -401,15 +444,14 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
      && ./tools/install-fwe.sh
    ```
 
-1. On the TCU, view and follow the AWS IoT FleetWise Edge Agent log (press CTRL+C to exit) by
-   running the following command:
+1. On the TCU, view and follow your Edge Agent log (press CTRL+C to exit) by running the following
+   command:
 
    ```bash
    journalctl -fu fwe@0 --output=cat
    ```
 
-   The following line appears, confirming the AWS IoT FleetWise Edge Agent successfully connected to
-   AWS IoT Core:
+   The following line appears, confirming your Edge Agent successfully connected to AWS IoT Core:
 
    ```
    [INFO ] [AwsIotConnectivityModule.cpp:161] [connect()] [Connection completed successfully]
@@ -433,10 +475,9 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
 ## Step 7: Collect OBD data
 
-1. On the development machine, install the AWS IoT FleetWise cloud demo script dependencies by
-   running the following commands. The script installs the following Ubuntu packages:
-   `python3 python3-pip`, and then installs the following PIP packages:
-   `wrapt plotly pandas cantools`.
+1. On the development machine, install the AWS IoT FleetWise demo script dependencies by running the
+   following commands. The script installs the following Ubuntu packages: `python3 python3-pip`, and
+   then installs the following PIP packages: `wrapt plotly pandas cantools`.
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \

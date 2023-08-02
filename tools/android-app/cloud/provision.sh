@@ -4,6 +4,7 @@
 
 set -euo pipefail
 
+S3_QR_CODE="false"
 S3_BUCKET=""
 S3_KEY_PREFIX=""
 S3_PRESIGNED_URL_EXPIRY=86400 # One day
@@ -17,6 +18,9 @@ VEHICLE_NAME="fwdemo-android-${TIMESTAMP}"
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case $1 in
+        --s3-qr-code)
+            S3_QR_CODE="true"
+            ;;
         --s3-bucket)
             S3_BUCKET=$2
             shift
@@ -43,6 +47,7 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
+            echo "  --s3-qr-code                         Store credentials in S3 and generate QR code with pre-signed provisioning URL"
             echo "  --s3-bucket <NAME>                   Existing S3 bucket name"
             echo "  --s3-key-prefix <PREFIX>             S3 bucket prefix"
             echo "  --s3-presigned-url-expiry <SECONDS>  S3 presigned URL expiry, default: ${S3_PRESIGNED_URL_EXPIRY}"
@@ -62,21 +67,23 @@ parse_args() {
 
 parse_args "$@"
 
-if [ "${S3_BUCKET}" == "" ]; then
-    echo -n "Enter name of existing S3 bucket: "
-    read S3_BUCKET
+if ${S3_QR_CODE}; then
     if [ "${S3_BUCKET}" == "" ]; then
-        echo "Error: S3 bucket name required"
-        exit -1
+        echo -n "Enter name of existing S3 bucket: "
+        read S3_BUCKET
+        if [ "${S3_BUCKET}" == "" ]; then
+            echo "Error: S3 bucket name required"
+            exit -1
+        fi
     fi
-fi
 
-echo "Getting S3 bucket region..."
-S3_BUCKET_REGION=`aws s3api get-bucket-location --bucket ${S3_BUCKET} | jq -r .LocationConstraint`
-if [ -z "${S3_BUCKET_REGION}" ] || [ "${S3_BUCKET_REGION}" == "null" ]; then
-    S3_BUCKET_REGION="us-east-1"
+    echo "Getting S3 bucket region..."
+    S3_BUCKET_REGION=`aws s3api get-bucket-location --bucket ${S3_BUCKET} | jq -r .LocationConstraint`
+    if [ -z "${S3_BUCKET_REGION}" ] || [ "${S3_BUCKET_REGION}" == "null" ]; then
+        S3_BUCKET_REGION="us-east-1"
+    fi
+    echo ${S3_BUCKET_REGION}
 fi
-echo ${S3_BUCKET_REGION}
 
 mkdir -p config
 ../../provision.sh \
@@ -99,21 +106,27 @@ echo {} | jq ".vehicle_name=\"${VEHICLE_NAME}\"" \
     | jq ".mqtt_topic_prefix=\"${TOPIC_PREFIX}\"" \
     > config/creds.json
 
-S3_URL="s3://${S3_BUCKET}/${S3_KEY_PREFIX}${VEHICLE_NAME}-creds.json"
-echo "Uploading credentials to S3..."
-aws s3 cp --region ${REGION} config/creds.json ${S3_URL}
-echo "Creating S3 pre-signed URL..."
-S3_PRESIGNED_URL=`aws s3 presign --region ${S3_BUCKET_REGION} --expires-in ${S3_PRESIGNED_URL_EXPIRY} ${S3_URL}`
-PROVISIONING_LINK="https://fleetwise-app.automotive.iot.aws.dev/config#url=`echo ${S3_PRESIGNED_URL} | jq -s -R -r @uri`"
-QR_CODE_FILENAME="config/provisioning-qr-code.png"
-segno --scale 5 --output ${QR_CODE_FILENAME} "${PROVISIONING_LINK}"
+if ${S3_QR_CODE}; then
+    S3_URL="s3://${S3_BUCKET}/${S3_KEY_PREFIX}${VEHICLE_NAME}-creds.json"
+    echo "Uploading credentials to S3..."
+    aws s3 cp --region ${REGION} config/creds.json ${S3_URL}
+    echo "Creating S3 pre-signed URL..."
+    S3_PRESIGNED_URL=`aws s3 presign --region ${S3_BUCKET_REGION} --expires-in ${S3_PRESIGNED_URL_EXPIRY} ${S3_URL}`
+    PROVISIONING_LINK="https://fleetwise-app.automotive.iot.aws.dev/config#url=`echo ${S3_PRESIGNED_URL} | jq -s -R -r @uri`"
 
-echo
-echo "You can now download the provisioning QR code."
-echo "----------------------------------"
-echo "| Provisioning QR code filename: |"
-echo "----------------------------------"
-echo `realpath ${QR_CODE_FILENAME}`
+    QR_CODE_FILENAME="config/provisioning-qr-code.png"
+    segno --scale 5 --output ${QR_CODE_FILENAME} "${PROVISIONING_LINK}"
 
-echo
-echo "Optional: After you have downloaded and scanned the QR code, you can delete the credentials for security by running the following command: aws s3 rm ${S3_URL}"
+    echo
+    echo "You can now download the provisioning QR code."
+    echo "----------------------------------"
+    echo "| Provisioning QR code filename: |"
+    echo "----------------------------------"
+    echo `realpath ${QR_CODE_FILENAME}`
+
+    echo
+    echo "Optional: After you have downloaded and scanned the QR code, you can delete the credentials for security by running the following command: aws s3 rm ${S3_URL}"
+else
+    echo
+    echo "Finished!"
+fi

@@ -174,7 +174,7 @@ OBDOverCANModule::doWork( void *data )
         // As we haven't detected ECUs, wait for 1 second and try again
         else
         {
-            FWE_LOG_TRACE( "Waiting for :" + std::to_string( SLEEP_TIME_SECS ) + " seconds" );
+            FWE_LOG_TRACE( "Waiting for: " + std::to_string( SLEEP_TIME_SECS ) + " seconds" );
             obdModule->mWait.wait( static_cast<uint32_t>( SLEEP_TIME_SECS * 1000 ) );
         }
     }
@@ -513,7 +513,7 @@ OBDOverCANModule::assignPIDsToECUs()
     mPIDAssigned.clear();
     for ( auto &ecu : mECUs )
     {
-        // Get supported PIDs. Edge agent will either request it from ECU or get it from the buffer
+        // Get supported PIDs. FWE will either request it from ECU or get it from the buffer
         auto numRequests = ecu->requestReceiveSupportedPIDs( SID::CURRENT_STATS );
         flush( numRequests, ecu );
         // Allocate PID to each ECU to request. Note that if the PID has been already assigned, it will not be

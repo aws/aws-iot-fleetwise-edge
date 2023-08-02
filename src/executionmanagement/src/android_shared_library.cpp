@@ -139,7 +139,7 @@ Java_com_aws_iotfleetwise_Fwe_run( JNIEnv *env,
         // Connect the Engine
         if ( mEngine->connect( config ) && mEngine->start() )
         {
-            LOGI( std::string( " AWS IoT FleetWise Edge Service Started successfully " ) );
+            LOGI( std::string( "Started successfully" ) );
         }
         else
         {
@@ -154,12 +154,12 @@ Java_com_aws_iotfleetwise_Fwe_run( JNIEnv *env,
         }
         if ( mEngine->stop() && mEngine->disconnect() )
         {
-            LOGI( std::string( " AWS IoT FleetWise Edge Service Stopped successfully " ) );
+            LOGI( std::string( "Stopped successfully" ) );
             mEngine = nullptr;
             return EXIT_SUCCESS;
         }
 
-        LOGE( std::string( " AWS IoT FleetWise Edge Service Stopped with errors " ) );
+        LOGE( std::string( "Stopped with errors" ) );
         mEngine = nullptr;
         return EXIT_FAILURE;
     }
@@ -196,6 +196,50 @@ Java_com_aws_iotfleetwise_Fwe_setLocation( JNIEnv *env, jobject me, jdouble lati
         return;
     }
     mEngine->setExternalGpsLocation( latitude, longitude );
+}
+#endif
+
+#ifdef FWE_FEATURE_AAOS_VHAL
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_aws_iotfleetwise_Fwe_getVehiclePropertyInfo( JNIEnv *env, jobject me )
+{
+    static_cast<void>( me );
+    jclass cls = env->FindClass( "[I" );
+    jintArray iniVal = env->NewIntArray( 4 );
+    jobjectArray outer;
+    if ( mEngine == nullptr )
+    {
+        outer = env->NewObjectArray( 0, cls, iniVal );
+    }
+    else
+    {
+        auto propertyInfo = mEngine->getVehiclePropertyInfo();
+        outer = env->NewObjectArray( static_cast<jsize>( propertyInfo.size() ), cls, iniVal );
+        for ( size_t i = 0; i < propertyInfo.size(); i++ )
+        {
+            jintArray inner = env->NewIntArray( 4 );
+            for ( size_t j = 0; j < 4; j++ )
+            {
+                jint val = static_cast<jint>( propertyInfo[i][j] );
+                env->SetIntArrayRegion( inner, static_cast<jsize>( j ), 1, &val );
+            }
+            env->SetObjectArrayElement( outer, static_cast<jsize>( i ), inner );
+            env->DeleteLocalRef( inner );
+        }
+    }
+    return outer;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_aws_iotfleetwise_Fwe_setVehicleProperty( JNIEnv *env, jobject me, jint signalId, jdouble value )
+{
+    static_cast<void>( env );
+    static_cast<void>( me );
+    if ( mEngine == nullptr )
+    {
+        return;
+    }
+    mEngine->setVehicleProperty( static_cast<uint32_t>( signalId ), value );
 }
 #endif
 

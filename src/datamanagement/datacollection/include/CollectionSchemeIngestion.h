@@ -58,8 +58,6 @@ public:
 
     const RawCanFrames_t &getCollectRawCanFrames() const override;
 
-    const ImagesDataType &getImageCaptureData() const override;
-
     bool isPersistNeeded() const override;
 
     bool isCompressionNeeded() const override;
@@ -92,11 +90,6 @@ private:
      * @brief Vector of all the CAN Messages that need to be collected/monitored
      */
     RawCanFrames_t mCollectedRawCAN;
-
-    /**
-     * @brief Vector of Image Capture metadata.
-     */
-    ImagesDataType mImagesCaptureData;
 
     /**
      * @brief Expression Node Pointer to the Tree Root

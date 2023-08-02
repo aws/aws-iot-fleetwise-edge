@@ -155,7 +155,7 @@ struct ECUMock
     Thread mThread;
 };
 
-// This function will be run in a separate thread to mock ECU response to Edge Agent OBD requests
+// This function will be run in a separate thread to mock ECU response to FWE OBD requests
 void
 ecuResponse( void *ecuMock )
 {
@@ -189,12 +189,12 @@ ecuResponse( void *ecuMock )
         }
         else if ( rxPDUData == std::vector<uint8_t>{ 0x01, 0x00, 0x20, 0x40, 0x60, 0x80, 0xA0 } )
         {
-            // Edge Agent is querying supported PIDs
+            // FWE is querying supported PIDs
             ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mSupportedPIDResponse1 );
         }
         else if ( rxPDUData == std::vector<uint8_t>{ 0x01, 0xC0, 0xE0 } )
         {
-            // Edge Agent is querying supported PIDs
+            // FWE is querying supported PIDs
             ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mSupportedPIDResponse2 );
         }
         else if ( rxPDUData == ecuMockPtr->mRequestPID1 )
@@ -399,7 +399,7 @@ TEST_P( OBDOverCANModuleTestWithAllSignalTypes, RequestPIDFromNotExtendedIDECUTe
 // In this test scenario, the decoder dictionary will request signals from PIDs 0x04, 0x14, 0x0D, 0x15, 0x16, 0x17
 // Engine ECU supports PIDs 0x04,0x05,0x09,0x11,0x12,0x13,0x14
 // Transmission ECU supports PIDs 0x0D, 0xC1,
-// Hence Edge Agent will only request 0x04, 0x14 to Engine ECU and 0x0D, 0xC1 to Transmission ECU
+// Hence FWE will only request 0x04, 0x14 to Engine ECU and 0x0D, 0xC1 to Transmission ECU
 TEST_F( OBDOverCANModuleTest, RequestPartialPIDFromNotExtendedIDECUTest )
 {
     // Setup ECU Mock

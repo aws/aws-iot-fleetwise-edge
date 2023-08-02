@@ -9,10 +9,17 @@ source ${SCRIPT_DIR}/install-deps-versions.sh
 
 USE_CACHE="true"
 SDK_PREFIX="/usr/local/android_sdk"
+ARCHS="x86_64:x86_64-linux-android:android-x86_64 \
+       armeabi-v7a:armv7a-linux-androideabi:android-arm \
+       arm64-v8a:aarch64-linux-android:android-arm64"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case $1 in
+        --archs)
+            ARCHS=$2
+            shift
+            ;;
         --native-prefix)
             NATIVE_PREFIX="$2"
             USE_CACHE="false"
@@ -20,6 +27,7 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
+            echo "  --archs <ARCHS>  Space separated list of archs in the format <ARCH>:<HOST_PLATFORM>:<SSL_TARGET>"
             echo "  --native-prefix  Native install prefix"
             exit 0
             ;;
@@ -223,7 +231,20 @@ install_deps() {
     rm -rf deps-cross-android
 }
 
-if ! ${USE_CACHE} || [ ! -d /usr/local/aarch64-linux-android ]  || [ ! -d /usr/local/armv7a-linux-androideabi ] || [ ! -d ${NATIVE_PREFIX} ]; then
-    install_deps "armeabi-v7a" "armv7a-linux-androideabi" "android-arm"
-    install_deps "arm64-v8a" "aarch64-linux-android" "android-arm64"
+ARCH_NOT_INSTALLED="false"
+for ARCH in ${ARCHS}; do
+    HOST_PLATFORM=`echo $ARCH | cut -d ':' -f2`
+    if [  ! -d /usr/local/${HOST_PLATFORM} ]; then
+        ARCH_NOT_INSTALLED="true"
+        break
+    fi
+done
+
+if ! ${USE_CACHE} || ${ARCH_NOT_INSTALLED} || [ ! -d ${NATIVE_PREFIX} ]; then
+    for ARCH in ${ARCHS}; do
+        TARGET_ARCH=`echo $ARCH | cut -d ':' -f1`
+        HOST_PLATFORM=`echo $ARCH | cut -d ':' -f2`
+        SSL_TARGET=`echo $ARCH | cut -d ':' -f3`
+        install_deps ${TARGET_ARCH} ${HOST_PLATFORM} ${SSL_TARGET}
+    done
 fi

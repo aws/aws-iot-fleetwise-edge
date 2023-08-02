@@ -265,11 +265,12 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     // Both collectionScheme1 and collectionScheme2 are expected to be enabled
     ASSERT_TRUE( test.updateMapsandTimeLine( currTime ) );
     // Invoke Decoder Dictionary Extractor function
-    std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> decoderDictionaryMap;
+    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
     test.decoderDictionaryExtractor( decoderDictionaryMap );
     ASSERT_TRUE( decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET ) != decoderDictionaryMap.end() );
     ASSERT_TRUE( decoderDictionaryMap.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap.end() );
-    auto &decoderDictionary = decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET];
+    auto decoderDictionary =
+        std::dynamic_pointer_cast<CANDecoderDictionary>( decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] );
     // Below section exam decoder dictionary
     // First, check whether dictionary has two top layer index: Channel1 and Channel2
     auto firstChannelId = canIDTranslator.getChannelNumericID( "10" );
@@ -330,7 +331,9 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     }
 
     ASSERT_EQ( decoderDictionaryMap[VehicleDataSourceProtocol::OBD]->signalIDsToCollect.size(), 4 );
-    const auto &obdPidDecoderDictionary = decoderDictionaryMap[VehicleDataSourceProtocol::OBD]->canMessageDecoderMethod;
+    const auto &obdPidDecoderDictionary =
+        std::dynamic_pointer_cast<CANDecoderDictionary>( decoderDictionaryMap[VehicleDataSourceProtocol::OBD] )
+            ->canMessageDecoderMethod;
     // Verify OBD PID Signals have correct decoder dictionary
     ASSERT_TRUE( obdPidDecoderDictionary.find( 0 ) != obdPidDecoderDictionary.end() );
     ASSERT_TRUE( obdPidDecoderDictionary.at( 0 ).find( 0x14 ) != obdPidDecoderDictionary.at( 0 ).end() );
@@ -369,17 +372,19 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     // enabled
     ASSERT_TRUE( test.updateMapsandTimeLine( currTime + SECOND_TO_MILLISECOND( 6 ) ) );
     // decoder dictionary map is a local variable in PM worker thread, create a new one
-    std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> decoderDictionaryMapNew;
+    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMapNew;
     test.decoderDictionaryExtractor( decoderDictionaryMapNew );
     ASSERT_TRUE( decoderDictionaryMapNew.find( VehicleDataSourceProtocol::RAW_SOCKET ) !=
                  decoderDictionaryMapNew.end() );
     // OBD is only included in CollectionScheme 2 and it's already expired. Hence it will be an empty decoder dictionary
     // for OBD
     ASSERT_TRUE( decoderDictionaryMapNew.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMapNew.end() );
-    decoderDictionary = decoderDictionaryMapNew[VehicleDataSourceProtocol::OBD];
+    decoderDictionary =
+        std::dynamic_pointer_cast<CANDecoderDictionary>( decoderDictionaryMapNew[VehicleDataSourceProtocol::OBD] );
     ASSERT_EQ( decoderDictionary, nullptr );
 
-    decoderDictionary = decoderDictionaryMapNew[VehicleDataSourceProtocol::RAW_SOCKET];
+    decoderDictionary = std::dynamic_pointer_cast<CANDecoderDictionary>(
+        decoderDictionaryMapNew[VehicleDataSourceProtocol::RAW_SOCKET] );
     // Now dictionary shall not contain anything for Node 10 as CollectionScheme1 is retired
     ASSERT_TRUE( decoderDictionary->canMessageDecoderMethod.find( firstChannelId ) ==
                  decoderDictionary->canMessageDecoderMethod.end() );
@@ -431,7 +436,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     // Both collectionScheme1 and collectionScheme2 are expected to be enabled
     ASSERT_TRUE( test2.updateMapsandTimeLine( { 1635951061244, 100 } ) );
     // Invoke Decoder Dictionary Extractor function
-    std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> decoderDictionaryMap2;
+    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap2;
     test2.decoderDictionaryExtractor( decoderDictionaryMap2 );
     ASSERT_TRUE( decoderDictionaryMap2.find( VehicleDataSourceProtocol::RAW_SOCKET ) != decoderDictionaryMap2.end() );
     ASSERT_TRUE( decoderDictionaryMap2.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap2.end() );
@@ -490,7 +495,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorNoSignalsTest )
     // Both collectionScheme1 and collectionScheme2 are expected to be enabled
     ASSERT_TRUE( test.updateMapsandTimeLine( currTime ) );
     // Invoke Decoder Dictionary Extractor function
-    std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> decoderDictionaryMap;
+    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
     test.decoderDictionaryExtractor( decoderDictionaryMap );
     ASSERT_TRUE( decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET ) != decoderDictionaryMap.end() );
 }
@@ -578,16 +583,14 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorFirstRawFrameThenSi
     // Both collectionScheme1 and collectionScheme2 are expected to be enabled
     ASSERT_TRUE( test.updateMapsandTimeLine( currTime ) );
     // Invoke Decoder Dictionary Extractor function
-    std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> decoderDictionaryMap;
+    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
     test.decoderDictionaryExtractor( decoderDictionaryMap );
     ASSERT_TRUE( decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET ) != decoderDictionaryMap.end() );
-
-    ASSERT_TRUE(
-        decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET )
-            ->second->canMessageDecoderMethod.find( canIDTranslator.getChannelNumericID( "10" ) ) !=
-        decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET )->second->canMessageDecoderMethod.cend() );
-    auto decoderMethod = decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET )
-                             ->second->canMessageDecoderMethod.find( canIDTranslator.getChannelNumericID( "10" ) );
+    auto decoderDictionary =
+        std::dynamic_pointer_cast<CANDecoderDictionary>( decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] );
+    ASSERT_TRUE( decoderDictionary->canMessageDecoderMethod.find( canIDTranslator.getChannelNumericID( "10" ) ) !=
+                 decoderDictionary->canMessageDecoderMethod.cend() );
+    auto decoderMethod = decoderDictionary->canMessageDecoderMethod.find( canIDTranslator.getChannelNumericID( "10" ) );
     ASSERT_TRUE( decoderMethod->second.find( 0x100 ) != decoderMethod->second.cend() );
     ASSERT_EQ( decoderMethod->second.find( 0x100 )->second.collectType, CANMessageCollectType::RAW_AND_DECODE );
     ASSERT_EQ( decoderMethod->second.find( 0x100 )->second.format.mSignals[0].mOffset, 17 );

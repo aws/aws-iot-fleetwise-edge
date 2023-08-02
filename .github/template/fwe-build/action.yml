@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-name: Build AWS IoT FleetWise Edge
+name: Build FWE
 
 inputs:
   build-arch:

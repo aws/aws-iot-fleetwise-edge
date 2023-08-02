@@ -88,8 +88,8 @@ TEST_F( IoTFleetWiseEngineTest, CheckPublishDataQueue )
 
     // Push to the publish data queue
     std::shared_ptr<TriggeredCollectionSchemeData> collectedDataPtr = std::make_shared<TriggeredCollectionSchemeData>();
-    collectedDataPtr->metaData.collectionSchemeID = "123";
-    collectedDataPtr->metaData.decoderID = "456";
+    collectedDataPtr->metadata.collectionSchemeID = "123";
+    collectedDataPtr->metadata.decoderID = "456";
     collectedDataPtr->triggerTime = 800;
     {
         CollectedSignal collectedSignalMsg1( 120 /*signalId*/, 800 /*receiveTime*/, 77.88 /*value*/ );
@@ -127,27 +127,4 @@ TEST_F( IoTFleetWiseEngineTest, InitAndFailToStartCorruptConfig )
     IoTFleetWiseEngine engine;
     // Connect should fail as the Config file has a non complete Bus definition
     ASSERT_FALSE( engine.connect( config ) );
-}
-
-TEST_F( IoTFleetWiseEngineTest, TestDataRetrieval )
-{
-    Json::Value config;
-    ASSERT_TRUE( IoTFleetWiseConfig::read( "em-example-config.json", config ) );
-    IoTFleetWiseEngine engine;
-    ASSERT_TRUE( engine.connect( config ) );
-    // Write some data to the file
-    std::string testString = "!24$iklmnopabcdefjh!24$3@qrstuvwxyz";
-
-    ASSERT_EQ( engine.mPersistDecoderManifestCollectionSchemesAndData->write(
-                   reinterpret_cast<const uint8_t *>( testString.c_str() ),
-                   testString.size(),
-                   DataType::EDGE_TO_CLOUD_PAYLOAD ),
-               ErrorCode::SUCCESS );
-
-    ASSERT_TRUE( engine.start() );
-    ASSERT_TRUE( engine.isAlive() );
-    ASSERT_EQ( engine.mPersistDecoderManifestCollectionSchemesAndData->erase( DataType::EDGE_TO_CLOUD_PAYLOAD ),
-               ErrorCode::SUCCESS );
-    ASSERT_TRUE( engine.disconnect() );
-    ASSERT_TRUE( engine.stop() );
 }

@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "files": [
+    {
+      "filename": "exampleFile1.bin",
+      "payloadSize": 10,
+      "compressionRequired": false
+    },
+    {
+      "filename": "exampleFile2.bin",
+      "payloadSize": 247,
+      "compressionRequired": true
+    }
+  ]
+}

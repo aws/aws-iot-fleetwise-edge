@@ -43,3 +43,16 @@ cp tools/cansim/cansim@.service /lib/systemd/system/
 systemctl daemon-reload
 systemctl enable `seq -f "cansim@%.0f" 0 $((BUS_COUNT-1))`
 systemctl start `seq -f "cansim@%.0f" 0 $((BUS_COUNT-1))`
+
+# Check that the simulators started correctly and are generating data
+for SEQUENCE in `seq 0 $((BUS_COUNT-1))`; do
+    DEVICE=vcan${SEQUENCE}
+    echo Checking if device ${DEVICE} is receiving data;
+    NUM_MESSAGES=$(candump -n 10 -T 5000 ${DEVICE} | wc -l)
+    echo "Received ${NUM_MESSAGES} messages";
+    if [ ${NUM_MESSAGES} -ne 10 ]; then
+        echo "Received fewer messages than expected. Most likely the CAN simulator #${SEQUENCE} didn't start correctly. See the log below:";
+        journalctl -u cansim@${SEQUENCE}.service | tail -n100
+        exit 1
+    fi
+done

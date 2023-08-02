@@ -1,5 +1,32 @@
 # Change Log
 
+## v1.0.7 (2023-08-01)
+
+Features:
+
+- Add Android Automotive (AAOS) support.
+- Add experimental Greengrass V2 support
+
+Bug fixes:
+
+- Fix always saving data to disk when offline, even when configured not to in the campaign.
+- Fix possible NullPointerException in Android app.
+
+Improvements:
+
+- Refactor persistent file handling, which now saves files under a subfolder called
+  `FWE_Persistency` in the directory configured in the config file by `persistencyPath`. Now a
+  separate file is saved for each payload file to be uploaded. An extra file `PayloadMetadata.json`
+  is created containing metadata for these files, the schema for which can be found
+  [here](./interfaces/persistency/schemas/persistencyMetadataFormat.json).
+- Reduce Android app `minSdk` to 21 (Android 5.0).
+- Update AWS C++ SDK to v1.11.111.
+
+Deprecation:
+
+- Remove the experimental camera feature (`-DFWE_FEATURE_CAMERA`). This is unsupported and it was
+  not being maintained.
+
 ## v1.0.6 (2023-06-12)
 
 Features:
@@ -10,7 +37,7 @@ Improvements:
 
 - Change from `arn` to `sync_id` for campaign_arn and document_arns, the `sync_id` being the ARN
   followed by the timestamp of the last update. The change is backwards compatible with older
-  versions of the edge agent.
+  versions of FWE.
 - Ubuntu package mirror from system used, rather than `ports.ubuntu.com`.
 - Add root CA and inline credentials support to static config file.
 - Add extra metrics for AWS SDK heap usage, used signal buffer, MQTT messages sent out.
@@ -33,7 +60,7 @@ Improvements:
 - Add documentation on [how to use edge specific metrics](docs/metrics.md).
 - Change from `arn` to `sync_id` for all decoder manifest Protobuf fields, the `sync_id` being the
   ARN followed by the timestamp of the last update. The change is backwards compatible with older
-  versions of the edge agent.
+  versions of FWE.
 - Improve MISRA C++ 2008, and AUTOSAR C++ compliance.
 - Updated CloudFormation templates to use
   [IMDSv2](https://aws.amazon.com/blogs/security/defense-in-depth-open-firewalls-reverse-proxies-ssrf-vulnerabilities-ec2-instance-metadata-service/).
@@ -84,9 +111,9 @@ Improvements:
 
 - Logs now show time in ISO 8601 format and UTC.
 - Added optional config `logColor` for controlling ANSI colors in the logs. Valid values: `Auto`,
-  `Yes`, `No`. Default value is `Auto`, which will make the agent try to detect whether stdout can
+  `Yes`, `No`. Default value is `Auto`, which will make FWE try to detect whether stdout can
   interpret the ANSI color escape sequences.
-- A containerized version of the edge agent is available from AWS ECR Public Gallery:
+- A containerized version of FWE is available from AWS ECR Public Gallery:
   https://gallery.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge.
 - Improve CERT-CPP compliance.
 - Improve quick start guide and demo script.
@@ -101,8 +128,8 @@ Bugfixes:
 - Use `std::condition_variable::wait_until` instead of `wait_for` to avoid the
   [bug](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=41861) when `wait_for` uses system time.
 - Fix extended id not working with cloud.
-- Handle `SIGTERM` signal. Now when stopping the agent with `systemctl` or `kill` without additional
-  args, it should gracefully shutdown.
+- Handle `SIGTERM` signal. Now when stopping FWE with `systemctl` or `kill` without additional args,
+  it should gracefully shutdown.
 - Fix bug in canigen.py when signal offset is greater than zero.
 
 Improvements:
@@ -160,12 +187,12 @@ Bugfixes:
 
 Improvements:
 
-- Remove the html version of developer guide.
-- Remove source code in S3 bucket. The S3 bucket will only be used to host quick demo cloud
-  formation.
-- Remove convertToPeculiarFloat function from DataCollectionProtoWriter.
-- Set default checkin period to 2-min in static-config.json. The quick demo will still use 5 second
-  as checkin period.
+- Remove the HTML version of developer guide.
+- Remove source code in S3 bucket. The S3 bucket will only be used to host quick demo
+  CloudFormation.
+- Remove `convertToPeculiarFloat` function from `DataCollectionProtoWriter`.
+- Set default checkin period to 2-min in `static-config.json`. The quick demo will still use 5
+  second as checkin period.
 - Update FleetWise CLI Model to GA release version.
 - Update Customer Demo to remove service-linked role creation for FleetWise Account Registration.
 
@@ -229,7 +256,7 @@ Bugfixes/Improvements:
 - Unit tests added to release, including clang-format and clang-tidy tests.
 - Source code now available on GitHub: https://github.com/aws/aws-iot-fleetwise-edge
   - GitHub CI job added that runs subset of unit tests that do not require SocketCAN.
-- Edge agent source code:
+- FWE source code:
   - No changes.
 - Edge agent developer guide and associated scripts:
   - Cloud demo script `demo.sh`:
@@ -249,7 +276,7 @@ Features:
 
 Bugfixes/Improvements:
 
-- Edge agent source code:
+- FWE source code:
   - Fixed bug in `PayloadManager.cpp` that caused corruption of the persisted data.
   - Improved the documentation of the Protobuf schemas.
   - Added retry with exponential back-off for making initial connection to AWS IoT Core.
@@ -267,7 +294,7 @@ Bugfixes/Improvements:
   - CloudFormation templates `fwdemo.yml` and `fwdev.yml`:
     - Kernel updated and SocketCAN modules installed from `linux-modules-extra-aws` to avoid modules
       becoming unavailable after system upgrade of EC2 instance.
-    - Edge agent now compiled and run on the same EC2 instance, rather than using CodePipeline.
+    - FWE now compiled and run on the same EC2 instance, rather than using CodePipeline.
 
 ## v0.1.0 (2021-11-29)
 

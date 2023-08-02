@@ -24,15 +24,6 @@ using namespace Aws::IoTFleetWise::OffboardConnectivity;
 using Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams;
 using namespace Aws::IoTFleetWise::Platform::Linux::PersistencyManagement;
 
-#pragma pack( push, 1 )
-struct PayloadHeader
-{
-    bool compressionRequired{ false };
-    size_t size{ 0 };
-};
-
-#pragma pack( pop )
-
 /**
  * @brief Class that handles offline data storage/retrieval and data compression before transmission
  */
@@ -42,46 +33,52 @@ public:
     PayloadManager( std::shared_ptr<CacheAndPersist> persistencyPtr );
 
     /**
-     * @brief Prepare the payload data to be written to storage. Adds a header with metadata consisting
-     *        of compression flag and size of the payload.
+     * @brief Prepares and writes the payload data to storage. Constructs and writes payload metadata JSON object.
      *
      * @param buf  buffer containing payload
      * @param size number of accessible bytes in buf
      * @param collectionSchemeParams object containing collectionScheme related metadata for data persistency and
      * transmission
      *
-     * @return true if data was persisted, else false
+     * @return true if data was persisted and metadata was added, else false
      */
     bool storeData( const std::uint8_t *buf, size_t size, const struct CollectionSchemeParams &collectionSchemeParams );
 
     /**
-     * @brief Parses the retrieved data from the storage. Separates metadata from the actual payload.
+     * @brief Constructs and writes payload metadata JSON object.
      *
-     * @param data  vector to store parsed payloads
-     *
-     * @return SUCCESS if true, EMPTY if no data to retrieve, FILESYSTEM_ERROR if other errors
+     * @param filename file to construct metadata for
+     * @param size size of the payload
+     * @param collectionSchemeParams object containing collectionScheme related metadata for data persistency and
+     * transmission
      */
-    ErrorCode retrieveData( std::vector<std::string> &data );
+    void storeMetadata( const std::string filename,
+                        size_t size,
+                        const struct CollectionSchemeParams &collectionSchemeParams );
+
+    /**
+     * @brief Retrieves metadata for all persisted files from the JSON file and removes extracted metadata from the JSON
+     * file.
+     *
+     * @param files JSON object for all persisted files
+     *
+     * @return SUCCESS if metadata was successfully retrieved, FILESYSTEM_ERROR for other errors
+     */
+    ErrorCode retrievePayloadMetadata( Json::Value &files );
+
+    /**
+     * @brief Retrieves persisted payload from the file and deletes the file.
+     *
+     * @param buf  buffer containing payload
+     * @param size number of accessible bytes in buf
+     * @param filename filename to retrieve payload
+     *
+     * @return SUCCESS if metadata was successfully retrieved, FILESYSTEM_ERROR for other errors
+     */
+    ErrorCode retrievePayload( uint8_t *buf, size_t size, const std::string &filename );
 
 private:
     std::shared_ptr<CacheAndPersist> mPersistencyPtr;
-
-    /**
-     * @brief Prepare the payload data to be written to storage. Adds a header with metadata consisting
-     *        of compression flag and size of the payload.
-     *
-     * @param buf  buffer to store encoded payload
-     * @param data proto data to be stored
-     * @param size size of the buffer being passed
-     * @param collectionSchemeParams object containing collectionScheme related metadata for data persistency and
-     * transmission
-     *
-     * @return true if prep was successful, false if error occurred
-     */
-    static bool preparePayload( uint8_t *const buf,
-                                size_t size,
-                                const std::string &data,
-                                const CollectionSchemeParams &collectionSchemeParams );
 };
 } // namespace OffboardConnectivityAwsIot
 } // namespace IoTFleetWise

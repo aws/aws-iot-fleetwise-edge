@@ -21,6 +21,7 @@ namespace DataInspection
  */
 // coverity[cert_dcl60_cpp_violation] false positive - class only defined once
 // coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
+// coverity[misra_cpp_2008_rule_3_2_2_violation] false positive - class only defined once
 class Geohash
 {
 public:

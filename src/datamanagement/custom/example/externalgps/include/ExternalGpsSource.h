@@ -59,8 +59,6 @@ private:
     static bool validLatitude( double latitude );
     static bool validLongitude( double longitude );
 
-    static const uint32_t CYCLIC_LOG_PERIOD_MS = 1000;
-
     uint16_t mLatitudeStartBit = 0;
     uint16_t mLongitudeStartBit = 0;
 

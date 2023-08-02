@@ -7,7 +7,6 @@ set(libraryAliasName IoTFleetWise::DataInspection)
 set(SRCS
   src/CollectionInspectionEngine.cpp
   src/CollectionInspectionWorkerThread.cpp
-  $<$<BOOL:${FWE_FEATURE_CAMERA}>:src/dds/DataOverDDSModule.cpp>
   src/diag/OBDOverCANModule.cpp
   src/diag/OBDOverCANECU.cpp
   src/location/GeohashFunctionNode.cpp
@@ -35,6 +34,7 @@ target_link_libraries(
   IoTFleetWise::Platform::Linux
   IoTFleetWise::Vehiclenetwork
   IoTFleetWise::DataDecoding
+  IoTFleetWise::DataCollection
   IoTFleetWise::Platform::Utility
   ${JSONCPP_LIBRARY}
 )
@@ -49,7 +49,6 @@ install(
   FILES
   include/CollectionInspectionEngine.h
   include/CollectionInspectionWorkerThread.h
-  $<$<BOOL:${FWE_FEATURE_CAMERA}>:${CMAKE_CURRENT_LIST_DIR}/include/DataOverDDSModule.h>
   include/DataReduction.h
   include/GeohashFunctionNode.h
   include/IActiveConditionProcessor.h
@@ -74,14 +73,6 @@ set(
   test/CANDataSourceTest.cpp
   test/ExternalCANDataSourceTest.cpp
 )
-
-if(FWE_FEATURE_CAMERA)
-  set(
-    testSources
-    ${testSources}
-    test/DataOverDDSModuleTest.cpp
-  )
-endif()
 
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")

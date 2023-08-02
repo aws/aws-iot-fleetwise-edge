@@ -1,16 +1,16 @@
-# Getting started with AWS IoT FleetWise Edge Agent on NXP S32G
+# Getting started on an NXP S32G board
 
-This section describes how to deploy AWS IoT FleetWise Edge Agent onto an NXP S32G-VNP-RDB2 board.
+This section describes how to get started on an NXP S32G-VNP-RDB2 board.
 
 ## Prerequisites
 
-- **NXP Semiconductors S32G Reference Design 2** — Part number: S32G-VNP-RDB2
-- **AWS IoT FleetWise Edge Agent Compiled for ARM64** — If you are using an EC2 Graviton instance as
-  your development machine, you will have completed this already in
-  [previous step](./edge-agent-dev-guide.md#compile-aws-iot-fleetwise-edge-agent-software).
+- **NXP Semiconductors S32G Reference Design 2:** Part number S32G-VNP-RDB2
+- **FWE Compiled for ARM64:** If you are using an EC2 Graviton instance as your development machine,
+  you will have completed this already in
+  [a previous step](./edge-agent-dev-guide.md#compile-your-edge-agent).
 
   - _If you are using a local Intel x86_64 (amd64) development machine_, you will need to run the
-    following to cross-compile AWS IoT FleetWise Edge Agent:
+    following to cross-compile your Edge Agent:
 
     ```bash
     cd ~/aws-iot-fleetwise-edge \
@@ -19,7 +19,7 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an NXP S3
         && ./tools/build-fwe-cross-arm64.sh
     ```
 
-- **Internet Router with Ethernet** — The S32G-VNP-RDB2 must be connected to an internet router via
+- **Internet Router with Ethernet:** The S32G-VNP-RDB2 must be connected to an internet router via
   an Ethernet cable for internet connectivity. It is beyond the scope of this document to describe
   how this is achieved, but one possibility is to use a WiFi to Ethernet bridge and a smartphone
   acting as an internet hotspot.
@@ -28,8 +28,8 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an NXP S3
 
 The following instructions use the development machine to build an SD-card image based on the Ubuntu
 variant of the NXP Linux BSP version 35.0, with the addition of the `can-isotp` kernel module
-required by AWS IoT FleetWise Edge Agent, an updated version of the `canutils` package and a
-`systemd` service called `setup-socketcan` for bringing up the CAN interfaces at startup.
+required by FWE, an updated version of the `canutils` package and a `systemd` service called
+`setup-socketcan` for bringing up the CAN interfaces at startup.
 
 1. Run the following _on the development machine_ to install the dependencies of the `bitbake` tool
    of the Yocto / OpenEmbedded project.
@@ -91,10 +91,9 @@ required by AWS IoT FleetWise Edge Agent, an updated version of the `canutils` p
 
 ## Provision AWS IoT Credentials
 
-Run the following commands _on the development machine_ (after compiling AWS IoT FleetWise Edge
-Agent for ARM64 as explained above), to create an IoT Thing and provision credentials for it. The
-AWS IoT FleetWise Edge Agent binary and its configuration files will be packaged into a ZIP file
-ready to be deployed to the board.
+Run the following commands _on the development machine_ (after compiling FWE for ARM64 as explained
+above), to create an IoT Thing and provision credentials for it. Your Edge Agent binary and its
+configuration files will be packaged into a ZIP file ready to be deployed to the board.
 
 ```bash
 mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
@@ -119,7 +118,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 && cd .. && zip -r aws-iot-fleetwise-deploy.zip .
 ```
 
-## Deploy AWS IoT FleetWise Edge Agent on NXP S32G
+## Deploy Edge Agent on NXP S32G board
 
 1. Run the following _on your local machine_ to copy the deployment ZIP file from the EC2 machine to
    your local machine:
@@ -137,7 +136,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    ```
 
 1. SSH to the S32G board, as described above, then run the following **_on the S32G_** to install
-   AWS IoT FleetWise Edge Agent as a service:
+   your Edge Agent as a service:
 
    ```bash
    mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
@@ -147,8 +146,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
        && sudo ./tools/install-fwe.sh
    ```
 
-1. Run the following **_on the S32G_** to view and follow the AWS IoT FleetWise Edge Agent log
-   (press CTRL+C to exit):
+1. Run the following **_on the S32G_** to view and follow the log (press CTRL+C to exit):
 
    ```bash
    sudo journalctl -fu fwe@0 --output=cat

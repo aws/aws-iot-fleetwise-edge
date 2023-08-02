@@ -4,9 +4,9 @@
 #pragma once
 
 // Includes
+#include "CacheAndPersist.h"
 #include "CollectionInspectionAPITypes.h"
 #include "CollectionSchemeManagementListener.h"
-#include "ICacheAndPersist.h"
 #include "ICollectionScheme.h"
 namespace Aws
 {

@@ -17,7 +17,7 @@ The decoder manifest changes are explained in the README in the parent folder
 # Configuration
 
 If you provide in the `staticConfig` section of the config.json file the following section you can
-change the parameters without recompiling AWS IoT FleetWise Edge:
+change the parameters without recompiling FWE:
 
 ```
 "iWaveGpsExample": {

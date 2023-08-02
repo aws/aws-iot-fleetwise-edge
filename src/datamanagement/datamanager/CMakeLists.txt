@@ -40,6 +40,7 @@ install(TARGETS ${libraryTargetName} DESTINATION lib)
 install(
   FILES
   include/ICollectionSchemeManager.h
+  include/IActiveCollectionSchemesListener.h
   include/CollectionSchemeManagementListener.h
   include/CollectionSchemeManager.h
   include/Schema.h

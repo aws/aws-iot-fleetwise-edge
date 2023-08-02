@@ -73,10 +73,10 @@ TEST( CollectionSchemeManagerTest2, storeTest )
         .WillOnce( ReturnRef( dataEmpty ) )
         .WillOnce( ReturnRef( dataDM ) )
         .WillOnce( ReturnRef( dataDM ) );
-    EXPECT_CALL( *testPersistency, write( _, _, DataType::COLLECTION_SCHEME_LIST ) )
+    EXPECT_CALL( *testPersistency, write( _, _, DataType::COLLECTION_SCHEME_LIST, _ ) )
         .WillOnce( Return( ErrorCode::SUCCESS ) )
         .WillOnce( Return( ErrorCode::MEMORY_FULL ) );
-    EXPECT_CALL( *testPersistency, write( _, _, DataType::DECODER_MANIFEST ) )
+    EXPECT_CALL( *testPersistency, write( _, _, DataType::DECODER_MANIFEST, _ ) )
         .WillOnce( Return( ErrorCode::SUCCESS ) )
         .WillOnce( Return( ErrorCode::MEMORY_FULL ) );
 
@@ -115,18 +115,18 @@ TEST( CollectionSchemeManagerTest2, retrieveTest )
     std::shared_ptr<mockCollectionSchemeList> testPL = std::make_shared<mockCollectionSchemeList>();
 
     NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1 );
-    EXPECT_CALL( *testPersistency, getSize( DataType::COLLECTION_SCHEME_LIST ) )
+    EXPECT_CALL( *testPersistency, getSize( DataType::COLLECTION_SCHEME_LIST, _ ) )
         .WillOnce( Return( 0 ) )
         .WillOnce( Return( 100 ) )
         .WillOnce( Return( 100 ) );
-    EXPECT_CALL( *testPersistency, getSize( DataType::DECODER_MANIFEST ) )
+    EXPECT_CALL( *testPersistency, getSize( DataType::DECODER_MANIFEST, _ ) )
         .WillOnce( Return( 0 ) )
         .WillOnce( Return( 100 ) )
         .WillOnce( Return( 100 ) );
-    EXPECT_CALL( *testPersistency, read( _, _, DataType::COLLECTION_SCHEME_LIST ) )
+    EXPECT_CALL( *testPersistency, read( _, _, DataType::COLLECTION_SCHEME_LIST, _ ) )
         .WillOnce( Return( ErrorCode::FILESYSTEM_ERROR ) )
         .WillOnce( Return( ErrorCode::SUCCESS ) );
-    EXPECT_CALL( *testPersistency, read( _, _, DataType::DECODER_MANIFEST ) )
+    EXPECT_CALL( *testPersistency, read( _, _, DataType::DECODER_MANIFEST, _ ) )
         .WillOnce( Return( ErrorCode::FILESYSTEM_ERROR ) )
         .WillOnce( Return( ErrorCode::SUCCESS ) );
     EXPECT_CALL( *testPL, copyData( _, 100 ) ).WillOnce( Return( true ) );
@@ -162,7 +162,8 @@ TEST( CollectionSchemeManagerTest2, StoreAndRetrieve )
 {
     int ret = std::system( "mkdir ./testPersist" );
     ASSERT_FALSE( WIFEXITED( ret ) == 0 );
-    std::shared_ptr<ICacheAndPersist> testPersistency = std::make_shared<CacheAndPersist>( "./testPersist", 4096 );
+    std::shared_ptr<CacheAndPersist> testPersistency = std::make_shared<CacheAndPersist>( "./testPersist", 4096 );
+    ASSERT_TRUE( testPersistency->init() );
     std::string dataPL =
         "if the destructor for an automatic object is explicitly invoked, and the block is subsequently left in a "
         "manner that would ordinarily invoke implicit destruction of the object, the behavior is undefined";

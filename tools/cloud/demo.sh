@@ -4,19 +4,23 @@
 
 set -euo pipefail
 
+ACCOUNT_ID=`aws sts get-caller-identity --query "Account" --output text`
+UUID="$(cat /proc/sys/kernel/random/uuid)"
+# A short string to avoid resource name conflicts. Since most resources names have a small
+# characters limit, using a full uuid would not be possible. As those names just need to be unique
+# in the same account, truncating the uuid should be enough.
+DISAMBIGUATOR="${UUID:0:8}"
+S3_SUFFIX="${ACCOUNT_ID}-${DISAMBIGUATOR}"
 ENDPOINT_URL=""
 ENDPOINT_URL_OPTION=""
 REGION="us-east-1"
-TIMESTAMP=`date +%s`
-ACCOUNT_ID=`aws sts get-caller-identity --query "Account" --output text`
 DEFAULT_VEHICLE_NAME="fwdemo"
 VEHICLE_NAME=""
-TIMESTREAM_DB_NAME="IoTFleetWiseDB-${TIMESTAMP}"
+TIMESTREAM_DB_NAME="IoTFleetWiseDB-${DISAMBIGUATOR}"
 TIMESTREAM_TABLE_NAME="VehicleDataTable"
 SERVICE_ROLE="IoTFleetWiseServiceRole"
 SERVICE_ROLE_POLICY_ARN=""
 SERVICE_PRINCIPAL="iotfleetwise.amazonaws.com"
-RANDOM_HASH="$(cat /proc/sys/kernel/random/uuid)"
 BUCKET_NAME=""
 SKIP_S3_POLICY=true
 CAMPAIGN_FILE=""
@@ -31,6 +35,7 @@ HEALTH_CHECK_RETRIES=360 # About 30mins
 MAX_ATTEMPTS_ON_REGISTRATION_FAILURE=5
 FORCE_REGISTRATION=false
 MIN_CLI_VERSION="aws-cli/2.11.24"
+CREATED_SIGNAL_CATALOG_NAME=""
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -81,7 +86,7 @@ parse_args() {
             echo "                          Vehicle name after a '-', e.g. ${DEFAULT_VEHICLE_NAME}-42"
             echo "  --campaign-file <FILE>  Campaign JSON file, default: ${DEFAULT_CAMPAIGN_FILE}"
             echo "  --dbc-file <FILE>       DBC file, default: ${DEFAULT_DBC_FILE}"
-            echo "  --bucket-name <NAME>    S3 bucket name, default: iot-fleetwise-demo-<RANDOM_HASH>"
+            echo "  --bucket-name <NAME>    S3 bucket name, if not specified a new bucket will be created"
             echo "  --clean-up              Delete created resources"
             echo "  --enable-s3-upload      Create campaigns to upload data to S3"
             echo "  --endpoint-url <URL>    The endpoint URL used for AWS CLI calls"
@@ -129,19 +134,26 @@ if [ "${CAMPAIGN_FILE}" == "" ]; then
     CAMPAIGN_FILE=${DEFAULT_CAMPAIGN_FILE}
 fi
 
-if [ "${BUCKET_NAME}" == "" ]; then
-    BUCKET_NAME="iot-fleetwise-demo-${RANDOM_HASH}"
+if [ ${S3_UPLOAD} == true ] && [ "${BUCKET_NAME}" == "" ]; then
+    BUCKET_NAME="iot-fleetwise-demo-${S3_SUFFIX}"
     SKIP_S3_POLICY=false
 fi
 
-NAME="${VEHICLE_NAME}-${TIMESTAMP}"
-SERVICE_ROLE="${SERVICE_ROLE}-${REGION}-${TIMESTAMP}"
+if [ ${FLEET_SIZE} -gt 1 ]; then
+    VEHICLES=( $(seq -f "${VEHICLE_NAME}-%g" 0 $((${FLEET_SIZE}-1))) )
+else
+    VEHICLES=( ${VEHICLE_NAME} )
+fi
+
+NAME="${VEHICLE_NAME}-${DISAMBIGUATOR}"
+SERVICE_ROLE="${SERVICE_ROLE}-${REGION}-${DISAMBIGUATOR}"
 
 echo -n "Date: "
 date +%Y-%m-%dT%H:%M:%S%z
-echo "Timestamp: ${TIMESTAMP}"
+echo "Disambiguator: ${DISAMBIGUATOR}"
 echo "Vehicle name: ${VEHICLE_NAME}"
 echo "Fleet Size: ${FLEET_SIZE}"
+echo "Vehicles: ${VEHICLES[@]}"
 
 # AWS CLI v1.x has a double base64 encoding issue
 echo "Checking AWS CLI version..."
@@ -153,16 +165,28 @@ if [[ "${CLI_VERSION}" < "${MIN_CLI_VERSION}" ]]; then
     exit -1
 fi
 
-error_handler() {
+save_variables() {
+    # Export some variables to a .env file so that they can be referenced by other scripts
+    echo "
+TIMESTREAM_DB_NAME=${TIMESTREAM_DB_NAME}
+TIMESTREAM_TABLE_NAME=${TIMESTREAM_TABLE_NAME}
+BUCKET_NAME=${BUCKET_NAME}
+" > demo.env
+}
+
+cleanup() {
+    save_variables
     if [ ${CLEAN_UP} == true ]; then
         ./clean-up.sh \
             --vehicle-name ${VEHICLE_NAME} \
             --fleet-size ${FLEET_SIZE} \
-            --timestamp ${TIMESTAMP} \
+            --disambiguator ${DISAMBIGUATOR} \
             ${ENDPOINT_URL_OPTION} \
-            --region ${REGION} \
-            --service-role ${SERVICE_ROLE} \
-            --service-role-policy-arn ${SERVICE_ROLE_POLICY_ARN}
+            --region ${REGION}
+        if [ ! -z "${CREATED_SIGNAL_CATALOG_NAME}" ]; then
+            echo "Deleting signal catalog: ${CREATED_SIGNAL_CATALOG_NAME}"
+            aws iotfleetwise delete-signal-catalog --name ${CREATED_SIGNAL_CATALOG_NAME} ${ENDPOINT_URL_OPTION} --region=${REGION}
+        fi
     fi
 }
 
@@ -182,7 +206,6 @@ approve_campaign() {
     echo "Waiting for campaign to become ready for approval..."
     while true; do
         sleep 5
-        SIGNAL_CATALOG_COUNT=`echo ${SIGNAL_CATALOG_LIST} | jq '.summaries|length'`
         CAMPAIGN_STATUS=`aws iotfleetwise get-campaign \
             ${ENDPOINT_URL_OPTION} --region ${REGION} \
             --name $1`
@@ -199,7 +222,7 @@ approve_campaign() {
         --action APPROVE | jq -r .arn
 }
 
-trap error_handler ERR
+trap cleanup EXIT
 
 echo "Getting AWS account ID..."
 echo ${ACCOUNT_ID}
@@ -242,7 +265,7 @@ while [ "${ACCOUNT_STATUS}" != "REGISTRATION_SUCCESS" ]; do
     fi
 done
 
-echo "Creating Timestream database..." >&2
+echo "Creating Timestream database..."
 aws timestream-write create-database \
     --region ${REGION} \
     --database-name ${TIMESTREAM_DB_NAME} | jq -r .Database.Arn
@@ -323,27 +346,21 @@ aws iam attach-role-policy \
     --policy-arn ${SERVICE_ROLE_POLICY_ARN} \
     --role-name "${SERVICE_ROLE}"
 
-if ((FLEET_SIZE==1)); then
-    echo "Deleting vehicle ${VEHICLE_NAME} if it already exists..."
-    aws iotfleetwise delete-vehicle \
-        ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --vehicle-name "${VEHICLE_NAME}"
-else
-    echo "Deleting vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1)) if it already exists..."
-    for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
-        for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
-            # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
-            # to print stderr from the output group, but not info about the background process.
-            { \
-                aws iotfleetwise delete-vehicle \
-                    ${ENDPOINT_URL_OPTION} --region ${REGION} \
-                    --vehicle-name "${VEHICLE_NAME}-$((i+j))" \
-            2>&3 &} 3>&2 2>/dev/null
-        done
-        # Wait for all background processes to finish
-        wait
+for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
+    for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
+        vehicle=${VEHICLES[$((i+j))]}
+        echo "Deleting vehicle ${vehicle} if it already exists..."
+        # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
+        # to print stderr from the output group, but not info about the background process.
+        { \
+            aws iotfleetwise delete-vehicle \
+                ${ENDPOINT_URL_OPTION} --region ${REGION} \
+                --vehicle-name "${vehicle}" \
+        2>&3 &} 3>&2 2>/dev/null
     done
-fi
+    # Wait for all background processes to finish
+    wait
+done
 
 if [ ${S3_UPLOAD} == true ]; then
     echo "S3 upload is enabled"
@@ -381,6 +398,8 @@ if [ ${S3_UPLOAD} == true ]; then
 }
 EOF
         aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file://s3-bucket-policy.json
+    else
+        echo "Skipping S3 bucket policy. Since bucket already existed it needs to be manually configured."
     fi
 fi
 
@@ -392,19 +411,13 @@ else
     DBC_NODES=`python3 dbc-to-nodes.py ${DBC_FILE}`
 fi
 
-echo "Checking for existing signal catalog..."
-SIGNAL_CATALOG_LIST=`aws iotfleetwise list-signal-catalogs \
-    ${ENDPOINT_URL_OPTION} --region ${REGION}`
-SIGNAL_CATALOG_COUNT=`echo ${SIGNAL_CATALOG_LIST} | jq '.summaries|length'`
-# Currently only one signal catalog is supported by the service
-if [ ${SIGNAL_CATALOG_COUNT} == 0 ]; then
-    echo "No existing signal catalog"
-    echo "Creating signal catalog with Vehicle node..."
-    SIGNAL_CATALOG_ARN=`aws iotfleetwise create-signal-catalog \
+if SIGNAL_CATALOG_ARN=`aws iotfleetwise create-signal-catalog \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
         --name ${NAME}-signal-catalog \
-        --nodes "${VEHICLE_NODE}" | jq -r .arn`
-    echo ${SIGNAL_CATALOG_ARN}
+        --nodes "${VEHICLE_NODE}" 2>/dev/null | jq -r .arn`; then
+
+    echo "Created new signal catalog: ${SIGNAL_CATALOG_ARN}"
+    CREATED_SIGNAL_CATALOG_NAME="${NAME}-signal-catalog"
 
     echo "Adding OBD signals to signal catalog..."
     aws iotfleetwise update-signal-catalog \
@@ -434,9 +447,12 @@ if [ ${SIGNAL_CATALOG_COUNT} == 0 ]; then
             }}
         ]' | jq -r .arn
 else
+    echo "Checking for existing signal catalogs..."
+    SIGNAL_CATALOG_LIST=`aws iotfleetwise list-signal-catalogs \
+        ${ENDPOINT_URL_OPTION} --region ${REGION}`
     SIGNAL_CATALOG_NAME=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].name`
     SIGNAL_CATALOG_ARN=`echo ${SIGNAL_CATALOG_LIST} | jq -r .summaries[0].arn`
-    echo ${SIGNAL_CATALOG_ARN}
+    echo "Reusing existing signal catalog: ${SIGNAL_CATALOG_ARN}"
 
     echo "Updating Vehicle node in signal catalog..."
     if UPDATE_SIGNAL_CATALOG_STATUS=`aws iotfleetwise update-signal-catalog \
@@ -564,35 +580,25 @@ aws iotfleetwise update-decoder-manifest \
     --name ${NAME}-decoder-manifest \
     --status ACTIVE | jq -r .arn
 
-if ((FLEET_SIZE==1)); then
-    echo "Creating vehicle ${VEHICLE_NAME}..."
-    aws iotfleetwise create-vehicle \
-        ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --decoder-manifest-arn ${DECODER_MANIFEST_ARN} \
-        --association-behavior ValidateIotThingExists \
-        --model-manifest-arn ${MODEL_MANIFEST_ARN} \
-        --attributes '{"Vehicle.Color":"Red"}' \
-        --vehicle-name "${VEHICLE_NAME}" | jq -r .arn
-else
-    echo "Creating vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1))..."
-    for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
-        for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
-            # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
-            # to print stderr from the output group, but not info about the background process.
-            { \
-                aws iotfleetwise create-vehicle \
-                    ${ENDPOINT_URL_OPTION} --region ${REGION} \
-                    --decoder-manifest-arn ${DECODER_MANIFEST_ARN} \
-                    --association-behavior ValidateIotThingExists \
-                    --model-manifest-arn ${MODEL_MANIFEST_ARN} \
-                    --attributes '{"Vehicle.Color":"Red"}' \
-                    --vehicle-name "${VEHICLE_NAME}-$((i+j))" >/dev/null \
-            2>&3 &} 3>&2 2>/dev/null
-        done
-        # Wait for all background processes to finish
-        wait
+for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
+    for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
+        echo "Creating vehicle ${vehicle}..."
+        vehicle=${VEHICLES[$((i+j))]}
+        # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
+        # to print stderr from the output group, but not info about the background process.
+        { \
+            aws iotfleetwise create-vehicle \
+                ${ENDPOINT_URL_OPTION} --region ${REGION} \
+                --decoder-manifest-arn ${DECODER_MANIFEST_ARN} \
+                --association-behavior ValidateIotThingExists \
+                --model-manifest-arn ${MODEL_MANIFEST_ARN} \
+                --attributes '{"Vehicle.Color":"Red"}' \
+                --vehicle-name "${vehicle}" >/dev/null \
+        2>&3 &} 3>&2 2>/dev/null
     done
-fi
+    # Wait for all background processes to finish
+    wait
+done
 
 echo "Creating fleet..."
 FLEET_ARN=`aws iotfleetwise create-fleet \
@@ -602,29 +608,22 @@ FLEET_ARN=`aws iotfleetwise create-fleet \
     --signal-catalog-arn ${SIGNAL_CATALOG_ARN} | jq -r .arn`
 echo ${FLEET_ARN}
 
-if ((FLEET_SIZE==1)); then
-    echo "Associating vehicle ${VEHICLE_NAME}..."
-    aws iotfleetwise associate-vehicle-fleet \
-        ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --fleet-id ${NAME}-fleet \
-        --vehicle-name "${VEHICLE_NAME}"
-else
-    echo "Associating vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1))..."
-    for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
-        for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
-            # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
-            # to print stderr from the output group, but not info about the background process.
-            { \
-                aws iotfleetwise associate-vehicle-fleet \
-                    ${ENDPOINT_URL_OPTION} --region ${REGION} \
-                    --fleet-id ${NAME}-fleet \
-                    --vehicle-name "${VEHICLE_NAME}-$((i+j))" \
-            2>&3 &} 3>&2 2>/dev/null
-        done
-        # Wait for all background processes to finish
-        wait
+for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
+    for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
+        vehicle=${VEHICLES[$((i+j))]}
+        echo "Associating vehicle ${vehicle}..."
+        # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
+        # to print stderr from the output group, but not info about the background process.
+        { \
+            aws iotfleetwise associate-vehicle-fleet \
+                ${ENDPOINT_URL_OPTION} --region ${REGION} \
+                --fleet-id ${NAME}-fleet \
+                --vehicle-name "${vehicle}" \
+        2>&3 &} 3>&2 2>/dev/null
     done
-fi
+    # Wait for all background processes to finish
+    wait
+done
 
 echo "Creating campaign from ${CAMPAIGN_FILE}..."
 CAMPAIGN=`cat ${CAMPAIGN_FILE} \
@@ -645,7 +644,7 @@ if [ ${S3_UPLOAD} == true ]; then
         | jq .targetArn=\"${FLEET_ARN}\"`
     aws iotfleetwise create-campaign \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --cli-input-json "${CAMPAIGN}" --data-destination-configs "[{\"s3Config\":{\"bucketArn\":\"arn:aws:s3:::${BUCKET_NAME}\",\"prefix\":\"${NAME}-campaign-s3-${RANDOM_HASH}\",\"dataFormat\":\"JSON\",\"storageCompressionFormat\":\"NONE\"}}]"| jq -r .arn
+        --cli-input-json "${CAMPAIGN}" --data-destination-configs "[{\"s3Config\":{\"bucketArn\":\"arn:aws:s3:::${BUCKET_NAME}\",\"prefix\":\"${NAME}-campaign-s3-${S3_SUFFIX}\",\"dataFormat\":\"JSON\",\"storageCompressionFormat\":\"NONE\"}}]"| jq -r .arn
 
     approve_campaign ${NAME}-campaign-s3-json
 
@@ -656,7 +655,7 @@ if [ ${S3_UPLOAD} == true ]; then
         | jq .targetArn=\"${FLEET_ARN}\"`
     aws iotfleetwise create-campaign \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --cli-input-json "${CAMPAIGN}" --data-destination-configs "[{\"s3Config\":{\"bucketArn\":\"arn:aws:s3:::${BUCKET_NAME}\",\"prefix\":\"${NAME}-campaign-s3-${RANDOM_HASH}\",\"dataFormat\":\"PARQUET\",\"storageCompressionFormat\":\"NONE\"}}]"| jq -r .arn
+        --cli-input-json "${CAMPAIGN}" --data-destination-configs "[{\"s3Config\":{\"bucketArn\":\"arn:aws:s3:::${BUCKET_NAME}\",\"prefix\":\"${NAME}-campaign-s3-${S3_SUFFIX}\",\"dataFormat\":\"PARQUET\",\"storageCompressionFormat\":\"NONE\"}}]"| jq -r .arn
 
     approve_campaign ${NAME}-campaign-s3-parquet
 fi
@@ -704,23 +703,19 @@ check_vehicle_healthy() {
     fi
 }
 
-if ((FLEET_SIZE==1)); then
-    echo "Waiting until status of vehicle ${VEHICLE_NAME} is healthy..."
-    check_vehicle_healthy "${VEHICLE_NAME}"
-else
-    echo "Waiting until status of vehicle ${VEHICLE_NAME}-0..$((FLEET_SIZE-1)) is healthy..."
-    for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
-        for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
-            # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
-            # to print stderr from the output group, but not info about the background process.
-            { \
-                check_vehicle_healthy "${VEHICLE_NAME}-$((i+j))" \
-            2>&3 &} 3>&2 2>/dev/null
-        done
-        # Wait for all background processes to finish
-        wait
+for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
+    for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
+        vehicle=${VEHICLES[$((i+j))]}
+        echo "Waiting until status of vehicle ${vehicle} is healthy..."
+        # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
+        # to print stderr from the output group, but not info about the background process.
+        { \
+            check_vehicle_healthy "${vehicle}" \
+        2>&3 &} 3>&2 2>/dev/null
     done
-fi
+    # Wait for all background processes to finish
+    wait
+done
 
 DELAY=30
 echo "Waiting ${DELAY} seconds for data to be collected..."
@@ -729,24 +724,32 @@ sleep ${DELAY}
 echo "The DB Name is ${TIMESTREAM_DB_NAME}"
 echo "The DB Table is ${TIMESTREAM_TABLE_NAME}"
 
-echo "Querying Timestream..."
-aws timestream-query query \
-    --region ${REGION} \
-    --query-string "SELECT * FROM \"${TIMESTREAM_DB_NAME}\".\"${TIMESTREAM_TABLE_NAME}\" \
-        WHERE vehicleName = '${VEHICLE_NAME}`if ((FLEET_SIZE>1)); then echo "-0"; fi`' \
-        AND time between ago(1m) and now() ORDER BY time ASC" \
-    > ${NAME}-timestream-result.json
+for vehicle in ${VEHICLES[@]}; do
+    echo "Querying Timestream for vehicle ${vehicle}..."
+    aws timestream-query query \
+        --region ${REGION} \
+        --query-string "SELECT * FROM \"${TIMESTREAM_DB_NAME}\".\"${TIMESTREAM_TABLE_NAME}\" \
+            WHERE vehicleName = '${vehicle}' \
+            AND time between ago(1m) and now() ORDER BY time ASC" \
+        > ${vehicle}-timestream-result.json
+done
 
 if [ "${DBC_FILE}" == "" ]; then
-    echo "Converting to HTML..."
-    OUTPUT_FILE_HTML="${NAME}.html"
-    python3 timestream-to-html.py ${NAME}-timestream-result.json ${OUTPUT_FILE_HTML}
+    OUTPUT_FILES=()
+    for vehicle in ${VEHICLES[@]}; do
+        echo "Converting to HTML..."
+        OUTPUT_FILE_HTML="${vehicle}.html"
+        OUTPUT_FILES+=(${OUTPUT_FILE_HTML})
+        python3 timestream-to-html.py ${vehicle}-timestream-result.json ${OUTPUT_FILE_HTML}
+    done
 
     echo "You can now view the collected data."
     echo "----------------------------------"
     echo "| Collected data in HTML format: |"
     echo "----------------------------------"
-    echo `pwd`/${OUTPUT_FILE_HTML}
+    for file in ${OUTPUT_FILES[@]}; do
+        echo $(pwd)/${file}
+    done
 fi
 
 if [ ${S3_UPLOAD} == true ]; then
@@ -757,7 +760,7 @@ if [ ${S3_UPLOAD} == true ]; then
     if [ "${DBC_FILE}" == "" ]; then
         echo "Converting data from S3 to HTML..."
         OUTPUT_FILE_HTML="${NAME}.html"
-        python3 s3-to-html.py --bucket ${BUCKET_NAME} --prefix ${NAME}-campaign-s3-${RANDOM_HASH} --json-output-filename ${NAME}-s3-json-result.html --parquet-output-filename ${NAME}-s3-parquet-result.html
+        python3 s3-to-html.py --bucket ${BUCKET_NAME} --prefix ${NAME}-campaign-s3-${S3_SUFFIX} --json-output-filename ${NAME}-s3-json-result.html --parquet-output-filename ${NAME}-s3-parquet-result.html
 
         echo "You can now view the collected data."
         echo "-------------------------------------"
@@ -765,13 +768,4 @@ if [ ${S3_UPLOAD} == true ]; then
         echo "-------------------------------------"
         echo `pwd`/${NAME}-s3-json-result.html "and" `pwd`/${NAME}-s3-parquet-result.html
     fi
-fi
-
-if [ ${CLEAN_UP} == true ]; then
-    ./clean-up.sh \
-        --vehicle-name ${VEHICLE_NAME} \
-        --fleet-size ${FLEET_SIZE} \
-        --timestamp ${TIMESTAMP} \
-        ${ENDPOINT_URL_OPTION} \
-        --region ${REGION}
 fi

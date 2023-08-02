@@ -4,6 +4,7 @@
 // Includes
 #include "IWaveGpsSource.h"
 #include "LoggingModule.h"
+#include "TraceModule.h"
 #include <cmath>
 #include <cstring>
 #include <fcntl.h>
@@ -97,10 +98,22 @@ IWaveGpsSource::pollData()
     {
         mValidCoordinateCounter++;
         auto timestamp = mClock->systemTimeSinceEpochMs();
-        mSignalBufferPtr->push(
-            CollectedSignal( getSignalIdFromStartBit( mLatitudeStartBit ), timestamp, lastValidLatitude ) );
-        mSignalBufferPtr->push(
-            CollectedSignal( getSignalIdFromStartBit( mLongitudeStartBit ), timestamp, lastValidLongitude ) );
+
+        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+        if ( !mSignalBufferPtr->push(
+                 CollectedSignal( getSignalIdFromStartBit( mLatitudeStartBit ), timestamp, lastValidLatitude ) ) )
+        {
+            TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+            FWE_LOG_WARN( "Signal buffer full" );
+        }
+
+        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+        if ( !mSignalBufferPtr->push(
+                 CollectedSignal( getSignalIdFromStartBit( mLongitudeStartBit ), timestamp, lastValidLongitude ) ) )
+        {
+            TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+            FWE_LOG_WARN( "Signal buffer full" );
+        }
     }
     if ( mCyclicLoggingTimer.getElapsedMs().count() > CYCLIC_LOG_PERIOD_MS )
     {

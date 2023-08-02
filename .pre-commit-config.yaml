@@ -16,7 +16,7 @@ repos:
       - id: check-case-conflict
       - id: check-json
       - id: check-yaml
-        exclude: cfn-templates|public-ecr
+        exclude: cfn-templates
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
       - id: check-merge-conflict
@@ -88,7 +88,20 @@ repos:
           interfaces/protobuf/schemas/edgeConfiguration/staticConfiguration.json --document-file
           "$x"; done' --
         language: python
-        files: "configuration/static-config.json"
+        files: "configuration/static-config.json|tools/android-app/app/src/main/assets/config-0.json"
+        types: [json]
+        additional_dependencies: ["json-spec==0.10.1"]
+        verbose: true
+      - id: validate-persistency-metadata
+        name: validate-persistency-metadata
+        # pre-commit intentionally pass all files as args to the command.
+        # Since the json command only takes one file at once we need some shell script to split the args.
+        entry:
+          bash -c 'for x in "$@"; do echo "Validating file $x"; json validate --schema-file
+          interfaces/persistency/schemas/persistencyMetadataFormat.json --document-file "$x"; done'
+          --
+        language: python
+        files: "interfaces/persistency/examples/persistencyMetadataFormat.json"
         types: [json]
         additional_dependencies: ["json-spec==0.10.1"]
         verbose: true

@@ -59,6 +59,23 @@ public class Fwe {
     public native static void setLocation(double latitude, double longitude);
 
     /**
+     * Returns an array of Android Automotive vehicle property info
+     * @return vehicle property info, with each member containing an array with 4 values:
+     * - Vehicle property ID
+     * - Area index
+     * - Result index
+     * - Signal ID
+     */
+    public native static int[][] getVehiclePropertyInfo();
+
+    /**
+     * Set an Android Automotive vehicle property
+     * @param signalId Signal ID
+     * @param value Vehicle property value
+     */
+    public native static void setVehicleProperty(int signalId, double value);
+
+    /**
      * Get a status summary
      * @return Status summary
      */

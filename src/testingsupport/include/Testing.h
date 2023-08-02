@@ -187,6 +187,21 @@ signalTypeToString( const testing::TestParamInfo<SignalType> &info )
     }
 }
 
+std::size_t operator""_KiB( unsigned long long sizeBytes )
+{
+    return static_cast<size_t>( sizeBytes * 1024 );
+}
+
+std::size_t operator""_MiB( unsigned long long sizeBytes )
+{
+    return static_cast<size_t>( sizeBytes * 1024 * 1024 );
+}
+
+std::size_t operator""_GiB( unsigned long long sizeBytes )
+{
+    return static_cast<size_t>( sizeBytes * 1024 * 1024 * 1024 );
+}
+
 } // namespace TestingSupport
 } // namespace IoTFleetWise
 } // namespace Aws

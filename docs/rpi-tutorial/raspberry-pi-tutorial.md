@@ -1,6 +1,17 @@
-# Tutorial: Run AWS IoT FleetWise Edge Agent on a Raspberry Pi
+# Raspberry Pi Tutorial
 
-**Copyright © Amazon Web Services, Inc. and/or its affiliates. All rights reserved.**
+## Topics
+
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [Step 1: Set up the Raspberry Pi](#step-1-setup-the-raspberry-pi)
+- [Step 2: Launch your development machine](#step-2-launch-your-development-machine)
+- [Step 3: Compile Edge Agent](#step-3-compile-egde-agent)
+- [Step 4: Provision AWS IoT credentials](#step-4-provision-aws-iot-credentials)
+- [Step 5: Deploy Edge Agent](#step-5-deploy-edge-agent)
+- [Step 6: Deploy a campaign to the Raspberry Pi](#step-6-deploy-a-campaign-to-the-raspberry-pi)
+
+**Copyright (C) Amazon Web Services, Inc. and/or its affiliates. All rights reserved.**
 
 Amazon's trademarks and trade dress may not be used in connection with any product or service that
 is not Amazon's, in any manner that is likely to cause confusion among customers, or in any manner
@@ -8,24 +19,60 @@ that disparages or discredits Amazon. All other trademarks not owned by Amazon a
 their respective owners, who may or may not be affiliated with, connected to, or sponsored by
 Amazon.
 
-**Note**
+## Introduction
 
-- AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
-- The AWS IoT FleetWise in-vehicle software component is licensed to you under the Apache License,
-  Version 2.0.
-- You are solely responsible for ensuring such software and any updates and modifications thereto
-  are deployed and maintained safely and securely in any vehicles and do not otherwise impact
-  vehicle safety.
+**AWS IoT FleetWise** provides a set of tools that enable automakers to collect, transform, and
+transfer vehicle data to the cloud at scale. With AWS IoT FleetWise you can build virtual
+representations of vehicle networks and define data collection rules to transfer only high-value
+data from your vehicles to AWS Cloud.
 
-## Topics
+**The Reference Implementation for AWS IoT FleetWise ("FWE")** provides C++ libraries that can be
+run with simulated vehicle data on certain supported vehicle hardware or that can help you develop
+an Edge Agent to run an application on your vehicle that integrates with AWS IoT FleetWise. You can
+use AWS IoT FleetWise pre-configured analytic capabilities to process collected data, gain insights
+about vehicle health, and use the service's visual interface to help diagnose and troubleshoot
+potential issues with the vehicle.
 
-- [Prerequisites](#prerequisites)
-- [Step 1: Set up the Raspberry Pi](#step-1-setup-the-raspberry-pi)
-- [Step 2: Launch your development machine](#step-2-launch-your-development-machine)
-- [Step 3: Compile AWS IoT FleetWise Edge Agent software](#step-3-compile-aws-iot-fleetwise-edge-agent-software)
-- [Step 4: Provision AWS IoT credentials](#step-4-provision-aws-iot-credentials)
-- [Step 5: Deploy Edge Agent](#step-5-deploy-edge-agent)
-- [Step 6: Deploy a campaign to the Raspberry Pi](#step-6-deploy-a-campaign-to-the-raspberry-pi)
+AWS IoT FleetWise's capability to collect ECU data and store them on cloud databases enables you to
+utilize different AWS services, such as Analytics Services, and ML, to develop novel use-cases that
+augment and/or supplement your existing vehicle functionality. In particular, AWS IoT FleetWise can
+help utilize fleet data (Big Data) to create value. For example, you can develop use cases that
+optimize vehicle routing, improve electric vehicle range estimation, and optimize battery life
+charging. You can use the data ingested through AWS IoT FleetWise to develop applications for
+predictive diagnostics, and for outlier detection with an electric vehicle's battery cells.
+
+You can use the included sample C++ application to learn more about the Reference Implementation,
+develop an Edge Agent for your use case and test interactions before integration.
+
+This software is licensed under the
+[Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+
+### Disclaimer
+
+**_The Reference Implementation for AWS IoT FleetWise ("FWE") is intended to help you develop your
+Edge Agent for AWS IoT FleetWise and includes sample code that you may reference or modify so your
+Edge Agent meets your requirements. As provided in the AWS IoT FleetWise Service Terms, you are
+solely responsible for your Edge Agent, including ensuring that your Edge Agent and any updates and
+modifications thereto are deployed and maintained safely and securely in any vehicles._**
+
+**_This software code base includes modules that are still in development and are disabled by
+default. These modules are not intended for use in a production environment. This includes a Remote
+Profiler module that helps sending traces from the device to AWS Cloud Watch. FWE has been checked
+for any memory leaks and runtime errors such as type overflows using Valgrind. No issues have been
+detected during the load tests._**
+
+**_Note that vehicle data collected through your use of AWS IoT FleetWise is intended for
+informational purposes only (including to help you train cloud-based artificial intelligence and
+machine learning models), and you may not use AWS IoT FleetWise to control or operate vehicle
+functions. You are solely responsible for all liability that may arise in connection with any use
+outside of AWS IoT FleetWise's intended purpose and in any manner contrary to applicable vehicle
+regulations. Vehicle data collected through your use of AWS IoT FleetWise should be evaluated for
+accuracy as appropriate for your use case, including for purposes of meeting any compliance
+obligations you may have under applicable vehicle safety regulations (such as safety monitoring and
+reporting obligations). Such evaluation should include collecting and reviewing information through
+other industry standard means and sources (such as reports from drivers of vehicles). You and your
+End Users are solely responsible for all decisions made, advice given, actions taken, and failures
+to take action based on your use of AWS IoT FleetWise._**
 
 ## Prerequisites
 
@@ -38,7 +85,8 @@ Amazon.
   [2-Channel Isolated CAN Bus Expansion HAT](https://rarecomponents.com/store/2-ch-can-hat-waveshare).
 - Access to an AWS account with administrator permissions
 - To be signed in to the AWS Management Console with an account in your chosen Region
-  - Note: AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
+  - **Note:** AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe
+    (Frankfurt).
 - A local Windows, Mac, or Linux machine
 
 ## Step 1: Setup the Raspberry Pi
@@ -81,8 +129,6 @@ you can use a local Intel x86_64 (amd64) machine. We recommended using the follo
 launch an AWS EC2 Graviton (arm64) instance. For more information about Amazon EC2 pricing, see
 [Amazon EC2 On-Demand Pricing](https://aws.amazon.com/ec2/pricing/on-demand/).
 
-### To launch an Amazon EC2 instance with administrator permissions
-
 1. Sign in to your [AWS account](https://aws.amazon.com/console/).
 1. Open the
    [**Launch CloudFormation Template**](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-iot-fleetwise.s3.us-west-2.amazonaws.com%2Flatest%2Fcfn-templates%2Ffwdev.yml&stackName=fwdev&param_Ec2VolumeSize=20).
@@ -103,23 +149,23 @@ launch an AWS EC2 Graviton (arm64) instance. For more information about Amazon E
    ssh -i <PATH_TO_PEM> ubuntu@<EC2_IP_ADDRESS>
    ```
 
-## Step 3: Compile AWS IoT FleetWise Edge Agent software
+## Step 3: Compile Edge Agent
 
-Next, compile the AWS IoT FleetWise Edge Agent software for the ARM 64-bit architecture of the
-processor present in the Raspberry Pi.
+Next, compile FWE for the ARM 64-bit architecture of the processor present in the Raspberry Pi.
 
-### To compile the AWS IoT FleetWise Edge Agent software
-
-1. On your development machine, clone the latest AWS IoT FleetWise Edge Agent software from GitHub
-   by running the following:
+1. On your development machine, clone the latest FWE source code from GitHub by running the
+   following:
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
      && cd ~/aws-iot-fleetwise-edge
    ```
 
-1. Install the AWS IoT FleetWise Edge Agent dependencies. The command below installs the following
-   Ubuntu packages for compiling the Edge Agent for ARM 64-bit:
+1. Review, modify and supplement [the FWE source code](../../src/) to ensure it meets your use case
+   and requirements.
+
+1. Install the FWE dependencies. The command below installs the following Ubuntu packages for
+   compiling FWEfor ARM 64-bit:
 
    `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`.
 
@@ -130,8 +176,8 @@ processor present in the Raspberry Pi.
    sudo -H ./tools/install-deps-native.sh
    ```
 
-1. To compile AWS IoT FleetWise Edge Agent software, run the following command. (If you are using a
-   local x86_64 development machine, use the `build-fwe-cross-arm64.sh` script instead.)
+1. To compile your Edge Agent, run the following command. (If you are using a local x86_64
+   development machine, use the `build-fwe-cross-arm64.sh` script instead.)
 
    ```bash
    ./tools/build-fwe-native.sh
@@ -140,8 +186,8 @@ processor present in the Raspberry Pi.
 ## Step 4: Provision AWS IoT credentials
 
 On the development machine, create an IoT Thing with the name `fwdemo-rpi` and provision its
-credentials by running the following command. The AWS IoT FleetWise Edge Agent binary and its
-configuration files are packaged into a ZIP file that is ready for deployment to the Raspberry Pi.
+credentials by running the following command. Your Edge Agent binary and its configuration files are
+packaged into a ZIP file that is ready for deployment to the Raspberry Pi.
 
 ```bash
 mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
@@ -168,8 +214,6 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
 ## Step 5: Deploy Edge Agent
 
-### To deploy AWS IoT FleetWise Edge Agent
-
 1. On your local machine, copy the deployment ZIP file from the machine with Amazon EC2 to your
    local machine by running the following command:
 
@@ -185,8 +229,8 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    ```
 
 1. As described in step 4 of [setting up the Raspberry Pi](#step-1-setup-the-raspberry-pi), connect
-   through SSH to the Raspberry Pi. On the Raspberry Pi, install AWS IoT FleetWise Edge Agent as a
-   service by running the following command:
+   through SSH to the Raspberry Pi. On the Raspberry Pi, install your Edge Agent as a service by
+   running the following command:
 
    ```bash
    mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
@@ -209,13 +253,12 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    ip link set up can0 txqueuelen 1000 type can bitrate 500000 restart-ms 100
    ip link set up can1 txqueuelen 1000 type can bitrate 500000 restart-ms 100
    ```
-1. Restart the setup-socketcan service and the IoT FleetWise Edge Agent service:
+1. Restart the setup-socketcan service and your Edge Agent service:
    ```
    sudo systemctl restart setup-socketcan
    sudo systemctl restart fwe@0
    ```
-1. To verify the IoT FleetWise Edge Agent is running and is connected to the cloud, check the Edge
-   Agent log files:
+1. To verify your Edge Agent is running and is connected to the cloud, check the log file:
    ```
    sudo journalctl -fu fwe@0 --output=cat
    ```
@@ -225,15 +268,13 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
      ```
    - Use the
      [troubleshooting information and solutions](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/troubleshooting.html)
-     in the AWS IoT FleetWise Developer Guide to help resolve issues with AWS IoT FleetWise Edge
-     Agent.
+     in the AWS IoT FleetWise Developer Guide to help resolve issues with FWE.
 
 ## Step 6: Deploy a campaign to the Raspberry Pi
 
-1. On the development machine, install the AWS IoT FleetWise cloud demo script dependencies by
-   running the following commands. The script installs the following Ubuntu packages:
-   `python3 python3-pip`, and then installs the following PIP packages:
-   `wrapt plotly pandas cantools`.
+1. On the development machine, install the AWS IoT FleetWise demo script dependencies by running the
+   following commands. The script installs the following Ubuntu packages: `python3 python3-pip`, and
+   then installs the following PIP packages: `wrapt plotly pandas cantools`.
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \

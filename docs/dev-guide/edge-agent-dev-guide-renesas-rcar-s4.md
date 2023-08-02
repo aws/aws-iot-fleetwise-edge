@@ -1,11 +1,11 @@
-# Getting started with AWS IoT FleetWise Edge Agent on Renesas R-Car S4
+# Getting started on a Renesas R-Car S4 board
 
-This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesas
+This section describes how to get started on a Renesas
 [R-Car S4 Reference Board/Spider](https://www.renesas.com/jp/en/products/automotive-products/automotive-system-chips-socs/rtp8a779f0askb0sp2s-r-car-s4-reference-boardspider).
 
 ## Prerequisites
 
-- **Renesas Electronics Corporation R-Car S4 Reference Board/Spider**
+- **Renesas Electronics Corporation R-Car S4 Reference Board/Spider:**
   - Spider board has eMMC and micro SD-card slot but the can't use simalutaneously.
   - For using sdcard, please execute following two steps. The detail files can find in
     [R-Car S4 SDK Start Up Guide PKG](https://www.renesas.com/us/en/products/automotive-products/automotive-system-chips-socs/r-car-s4-automotive-system-chip-soc-car-servercommunication-gateway#design_development).
@@ -16,11 +16,12 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesa
   1.  Please change SW3 and SW6 on the CPU board.
       - For more details, please refer to section 3.7.8.1 "Enable SD Card" in "R-Car
         S4_StartupGuide_x_x_x.pdf"
-- **AWS IoT FleetWise Edge Agent Compiled for ARM64** — If you are using an EC2 Graviton instance as
-  your development machine, you will have completed this already above.
+- **FWE Compiled for ARM64:** If you are using an EC2 Graviton instance as your development machine,
+  you will have completed this already in
+  [a previous step](./edge-agent-dev-guide.md#compile-your-edge-agent).
 
   - _If you are using a local Intel x86_64 development machine running ubuntu 20.04_, you will need
-    to run the following to cross-compile AWS IoT FleetWise Edge Agent:
+    to run the following to cross-compile your Edge Agent:
 
     ```bash
     cd ~/aws-iot-fleetwise-edge
@@ -29,7 +30,7 @@ This section describes how to deploy AWS IoT FleetWise Edge Agent onto an Renesa
         && ./tools/build-fwe-cross-arm64.sh
     ```
 
-- **Internet Router with Ethernet** — The R-Car S4 Spider board must be connected to an internet
+- **Internet Router with Ethernet:** The R-Car S4 Spider board must be connected to an internet
   router via an Ethernet cable for internet connectivity. It is beyond the scope of this document to
   describe how this is achieved, but one possibility is to use a WiFi to Ethernet bridge and a
   smartphone acting as an internet hotspot.
@@ -100,10 +101,10 @@ on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 
 ## Provision AWS IoT Credentials
 
-Run the following commands _on the development machine_ (after compiling AWS IoT FleetWise Edge
-Agent for ARM64 as explained [above](#prerequisites)), to create an IoT Thing and provision
-credentials for it. The AWS IoT FleetWise Edge Agent binary and its configuration files will be
-packaged into a ZIP file ready to be deployed to the board.
+Run the following commands _on the development machine_ (after compiling the FWE for ARM64 as
+explained [above](#prerequisites)), to create an IoT Thing and provision credentials for it. Your
+Edge Agent binary and its configuration files will be packaged into a ZIP file ready to be deployed
+to the board.
 
 ```bash
 mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
@@ -128,7 +129,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 && cd .. && zip -r aws-iot-fleetwise-deploy.zip .
 ```
 
-## Deploy AWS IoT FleetWise Edge Agent software on R-Car S4 Spider board
+## Deploy Edge Agent on R-Car S4 Spider board
 
 1. Run the following _on your local machine_ to copy the deployment ZIP file from the EC2 machine to
    your local machine:
@@ -146,7 +147,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    ```
 
 1. SSH to the R-Car S4 Spider board, as described above, then run the following **_on the R-Car S4
-   Spider board_** to install AWS IoT FleetWise Edge Agent as a service:
+   Spider board_** to install your Edge Agent as a service:
 
    ```bash
     mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
@@ -159,8 +160,8 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
     sudo -H ./tools/install-cansim.sh
    ```
 
-1. Run the following **_on the R-Car S4 Spider board_** to view and follow the AWS IoT FleetWise
-   Edge Agent log (press CTRL+C to exit):
+1. Run the following **_on the R-Car S4 Spider board_** to view and follow the log (press CTRL+C to
+   exit):
 
    ```bash
    sudo journalctl -fu fwe@0 --output=cat

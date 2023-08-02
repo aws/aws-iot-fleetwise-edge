@@ -111,14 +111,15 @@ protected:
 /** @brief  Test attempting to disconnect when connection has already failed */
 TEST_F( AwsIotConnectivityModuleTest, disconnectAfterFailedConnect )
 {
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    ASSERT_FALSE( m->connect( "", "", "", "", "", bootstrap ) );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", bootstrap );
+    ASSERT_FALSE( m->connect() );
     // disconnect must only disconnect when connection is available so this should not seg fault
     m->disconnect();
 }
 
 /** @brief Test successful connection */
-TEST_F( AwsIotConnectivityModuleTest, connectSuccessfull )
+TEST_F( AwsIotConnectivityModuleTest, connectSuccessfully )
 {
     std::string endpoint( "endpoint" );
     auto con = setupValidConnection();
@@ -126,9 +127,10 @@ TEST_F( AwsIotConnectivityModuleTest, connectSuccessfull )
     std::string requestedEndpoint;
     EXPECT_CALL( confBuilder, WithEndpoint( _ ) ).Times( 1 ).WillOnce( SaveArg<0>( &requestedEndpoint ) );
 
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "key", "cert", "rootca", endpoint, "clientIdTest", bootstrap );
 
-    ASSERT_TRUE( m->connect( "key", "cert", "rootca", endpoint, "clientIdTest", bootstrap ) );
+    ASSERT_TRUE( m->connect() );
 
     con->OnDisconnect( *con );
 
@@ -143,8 +145,9 @@ TEST_F( AwsIotConnectivityModuleTest, connectFailsOnClientBootstrapCreation )
 {
     auto con = setupValidConnection();
 
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    ASSERT_FALSE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", nullptr ) );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "key", "cert", "rootca", "endpoint", "clientIdTest", nullptr );
+    ASSERT_FALSE( m->connect() );
 }
 
 /** @brief Test trying to connect, where creation of the client fails */
@@ -153,8 +156,9 @@ TEST_F( AwsIotConnectivityModuleTest, connectFailsOnClientCreation )
     auto con = setupValidConnection();
     EXPECT_CALL( clientMock, operatorBool() ).Times( AtLeast( 1 ) ).WillRepeatedly( Return( false ) );
 
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    ASSERT_FALSE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
+    ASSERT_FALSE( m->connect() );
 }
 
 /** @brief Test opening a connection, then interrupting it and resuming it */
@@ -162,8 +166,9 @@ TEST_F( AwsIotConnectivityModuleTest, connectionInterrupted )
 {
     auto con = setupValidConnection();
 
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
+    ASSERT_TRUE( m->connect() );
 
     con->OnConnectionInterrupted( *con, 10 );
     con->OnConnectionResumed( *con, ReturnCode::AWS_MQTT_CONNECT_ACCEPTED, true );
@@ -197,13 +202,14 @@ TEST_F( AwsIotConnectivityModuleTest, connectFailsServerUnavailableWithDelay )
         con->OnDisconnect( *con );
     } );
 
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
 
     EXPECT_CALL( *con, Connect( _, _, _, _ ) ).Times( 1 ).WillOnce( Return( true ) );
     // We want to see exactly one call to disconnect
     EXPECT_CALL( *con, Disconnect() ).Times( 1 ).WillRepeatedly( Return( true ) );
 
-    ASSERT_FALSE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
+    ASSERT_FALSE( m->connect() );
     std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
     killAllThread = true;
     completeThread.join();
@@ -213,8 +219,9 @@ TEST_F( AwsIotConnectivityModuleTest, connectFailsServerUnavailableWithDelay )
 /** @brief Test subscribing without a configured topic, expect an error */
 TEST_F( AwsIotConnectivityModuleTest, subscribeWithoutTopic )
 {
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    AwsIotChannel c( m.get(), nullptr );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
     ASSERT_EQ( c.subscribe(), ConnectivityError::NotConfigured );
     c.invalidateConnection();
 }
@@ -222,8 +229,9 @@ TEST_F( AwsIotConnectivityModuleTest, subscribeWithoutTopic )
 /** @brief Test subscribing without being connected, expect an error */
 TEST_F( AwsIotConnectivityModuleTest, subscribeWithoutBeingConnected )
 {
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    AwsIotChannel c( m.get(), nullptr );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
     c.setTopic( "topic" );
     ASSERT_EQ( c.subscribe(), ConnectivityError::NoConnection );
     c.invalidateConnection();
@@ -234,10 +242,12 @@ TEST_F( AwsIotConnectivityModuleTest, subscribeSuccessfully )
 {
     auto con = setupValidConnection();
 
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    AwsIotChannel c( m.get(), nullptr );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
 
-    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
+    ASSERT_TRUE( m->connect() );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
+
     c.setTopic( "topic" );
     EXPECT_CALL( *con, Subscribe( _, _, _, _ ) )
         .Times( 1 )
@@ -266,8 +276,9 @@ TEST_F( AwsIotConnectivityModuleTest, subscribeSuccessfully )
 TEST_F( AwsIotConnectivityModuleTest, sendWithoutTopic )
 {
     auto con = setupValidConnection();
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    AwsIotChannel c( m.get(), nullptr );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
     std::uint8_t input[] = { 0xca, 0xfe };
     ASSERT_EQ( c.sendBuffer( input, sizeof( input ) ), ConnectivityError::NotConfigured );
     c.invalidateConnection();
@@ -276,8 +287,9 @@ TEST_F( AwsIotConnectivityModuleTest, sendWithoutTopic )
 /** @brief Test sending without a connection, expect an error */
 TEST_F( AwsIotConnectivityModuleTest, sendWithoutConnection )
 {
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    AwsIotChannel c( m.get(), nullptr );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
     std::uint8_t input[] = { 0xca, 0xfe };
     c.setTopic( "topic" );
     ASSERT_EQ( c.sendBuffer( input, sizeof( input ) ), ConnectivityError::NoConnection );
@@ -288,9 +300,10 @@ TEST_F( AwsIotConnectivityModuleTest, sendWithoutConnection )
 TEST_F( AwsIotConnectivityModuleTest, sendWrongInput )
 {
     auto con = setupValidConnection();
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    AwsIotChannel c( m.get(), nullptr );
-    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
+    ASSERT_TRUE( m->connect() );
     c.setTopic( "topic" );
     ASSERT_EQ( c.sendBuffer( nullptr, 10 ), ConnectivityError::WrongInputData );
     con->OnDisconnect( *con );
@@ -301,9 +314,11 @@ TEST_F( AwsIotConnectivityModuleTest, sendWrongInput )
 TEST_F( AwsIotConnectivityModuleTest, sendTooBig )
 {
     auto con = setupValidConnection();
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    AwsIotChannel c( m.get(), nullptr );
-    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
+
+    ASSERT_TRUE( m->connect() );
     c.setTopic( "topic" );
     std::vector<uint8_t> a;
     a.resize( c.getMaxSendSize() + 1U );
@@ -318,9 +333,11 @@ TEST_F( AwsIotConnectivityModuleTest, sendTooBig )
 TEST_F( AwsIotConnectivityModuleTest, sendMultiple )
 {
     auto con = setupValidConnection();
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    AwsIotChannel c( m.get(), nullptr );
-    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
+    ASSERT_TRUE( m->connect() );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
+
     std::uint8_t input[] = { 0xca, 0xfe };
     c.setTopic( "topic" );
     std::list<MqttConnection::OnOperationCompleteHandler> completeHandlers;
@@ -365,8 +382,9 @@ TEST_F( AwsIotConnectivityModuleTest, sdkRAMExceeded )
 {
     auto con = setupValidConnection();
 
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
-    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap ) );
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
+    ASSERT_TRUE( m->connect() );
 
     auto &memMgr = AwsSDKMemoryManager::getInstance();
     void *alloc1 = memMgr.AllocateMemory( 600000000, alignof( std::size_t ) );
@@ -377,13 +395,13 @@ TEST_F( AwsIotConnectivityModuleTest, sdkRAMExceeded )
     ASSERT_NE( alloc2, nullptr );
     memMgr.FreeMemory( alloc2 );
 
-    AwsIotChannel c( m.get(), nullptr );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
     c.setTopic( "topic" );
     std::array<std::uint8_t, 2> input = { 0xCA, 0xFE };
     const auto required = input.size() * sizeof( std::uint8_t );
     {
         void *alloc3 =
-            memMgr.AllocateMemory( 50 * AwsIotChannel::MAXIMUM_IOT_SDK_HEAP_MEMORY_BYTES, alignof( std::size_t ) );
+            memMgr.AllocateMemory( 50 * AwsSDKMemoryManager::getInstance().getLimit(), alignof( std::size_t ) );
         ASSERT_NE( alloc3, nullptr );
 
         ASSERT_EQ( c.sendBuffer( input.data(), input.size() * sizeof( std::uint8_t ) ),
@@ -394,16 +412,16 @@ TEST_F( AwsIotConnectivityModuleTest, sdkRAMExceeded )
         constexpr auto offset = alignof( std::max_align_t );
         // check that we will be out of memory even if we allocate less than the max because of the allocator's offset
         // in the below alloc we are leaving space for the input
-        auto alloc4 = memMgr.AllocateMemory( AwsIotChannel::MAXIMUM_IOT_SDK_HEAP_MEMORY_BYTES - ( offset + required ),
+        auto alloc4 = memMgr.AllocateMemory( AwsSDKMemoryManager::getInstance().getLimit() - ( offset + required ),
                                              alignof( std::size_t ) );
         ASSERT_NE( alloc4, nullptr );
         ASSERT_EQ( c.sendBuffer( input.data(), sizeof( input ) ), ConnectivityError::QuotaReached );
         memMgr.FreeMemory( alloc4 );
 
         // check that allocation and hence send succeed when there is just enough memory
-        // here we subtract the offset twice - once for MAXIMUM_IOT_SDK_HEAP_MEMORY_BYTES and once for the input
+        // here we subtract the offset twice - once for MAXIMUM_AWS_SDK_HEAP_MEMORY_BYTES and once for the input
         auto alloc5 = memMgr.AllocateMemory(
-            AwsIotChannel::MAXIMUM_IOT_SDK_HEAP_MEMORY_BYTES - ( ( 2 * offset ) + required ), alignof( std::size_t ) );
+            AwsSDKMemoryManager::getInstance().getLimit() - ( ( 2 * offset ) + required ), alignof( std::size_t ) );
         ASSERT_NE( alloc5, nullptr );
 
         std::list<MqttConnection::OnOperationCompleteHandler> completeHandlers;
@@ -431,16 +449,249 @@ TEST_F( AwsIotConnectivityModuleTest, sdkRAMExceeded )
     c.invalidateConnection();
 }
 
+/** @brief Test sending file over MQTT without topic */
+TEST_F( AwsIotConnectivityModuleTest, sendFileOverMQTTNoTopic )
+{
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
+    std::string filename{ "testFile.json" };
+    ASSERT_EQ( c.sendFile( filename, 0 ), ConnectivityError::NotConfigured );
+    c.invalidateConnection();
+}
+
+/** @brief Test sending file over MQTT, payload manager not defined */
+TEST_F( AwsIotConnectivityModuleTest, sendFileOverMQTTNoPayloadManager )
+{
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+    AwsIotChannel c( m.get(), nullptr, m->mConnection );
+    std::string filename{ "testFile.json" };
+    c.setTopic( "topic" );
+    ASSERT_EQ( c.sendFile( filename, 0 ), ConnectivityError::NotConfigured );
+    c.invalidateConnection();
+}
+
+/** @brief Test sending file over MQTT, filename not defined */
+TEST_F( AwsIotConnectivityModuleTest, sendFileOverMQTTNoFilename )
+{
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+    char buffer[PATH_MAX];
+    if ( getcwd( buffer, sizeof( buffer ) ) != NULL )
+    {
+        const std::shared_ptr<CacheAndPersist> persistencyPtr =
+            std::make_shared<CacheAndPersist>( std::string( buffer ) + "/Persistency", 131072 );
+        persistencyPtr->init();
+        const std::shared_ptr<PayloadManager> payloadManager = std::make_shared<PayloadManager>( persistencyPtr );
+        AwsIotChannel c( m.get(), payloadManager, m->mConnection );
+        std::string filename;
+        c.setTopic( "topic" );
+        ASSERT_EQ( c.sendFile( filename, 0 ), ConnectivityError::WrongInputData );
+        c.invalidateConnection();
+    }
+}
+
+/** @brief Test sending file over MQTT, file size too big */
+TEST_F( AwsIotConnectivityModuleTest, sendFileOverMQTTBigFile )
+{
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+    char buffer[PATH_MAX];
+    if ( getcwd( buffer, sizeof( buffer ) ) != NULL )
+    {
+        const std::shared_ptr<CacheAndPersist> persistencyPtr =
+            std::make_shared<CacheAndPersist>( std::string( buffer ) + "/Persistency", 131072 );
+        persistencyPtr->init();
+        const std::shared_ptr<PayloadManager> payloadManager = std::make_shared<PayloadManager>( persistencyPtr );
+        AwsIotChannel c( m.get(), payloadManager, m->mConnection );
+        std::string filename = "testFile.json";
+        c.setTopic( "topic" );
+        ASSERT_EQ( c.sendFile( filename, 150000 ), ConnectivityError::WrongInputData );
+        c.invalidateConnection();
+    }
+}
+
+TEST_F( AwsIotConnectivityModuleTest, sendFileOverMQTTNoFile )
+{
+    char buffer[PATH_MAX];
+    if ( getcwd( buffer, sizeof( buffer ) ) != NULL )
+    {
+        auto con = setupValidConnection();
+        std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>(
+            "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
+
+        const std::shared_ptr<CacheAndPersist> persistencyPtr =
+            std::make_shared<CacheAndPersist>( std::string( buffer ) + "/Persistency", 131072 );
+        persistencyPtr->init();
+        const std::shared_ptr<PayloadManager> payloadManager = std::make_shared<PayloadManager>( persistencyPtr );
+
+        AwsIotChannel c( m.get(), payloadManager, m->mConnection );
+
+        ASSERT_TRUE( m->connect() );
+        c.setTopic( "topic" );
+
+        std::string filename = "testFile.json";
+        ASSERT_EQ( c.sendFile( filename, 100 ), ConnectivityError::WrongInputData );
+
+        con->OnDisconnect( *con );
+        c.invalidateConnection();
+    }
+}
+
+TEST_F( AwsIotConnectivityModuleTest, sendFileOverMQTTSdkRAMExceeded )
+{
+    char buffer[PATH_MAX];
+    if ( getcwd( buffer, sizeof( buffer ) ) != NULL )
+    {
+        auto con = setupValidConnection();
+
+        std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>(
+            "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
+        ASSERT_TRUE( m->connect() );
+
+        auto &memMgr = AwsSDKMemoryManager::getInstance();
+        void *alloc1 = memMgr.AllocateMemory( 600000000, alignof( std::size_t ) );
+        ASSERT_NE( alloc1, nullptr );
+        memMgr.FreeMemory( alloc1 );
+
+        void *alloc2 = memMgr.AllocateMemory( 600000010, alignof( std::size_t ) );
+        ASSERT_NE( alloc2, nullptr );
+        memMgr.FreeMemory( alloc2 );
+
+        const std::shared_ptr<CacheAndPersist> persistencyPtr =
+            std::make_shared<CacheAndPersist>( std::string( buffer ) + "/Persistency", 131072 );
+        persistencyPtr->init();
+
+        const std::shared_ptr<PayloadManager> payloadManager = std::make_shared<PayloadManager>( persistencyPtr );
+        AwsIotChannel c( m.get(), payloadManager, m->mConnection );
+
+        c.setTopic( "topic" );
+        // Fake file content
+        std::array<std::uint8_t, 2> input = { 0xCA, 0xFE };
+        const auto required = input.size() * sizeof( std::uint8_t );
+        std::string filename = "testFile.bin";
+        {
+            void *alloc3 =
+                memMgr.AllocateMemory( 50 * AwsSDKMemoryManager::getInstance().getLimit(), alignof( std::size_t ) );
+            ASSERT_NE( alloc3, nullptr );
+            CollectionSchemeParams collectionSchemeParams;
+            collectionSchemeParams.persist = true;
+            collectionSchemeParams.compression = false;
+            ASSERT_EQ( c.sendFile( filename, input.size() * sizeof( std::uint8_t ), collectionSchemeParams ),
+                       ConnectivityError::QuotaReached );
+            memMgr.FreeMemory( alloc3 );
+        }
+        {
+            constexpr auto offset = alignof( std::max_align_t );
+            // check that we will be out of memory even if we allocate less than the max because of the allocator's
+            // offset in the below alloc we are leaving space for the input
+            auto alloc4 = memMgr.AllocateMemory( AwsSDKMemoryManager::getInstance().getLimit() - ( offset + required ),
+                                                 alignof( std::size_t ) );
+            ASSERT_NE( alloc4, nullptr );
+            ASSERT_EQ( c.sendFile( filename, sizeof( input ) ), ConnectivityError::QuotaReached );
+            memMgr.FreeMemory( alloc4 );
+        }
+
+        con->OnDisconnect( *con );
+        c.invalidateConnection();
+    }
+}
+
+TEST_F( AwsIotConnectivityModuleTest, sendFileOverMQTT )
+{
+    char buffer[PATH_MAX];
+    if ( getcwd( buffer, sizeof( buffer ) ) != NULL )
+    {
+        int ret = std::system( "mkdir ./Persistency" );
+        ASSERT_FALSE( WIFEXITED( ret ) == 0 );
+
+        auto con = setupValidConnection();
+        std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>(
+            "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap );
+
+        const std::shared_ptr<CacheAndPersist> persistencyPtr =
+            std::make_shared<CacheAndPersist>( std::string( buffer ) + "/Persistency", 131072 );
+        persistencyPtr->init();
+
+        std::string testData = "abcdefjh!24$iklmnop!24$3@qaabcdefjh!24$iklmnop!24$3@qaabcdefjh!24$iklmnop!24$3@qabbbb";
+        const uint8_t *stringData = reinterpret_cast<const uint8_t *>( testData.data() );
+
+        std::string filename = "testFile.bin";
+        persistencyPtr->write( stringData, testData.size(), DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
+
+        const std::shared_ptr<PayloadManager> payloadManager = std::make_shared<PayloadManager>( persistencyPtr );
+
+        AwsIotChannel c( m.get(), payloadManager, m->mConnection );
+        ASSERT_TRUE( m->connect() );
+        c.setTopic( "topic" );
+
+        std::list<MqttConnection::OnOperationCompleteHandler> completeHandlers;
+        EXPECT_CALL( *con, Publish( _, _, _, _, _ ) )
+            .Times( 2 )
+            .WillRepeatedly( Invoke(
+                [&completeHandlers]( const char *,
+                                     aws_mqtt_qos,
+                                     bool,
+                                     const struct aws_byte_buf &,
+                                     MqttConnection::OnOperationCompleteHandler &&onOpComplete ) noexcept -> bool {
+                    completeHandlers.push_back( std::move( onOpComplete ) );
+                    return true;
+                } ) );
+
+        ASSERT_EQ( c.sendFile( filename, testData.size() ), ConnectivityError::Success );
+
+        // Confirm 1st (success as packetId is 1---v):
+        completeHandlers.front().operator()( *con, 1, 0 );
+        completeHandlers.pop_front();
+
+        // Test callback return false
+        persistencyPtr->write( stringData, testData.size(), DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
+        ASSERT_EQ( c.sendFile( filename, testData.size() ), ConnectivityError::Success );
+
+        completeHandlers.front().operator()( *con, 0, 0 );
+        completeHandlers.pop_front();
+
+        con->OnDisconnect( *con );
+        c.invalidateConnection();
+    }
+}
+
+/** @brief Test sending file over MQTT, no connection */
+TEST_F( AwsIotConnectivityModuleTest, sendFileOverMQTTNoConnection )
+{
+    std::shared_ptr<AwsIotConnectivityModule> m =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+    char buffer[PATH_MAX];
+    if ( getcwd( buffer, sizeof( buffer ) ) != NULL )
+    {
+        const std::shared_ptr<CacheAndPersist> persistencyPtr =
+            std::make_shared<CacheAndPersist>( std::string( buffer ) + "/Persistency", 131072 );
+        persistencyPtr->init();
+        const std::shared_ptr<PayloadManager> payloadManager = std::make_shared<PayloadManager>( persistencyPtr );
+        AwsIotChannel c( m.get(), payloadManager, m->mConnection );
+        std::string filename = "testFile.json";
+        c.setTopic( "topic" );
+        ASSERT_EQ( c.sendFile( filename, 100 ), ConnectivityError::NoConnection );
+        CollectionSchemeParams collectionSchemeParams;
+        collectionSchemeParams.persist = true;
+        collectionSchemeParams.compression = false;
+        ASSERT_EQ( c.sendFile( filename, 100, collectionSchemeParams ), ConnectivityError::NoConnection );
+        c.invalidateConnection();
+    }
+}
+
 /** @brief Test the separate thread with exponential backoff that tries to connect until connection succeeds */
 TEST_F( AwsIotConnectivityModuleTest, asyncConnect )
 {
     auto con = setupValidConnection();
 
-    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>();
+    std::shared_ptr<AwsIotConnectivityModule> m = std::make_shared<AwsIotConnectivityModule>(
+        "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap, true );
 
     EXPECT_CALL( *con, Connect( _, _, _, _ ) ).Times( 1 ).WillOnce( Return( true ) );
 
-    ASSERT_TRUE( m->connect( "key", "cert", "rootca", "endpoint", "clientIdTest", bootstrap, true ) );
+    ASSERT_TRUE( m->connect() );
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) ); // first attempt should come immediately
 

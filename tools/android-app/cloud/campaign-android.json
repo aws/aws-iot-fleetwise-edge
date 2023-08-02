@@ -88,6 +88,192 @@
     },
     {
       "name": "Vehicle.OBD.Odometer"
+    },
+    {
+      "name": "Vehicle.VHAL.PERF_ODOMETER"
+    },
+    {
+      "name": "Vehicle.VHAL.PERF_VEHICLE_SPEED"
+    },
+    {
+      "name": "Vehicle.VHAL.PERF_STEERING_ANGLE"
+    },
+    {
+      "name": "Vehicle.VHAL.ENGINE_COOLANT_TEMP"
+    },
+    {
+      "name": "Vehicle.VHAL.ENGINE_OIL_LEVEL"
+    },
+    {
+      "name": "Vehicle.VHAL.ENGINE_OIL_TEMP"
+    },
+    {
+      "name": "Vehicle.VHAL.ENGINE_RPM"
+    },
+    {
+      "name": "Vehicle.VHAL.FUEL_LEVEL"
+    },
+    {
+      "name": "Vehicle.VHAL.EV_BATTERY_LEVEL"
+    },
+    {
+      "name": "Vehicle.VHAL.EV_CHARGE_PORT_CONNECTED"
+    },
+    {
+      "name": "Vehicle.VHAL.EV_BATTERY_INSTANTANEOUS_CHARGE_RATE"
+    },
+    {
+      "name": "Vehicle.VHAL.RANGE_REMAINING"
+    },
+    {
+      "name": "Vehicle.VHAL.TIRE_PRESSURE_0"
+    },
+    {
+      "name": "Vehicle.VHAL.TIRE_PRESSURE_1"
+    },
+    {
+      "name": "Vehicle.VHAL.TIRE_PRESSURE_2"
+    },
+    {
+      "name": "Vehicle.VHAL.TIRE_PRESSURE_3"
+    },
+    {
+      "name": "Vehicle.VHAL.GEAR_SELECTION"
+    },
+    {
+      "name": "Vehicle.VHAL.CURRENT_GEAR"
+    },
+    {
+      "name": "Vehicle.VHAL.PARKING_BRAKE_ON"
+    },
+    {
+      "name": "Vehicle.VHAL.FUEL_LEVEL_LOW"
+    },
+    {
+      "name": "Vehicle.VHAL.TURN_SIGNAL_STATE"
+    },
+    {
+      "name": "Vehicle.VHAL.IGNITION_STATE"
+    },
+    {
+      "name": "Vehicle.VHAL.ABS_ACTIVE"
+    },
+    {
+      "name": "Vehicle.VHAL.TRACTION_CONTROL_ACTIVE"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_FAN_SPEED_0"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_FAN_DIRECTION_0"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_0"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_1"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_AC_ON_0"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_RECIRC_ON_0"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_DUAL_ON_0"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_AUTO_ON_0"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_0"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_1"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_SIDE_MIRROR_HEAT_0"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_STEERING_WHEEL_HEAT"
+    },
+    {
+      "name": "Vehicle.VHAL.HVAC_POWER_ON_0"
+    },
+    {
+      "name": "Vehicle.VHAL.ENV_OUTSIDE_TEMPERATURE"
+    },
+    {
+      "name": "Vehicle.VHAL.DOOR_POS_0"
+    },
+    {
+      "name": "Vehicle.VHAL.DOOR_POS_1"
+    },
+    {
+      "name": "Vehicle.VHAL.DOOR_POS_2"
+    },
+    {
+      "name": "Vehicle.VHAL.DOOR_POS_3"
+    },
+    {
+      "name": "Vehicle.VHAL.DOOR_POS_4"
+    },
+    {
+      "name": "Vehicle.VHAL.DOOR_LOCK_0"
+    },
+    {
+      "name": "Vehicle.VHAL.DOOR_LOCK_1"
+    },
+    {
+      "name": "Vehicle.VHAL.DOOR_LOCK_2"
+    },
+    {
+      "name": "Vehicle.VHAL.DOOR_LOCK_3"
+    },
+    {
+      "name": "Vehicle.VHAL.SEAT_OCCUPANCY_0"
+    },
+    {
+      "name": "Vehicle.VHAL.SEAT_OCCUPANCY_1"
+    },
+    {
+      "name": "Vehicle.VHAL.WINDOW_POS_0"
+    },
+    {
+      "name": "Vehicle.VHAL.WINDOW_POS_1"
+    },
+    {
+      "name": "Vehicle.VHAL.WINDOW_POS_2"
+    },
+    {
+      "name": "Vehicle.VHAL.WINDOW_POS_3"
+    },
+    {
+      "name": "Vehicle.VHAL.WINDOW_POS_4"
+    },
+    {
+      "name": "Vehicle.VHAL.HEADLIGHTS_STATE"
+    },
+    {
+      "name": "Vehicle.VHAL.HIGH_BEAM_LIGHTS_STATE"
+    },
+    {
+      "name": "Vehicle.VHAL.FOG_LIGHTS_STATE"
+    },
+    {
+      "name": "Vehicle.VHAL.HAZARD_LIGHTS_STATE"
+    },
+    {
+      "name": "Vehicle.VHAL.HEADLIGHTS_SWITCH"
+    },
+    {
+      "name": "Vehicle.VHAL.HIGH_BEAM_LIGHTS_SWITCH"
+    },
+    {
+      "name": "Vehicle.VHAL.FOG_LIGHTS_SWITCH"
+    },
+    {
+      "name": "Vehicle.VHAL.HAZARD_LIGHTS_SWITCH"
     }
   ]
 }

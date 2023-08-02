@@ -1,9 +1,8 @@
-AWS IoT FleetWise Edge includes the following third-party software/licensing:
+The Reference Implementation for AWS IoT FleetWise includes the following third-party
+software/licensing:
 
-** AWS SDK for C++: v1.11.94 - https://github.com/aws/aws-sdk-cpp
-** Fast-DDS: v2.3.3 - https://github.com/eProsima/Fast-DDS
-** Fast-CDR: v1.0.21 - https://github.com/eProsima/Fast-CDR
-** Foonathan Memory Vendor: v1.1.0 - https://github.com/eProsima/foonathan_memory_vendor
+** AWS SDK for C++: v1.11.111 - https://github.com/aws/aws-sdk-cpp
+** AWS IoT Device SDK for C++ v2: v1.22.0 - https://github.com/aws/aws-iot-device-sdk-cpp-v2
 ** Google Benchmark: v1.6.1 - https://github.com/google/benchmark
 ** OpenSSL: v1.1.1 - https://github.com/openssl/openssl
 
@@ -380,8 +379,8 @@ Some of the benchmark data in testdata/ is licensed differently:
    for more information.
 
  - paper-100k.pdf is an excerpt (bytes 92160 to 194560) from the paper
-   “Combinatorial Modeling of Chromatin Features Quantitatively Predicts DNA
-   Replication Timing in _Drosophila_” by Federico Comoglio and Renato Paro,
+   "Combinatorial Modeling of Chromatin Features Quantitatively Predicts DNA
+   Replication Timing in _Drosophila_" by Federico Comoglio and Renato Paro,
    which is licensed under the CC-BY license. See
    http://www.ploscompbiol.org/static/license for more ifnormation.
 
@@ -391,55 +390,6 @@ Some of the benchmark data in testdata/ is licensed differently:
    public domain according to the license information
    (http://www.gutenberg.org/ebooks/53).
 
-
-----------------
-
-** Foonathan Memory: v0.7 - https://github.com/foonathan/memory
-
-Copyright (C) 2015-2020 Jonathan Müller <jonathanmueller.dev@gmail.com>
-
-This software is provided 'as-is', without any express or
-implied warranty. In no event will the authors be held
-liable for any damages arising from the use of this software.
-
-Permission is granted to anyone to use this software for any purpose,
-including commercial applications, and to alter it and redistribute
-it freely, subject to the following restrictions:
-
-1. The origin of this software must not be misrepresented;
-   you must not claim that you wrote the original software.
-   If you use this software in a product, an acknowledgment
-   in the product documentation would be appreciated but
-   is not required.
-
-2. Altered source versions must be plainly marked as such,
-   and must not be misrepresented as being the original software.
-
-3. This notice may not be removed or altered from any
-   source distribution.
-
-----------------
-
-** TinyXML-2: v6.0.0 - https://github.com/leethomason/tinyxml2
-
-This software is provided 'as-is', without any express or implied
-warranty. In no event will the authors be held liable for any
-damages arising from the use of this software.
-
-Permission is granted to anyone to use this software for any
-purpose, including commercial applications, and to alter it and
-redistribute it freely, subject to the following restrictions:
-
-1. The origin of this software must not be misrepresented; you must
-not claim that you wrote the original software. If you use this
-software in a product, an acknowledgment in the product documentation
-would be appreciated but is not required.
-
-2. Altered source versions must be plainly marked as such, and
-must not be misrepresented as being the original software.
-
-3. This notice may not be removed or altered from any source
-distribution.
 
 ----------------
 
