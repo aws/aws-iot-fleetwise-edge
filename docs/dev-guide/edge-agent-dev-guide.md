@@ -1,6 +1,15 @@
-# AWS IoT FleetWise Edge Agent Developer Guide
+# Edge Agent Developer Guide
 
-**Copyright © Amazon Web Services, Inc. and/or its affiliates. All rights reserved.**
+**Note:** AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
+
+**Topics**
+
+- [Introduction](#introduction)
+- [Quick start demo](#quick-start-demo)
+- [Getting started guide](#getting-started-guide)
+- [Software Architecture](#software-architecture)
+
+**Copyright (C) Amazon Web Services, Inc. and/or its affiliates. All rights reserved.**
 
 Amazon's trademarks and trade dress may not be used in connection with any product or service that
 is not Amazon's, in any manner that is likely to cause confusion among customers, or in any manner
@@ -8,71 +17,90 @@ that disparages or discredits Amazon. All other trademarks not owned by Amazon a
 their respective owners, who may or may not be affiliated with, connected to, or sponsored by
 Amazon.
 
-**Note**
-
-- AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
+## Introduction
 
 **AWS IoT FleetWise** provides a set of tools that enable automakers to collect, transform, and
 transfer vehicle data to the cloud at scale. With AWS IoT FleetWise you can build virtual
 representations of vehicle networks and define data collection rules to transfer only high-value
 data from your vehicles to AWS Cloud.
 
-**AWS IoT FleetWise Edge Agent** software provides C++ libraries that enable you to run the
-application on your vehicle. You can use AWS IoT FleetWise pre-configured analytic capabilities to
-process collected data, gain insights about vehicle health, and use the service's visual interface
-to help diagnose and troubleshoot potential issues with the vehicle.
+**The Reference Implementation for AWS IoT FleetWise ("FWE")** provides C++ libraries that can be
+run with simulated vehicle data on certain supported vehicle hardware or that can help you develop
+an Edge Agent to run an application on your vehicle that integrates with AWS IoT FleetWise. You can
+use AWS IoT FleetWise pre-configured analytic capabilities to process collected data, gain insights
+about vehicle health, and use the service's visual interface to help diagnose and troubleshoot
+potential issues with the vehicle.
 
 AWS IoT FleetWise's capability to collect ECU data and store them on cloud databases enables you to
 utilize different AWS services, such as Analytics Services, and ML, to develop novel use-cases that
 augment and/or supplement your existing vehicle functionality. In particular, AWS IoT FleetWise can
 help utilize fleet data (Big Data) to create value. For example, you can develop use cases that
 optimize vehicle routing, improve electric vehicle range estimation, and optimize battery life
-charging. You can extend AWS IoT FleetWise other use cases such as for pet or child detection,
-Driver Monitoring System applications, predictive diagnostics, and for outlier detection with an
-electric vehicle's battery cells.
+charging. You can use the data ingested through AWS IoT FleetWise to develop applications for
+predictive diagnostics, and for outlier detection with an electric vehicle's battery cells.
 
-You can use the included sample C++ application to learn more about AWS IoT FleetWise Edge Agent
-interfaces and to test interactions before integration.
+You can use the included sample C++ application to learn more about the Reference Implementation,
+develop an Edge Agent for your use case and test interactions before integration.
 
-**_The AWS IoT FleetWise in-vehicle software component is licensed to you under the
-[Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0). You are solely
-responsible for ensuring such software and any updates and modifications thereto are deployed and
-maintained safely and securely in any vehicles and do not otherwise impact vehicle safety._**
+This software is licensed under the
+[Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
-**Topics**
+### Disclaimer
 
-- [AWS IoT FleetWise quick start demo](#aws-iot-fleetwise-quick-start-demo)
-- [Getting started with AWS IoT FleetWise Edge Agent](#getting-started-with-aws-iot-fleetwise-edge-agent)
-- [AWS IoT FleetWise Edge Agent Architecture](#aws-iot-fleetwise-edge-agent-architecture)
+**_The Reference Implementation for AWS IoT FleetWise ("FWE") is intended to help you develop your
+Edge Agent for AWS IoT FleetWise and includes sample code that you may reference or modify so your
+Edge Agent meets your requirements. As provided in the AWS IoT FleetWise Service Terms, you are
+solely responsible for your Edge Agent, including ensuring that your Edge Agent and any updates and
+modifications thereto are deployed and maintained safely and securely in any vehicles._**
 
-# AWS IoT FleetWise quick start demo
+**_This software code base includes modules that are still in development and are disabled by
+default. These modules are not intended for use in a production environment. This includes a Remote
+Profiler module that helps sending traces from the device to AWS Cloud Watch. FWE has been checked
+for any memory leaks and runtime errors such as type overflows using Valgrind. No issues have been
+detected during the load tests._**
+
+**_Note that vehicle data collected through your use of AWS IoT FleetWise is intended for
+informational purposes only (including to help you train cloud-based artificial intelligence and
+machine learning models), and you may not use AWS IoT FleetWise to control or operate vehicle
+functions. You are solely responsible for all liability that may arise in connection with any use
+outside of AWS IoT FleetWise's intended purpose and in any manner contrary to applicable vehicle
+regulations. Vehicle data collected through your use of AWS IoT FleetWise should be evaluated for
+accuracy as appropriate for your use case, including for purposes of meeting any compliance
+obligations you may have under applicable vehicle safety regulations (such as safety monitoring and
+reporting obligations). Such evaluation should include collecting and reviewing information through
+other industry standard means and sources (such as reports from drivers of vehicles). You and your
+End Users are solely responsible for all decisions made, advice given, actions taken, and failures
+to take action based on your use of AWS IoT FleetWise._**
+
+# Quick start demo
 
 This guide is intended to quickly demonstrate the basic features of AWS IoT FleetWise by firstly
-deploying the AWS IoT FleetWise Edge Agent to an AWS EC2 instance representing one or more simulated
-vehicles. A script is then run using the AWS CLI to control AWS IoT FleetWise Cloud in order collect
-data from the vehicle.
+deploying FWE to an AWS EC2 instance representing one or more simulated vehicles. A script is then
+run using the AWS CLI to control AWS IoT FleetWise in order collect data from the simulated vehicle.
 
 This guide showcases AWS IoT FleetWise at a high level. If you are interested in exploring AWS IoT
-FleetWise at a more detailed technical level, see
-[Getting started with AWS IoT FleetWise Edge Agent](#getting-started-with-aws-iot-fleetwise-edge-agent).
+FleetWise at a more detailed technical level, see the
+[Getting started guide](#getting-started-guide).
 
 **Topics:**
 
 - [Prerequisites for quick start demo](#prerequisites-for-quick-start-demo)
-- [Deploy the AWS IoT FleetWise Edge Agent software](#deploy-the-aws-iot-fleetwise-edge-agent-software)
-- [Use the AWS IoT FleetWise cloud demo](#use-the-aws-iot-fleetwise-cloud-demo)
+- [Deploy Edge Agent](#deploy-edge-agent)
+- [Use the AWS IoT FleetWise demo](#use-the-aws-iot-fleetwise-demo)
 - [Explore collected data](#explore-collected-data)
 
 ## Prerequisites for quick start demo
 
-This guide assumes you have already logged in to the AWS console in your desired region using an
-account with administrator rights.
+- Access to an AWS Account with administrator privileges.
+- Logged in to the AWS Console in your desired region using the account with administrator
+  privileges.
+  - **Note:** AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe
+    (Frankfurt).
 
-- Note: AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
+## Deploy Edge Agent
 
-## Deploy the AWS IoT FleetWise Edge Agent software
-
-An AWS CloudFormation template is used to deploy the AWS IoT FleetWise Edge Agent to a new AWS EC2
+After reviewing [the FWE source code](../../src/), to ensure that it meets your use case and
+requirements, you can use the following CloudFormation template to deploy FWE to a new AWS EC2
 instance.
 
 1. Click here to
@@ -85,22 +113,21 @@ instance.
 1. Choose **Create stack**.
 1. Wait until the status of the Stack is 'CREATE_COMPLETE', this will take approximately 10 minutes.
 
-AWS IoT FleetWise Edge Agent software has been deployed to an AWS EC2 Graviton (ARM64) Instance
-along with credentials that allow it to connect to AWS IoT Core. CAN data is also being generated on
-the EC2 instance to simulate periodic hard-braking events. The AWS IoT FleetWise Cloud demo script
-in the following section will deploy a campaign to the simulated fleet of vehicles to capture the
-engine torque when a hard braking-event occurs.
+FWE has been deployed to an AWS EC2 Graviton (ARM64) Instance along with credentials that allow it
+to connect to AWS IoT Core. CAN data is also being generated on the EC2 instance to simulate
+periodic hard-braking events. The AWS IoT FleetWise demo script in the following section will deploy
+a campaign to the simulated fleet of vehicles to capture the engine torque when a hard braking-event
+occurs.
 
-## Use the AWS IoT FleetWise cloud demo
+## Use the AWS IoT FleetWise demo
 
 The instructions below will register your AWS account for AWS IoT FleetWise, create a demonstration
 vehicle model, register the virtual vehicle created in the previous section and run a campaign to
 collect data from it.
 
 1. Open the AWS CloudShell: [Launch CloudShell](https://console.aws.amazon.com/cloudshell/home)
-1. Copy and paste the following commands to clone the latest AWS IoT FleetWise Edge Agent software
-   from GitHub, install the dependencies of the cloud demo script and enable latest IoT FleetWise
-   commands in the AWS CLI.
+1. Copy and paste the following commands to clone the latest FWE software from GitHub, install the
+   dependencies of the demo script and enable latest IoT FleetWise commands in the AWS CLI.
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
@@ -117,7 +144,7 @@ collect data from it.
    rm -rf ./aws*
    ```
 
-   The AWS IoT FleetWise Cloud demo script performs the following:
+   The AWS IoT FleetWise demo script performs the following:
 
    - Registers your AWS account with AWS IoT FleetWise, if not already registered
    - Creates Timestream database and table for collected data for Timestream campaigns, if not
@@ -184,14 +211,14 @@ collect data from it.
    ```
 
 1. When the script completes, a path to an HTML file is given in the format
-   `/home/cloudshell-user/aws-iot-fleetwise-cloud/fwdemo-<TIMESTAMP>.html`. Copy the path, then
-   click on the Actions drop down menu in the top-right corner of the CloudShell window and choose
-   **Download file**. Paste the path to the file, choose **Download**, and open the downloaded file
-   in your browser.
+   `/home/cloudshell-user/aws-iot-fleetwise-edge/fwdemo-*.html`. Copy the path, then click on the
+   Actions drop down menu in the top-right corner of the CloudShell window and choose **Download
+   file**. Paste the path to the file, choose **Download**, and open the downloaded file in your
+   browser.
 
    If you enabled S3 upload, results are stored in
-   `/home/cloudshell-user/aws-iot-fleetwise-cloud/fwdemo-<TIMESTAMP>-s3-json-result.html` and
-   `/home/cloudshell-user/aws-iot-fleetwise-cloud/fwdemo-<TIMESTAMP>-s3-parquet-result.html`
+   `/home/cloudshell-user/aws-iot-fleetwise-edge/fwdemo-*-s3-json-result.html` and
+   `/home/cloudshell-user/aws-iot-fleetwise-edge/fwdemo-*-s3-parquet-result.html`
 
 ## Explore collected data
 
@@ -203,56 +230,56 @@ collect data from it.
 
 ![](./images/collected_data_plot.png)
 
-# Getting started with AWS IoT FleetWise Edge Agent
+# Getting started guide
 
-This guide is intended to demonstrate the basic features of AWS IoT FleetWise by firstly building
-AWS IoT FleetWise Edge and running it on a development machine (locally or on AWS EC2) in order to
-represent a simulated vehicle. A script is then run to interact with AWS IoT FleetWise Cloud in
-order collect data from the simulated vehicle. Instructions are also provided for running AWS IoT
-FleetWise Edge Agent on an NXP S32G-VNP-RDB2 development board or Renesas R-Car S4 Spider board and
+This guide is intended to demonstrate the basic features of AWS IoT FleetWise by firstly allowing
+you to build your own Edge Agent and running it on a development machine (locally or on AWS EC2) in
+order to represent a simulated vehicle. A script is then run to interact with AWS IoT FleetWise in
+order to collect data from the simulated vehicle. Instructions are also provided for running your
+own Edge Agent on an NXP S32G-VNP-RDB2 development board or Renesas R-Car S4 Spider board and
 deploying a campaign to collect OBD data.
 
-This guide covers building AWS IoT FleetWise at a detailed technical level, using a development
-machine to build and run the Edge Agent executable. If you would prefer to learn about AWS IoT
-FleetWise at a higher level that does not require use of a development machine, see
-[AWS IoT FleetWise quick start demo](#aws-iot-fleetwise-quick-start-demo).
+This guide covers building your Edge Agent at a detailed technical level, using a development
+machine to build and run the executable. If you would prefer to learn about AWS IoT FleetWise at a
+higher level that does not require use of a development machine, see the
+[Quick start demo](#quick-start-demo).
 
 #### Topics:
 
-- [Getting started with AWS IoT FleetWise on a development machine](#getting-started-with-aws-iot-fleetwise-on-a-development-machine)
+- [Getting started on a development machine](#getting-started-on-a-development-machine)
   - [Prerequisites for development machine](#prerequisites-for-development-machine)
   - [Launch your development machine](#launch-your-development-machine)
-  - [Compile AWS IoT FleetWise Edge Agent software](#compile-aws-iot-fleetwise-edge-agent-software)
-  - [Deploy AWS IoT FleetWise Edge Agent software](#deploy-aws-iot-fleetwise-edge-agent-software)
+  - [Compile your Edge Agent](#compile-your-edge-agent)
+  - [Deploy your Edge Agent](#deploy-your-edge-agent)
   - [Run the AWS IoT FleetWise demo script](#run-the-aws-iot-fleetwise-demo-script)
-- [Getting started with AWS IoT FleetWise Edge Agent on a NXP S32G board](./edge-agent-dev-guide-nxp-s32g.md)
+- [Getting started on an NXP S32G board](./edge-agent-dev-guide-nxp-s32g.md)
   - [Prerequisites for NXP S32G](./edge-agent-dev-guide-nxp-s32g.md#prerequisites)
   - [Build an SD-Card Image](./edge-agent-dev-guide-nxp-s32g.md#build-an-sd-card-image)
   - [Flash the SD-Card Image](./edge-agent-dev-guide-nxp-s32g.md#flash-the-sd-card-image)
   - [Specify initial board configuration](./edge-agent-dev-guide-nxp-s32g.md#specify-initial-board-configuration)
   - [Provision AWS IoT Credentials](./edge-agent-dev-guide-nxp-s32g.md#provision-aws-iot-credentials)
-  - [Deploy AWS IoT FleetWise Edge Agent on NXP S32G](./edge-agent-dev-guide-nxp-s32g.md#deploy-aws-iot-fleetwise-edge-agent-on-nxp-s32g)
+  - [Deploy Edge Agent on NXP S32G board](./edge-agent-dev-guide-nxp-s32g.md#deploy-edge-agent-on-nxp-s32g-board)
   - [Collect OBD Data](./edge-agent-dev-guide-nxp-s32g.md#collect-obd-data)
-- [Getting started with AWS IoT FleetWise Edge Agent on a Renesas R-Car S4 board](./edge-agent-dev-guide-renesas-rcar-s4.md)
+- [Getting started on a Renesas R-Car S4 board](./edge-agent-dev-guide-renesas-rcar-s4.md)
   - [Prerequisites](./edge-agent-dev-guide-renesas-rcar-s4.md#prerequisites)
   - [Build an SD-Card Image](./edge-agent-dev-guide-renesas-rcar-s4.md#build-an-sd-card-image)
   - [Flash the SD-Card Image](./edge-agent-dev-guide-renesas-rcar-s4.md#flash-the-sd-card-image)
   - [Specify initial board configuration](./edge-agent-dev-guide-renesas-rcar-s4.md#specify-initial-board-configuration)
   - [Provision AWS IoT Credentials](./edge-agent-dev-guide-renesas-rcar-s4.md#provision-aws-iot-credentials)
-  - [Deploy and run AWS IoT FleetWise Edge Agent software on R-Car S4 Spider board](./edge-agent-dev-guide-renesas-rcar-s4.md#deploy-aws-iot-fleetwise-edge-agent-software-on-r-car-s4-spider-board)
+  - [Deploy Edge Agent on R-Car S4 Spider board](./edge-agent-dev-guide-renesas-rcar-s4.md#deploy-edge-agent-on-r-car-s4-spider-board)
   - [Collect OBD Data](./edge-agent-dev-guide-renesas-rcar-s4.md#collect-obd-data)
 
-## Getting started with AWS IoT FleetWise on a development machine
+## Getting started on a development machine
 
-This section describes how to get started with AWS IoT FleetWise Edge Agent on a development
-machine.
+This section describes how to get started on a development machine.
 
 ### Prerequisites for development machine
 
 - Access to an AWS Account with administrator privileges.
 - Logged in to the AWS Console in your desired region using the account with administrator
   privileges.
-  - Note: AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
+  - **Note:** AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe
+    (Frankfurt).
 - A local Linux or MacOS machine.
 
 ### Launch your development machine
@@ -280,21 +307,21 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
    ssh -i <PATH_TO_PEM> ubuntu@<EC2_IP_ADDRESS>
    ```
 
-### Compile AWS IoT FleetWise Edge Agent software
+### Compile your Edge Agent
 
-1. Run the following _on the development machine_ to clone the latest AWS IoT FleetWise Edge Agent
-   software from GitHub.
+1. Run the following _on the development machine_ to clone the latest FWE source code from GitHub.
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
        && cd ~/aws-iot-fleetwise-edge
    ```
 
-   You can browse the [README.md](../../README.md) and source code while referring to this guide.
+1. Review, modify and supplement [the FWE source code](../../src/) to ensure it meets your use case
+   and requirements.
 
-1. Install the AWS IoT FleetWise Edge Agent dependencies
+1. Install the dependencies for FWE by running the commands below.
 
-   Commands below will:
+   The commands below will:
 
    1. Install the following Ubuntu packages:
       `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`.
@@ -315,16 +342,16 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
        && sudo -H ./tools/install-cansim.sh
    ```
 
-1. Run the following to compile AWS IoT FleetWise Edge Agent software:
+1. Run the following to compile your own Edge Agent:
 
    ```bash
    ./tools/build-fwe-native.sh
    ```
 
-### Deploy AWS IoT FleetWise Edge Agent software
+### Deploy your Edge Agent
 
 1. Run the following _on the development machine_ to provision an AWS IoT Thing with credentials and
-   install AWS IoT FleetWise Edge Agent as a service.
+   install your Edge Agent as a service.
 
    **Note** To create AWS IoT things in Europe (Frankfurt), configure `--region` to `eu-central-1`
    in the call to `provision.sh`
@@ -347,16 +374,16 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
        && sudo ./tools/install-fwe.sh
    ```
 
-   1. At this point AWS IoT FleetWise Edge Agent is running and periodically sending 'checkins' to
-      AWS IoT FleetWise, in order to announce its current list of campaigns (which at this stage
-      will be an empty list). CAN data is also being generated on the development machine to
-      simulate periodic hard-braking events. The AWS IoT FleetWise Cloud demo script in the
-      following section will deploy a campaign to the simulated vehicle to capture the engine torque
-      when a hard braking-event occurs.
+   1. At this point your Edge Agent is running and periodically sending 'checkins' to AWS IoT
+      FleetWise, in order to announce its current list of campaigns (which at this stage will be an
+      empty list). CAN data is also being generated on the development machine to simulate periodic
+      hard-braking events. The AWS IoT FleetWise demo script in the following section will deploy a
+      campaign to the simulated vehicle to capture the engine torque when a hard braking-event
+      occurs.
 
-1. Run the following to view and follow the AWS IoT FleetWise Edge Agent log. You can open a new SSH
-   session with the development machine and run this command to follow the log in real time as the
-   campaign is deployed in the next section. To exit the logs, use CTRL + C.
+1. Run the following to view and follow the log for your Edge Agent. You can open a new SSH session
+   with the development machine and run this command to follow the log in real time as the campaign
+   is deployed in the next section. To exit the logs, use CTRL + C.
 
    ```bash
    sudo journalctl -fu fwe@0 --output=cat
@@ -369,7 +396,7 @@ vehicle model, register the virtual vehicle created in the previous section, and
 collect data from it.
 
 1. Run the following _on the development machine_ to install the dependencies of the AWS IoT
-   FleetWise Cloud demo script:
+   FleetWise demo script:
 
    1. Following command installs the following Ubuntu packages: `python3 python3-pip`. It then
       installs the following PIP packages: `wrapt plotly pandas cantools boto3 fastparquet`
@@ -499,15 +526,15 @@ collect data from it.
    ./demo.sh --vehicle-name fwdemo-ec2 --dbc-file <DBC_FILE> --campaign-file <CAMPAIGN_FILE> --region eu-central-1
    ```
 
-## Getting started with AWS IoT FleetWise Edge Agent on NXP S32G
+## Getting started on a NXP S32G board
 
-[Getting started with AWS IoT FleetWise Edge Agent on NXP S32G](./edge-agent-dev-guide-nxp-s32g.md)
+[Getting started on an NXP S32G board](./edge-agent-dev-guide-nxp-s32g.md)
 
-## Getting started with AWS IoT FleetWise Edge Agent on Renesas S4
+## Getting started on an Renesas S4 board
 
-[Getting started with AWS IoT FleetWise Edge Agent on Renesas R-Car S4](./edge-agent-dev-guide-renesas-rcar-s4.md)
+[Getting started on a Renesas R-Car S4 board](./edge-agent-dev-guide-renesas-rcar-s4.md)
 
-# AWS IoT FleetWise Edge Agent Architecture
+# Software Architecture
 
 AWS IoT FleetWise is an AWS service that enables automakers to collect, store, organize, and monitor
 data from vehicles. Automakers need the ability to connect remotely to their fleet of vehicles and
@@ -518,8 +545,8 @@ enable OEMs to optimize the data collection process by defining what signals to 
 to collect them, and most importantly the trigger conditions, or events, that enable the collection
 process.
 
-This document reviews the architecture, operation, and key features of the AWS IoT FleetWise Edge
-Agent software.
+This document reviews the architecture, operation, and key features of the Reference Implementation
+for AWS IoT FleetWise ("FWE").
 
 **Topics**
 
@@ -539,7 +566,8 @@ Agent software.
 - [Security](#security)
   - [Best practices and recommendation](#best-practices-and-recommendation)
 - [Supported platforms](#supported-platforms)
-- [Disclaimer](#disclaimer)
+- [Getting help](#getting-help)
+- [Resources](#resources)
 
 ## Terminology
 
@@ -549,12 +577,11 @@ EngineSpeed, and RadarAmplitude.
 
 **Data Collection Scheme:** A document that defines the rules used to collect data from a vehicle.
 It defines an event trigger, filters, duration and frequency of data collection. This document is
-used by AWS IoT FleetWise Edge Agent for collecting and filtering only relevant data. A data
-collection scheme can use multiple event triggers. It can be attached to a single vehicle or a fleet
-of vehicles.
+used by FWE for collecting and filtering only relevant data. A data collection scheme can use
+multiple event triggers. It can be attached to a single vehicle or a fleet of vehicles.
 
-**Board Support Package (BSP):** A set of libraries that support running AWS IoT FleetWise Edge
-Agent on a POSIX Operating System.
+**Board Support Package (BSP):** A set of libraries that support running FWE on a POSIX Operating
+System.
 
 **Controller Area Network (CAN):** A serial networking technology that enables vehicle electronic
 devices to interconnect.
@@ -588,31 +615,29 @@ foundation to define data collection schemes and specify what data to collect an
 triggers to inspect data.
 
 AWS IoT FleetWise enables you to create campaigns that can be deployed to a fleet of vehicles. Once
-a campaign is active, it is deployed from the cloud to the target vehicles via a push mechanism. AWS
-IoT FleetWise Edge Agent software uses the underlying collection schemes to acquire sensor data from
-the vehicle network. It applies the inspection rules and uploads the data back to AWS IoT FleetWise
-data plane. The data plane persists collected data in the OEM's AWS Account; the account can then be
-used to analyse the data.
+a campaign is active, it is deployed from the cloud to the target vehicles via a push mechanism. FWE
+uses the underlying collection schemes to acquire sensor data from the vehicle network. It applies
+the inspection rules and uploads the data back to AWS IoT FleetWise data plane. The data plane
+persists collected data in the OEM's AWS Account; the account can then be used to analyse the data.
 
 ### Software Layers
 
-AWS IoT FleetWise architecture allocates its functionalities into a set of software layers that are
-interdependent. The software layers exchange over abstract APIs that implement a dependency
-inversion design pattern. The below section describes each of the layers bottom up as outline in the
-figure above.
+The functionality of FWE is dependent on a set of software layers that are interdependent. The
+software layers exchange over abstract APIs that implement a dependency inversion design pattern.
+The below section describes each of the layers bottom up as outline in the figure above.
 
 **Vehicle Data Acquisition**
 
-This layer binds the AWS IoT FleetWise Edge Agent software with the vehicle network, leveraging the
-onboard device drivers and middle-wares the OEM uses in the target hardware. It has a dependency on
-the host environment including the operating system, the peripheral drivers and the vehicle
-architecture overall. This layer listens and/or requests data from the vehicle network and
-normalizes it, before applying various signal decoding rules that are vehicle protocol specific e.g.
-CAN Signal database files. The output of this layer is a set of transformed key/value pairs of
-signals and their corresponding values. This layer has a dependency on the decoding rules the OEM
-has defined for the signals they want to inspect, which are specified in the Cloud Control plane.
-This layer stores the decoded values into a signal history buffer. This signal history buffer has a
-maximum fixed size to not exhaust the system resources.
+This layer binds FWE with the vehicle network, leveraging the onboard device drivers and
+middle-wares the OEM uses in the target hardware. It has a dependency on the host environment
+including the operating system, the peripheral drivers and the vehicle architecture overall. This
+layer listens and/or requests data from the vehicle network and normalizes it, before applying
+various signal decoding rules that are vehicle protocol specific e.g. CAN Signal database files. The
+output of this layer is a set of transformed key/value pairs of signals and their corresponding
+values. This layer has a dependency on the decoding rules the OEM has defined for the signals they
+want to inspect, which are specified in the Cloud Control plane. This layer stores the decoded
+values into a signal history buffer. This signal history buffer has a maximum fixed size to not
+exhaust the system resources.
 
 **Vehicle Data Inspection**
 
@@ -622,43 +647,41 @@ snapshot of the data at hand is shared with the Cloud data plane. More than one 
 be defined and applied to the signal data. This layer holds a set of data structures that allow fast
 indexing of the data by identifier and time, so that the data collection can be achieved as a quick
 as the conditions are met. Once a snapshot of the signal data is available, this layer passes over
-the data to the Off-board connectivity layer for further processing. The mechanism of data
+the data to the offboard connectivity layer for further processing. The mechanism of data
 transmission between these two layers uses also a message queue with a predefined maximum size.
 
 **Scheme Management**
 
-The Cloud control plane serves the device software with data collection scheme and decoder
-manifests. A decoder manifest is an artifact that defines the vehicle signal catalog and the way
-each signal can get decoded from its raw format. A collection scheme describes the inspection rules
-to be applied to the signal values. The Scheme Management module has the responsibility of managing
-the life cycle e.g. activation/deactivation based on time and version of the collection schemes and
-the decoder manifest delivered to the device software. The outcome of the scheme management are at
-any given point in time, the inspection matrix needed by the Data Inspection Layer and the decoding
-dictionary needed by by the Data Normalization layer.
+The Cloud control plane serves FWE with data collection scheme and decoder manifests. A decoder
+manifest is an artifact that defines the vehicle signal catalog and the way each signal can get
+decoded from its raw format. A collection scheme describes the inspection rules to be applied to the
+signal values. The Scheme Management module has the responsibility of managing the life cycle e.g.
+activation/deactivation based on time and version of the collection schemes and the decoder manifest
+delivered to FWE. The outcome of the scheme management are at any given point in time, the
+inspection matrix needed by the Data Inspection Layer and the decoding dictionary needed by by the
+Data Normalization layer.
 
-**Off-board Connectivity**
+**Offboard Connectivity**
 
-This layer of the software owns the communication of the AWS IoT FleetWise vehicle software with the
-outside world i.e. AWS Cloud. It implements a publish/subscribe pattern, with two communication
-channels, one used for receiving collection schemes and decoder manifest from the Control Plane, and
-one for publishing the collected data back to the Data Plane.
+This layer of the software owns the communication of FWE with the outside world i.e. AWS Cloud. It
+implements a publish/subscribe pattern, with two communication channels, one used for receiving
+collection schemes and decoder manifest from the Control Plane, and one for publishing the collected
+data back to the Data Plane.
 
-This layer ensures that the Device Software has valid credentials to communicate securely with the
-Cloud APIs.
+This layer ensures that FWE has valid credentials to communicate securely with the Cloud APIs.
 
 **Service Control**
 
-This layer owns the execution context of the AWS IoT FleetWise Edge Agent software within the target
-hardware in the vehicle. It manages the lifecycle of the vehicle software, including the
-startup/shutdown sequences, along with acting as a local monitoring module to ensure smooth
-execution of the service. The configuration of the service is validated and loaded into the system
-in this layer of the software.
+This layer owns the execution context of FWE within the target hardware in the vehicle. It manages
+the lifecycle of FWE, including the startup/shutdown sequences, along with acting as a local
+monitoring module to ensure smooth execution of the service. The configuration of the service is
+validated and loaded into the system in this layer of the software.
 
 ### Overview of the software libraries
 
-The code base of the device software consists of 6 C++ libraries that implement the functionalities
-of the layers described above. All these libraries are loaded in a POSIX user space application
-running a single process.
+The code base of the Reference Implementation consists of 6 C++ libraries that implement the
+functionalities of the layers described above. All these libraries are loaded in a POSIX user space
+application running a single process.
 
 ![software libraries](./images/software_libraries.png)
 
@@ -703,8 +726,8 @@ Collection Schemes and Decoder manifests.
 This library is used by the Data Inspection Library to normalize and decode the raw CAN Frames, and
 by the Execution Management library to initiate the Collection Scheme and decoder Manifest decoding.
 
-The library also implements a serialization module to serialize the data the device software wants
-to send to the data plane. The serialization schema is described below in the data model.
+The library also implements a serialization module to serialize the data FWE wants to send to the
+data plane. The serialization schema is described below in the data model.
 
 **Data Inspection Library**
 
@@ -719,13 +742,12 @@ This library implements a software module for each of the following:
 - Cache of the needed signals in a signal history buffer.
 
 Upon fulfillment of one or more trigger conditions, this library extracts from the signal history
-buffer a data snapshot that's shared with the Off-board connectivity library for further processing.
+buffer a data snapshot that's shared with the offboard connectivity library for further processing.
 Again here a circular buffer is used as a transport mechanism of the data between the two libraries.
 
 **Connectivity Library**
 
-This library implements the communication routines between the device software and the Cloud Control
-and Data Plane.
+This library implements the communication routines between FWE and the Cloud Control and Data Plane.
 
 Since all the communication between the device and the cloud occurs over a secure MQTT connection,
 this library uses the AWS IoT Device SDK for C++ v2 as an MQTT client. It creates exactly one
@@ -738,10 +760,10 @@ update of either the Scheme or the decoder manifests, which are enacted accordan
 
 **Execution Management Library**
 
-This library implements the bootstrap sequence of the device software. It parses the provided
-configuration and ensures that are the above libraries are provided with their corresponding
-settings. During shutdown, it ensures that all the modules and corresponding system resources
-(threads, loggers, and sockets) are stopped/closed properly.
+This library implements the bootstrap sequence of FWE. It parses the provided configuration and
+ensures that are the above libraries are provided with their corresponding settings. During
+shutdown, it ensures that all the modules and corresponding system resources (threads, loggers, and
+sockets) are stopped/closed properly.
 
 If there is no connectivity, or during shutdown of the service , this library persists the data
 snapshots that are queued for sending to the cloud. Upon re-connection, this library will attempt to
@@ -754,7 +776,7 @@ application.
 
 ## Programming and Execution model
 
-The device software implements a concurrent and event-based multithreading system.
+FWE implements a concurrent and event-based multithreading system.
 
 - **In the Vehicle Network Management library,** each CAN Network Interface spawns one thread to
   take care of opening a Socket to the network device. E.g. if the device has 4 CAN Networks
@@ -779,8 +801,7 @@ The device software implements a concurrent and event-based multithreading syste
 - **In the Connectivity Library**, most of the execution runs in the context of the main application
   thread. Callbacks and notifications from the MQTT stack happen in the context of the AWS IoT
   Device SDK thread. This module intercepts the notifications and switches the thread context to one
-  of the device software threads so that no real data processing happens in the MQTT connection
-  thread.
+  of FWE threads so that no real data processing happens in the MQTT connection thread.
 - **In the Execution Management Library**, there are two threads
   - One thread which is managing all the bootstrap sequence and intercepting SystemD signals i.e.
     application main thread
@@ -790,68 +811,66 @@ The device software implements a concurrent and event-based multithreading syste
 
 ## Data Models
 
-The device software defines four schemas that describe the communication with the Cloud Control and
-Data Plane services.
+FWE defines four schemas that describe the communication with the Cloud Control and Data Plane
+services.
 
-All the payloads exchanged between the device software and the cloud services are serialized in a
-Protobuff format.
+All the payloads exchanged between FWE and the cloud services are serialized in a Protobuff format.
 
 ### Device to Cloud communication
 
-The device software sends two artifacts with the Cloud services:
+FWE sends two artifacts with the Cloud services:
 
 **Check-in Information**
 
 This check-in information consists of data collection schemes and decoder manifest Amazon Resource
-Name (ARN) that are active in the device software at a given time point. This check-in message is
-send regularly at a configurable frequency to the cloud services. Refer to
+Name (ARN) that are active in FWE at a given time point. This check-in message is send regularly at
+a configurable frequency to the cloud services. Refer to
 [checkin.proto](../../interfaces/protobuf/schemas/edgeToCloud/checkin.proto).
 
 **Data Snapshot Information**
 
 This message is send conditionally to the cloud data plane services once one or more inspection rule
-is met. Depending on the configuration of the software, (e.g. send decoded and raw data), the device
-software sends one or more instance of this message in an MQTT packet to the cloud. Refer to
+is met. Depending on the configuration of FWE, (e.g. send decoded and raw data), FWE sends one or
+more instance of this message in an MQTT packet to the cloud. Refer to
 [vehicle_data.proto](../../interfaces/protobuf/schemas/edgeToCloud/vehicle_data.proto).
 
 ### Cloud to Device communication
 
-The Cloud Control plane services publish to the Device Software dedicated MQTT Topic the following
-two artifacts:
+The Cloud Control plane services publish to FWE dedicated MQTT Topic the following two artifacts:
 
-**Decoder Manifest** — This artifact describes the Vehicle Network Interfaces that the user defined.
+**Decoder Manifest:** This artifact describes the Vehicle Network Interfaces that the user defined.
 The description includes the semantics of each of the Network interface traffic to be inspected
 including the signal decoding rules. Refer to
 [decoder_manifest.proto](../../interfaces/protobuf/schemas/cloudToEdge/decoder_manifest.proto).
 
-**Collection Scheme**
-
-This artifact describes effectively the inspection rules, that the device software will apply on the
-network traffic it receives. Using the decoder manifest, the Inspection module will apply the rules
-defined in the collection schemes to generate data snapshots. Refer to
+**Collection Scheme:** This artifact describes effectively the inspection rules, that FWE will apply
+on the network traffic it receives. Using the decoder manifest, the Inspection module will apply the
+rules defined in the collection schemes to generate data snapshots. Refer to
 [collection_schemes.proto](../../interfaces/protobuf/schemas/cloudToEdge/collection_schemes.proto).
 
 ## Data Persistency
 
-The device software requires a temporary disk location in order to persist and reload the documents
-it exchanges with the cloud services. The persistency operates on three types of documents:
+FWE requires a temporary disk location in order to persist and reload the documents it exchanges
+with the cloud services. The persistency operates on three types of documents:
 
-- Collection Schemes data: This data set is persisted during shutdown of the device software, and
-  re-loaded upon startup.
-- Decoder Manifest Data: This data set is persisted during shutdown of the device software, and
-  re-loaded upon startup.
+- Collection Schemes data: This data set is persisted during shutdown of FWE, and re-loaded upon
+  startup.
+- Decoder Manifest Data: This data set is persisted during shutdown of FWE, and re-loaded upon
+  startup.
 - Data Snapshots: This data set is persisted when there is no connectivity in the system. Upon the
   next startup of the service, the data is reloaded and send if there is connectivity.
 
 The persistency module operates on a fixed/configurable maximum partition size. If there is no space
 left, the module does not persist the data.
 
-All data exchanged between the device software and the cloud or persisted on the disk is compressed.
+Persisted data is uploaded once on the bootup. Upload will be repeated after interval that is set in
+the static configuration under ["staticConfig"]["persistency"]["persistencyUploadRetryIntervalMs"].
+If this value is not set, upload will be retried only on the next bootup.
 
 ## Logging
 
-The device software defines a Logger interface and implements a standard output logging backend. The
-interface can be extended to support other logging backends if needed.
+FWE defines a Logger interface and implements a standard output logging backend. The interface can
+be extended to support other logging backends if needed.
 
 The logger interface defines the following severity levels :
 
@@ -876,13 +895,13 @@ described below in the configuration section. Each log entry includes the follow
 [Thread: ID] [Time] [Level] [Filename:LineNumber] [Function()]: [Message]
 ```
 
-- Thread — the thread ID triggering the log entry.
-- Time — the timestamp in milliseconds since Epoch.
-- Level — the severity of the log entry.
-- Filename - the file name that invoked the log entry.
-- LineNumber - the line in the file that invoked the log entry.
-- Function — the function name that invoked the log entry.
-- Message — the actual log message.
+- **Thread:** the thread ID triggering the log entry.
+- **Time:** the timestamp in milliseconds since Epoch.
+- **Level:** the severity of the log entry.
+- **Filename:** the file name that invoked the log entry.
+- **LineNumber:** the line in the file that invoked the log entry.
+- **Function:** the function name that invoked the log entry.
+- **Message:** the actual log message.
 
 ## Configuration
 
@@ -911,12 +930,14 @@ described below in the configuration section. Each log entry includes the follow
 |                             | persistencyUploadRetryIntervalMs            | Interval to wait before retrying to upload persisted signal data (in milliseconds). After successfully uploading, the persisted signal data will be cleared. Only signal data that could not be uploaded will be persisted. (in milliseconds)                                                                                                                                   | integer  |
 | internalParameters          | readyToPublishDataBufferSize                | Size of the buffer used for storing ready to publish, filtered data                                                                                                                                                                                                                                                                                                             | integer  |
 |                             | systemWideLogLevel                          | Sets logging level severity: `Trace`, `Info`, `Warning`, `Error`                                                                                                                                                                                                                                                                                                                | string   |
-|                             | logColor                                    | Whether logs should be colored: `Auto`, `Yes`, `No`. Default to `Auto`, meaning the agent will try to detect whether colored output is supported (for example when connected to a tty)                                                                                                                                                                                          | string   |
+|                             | logColor                                    | Whether logs should be colored: `Auto`, `Yes`, `No`. Default to `Auto`, meaning FWE will try to detect whether colored output is supported (for example when connected to a tty)                                                                                                                                                                                                | string   |
+|                             | maximumAwsSdkHeapMemoryBytes                | The maximum size of AWS SDK heap memory                                                                                                                                                                                                                                                                                                                                         | integer  |
 |                             | dataReductionProbabilityDisabled            | Disables probability-based DDC (only for debug purpose)                                                                                                                                                                                                                                                                                                                         | boolean  |
 |                             | metricsCyclicPrintIntervalMs                | Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never                                                                                                                                                                                                                                                          | string   |
 | publishToCloudParameters    | maxPublishMessageCount                      | Maximum messages that can be published to the cloud in one payload                                                                                                                                                                                                                                                                                                              | integer  |
 |                             | collectionSchemeManagementCheckinIntervalMs | Time interval between collection schemes checkins(in milliseconds)                                                                                                                                                                                                                                                                                                              | integer  |
 | mqttConnection              | endpointUrl                                 | AWS account's IoT device endpoint                                                                                                                                                                                                                                                                                                                                               | string   |
+|                             | connectionType                              | The connection module type, it can be iotCore or iotGreengrassV2                                                                                                                                                                                                                                                                                                                | string   |
 |                             | clientId                                    | The ID that uniquely identifies this device in the AWS Region                                                                                                                                                                                                                                                                                                                   | string   |
 |                             | collectionSchemeListTopic                   | Topic for subscribing to Collection Scheme                                                                                                                                                                                                                                                                                                                                      | string   |
 |                             | decoderManifestTopic                        | Topic for subscribing to Decoder Manifest                                                                                                                                                                                                                                                                                                                                       | string   |
@@ -937,12 +958,11 @@ described below in the configuration section. Each log entry includes the follow
 
 ## Security
 
-The device software has been designed with security principles in mind. Security has been
-incorporated into four main domains:
+FWE has been designed with security principles in mind. Security has been incorporated into four
+main domains:
 
-- Device Authentication: the device software uses Client Certificates (x.509) to communicate with
-  AWS IoT services. All the communications from and to the device software are over a secure TLS
-  Connection. Refer to the
+- Device Authentication: FWE uses Client Certificates (x.509) to communicate with AWS IoT services.
+  All the communications from and to FWE are over a secure TLS Connection. Refer to the
   [AWS IoT Security documentation](https://docs.aws.amazon.com/iot/latest/developerguide/x509-client-certs.html)
   for further details.
 - Data in transit: All the data exchanged with the AWS IoT services is encrypted in transit.
@@ -950,16 +970,15 @@ incorporated into four main domains:
   persistency. It's assumed that the software operates in a secure partition that the OEM puts in
   place and rely on the OEM secure storage infrastructure that is applied for all IO operations
   happening in the gateway e.g. via HSM, OEM crypto stack.
-- Access to vehicle CAN data: the device software assumes that the software operates in a secure
-  execution partition, that guarantees that if needed, the CAN traffic is encrypted/decrypted by the
-  OEM Crypto stack (either on chip/HSM or via separate core running the crypto stack).
+- Access to vehicle CAN data: FWE assumes that the software operates in a secure execution
+  partition, that guarantees that if needed, the CAN traffic is encrypted/decrypted by the OEM
+  Crypto stack (either on chip/HSM or via separate core running the crypto stack).
 
-The device software can be extended to invoke cryptography APIs to encrypt and decrypt the data as
-per the need.
+FWE can be extended to invoke cryptography APIs to encrypt and decrypt the data as per the need.
 
-The device software has been designed to be deployed in a non safety relevant in-vehicle
-domain/partition. Due to its use of dynamic memory allocation, this software is not suited for
-deployment on real time/lock step/safety cores.
+FWE has been designed to be deployed in a non safety relevant in-vehicle domain/partition. Due to
+its use of dynamic memory allocation, this software is not suited for deployment on real time/lock
+step/safety cores.
 
 ### Best Practices and recommendation
 
@@ -982,35 +1001,25 @@ Please refer to
 [Device Manufacturing and Provisioning with X.509 Certificates in AWS IoT Core](https://d1.awsstatic.com/whitepapers/device-manufacturing-provisioning.pdf)
 for security recommendations on device manufacturing and provisioning.
 
-Note: This is **only** a recommendation. Your system must be protected with proper security
-measures.
+Note: This is **only** a recommendation. You are responsible for protecting your system with proper
+security measures.
 
 ## Supported Platforms
 
-The AWS IoT FleetWise Edge Agent software has been developed for 64 bit architecture. It has been
-tested on both ARM and X86 multicore based machines, with a Linux Kernel version of 5.4 and above.
-The kernel module for ISO-TP (can-isotp) would need to be installed in addition for Kernels below
-5.10.
-
-## Disclaimer
-
-The device software code base includes modules that are still in development an are disabled by
-default. These modules are not intended for use in a production environment. This includes the Data
-Distribution Service Support (DDS) that is used to communicate with any sensor node connected over a
-DDS bus and a Remote Profiler module that helps sending traces from the device to AWS Cloud Watch.
-The device software has been checked for any memory leaks and runtime errors such as type overflows
-using Valgrind. No issues have been detected during the load tests.
+FWE has been developed for 64 bit architecture. It has been tested on both ARM and x86 multicore
+based machines, with a Linux Kernel version of 5.4 and above. The kernel module for ISO-TP
+(`can-isotp`) would need to be installed in addition for kernels below 5.10.
 
 ## Getting Help
 
 Contact [AWS Support](https://aws.amazon.com/contact-us/) if you have any technical questions about
-AWS IoT FleetWise Edge Agent.
+FWE.
 
 ## Resources
 
-The following documents or websites provide more information about AWS IoT FleetWise Edge Agent.
+The following documents or websites provide more information about FWE.
 
 1. [Change Log](../../CHANGELOG.md) provides a summary of feature enhancements, updates, and
    resolved and known issues.
-2. [AWS IoT FleetWise Edge Agent Offboarding](../AWS-IoTFleetWiseOffboarding.md) provides a summary
-   of the steps needed on the Client side to off board from the service.
+1. [Offboarding and Data Deletion](../AWS-IoTFleetWiseOffboarding.md) provides a summary of the
+   steps needed on the client side to offboard from the service.

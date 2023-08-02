@@ -185,12 +185,10 @@ TEST( CollectionSchemeManager, InpsectionMatrixExtractorConditionDataTest )
     CANFrame.interfaceID = "102";
     CANFrame.sampleBufferSize = 103;
     CANFrame.minimumSampleIntervalMs = 104;
-    std::vector<ImageCollectionInfo> imageSettings;
-    imageSettings.emplace_back( 1, 1, ImageCollectionType::TIME_BASED, 3 );
     std::vector<SignalCollectionInfo> testSignals = { Signals };
     std::vector<CanFrameCollectionInfo> testCANFrames = { CANFrame };
-    ICollectionSchemePtr collectionScheme = std::make_shared<ICollectionSchemeTest>(
-        "COLLECTIONSCHEME1", "DM1", 0, 10, testSignals, testCANFrames, imageSettings );
+    ICollectionSchemePtr collectionScheme =
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", 0, 10, testSignals, testCANFrames );
     std::vector<ICollectionSchemePtr> list1;
     list1.emplace_back( collectionScheme );
     CollectionSchemeManagerTest test( "DM1" );
@@ -220,14 +218,8 @@ TEST( CollectionSchemeManager, InpsectionMatrixExtractorConditionDataTest )
         ASSERT_EQ( CANFrame.interfaceID, canIDTranslator.getInterfaceID( conditionData.canFrames[0].channelID ) );
         ASSERT_EQ( CANFrame.sampleBufferSize, conditionData.canFrames[0].sampleBufferSize );
         ASSERT_EQ( CANFrame.minimumSampleIntervalMs, conditionData.canFrames[0].minimumSampleIntervalMs );
-        // Image Capture
-        ASSERT_TRUE( conditionData.includeImageCapture );
-        ASSERT_EQ( conditionData.imageCollectionInfos.size(), 1 );
-        ASSERT_EQ( conditionData.imageCollectionInfos[0].beforeDurationMs, imageSettings[0].beforeDurationMs );
-        ASSERT_EQ( conditionData.imageCollectionInfos[0].deviceID, imageSettings[0].deviceID );
-        ASSERT_EQ( conditionData.imageCollectionInfos[0].imageFormat, imageSettings[0].imageFormat );
         // Decoder and CollectionScheme IDs
-        ASSERT_EQ( conditionData.metaData.decoderID, collectionScheme->getDecoderManifestID() );
-        ASSERT_EQ( conditionData.metaData.collectionSchemeID, collectionScheme->getCollectionSchemeID() );
+        ASSERT_EQ( conditionData.metadata.decoderID, collectionScheme->getDecoderManifestID() );
+        ASSERT_EQ( conditionData.metadata.collectionSchemeID, collectionScheme->getCollectionSchemeID() );
     }
 }

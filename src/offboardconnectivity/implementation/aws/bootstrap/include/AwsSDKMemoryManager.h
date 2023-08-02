@@ -33,13 +33,28 @@ public:
     void *AllocateMemory( std::size_t blockSize, std::size_t alignment, const char *allocationTag = nullptr ) override;
 
     void FreeMemory( void *memoryPtr ) override;
+    /**
+     * @brief Set the Limit of maximal memory usage
+     *
+     * @param size
+     * @return true if setting succeeds
+     * @return false if setting fails
+     */
+    bool setLimit( std::size_t size );
+
+    /**
+     * @brief Get the Limit object
+     *
+     * @return std::size_t
+     */
+    std::size_t getLimit() const;
 
     /**
      * @brief Reserve a chunk of memory for usage later
      *
-     * @return std::size_t Memory size currently in use plus reserved
+     * @return true if successfully reserved, false if the allocation exceeds the limit
      */
-    std::size_t reserveMemory( std::size_t bytes );
+    bool reserveMemory( std::size_t bytes );
 
     /**
      * @brief Release the memory reservation.
@@ -59,6 +74,10 @@ private:
      *
      */
     std::atomic<std::size_t> mMemoryUsedAndReserved{ 0 };
+
+    static constexpr std::size_t MAXIMUM_AWS_SDK_HEAP_MEMORY_BYTES = 10000000;
+
+    size_t mMaximumAwsSDKMemorySize = MAXIMUM_AWS_SDK_HEAP_MEMORY_BYTES;
 };
 } // namespace OffboardConnectivityAwsIot
 } // namespace IoTFleetWise

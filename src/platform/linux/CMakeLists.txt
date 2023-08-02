@@ -24,6 +24,10 @@ add_library(
   persistencymanagement/src/CacheAndPersist.cpp
 )
 
+find_path(JSONCPP_INCLUDE_DIR "json/json.h" PATH_SUFFIXES "jsoncpp")
+find_library(JSONCPP_LIBRARY NAMES jsoncpp)
+find_package(Boost 1.65.1 REQUIRED COMPONENTS filesystem)
+
 # These are public includes so we can expose the headers to other consumers
 target_include_directories(
   ${libraryTargetName}
@@ -33,14 +37,15 @@ target_include_directories(
   timemanagement/include
   resourcemanagement/include
   persistencymanagement/include
-  # Linux Kernel less than 5.10 require this header.
-  can
+  ${JSONCPP_INCLUDE_DIR}
 )
 
 target_link_libraries(
   ${libraryTargetName}
   # From the Platform, this is what is used: logmanagement timemanagement
   IoTFleetWise::Platform::Utility
+  Boost::filesystem
+  ${JSONCPP_LIBRARY}
 )
 
 # This allows the preprocessor to enable the code in the libraries

@@ -21,10 +21,6 @@ using namespace Aws::IoTFleetWise::Platform::Linux::PersistencyManagement;
 using Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams;
 using Aws::IoTFleetWise::OffboardConnectivity::ConnectivityError;
 
-const uint32_t IoTFleetWiseEngine::MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG = 6;
-const uint64_t IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 1000;
-const uint64_t IoTFleetWiseEngine::DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 10000;
-
 static const std::string CAN_INTERFACE_TYPE = "canInterface";
 static const std::string EXTERNAL_CAN_INTERFACE_TYPE = "externalCanInterface";
 static const std::string OBD_INTERFACE_TYPE = "obdInterface";
@@ -104,14 +100,11 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         {
             FWE_LOG_ERROR( "Failed to init persistency library" );
         }
+        uint64_t persistencyUploadRetryIntervalMs = DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS;
         if ( config["staticConfig"]["persistency"].isMember( "persistencyUploadRetryIntervalMs" ) )
         {
-            mPersistencyUploadRetryIntervalMs =
-                static_cast<uint64_t>( config["staticConfig"]["persistencyUploadRetryIntervalMs"].asInt() );
-        }
-        else
-        {
-            mPersistencyUploadRetryIntervalMs = DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS;
+            persistencyUploadRetryIntervalMs = static_cast<uint64_t>(
+                config["staticConfig"]["persistency"]["persistencyUploadRetryIntervalMs"].asInt() );
         }
         // Payload Manager for offline data management
         mPayloadManager = std::make_shared<PayloadManager>( mPersistDecoderManifestCollectionSchemesAndData );
@@ -149,23 +142,106 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             mCANIDTranslator.add( "EXTERNAL-GPS-CAN" );
         }
 #endif
+#ifdef FWE_FEATURE_AAOS_VHAL
+        if ( config["staticConfig"].isMember( "aaosVhalExample" ) )
+        {
+            mCANIDTranslator.add(
+                config["staticConfig"]["aaosVhalExample"][AaosVhalSource::CAN_CHANNEL_NUMBER].asString() );
+        }
+        else
+        {
+            mCANIDTranslator.add( "AAOS-VHAL-CAN" );
+        }
+#endif
         /*************************CAN InterfaceID to InternalID Translator end*********/
 
         /**************************Connectivity bootstrap begin*******************************/
+        // Pass on the AWS SDK Bootstrap handle to the IoTModule.
+        auto bootstrapPtr = AwsBootstrap::getInstance().getClientBootStrap();
+        std::size_t maxAwsSdkHeapMemoryBytes = 0U;
+        if ( config["staticConfig"]["internalParameters"]["maximumAwsSdkHeapMemoryBytes"] )
+        {
+            maxAwsSdkHeapMemoryBytes =
+                config["staticConfig"]["internalParameters"]["maximumAwsSdkHeapMemoryBytes"].asUInt();
+            if ( ( maxAwsSdkHeapMemoryBytes != 0U ) &&
+                 AwsSDKMemoryManager::getInstance().setLimit( maxAwsSdkHeapMemoryBytes ) )
+            {
+                FWE_LOG_INFO( "Maximum AWS SDK Heap Memory Bytes has been configured:" +
+                              std::to_string( maxAwsSdkHeapMemoryBytes ) );
+            }
+            else
+            {
+                FWE_LOG_TRACE( "Maximum AWS SDK Heap Memory Bytes will use default value" );
+            }
+        }
+        else
+        {
+            FWE_LOG_TRACE( "Maximum AWS SDK Heap Memory Bytes will use default value" );
+        }
 
-        mAwsIotModule = std::make_shared<AwsIotConnectivityModule>();
+#ifdef FWE_FEATURE_GREENGRASSV2
+        if ( config["staticConfig"]["mqttConnection"]["connectionType"].asString() == "iotGreengrassV2" )
+        {
+            FWE_LOG_INFO( "ConnectionType is iotGreengrassV2" )
+            mConnectivityModule = std::make_shared<AwsGGConnectivityModule>( bootstrapPtr );
+        }
+        else
+#endif
+        {
+            std::string privateKey;
+            std::string certificate;
+            std::string rootCA;
+            FWE_LOG_INFO( "ConnectionType is iotCore " +
+                          config["staticConfig"]["mqttConnection"]["connectionType"].asString() )
+            // fetch connection parameters from config
+            if ( config["staticConfig"]["mqttConnection"].isMember( "privateKey" ) )
+            {
+                privateKey = config["staticConfig"]["mqttConnection"]["privateKey"].asString();
+            }
+            else if ( config["staticConfig"]["mqttConnection"].isMember( "privateKeyFilename" ) )
+            {
+                privateKey =
+                    getFileContents( config["staticConfig"]["mqttConnection"]["privateKeyFilename"].asString() );
+            }
+            if ( config["staticConfig"]["mqttConnection"].isMember( "certificate" ) )
+            {
+                certificate = config["staticConfig"]["mqttConnection"]["certificate"].asString();
+            }
+            else if ( config["staticConfig"]["mqttConnection"].isMember( "certificateFilename" ) )
+            {
+                certificate =
+                    getFileContents( config["staticConfig"]["mqttConnection"]["certificateFilename"].asString() );
+            }
+            if ( config["staticConfig"]["mqttConnection"].isMember( "rootCA" ) )
+            {
+                rootCA = config["staticConfig"]["mqttConnection"]["rootCA"].asString();
+            }
+            else if ( config["staticConfig"]["mqttConnection"].isMember( "rootCAFilename" ) )
+            {
+                rootCA = getFileContents( config["staticConfig"]["mqttConnection"]["rootCAFilename"].asString() );
+            }
+            mConnectivityModule = std::make_shared<AwsIotConnectivityModule>(
+                privateKey,
+                certificate,
+                rootCA,
+                config["staticConfig"]["mqttConnection"]["endpointUrl"].asString(),
+                config["staticConfig"]["mqttConnection"]["clientId"].asString(),
+                bootstrapPtr,
+                true );
+        }
 
         // Only CAN data channel needs a payloadManager object for persistency and compression support,
         // for other components this will be nullptr
-        mAwsIotChannelSendCanData = mAwsIotModule->createNewChannel( mPayloadManager );
-        mAwsIotChannelSendCanData->setTopic( config["staticConfig"]["mqttConnection"]["canDataTopic"].asString() );
+        mConnectivityChannelSendVehicleData = mConnectivityModule->createNewChannel( mPayloadManager );
+        mConnectivityChannelSendVehicleData->setTopic(
+            config["staticConfig"]["mqttConnection"]["canDataTopic"].asString() );
 
-        mAwsIotChannelReceiveCollectionSchemeList = mAwsIotModule->createNewChannel( nullptr );
-        mAwsIotChannelReceiveCollectionSchemeList->setTopic(
+        mConnectivityChannelReceiveCollectionSchemeList = mConnectivityModule->createNewChannel( nullptr );
+        mConnectivityChannelReceiveCollectionSchemeList->setTopic(
             config["staticConfig"]["mqttConnection"]["collectionSchemeListTopic"].asString(), true );
 
-        mAwsIotChannelReceiveDecoderManifest = mAwsIotModule->createNewChannel( nullptr );
-        mAwsIotChannelReceiveDecoderManifest->setTopic(
+        mConnectivityChannelReceiveDecoderManifest = mConnectivityModule->createNewChannel( nullptr );
+        mConnectivityChannelReceiveDecoderManifest->setTopic(
             config["staticConfig"]["mqttConnection"]["decoderManifestTopic"].asString(), true );
 
         /*
@@ -175,8 +251,8 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
          */
         if ( config["staticConfig"]["mqttConnection"]["metricsUploadTopic"].asString().length() > 0 )
         {
-            mAwsIotChannelMetricsUpload = mAwsIotModule->createNewChannel( nullptr );
-            mAwsIotChannelMetricsUpload->setTopic(
+            mConnectivityChannelMetricsUpload = mConnectivityModule->createNewChannel( nullptr );
+            mConnectivityChannelMetricsUpload->setTopic(
                 config["staticConfig"]["mqttConnection"]["metricsUploadTopic"].asString() );
         }
         /*
@@ -185,58 +261,18 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
          */
         if ( config["staticConfig"]["mqttConnection"]["loggingUploadTopic"].asString().length() > 0 )
         {
-            mAwsIotChannelLogsUpload = mAwsIotModule->createNewChannel( nullptr );
-            mAwsIotChannelLogsUpload->setTopic(
+            mConnectivityChannelLogsUpload = mConnectivityModule->createNewChannel( nullptr );
+            mConnectivityChannelLogsUpload->setTopic(
                 config["staticConfig"]["mqttConnection"]["loggingUploadTopic"].asString() );
         }
 
         // Create an ISender for sending Checkins
-        mAwsIotChannelSendCheckin = mAwsIotModule->createNewChannel( nullptr );
-        mAwsIotChannelSendCheckin->setTopic( config["staticConfig"]["mqttConnection"]["checkinTopic"].asString() );
+        mConnectivityChannelSendCheckin = mConnectivityModule->createNewChannel( nullptr );
+        mConnectivityChannelSendCheckin->setTopic(
+            config["staticConfig"]["mqttConnection"]["checkinTopic"].asString() );
 
-        mDataCollectionSender = std::make_shared<DataCollectionSender>(
-            mAwsIotChannelSendCanData,
-            config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asUInt(),
-            mCANIDTranslator );
-
-        // Pass on the AWS SDK Bootstrap handle to the IoTModule.
-        auto bootstrapPtr = AwsBootstrap::getInstance().getClientBootStrap();
-
-        std::string privateKey;
-        std::string certificate;
-        std::string rootCA;
-        if ( config["staticConfig"]["mqttConnection"].isMember( "privateKey" ) )
-        {
-            privateKey = config["staticConfig"]["mqttConnection"]["privateKey"].asString();
-        }
-        else if ( config["staticConfig"]["mqttConnection"].isMember( "privateKeyFilename" ) )
-        {
-            privateKey = getFileContents( config["staticConfig"]["mqttConnection"]["privateKeyFilename"].asString() );
-        }
-        if ( config["staticConfig"]["mqttConnection"].isMember( "certificate" ) )
-        {
-            certificate = config["staticConfig"]["mqttConnection"]["certificate"].asString();
-        }
-        else if ( config["staticConfig"]["mqttConnection"].isMember( "certificateFilename" ) )
-        {
-            certificate = getFileContents( config["staticConfig"]["mqttConnection"]["certificateFilename"].asString() );
-        }
-        if ( config["staticConfig"]["mqttConnection"].isMember( "rootCA" ) )
-        {
-            rootCA = config["staticConfig"]["mqttConnection"]["rootCA"].asString();
-        }
-        else if ( config["staticConfig"]["mqttConnection"].isMember( "rootCAFilename" ) )
-        {
-            rootCA = getFileContents( config["staticConfig"]["mqttConnection"]["rootCAFilename"].asString() );
-        }
         // For asynchronous connect the call needs to be done after all channels created and setTopic calls
-        mAwsIotModule->connect( privateKey,
-                                certificate,
-                                rootCA,
-                                config["staticConfig"]["mqttConnection"]["endpointUrl"].asString(),
-                                config["staticConfig"]["mqttConnection"]["clientId"].asString(),
-                                bootstrapPtr,
-                                true );
+        mConnectivityModule->connect();
         /*************************Connectivity bootstrap end***************************************/
 
         /*************************Remote Profiling bootstrap begin**********************************/
@@ -269,8 +305,8 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             // loggingUploadMaxWaitBeforeUploadMs
             // profilerPrefix
             mRemoteProfiler = std::make_unique<RemoteProfiler>(
-                mAwsIotChannelMetricsUpload,
-                mAwsIotChannelLogsUpload,
+                mConnectivityChannelMetricsUpload,
+                mConnectivityChannelLogsUpload,
                 config["staticConfig"]["remoteProfilerDefaultValues"]["metricsUploadIntervalMs"].asUInt(),
                 config["staticConfig"]["remoteProfilerDefaultValues"]["loggingUploadMaxWaitBeforeUploadMs"].asUInt(),
                 logThreshold,
@@ -315,24 +351,38 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             FWE_LOG_ERROR( "Failed to init and start the Inspection Engine" );
             return false;
         }
-        // Make sure the Inspection Engine can notify the Bootstrap thread about ready to be
-        // published data.
-        if ( !mCollectionInspectionWorkerThread->subscribeListener( this ) )
+        /*************************Inspection Engine bootstrap end***********************************/
+
+        /*************************DataSender bootstrap begin*********************************/
+        mDataSenderManagerWorkerThread = std::make_shared<DataSenderManagerWorkerThread>(
+            mCANIDTranslator,
+            mConnectivityModule,
+            mConnectivityChannelSendVehicleData,
+            mPayloadManager,
+            config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asUInt(),
+            persistencyUploadRetryIntervalMs );
+        if ( ( !mDataSenderManagerWorkerThread->init( mCollectedDataReadyToPublish ) ) ||
+             ( !mDataSenderManagerWorkerThread->start() ) )
         {
-            FWE_LOG_ERROR( "Failed register the Engine Thread to the Inspection Module" );
+            FWE_LOG_ERROR( "Failed to init and start the Data Sender" );
             return false;
         }
 
-        /*************************Inspection Engine bootstrap end***********************************/
+        if ( !mCollectionInspectionWorkerThread->subscribeListener( mDataSenderManagerWorkerThread.get() ) )
+        {
+            FWE_LOG_ERROR( "Failed register the Data Sender Thread to the Inspection Module" );
+            return false;
+        }
+        /*************************DataSender bootstrap end*********************************/
 
         /*************************CollectionScheme Ingestion bootstrap begin*********************************/
 
         // CollectionScheme Ingestion module executes in the context for the offboardconnectivity thread. Upcoming
         // messages are expected to come either on the decoder manifest topic or the collectionScheme topic or both
         // ( eventually ).
-        mSchemaPtr = std::make_shared<Schema>( mAwsIotChannelReceiveDecoderManifest,
-                                               mAwsIotChannelReceiveCollectionSchemeList,
-                                               mAwsIotChannelSendCheckin );
+        mSchemaPtr = std::make_shared<Schema>( mConnectivityChannelReceiveDecoderManifest,
+                                               mConnectivityChannelReceiveCollectionSchemeList,
+                                               mConnectivityChannelSendCheckin );
 
         /*****************************CollectionScheme Management bootstrap begin*****************************/
 
@@ -364,6 +414,15 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                  static_cast<IActiveConditionProcessor *>( mCollectionInspectionWorkerThread.get() ) ) )
         {
             FWE_LOG_ERROR( "Failed register the Inspection Engine to the CollectionScheme Manager Module" );
+            return false;
+        }
+
+        // Make sure the CollectionScheme Manager can notify the Data Sender about the availability of
+        // a new set of collection CollectionSchemes.
+        if ( !mCollectionSchemeManagerPtr->subscribeListener(
+                 static_cast<IActiveCollectionSchemesListener *>( mDataSenderManagerWorkerThread.get() ) ) )
+        {
+            FWE_LOG_ERROR( "Failed register the Data Sender to the CollectionScheme Manager Module" );
             return false;
         }
 
@@ -486,88 +545,6 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         }
         /****************************CollectionScheme Manager bootstrap end*************************/
 
-#ifdef FWE_FEATURE_CAMERA
-        /********************************DDS Module bootstrap start*********************************/
-        // First we need to parse the configuration
-        // and extract all the node(s) settings our DDS module needs. Those are per node( device):
-        // - The device unique ID.
-        // - The device Type e.g. CAMERA.
-        // - The upstream ( Publish ) and downstream( subscribe ) DDS Topics.
-        // - The Topics DDS QoS.
-        // - The DDS Transport to be used ( SHM or UDP ).
-        // - The temporary location where the data artifact received will be stored.
-        // - Writer and Reader names that will be registered on the DDS Network.
-        // - The DDS Domain ID that we should register too.
-        // Other configurations can be added as per the need e.g. UDP Ports/IPs
-
-        DDSDataSourcesConfig ddsNodes;
-        for ( const auto &ddsNode : config["dds-nodes-configuration"] )
-        {
-            DDSDataSourceConfig nodeConfig;
-            // Transport, currently only UDP and SHM are supported
-            if ( ddsNode["dds-transport-protocol"].asString() == "SHM" )
-            {
-                nodeConfig.transportType = DDSTransportType::SHM;
-            }
-            else if ( ddsNode["dds-transport-protocol"].asString() == "UDP" )
-            {
-                nodeConfig.transportType = DDSTransportType::UDP;
-            }
-            else
-            {
-                FWE_LOG_WARN( "Unsupported Transport config provided for a DDS Node, skipping it" );
-                continue;
-            }
-
-            // Device Type, currently only CAMERA is supported
-            if ( ddsNode["dds-device-type"].asString() == "CAMERA" )
-            {
-                nodeConfig.sourceType = SensorSourceType::CAMERA;
-            }
-            else
-            {
-                FWE_LOG_WARN( "Unsupported Device type provided for a DDS Node, skipping it" );
-                continue;
-            }
-
-            nodeConfig.sourceID = ddsNode["dds-device-id"].asUInt();
-            nodeConfig.domainID = ddsNode["dds-domain-id"].asUInt();
-            nodeConfig.readerName = ddsNode["dds-reader-name"].asString();
-            nodeConfig.writerName = ddsNode["dds-writer-name"].asString();
-            nodeConfig.publishTopicName = ddsNode["upstream-dds-topic-name"].asString();
-            nodeConfig.subscribeTopicName = ddsNode["downstream-dds-topic-name"].asString();
-            nodeConfig.topicQoS = ddsNode["dds-topics-qos"].asString();
-            nodeConfig.temporaryCacheLocation = ddsNode["dds-tmp-cache-location"].asString();
-            ddsNodes.emplace_back( nodeConfig );
-        }
-        // Only if there is at least one DDS Node, we should create the DDS Module
-        if ( !ddsNodes.empty() )
-        {
-            mDataOverDDSModule = std::make_shared<DataOverDDSModule>();
-            // Init the Module
-            if ( !mDataOverDDSModule->init( ddsNodes ) )
-            {
-                FWE_LOG_ERROR( "Failed to initialize the DDS Module" );
-                return false;
-            }
-            // Register the DDS Module as a listener to the Inspection Engine and connect it.
-            if ( ( !mCollectionInspectionWorkerThread->subscribeToEvents(
-                     static_cast<InspectionEventListener *>( mDataOverDDSModule.get() ) ) ) ||
-                 ( !mDataOverDDSModule->connect() ) )
-            {
-                FWE_LOG_ERROR( "Failed to connect the DDS Module" );
-                return false;
-            }
-            FWE_LOG_INFO( "DDS Module connected" );
-        }
-        else
-        {
-            FWE_LOG_INFO( "DDS Module disabled" );
-        }
-
-        /********************************DDS Module bootstrap end*********************************/
-#endif // FWE_FEATURE_CAMERA
-
 #ifdef FWE_FEATURE_IWAVE_GPS
         /********************************IWave GPS Example NMEA reader *********************************/
         mIWaveGpsSource = std::make_shared<IWaveGpsSource>( signalBufferPtr );
@@ -651,6 +628,42 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         /********************************External GPS Example NMEA reader end******************************/
 #endif
 
+#ifdef FWE_FEATURE_AAOS_VHAL
+        /********************************AAOS VHAL Example reader *********************************/
+        mAaosVhalSource = std::make_shared<AaosVhalSource>( signalBufferPtr );
+        bool aaosVhalInitSuccessful = false;
+        if ( config["staticConfig"].isMember( "aaosVhalExample" ) )
+        {
+            FWE_LOG_TRACE( "Found 'aaosVhalExample' section in config file" );
+            aaosVhalInitSuccessful = mAaosVhalSource->init(
+                mCANIDTranslator.getChannelNumericID(
+                    config["staticConfig"]["aaosVhalExample"][AaosVhalSource::CAN_CHANNEL_NUMBER].asString() ),
+                stringToU32( config["staticConfig"]["aaosVhalExample"][AaosVhalSource::CAN_RAW_FRAME_ID].asString() ) );
+        }
+        else
+        {
+            // If not config available default to this values
+            aaosVhalInitSuccessful =
+                mAaosVhalSource->init( mCANIDTranslator.getChannelNumericID( "AAOS-VHAL-CAN" ), 1 );
+        }
+        if ( aaosVhalInitSuccessful )
+        {
+            if ( !mCollectionSchemeManagerPtr->subscribeListener(
+                     static_cast<IActiveDecoderDictionaryListener *>( mAaosVhalSource.get() ) ) )
+            {
+                FWE_LOG_ERROR( "Failed to register the AaosVhalExample to the CollectionScheme Manager" );
+                return false;
+            }
+            mAaosVhalSource->start();
+        }
+        else
+        {
+            FWE_LOG_ERROR( "AaosVhalExample initialization failed" );
+            return false;
+        }
+        /********************************AAOS VHAL Example reader end******************************/
+#endif
+
         mPrintMetricsCyclicPeriodMs =
             config["staticConfig"]["internalParameters"]["metricsCyclicPrintIntervalMs"].asUInt(); // default to 0
     }
@@ -668,6 +681,12 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 bool
 IoTFleetWiseEngine::disconnect()
 {
+#ifdef FWE_FEATURE_AAOS_VHAL
+    if ( mAaosVhalSource )
+    {
+        mAaosVhalSource->stop();
+    }
+#endif
 #ifdef FWE_FEATURE_EXTERNAL_GPS
     if ( mExternalGpsSource )
     {
@@ -680,19 +699,6 @@ IoTFleetWiseEngine::disconnect()
         mIWaveGpsSource->stop();
     }
 #endif
-#ifdef FWE_FEATURE_CAMERA
-    if ( mDataOverDDSModule )
-    {
-        if ( ( !mCollectionInspectionWorkerThread->unSubscribeFromEvents(
-                 static_cast<InspectionEventListener *>( mDataOverDDSModule.get() ) ) ) ||
-             ( !mDataOverDDSModule->disconnect() ) )
-        {
-
-            FWE_LOG_ERROR( "Could not disconnect DDS Module" );
-            return false;
-        }
-    }
-#endif // FWE_FEATURE_CAMERA
 
     if ( mOBDOverCANModule )
     {
@@ -731,11 +737,18 @@ IoTFleetWiseEngine::disconnect()
         }
     }
 
-    if ( mAwsIotModule->isAlive() && ( !mAwsIotModule->disconnect() ) )
+    if ( mConnectivityModule->isAlive() && ( !mConnectivityModule->disconnect() ) )
     {
-        FWE_LOG_ERROR( "Could not disconnect the off-board connectivity" );
+        FWE_LOG_ERROR( "Could not disconnect the offboard connectivity" );
         return false;
     }
+
+    if ( !mDataSenderManagerWorkerThread->stop() )
+    {
+        FWE_LOG_ERROR( "Could not stop the DataSenderManager" );
+        return false;
+    }
+
     FWE_LOG_INFO( "Engine Disconnected" );
     TraceModule::get().sectionEnd( TraceSection::FWE_SHUTDOWN );
     TraceModule::get().print();
@@ -790,176 +803,34 @@ IoTFleetWiseEngine::isAlive()
 void
 IoTFleetWiseEngine::doWork( void *data )
 {
-
     IoTFleetWiseEngine *engine = static_cast<IoTFleetWiseEngine *>( data );
-    // Time in seconds
-    double timeTrigger = 0;
-    bool uploadedPersistedDataOnce = false;
     TraceModule::get().sectionEnd( TraceSection::FWE_STARTUP );
-
-    engine->mRetrySendingPersistedDataTimer.reset();
 
     while ( !engine->shouldStop() )
     {
-        // The interrupt arrives because of 2 reasons :
-        // 1- An event trigger( either cyclic or interrupt ) has arrived, for this, all the buffers of the consumers
-        // should be read and flushed.
-        // 2- A consumer has been either reconnected or disconnected on runtime.
-        // we should then either register or unregister for callbacks from this consumer.
-        // 3- A new collectionScheme is available - First old data is sent out then the new collectionScheme is
-        // applied to all consumers of the channel data
-
         engine->mTimer.reset();
-        uint32_t elapsedTimeUs = 0;
-        if ( !uploadedPersistedDataOnce )
-        {
-            // Minimum delay one tenth of FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS
-            uint64_t timeToWaitMs =
-                IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS -
-                std::min( static_cast<uint64_t>( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ),
-                          IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS );
-            timeTrigger = static_cast<double>( std::max(
-                              IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS / 10, timeToWaitMs ) ) /
-                          1000.0;
-        }
-        else if ( engine->mPersistencyUploadRetryIntervalMs > 0 )
-        {
-            uint64_t timeToWaitMs =
-                engine->mPersistencyUploadRetryIntervalMs -
-                std::min( static_cast<uint64_t>( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ),
-                          engine->mPersistencyUploadRetryIntervalMs );
-            timeTrigger = static_cast<double>(
-                              std::max( IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS, timeToWaitMs ) ) /
-                          1000.0;
-        }
-
+        uint64_t minTimeToWaitMs = UINT64_MAX;
         if ( engine->mPrintMetricsCyclicPeriodMs != 0 )
         {
             uint64_t timeToWaitMs =
                 engine->mPrintMetricsCyclicPeriodMs -
                 std::min( static_cast<uint64_t>( engine->mPrintMetricsCyclicTimer.getElapsedMs().count() ),
                           engine->mPrintMetricsCyclicPeriodMs );
-            timeTrigger = std::min( timeTrigger, static_cast<double>( timeToWaitMs ) / 1000.0 );
+            minTimeToWaitMs = std::min( minTimeToWaitMs, timeToWaitMs );
         }
-        if ( timeTrigger > 0 )
+        if ( minTimeToWaitMs < UINT64_MAX )
         {
-            FWE_LOG_TRACE( "Waiting for :" + std::to_string( timeTrigger ) + " seconds. Persistency " +
-                           std::to_string( engine->mPersistencyUploadRetryIntervalMs ) + " configured, " +
-                           std::to_string( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) +
-                           " timer. Cyclic Metrics Print:" + std::to_string( engine->mPrintMetricsCyclicPeriodMs ) +
-                           " configured,  " +
+            FWE_LOG_TRACE( "Waiting for: " + std::to_string( minTimeToWaitMs ) + " ms. Cyclic metrics print:" +
+                           std::to_string( engine->mPrintMetricsCyclicPeriodMs ) + " configured,  " +
                            std::to_string( engine->mPrintMetricsCyclicTimer.getElapsedMs().count() ) + " timer." );
-            engine->mWait.wait( static_cast<uint32_t>( timeTrigger * 1000 ) );
+            engine->mWait.wait( static_cast<uint32_t>( minTimeToWaitMs ) );
         }
         else
         {
             engine->mWait.wait( Platform::Linux::Signal::WaitWithPredicate );
-            elapsedTimeUs += static_cast<uint32_t>( engine->mTimer.getElapsedMs().count() );
-            FWE_LOG_TRACE( "Event Arrived" );
-            FWE_LOG_TRACE( "Time Elapsed waiting for the Event : " + std::to_string( elapsedTimeUs ) );
-        }
-
-        // Dequeues the collected data queue and sends the data to cloud
-        auto consumedElements = engine->mCollectedDataReadyToPublish->consume_all(
-            [&]( const TriggeredCollectionSchemeDataPtr triggeredCollectionSchemeDataPtr ) {
-                // Only used for trace logging
-                std::string firstSignalValues = "[";
-                uint32_t signalPrintCounter = 0;
-                std::string firstSignalTimestamp;
-                for ( auto &s : triggeredCollectionSchemeDataPtr->signals )
-                {
-                    if ( firstSignalTimestamp.empty() )
-                    {
-                        firstSignalTimestamp = " first signal timestamp: " + std::to_string( s.receiveTime );
-                    }
-                    signalPrintCounter++;
-                    if ( signalPrintCounter > MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG )
-                    {
-                        firstSignalValues += " ...";
-                        break;
-                    }
-                    auto signalValue = s.getValue();
-                    firstSignalValues += std::to_string( s.signalID ) + ":";
-                    switch ( signalValue.getType() )
-                    {
-                    case SignalType::UINT8:
-                        firstSignalValues += std::to_string( signalValue.value.uint8Val ) + ",";
-                        break;
-                    case SignalType::INT8:
-                        firstSignalValues += std::to_string( signalValue.value.int8Val ) + ",";
-                        break;
-                    case SignalType::UINT16:
-                        firstSignalValues += std::to_string( signalValue.value.uint16Val ) + ",";
-                        break;
-                    case SignalType::INT16:
-                        firstSignalValues += std::to_string( signalValue.value.int16Val ) + ",";
-                        break;
-                    case SignalType::UINT32:
-                        firstSignalValues += std::to_string( signalValue.value.uint32Val ) + ",";
-                        break;
-                    case SignalType::INT32:
-                        firstSignalValues += std::to_string( signalValue.value.int32Val ) + ",";
-                        break;
-                    case SignalType::UINT64:
-                        firstSignalValues += std::to_string( signalValue.value.uint64Val ) + ",";
-                        break;
-                    case SignalType::INT64:
-                        firstSignalValues += std::to_string( signalValue.value.int64Val ) + ",";
-                        break;
-                    case SignalType::FLOAT:
-                        firstSignalValues += std::to_string( signalValue.value.floatVal ) + ",";
-                        break;
-                    case SignalType::DOUBLE:
-                        firstSignalValues += std::to_string( signalValue.value.doubleVal ) + ",";
-                        break;
-                    case SignalType::BOOLEAN:
-                        firstSignalValues += std::to_string( static_cast<int>( signalValue.value.boolVal ) ) + ",";
-                        break;
-                    default:
-                        firstSignalValues += std::to_string( signalValue.value.doubleVal ) + ",";
-                        break;
-                    }
-                }
-                firstSignalValues += "]";
-                // Avoid invoking Data Collection Sender if there is nothing to send.
-                if ( triggeredCollectionSchemeDataPtr->signals.empty() &&
-                     triggeredCollectionSchemeDataPtr->canFrames.empty() &&
-                     triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.empty() &&
-                     ( !triggeredCollectionSchemeDataPtr->mGeohashInfo.hasItems() ) )
-                {
-                    FWE_LOG_INFO(
-                        "The trigger for Campaign:  " + triggeredCollectionSchemeDataPtr->metaData.collectionSchemeID +
-                        " activated eventID: " + std::to_string( triggeredCollectionSchemeDataPtr->eventID ) +
-                        " but no data is available to ingest" );
-                }
-                else
-                {
-                    FWE_LOG_INFO( "FWE data ready to send with eventID " +
-                                  std::to_string( triggeredCollectionSchemeDataPtr->eventID ) + " from " +
-                                  triggeredCollectionSchemeDataPtr->metaData.collectionSchemeID +
-                                  " Signals:" + std::to_string( triggeredCollectionSchemeDataPtr->signals.size() ) +
-                                  " " + firstSignalValues + firstSignalTimestamp + " raw CAN frames:" +
-                                  std::to_string( triggeredCollectionSchemeDataPtr->canFrames.size() ) + " DTCs:" +
-                                  std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() ) +
-                                  " Geohash:" + triggeredCollectionSchemeDataPtr->mGeohashInfo.mGeohashString );
-                    engine->mDataCollectionSender->send( triggeredCollectionSchemeDataPtr );
-                }
-            } );
-        TraceModule::get().setVariable( TraceVariable::QUEUE_INSPECTION_TO_SENDER, consumedElements );
-
-        if ( ( ( engine->mPersistencyUploadRetryIntervalMs > 0 ) &&
-               ( static_cast<uint64_t>( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) >=
-                 engine->mPersistencyUploadRetryIntervalMs ) ) ||
-             ( ( !uploadedPersistedDataOnce ) &&
-               ( static_cast<uint64_t>( engine->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) >=
-                 IoTFleetWiseEngine::FAST_RETRY_UPLOAD_PERSISTED_INTERVAL_MS ) ) )
-        {
-            engine->mRetrySendingPersistedDataTimer.reset();
-            if ( engine->mAwsIotModule->isAlive() && engine->checkAndSendRetrievedData() )
-            {
-                // Check if data was persisted, Retrieve all the data and send
-                uploadedPersistedDataOnce = true;
-            }
+            auto elapsedTimeMs = engine->mTimer.getElapsedMs().count();
+            FWE_LOG_TRACE( "Event arrived. Time elapsed waiting for the event: " + std::to_string( elapsedTimeMs ) +
+                           " ms" );
         }
         if ( ( engine->mPrintMetricsCyclicPeriodMs > 0 ) &&
              ( static_cast<uint64_t>( engine->mPrintMetricsCyclicTimer.getElapsedMs().count() ) >=
@@ -970,61 +841,6 @@ IoTFleetWiseEngine::doWork( void *data )
             TraceModule::get().startNewObservationWindow(
                 static_cast<uint32_t>( engine->mPrintMetricsCyclicPeriodMs ) );
         }
-    }
-}
-
-void
-IoTFleetWiseEngine::onDataReadyToPublish()
-{
-    mWait.notify();
-}
-
-bool
-IoTFleetWiseEngine::checkAndSendRetrievedData()
-{
-    std::vector<std::string> payloads;
-
-    // Retrieve the data from persistency library
-    ErrorCode status = mPayloadManager->retrieveData( payloads );
-
-    if ( status == ErrorCode::SUCCESS )
-    {
-        ConnectivityError res = ConnectivityError::Success;
-        FWE_LOG_TRACE( "Number of Payloads to transmit : " + std::to_string( payloads.size() ) );
-
-        for ( const auto &payload : payloads )
-        {
-            // transmit the retrieved payload
-            res = mDataCollectionSender->transmit( payload );
-            if ( res != ConnectivityError::Success )
-            {
-                // Error occurred in the transmission
-                FWE_LOG_ERROR( "Payload transmission failed, will be retried on the next bootup" );
-                break;
-            }
-            else
-            {
-                FWE_LOG_TRACE( "Payload has been successfully sent to the backend" );
-            }
-        }
-        if ( res == ConnectivityError::Success )
-        {
-            // All the stored data has been transmitted, erase the file contents
-            mPersistDecoderManifestCollectionSchemesAndData->erase( DataType::EDGE_TO_CLOUD_PAYLOAD );
-            FWE_LOG_INFO( "All " + std::to_string( payloads.size() ) + " Payloads successfully sent to the backend" );
-            return true;
-        }
-        return false;
-    }
-    else if ( status == ErrorCode::EMPTY )
-    {
-        FWE_LOG_TRACE( "No Payloads to Retrieve" );
-        return true;
-    }
-    else
-    {
-        FWE_LOG_ERROR( "Payload Retrieval Failed" );
-        return false;
     }
 }
 
@@ -1081,21 +897,39 @@ IoTFleetWiseEngine::setExternalGpsLocation( double latitude, double longitude )
 }
 #endif
 
+#ifdef FWE_FEATURE_AAOS_VHAL
+std::vector<std::array<uint32_t, 4>>
+IoTFleetWiseEngine::getVehiclePropertyInfo()
+{
+    std::vector<std::array<uint32_t, 4>> propertyInfo;
+    if ( mAaosVhalSource != nullptr )
+    {
+        propertyInfo = mAaosVhalSource->getVehiclePropertyInfo();
+    }
+    return propertyInfo;
+}
+void
+IoTFleetWiseEngine::setVehicleProperty( uint32_t signalId, double value )
+{
+    if ( mAaosVhalSource == nullptr )
+    {
+        return;
+    }
+    mAaosVhalSource->setVehicleProperty( signalId, value );
+}
+#endif
+
 std::string
 IoTFleetWiseEngine::getStatusSummary()
 {
-    if ( mAwsIotModule == nullptr || mCollectionSchemeManagerPtr == nullptr || mAwsIotChannelSendCanData == nullptr ||
-         mOBDOverCANModule == nullptr
-#ifdef FWE_FEATURE_EXTERNAL_GPS
-         || mExternalGpsSource == nullptr
-#endif
-    )
+    if ( mConnectivityModule == nullptr || mCollectionSchemeManagerPtr == nullptr ||
+         mConnectivityChannelSendVehicleData == nullptr || mOBDOverCANModule == nullptr )
     {
         return "";
     }
     std::string status;
-    status +=
-        std::string( "MQTT connection: " ) + ( mAwsIotModule->isAlive() ? "CONNECTED" : "NOT CONNECTED" ) + "\n\n";
+    status += std::string( "MQTT connection: " ) + ( mConnectivityModule->isAlive() ? "CONNECTED" : "NOT CONNECTED" ) +
+              "\n\n";
 
     status += "Campaign ARNs:\n";
     auto collectionSchemeArns = mCollectionSchemeManagerPtr->getCollectionSchemeArns();
@@ -1112,7 +946,7 @@ IoTFleetWiseEngine::getStatusSummary()
     }
     status += "\n";
 
-    status += "Payloads sent: " + std::to_string( mAwsIotChannelSendCanData->getPayloadCountSent() ) + "\n\n";
+    status += "Payloads sent: " + std::to_string( mConnectivityChannelSendVehicleData->getPayloadCountSent() ) + "\n\n";
     return status;
 }
 

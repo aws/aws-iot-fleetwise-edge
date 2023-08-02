@@ -9,12 +9,6 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/configure_vehicle"
-        android:textAppearance="@style/TextAppearance.AppCompat.Large" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
         android:text="@string/provisioning_help"
         android:textAppearance="@style/TextAppearance.AppCompat.Medium" />
 

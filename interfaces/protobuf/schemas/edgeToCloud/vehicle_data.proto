@@ -7,7 +7,7 @@ option java_package = "com.amazonaws.iot.autobahn.schemas";
 package Aws.IoTFleetWise.Schemas.VehicleDataMsg;
 
 /*
- * VehicleData payload from IoTFleetWise Edge for all events triggered by CollectionSchemes including condition based
+ * VehicleData payload for all events triggered by CollectionSchemes including condition based
  * events and periodic time based events.
  */
 message VehicleData {

@@ -7,6 +7,7 @@
 #include "CANInterfaceIDTranslator.h"
 #include "ClockHandler.h"
 #include "CollectionSchemeManagementListener.h"
+#include "IActiveCollectionSchemesListener.h"
 #include "IActiveConditionProcessor.h"
 #include "IActiveDecoderDictionaryListener.h"
 #include "ICollectionSchemeList.h"
@@ -56,16 +57,19 @@ struct TimeData
  * 5. Extract Inspection Matrix and propagate to Inspection Engine;
  * 6. Delete expired collectionSchemes from Enabled list, or removed collectionScheme from existing list per Cloud
   request.
+ * 7. Notify other components about currently Enabled CollectionSchemes.
  */
 
 class CollectionSchemeManager : public ICollectionSchemeManager,
                                 public CollectionSchemeManagementListener,
                                 public ThreadListeners<IActiveDecoderDictionaryListener>,
-                                public ThreadListeners<IActiveConditionProcessor>
+                                public ThreadListeners<IActiveConditionProcessor>,
+                                public ThreadListeners<IActiveCollectionSchemesListener>
 {
 public:
     using ThreadListeners<IActiveDecoderDictionaryListener>::subscribeListener;
     using ThreadListeners<IActiveConditionProcessor>::subscribeListener;
+    using ThreadListeners<IActiveCollectionSchemesListener>::subscribeListener;
 
     CollectionSchemeManager() = default;
 
@@ -91,7 +95,7 @@ public:
      * @return True if successful. False otherwise.
      */
     bool init( uint32_t checkinIntervalMsec,
-               const std::shared_ptr<ICacheAndPersist> &schemaPersistencyPtr,
+               const std::shared_ptr<CacheAndPersist> &schemaPersistencyPtr,
                CANInterfaceIDTranslator &canIDTranslator );
     /**
      * @brief Sets up connection with CollectionScheme Ingestion and start main thread.
@@ -155,6 +159,7 @@ public:
 private:
     using ThreadListeners<IActiveDecoderDictionaryListener>::notifyListeners;
     using ThreadListeners<IActiveConditionProcessor>::notifyListeners;
+    using ThreadListeners<IActiveCollectionSchemesListener>::notifyListeners;
 
     /**
      * @brief Starts main thread
@@ -254,7 +259,7 @@ protected:
      * different network types
      */
     void decoderDictionaryExtractor(
-        std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> &decoderDictionaryMap );
+        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap );
 
     /**
      * @brief This function invoke all the listener for decoder dictionary update. The listener can be any types of
@@ -264,7 +269,7 @@ protected:
      * different network types
      */
     void decoderDictionaryUpdater(
-        std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> &decoderDictionaryMap );
+        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap );
 
     void inspectionMatrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix ) override;
 
@@ -360,8 +365,8 @@ protected:
     bool mProcessCollectionScheme{ false };
     // flag used by main thread to check if DM needs to be processed
     bool mProcessDecoderManifest{ false };
-    // CacheAndPersist object passed from K-Engine
-    std::shared_ptr<ICacheAndPersist> mSchemaPersistency;
+    // CacheAndPersist object passed from IoTFleetWiseEngine
+    std::shared_ptr<CacheAndPersist> mSchemaPersistency;
 
     CANInterfaceIDTranslator mCANIDTranslator;
 };

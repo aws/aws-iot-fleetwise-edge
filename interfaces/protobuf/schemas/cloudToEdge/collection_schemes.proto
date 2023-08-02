@@ -7,7 +7,7 @@ option java_package = "com.amazonaws.iot.autobahn.schemas";
 package Aws.IoTFleetWise.Schemas.CollectionSchemesMsg;
 
 /*
- * List of collectionSchemes to be enacted by AWS IoT FleetWise Edge
+ * List of collectionSchemes
  */
 message CollectionSchemes {
 
@@ -103,9 +103,10 @@ message CollectionScheme {
     Probabilities probabilities = 14;
 
     /*
-     * Image Data to collect as part of this collectionScheme.
+     * This field was never supported, so it should not be used any more.
      */
-    repeated ImageData image_data = 15;
+    reserved 15;
+    reserved "image_data";
 }
 
 message Probabilities{
@@ -429,63 +430,4 @@ message RawCanFrame {
      * this period will be dropped. A value of 0 will collect samples as fast as they arrive.
      */
     uint32 minimum_sample_period_ms = 4;
-}
-
-message ImageData{
-
-    /*
-     * Image Source Node ID which contain network interface information needed to access the image source.
-     *
-     */
-    uint32 image_source_node_id = 1;
-
-    /*
-     * Each image source may have a list of supported image types.
-     */
-    ImageType image_type = 2;
-
-    /*
-     * Images may be collected in different ways, such as time based windows and frame based requests
-     */
-    oneof image_collection_method {
-
-        /*
-         * A time based window of before and after time relative to an event trigger.
-         */
-        TimeBasedImageData time_based_image_data = 3;
-    }
-
-    /*
-     * Image data to be collected within a specified time range centered at the event trigger time of the collectionScheme.  Note
-     * that the number of frames collected in this time range will be dependant on the Frames Per Second rate support by
-     * the Camera ECU.
-     */
-    message TimeBasedImageData {
-
-        /*
-         * The duration in milliseconds of image data to collect before the event is triggered. For after duration,
-         * after_duration_ms of the collectionScheme is used.
-         */
-        uint32 before_duration_ms = 1;
-    }
-
-    /*
-     * Image sources may have one or more supported image types - this field lets the customer specify which image type
-     * they would like to collect.
-     */
-    enum ImageType {
-        COMPRESSED_JPG = 0;
-        COMPRESSED_PNG = 1;
-        // Reserve 2-99 for compressed formats
-        RAW_RGB8 = 100;
-        RAW_RGBA8 = 101;
-        RAW_RGB16 = 102;
-        RAW_RGBA16 = 103;
-        RAW_BGR8 = 104;
-        RAW_BGRA8 = 105;
-        RAW_BGR16 = 106;
-        RAW_BGRA16 = 107;
-        RAW_MONO8= 108;
-        RAW_MONO16= 109;
-    }
 }

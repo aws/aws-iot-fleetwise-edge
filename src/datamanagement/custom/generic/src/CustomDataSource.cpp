@@ -52,6 +52,7 @@ CustomDataSource::start()
 SignalID
 CustomDataSource::getSignalIdFromStartBit( uint16_t startBit )
 {
+    std::lock_guard<std::mutex> lock( mExtractionOngoing );
     for ( auto &signal : mUsedMessageFormat.mSignals )
     {
         if ( signal.mFirstBitPosition == startBit )
@@ -60,6 +61,13 @@ CustomDataSource::getSignalIdFromStartBit( uint16_t startBit )
         }
     }
     return INVALID_SIGNAL_ID;
+}
+
+std::vector<CANSignalFormat>
+CustomDataSource::getSignalInfo()
+{
+    std::lock_guard<std::mutex> lock( mExtractionOngoing );
+    return mUsedMessageFormat.mSignals;
 }
 
 bool

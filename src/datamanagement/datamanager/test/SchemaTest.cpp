@@ -58,17 +58,30 @@ public:
         }
         return mCallback( buf, size );
     }
+
+    ConnectivityError
+    sendFile( const std::string &filePath,
+              size_t size,
+              struct CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) override
+    {
+        static_cast<void>( filePath );
+        static_cast<void>( size );
+        static_cast<void>( collectionSchemeParams );
+        return ConnectivityError::TypeNotSupported;
+    }
 };
 
 TEST( CollectionSchemeIngestionTest, CollectionSchemeIngestionClass )
 {
     // Create a dummy AwsIotConnectivityModule object so that we can create dummy IReceiver objects to pass to the
     // constructor. Note that the MQTT callback aspect of CollectionSchemeProtoBuilder will not be used in this test.
-    std::shared_ptr<AwsIotConnectivityModule> awsIotModule = std::make_shared<AwsIotConnectivityModule>();
+    std::shared_ptr<AwsIotConnectivityModule> awsIotModule =
+        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
 
-    Schema collectionSchemeIngestion( std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr ),
-                                      std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr ),
-                                      std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr ) );
+    Schema collectionSchemeIngestion(
+        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, awsIotModule.get()->mConnection ),
+        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, awsIotModule.get()->mConnection ),
+        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, awsIotModule.get()->mConnection ) );
 
     auto dummyDecoderManifest = std::make_shared<DecoderManifestIngestion>();
     auto dummyCollectionSchemeList = std::make_shared<CollectionSchemeIngestionList>();
@@ -124,14 +137,15 @@ public:
 TEST( CollectionSchemeIngestionTest, Checkins )
 {
     // Create a dummy AwsIotConnectivityModule object so that we can create dummy IReceiver objects
-    auto awsIotModule = std::make_shared<AwsIotConnectivityModule>();
+    auto awsIotModule = std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
 
     // Create a mock Sender
     auto mockSender = std::make_shared<MockSender>();
 
-    Schema collectionSchemeIngestion( std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr ),
-                                      std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr ),
-                                      mockSender );
+    Schema collectionSchemeIngestion(
+        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, awsIotModule.get()->mConnection ),
+        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, awsIotModule.get()->mConnection ),
+        mockSender );
 
     std::shared_ptr<const Clock> clock = ClockHandler::getClock();
     Timestamp timeBeforeCheckin = clock->systemTimeSinceEpochMs();
@@ -591,81 +605,154 @@ TEST( SchemaTest, SchemaCollectionEventBased )
     message->set_condition_trigger_mode(
         CollectionSchemesMsg::ConditionBasedCollectionScheme_ConditionTriggerMode_TRIGGER_ALWAYS );
 
-    //  Build the AST Tree shown here:
+    //  Build the AST Tree:
+    //----------
+
     auto *root = new CollectionSchemesMsg::ConditionNode();
+    message->set_allocated_condition_tree( root );
     auto *rootOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    root->set_allocated_node_operator( rootOp );
     rootOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_AND );
 
-    auto *right_child = new CollectionSchemesMsg::ConditionNode();
-    auto *right_childOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
-    right_childOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER );
+    //----------
 
-    auto *left_child = new CollectionSchemesMsg::ConditionNode();
-    auto *left_childOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
-    left_childOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_AND );
+    auto *left = new CollectionSchemesMsg::ConditionNode();
+    rootOp->set_allocated_left_child( left );
+    auto *leftOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    left->set_allocated_node_operator( leftOp );
+    leftOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_OR );
 
-    auto *left_child_left_child = new CollectionSchemesMsg::ConditionNode();
-    auto *left_child_left_childOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
-    left_child_left_childOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_EQUAL );
+    auto *right = new CollectionSchemesMsg::ConditionNode();
+    rootOp->set_allocated_right_child( right );
+    auto *rightOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    right->set_allocated_node_operator( rightOp );
+    rightOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER );
 
-    auto *left_child_right_child = new CollectionSchemesMsg::ConditionNode();
-    auto *left_child_right_childOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
-    left_child_right_childOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_EQUAL );
+    //----------
 
-    auto *left_child_left_child_left_child = new CollectionSchemesMsg::ConditionNode();
-    left_child_left_child_left_child->set_node_signal_id( 19 );
-    auto *left_child_left_child_right_child = new CollectionSchemesMsg::ConditionNode();
+    auto *left_left = new CollectionSchemesMsg::ConditionNode();
+    leftOp->set_allocated_left_child( left_left );
+    auto *left_leftOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    left_left->set_allocated_node_operator( left_leftOp );
+    left_leftOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_BIGGER );
 
-    left_child_left_child_right_child->set_node_double_value( 1 );
-    left_child_left_childOp->set_allocated_left_child( left_child_left_child_left_child );
-    left_child_left_childOp->set_allocated_right_child( left_child_left_child_right_child );
-    left_child_left_child->set_allocated_node_operator( left_child_left_childOp );
+    auto *left_right = new CollectionSchemesMsg::ConditionNode();
+    leftOp->set_allocated_right_child( left_right );
+    auto *left_rightOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    left_right->set_allocated_node_operator( left_rightOp );
+    left_rightOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_NOT_EQUAL );
 
-    auto *left_child_right_child_left_child = new CollectionSchemesMsg::ConditionNode();
-    left_child_right_child_left_child->set_node_signal_id( 17 );
-    auto *left_child_right_child_right_child = new CollectionSchemesMsg::ConditionNode();
-    left_child_right_child_right_child->set_node_double_value( 1 );
-    left_child_right_childOp->set_allocated_left_child( left_child_right_child_left_child );
-    left_child_right_childOp->set_allocated_right_child( left_child_right_child_right_child );
-    left_child_right_child->set_allocated_node_operator( left_child_right_childOp );
+    auto *right_left = new CollectionSchemesMsg::ConditionNode();
+    rightOp->set_allocated_left_child( right_left );
+    auto *right_leftOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    right_left->set_allocated_node_operator( right_leftOp );
+    right_leftOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER_EQUAL );
 
-    left_childOp->set_allocated_right_child( left_child_right_child );
-    left_childOp->set_allocated_left_child( left_child_left_child );
-    left_child->set_allocated_node_operator( left_childOp );
+    auto *right_right = new CollectionSchemesMsg::ConditionNode();
+    rightOp->set_allocated_right_child( right_right );
+    auto *right_rightOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    right_right->set_allocated_node_operator( right_rightOp );
+    right_rightOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER );
 
-    // Build the Right Side of the AST
-    auto *right_child_left_child = new CollectionSchemesMsg::ConditionNode();
-    right_child_left_child->set_node_signal_id( 3 );
-    auto *right_child_right_child = new CollectionSchemesMsg::ConditionNode();
-    right_child_right_child->set_node_double_value( 30 );
-    right_childOp->set_allocated_left_child( right_child_left_child );
-    right_childOp->set_allocated_right_child( right_child_right_child );
-    right_child->set_allocated_node_operator( right_childOp );
+    //----------
 
-    // connect to root
-    rootOp->set_allocated_right_child( right_child );
-    rootOp->set_allocated_left_child( left_child );
-    root->set_allocated_node_operator( rootOp );
-    message->set_allocated_condition_tree( root );
+    auto *left_left_left = new CollectionSchemesMsg::ConditionNode();
+    left_leftOp->set_allocated_left_child( left_left_left );
+    left_left_left->set_node_signal_id( 19 );
+
+    auto *left_left_right = new CollectionSchemesMsg::ConditionNode();
+    left_leftOp->set_allocated_right_child( left_left_right );
+    left_left_right->set_node_double_value( 1 );
+
+    auto *left_right_left = new CollectionSchemesMsg::ConditionNode();
+    left_rightOp->set_allocated_left_child( left_right_left );
+    auto *left_right_leftOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    left_right_left->set_allocated_node_operator( left_right_leftOp );
+    left_right_leftOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MULTIPLY );
+
+    auto *left_right_right = new CollectionSchemesMsg::ConditionNode();
+    left_rightOp->set_allocated_right_child( left_right_right );
+    auto *left_right_rightOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    left_right_right->set_allocated_node_operator( left_right_rightOp );
+    left_right_rightOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_DIVIDE );
+
+    auto *right_left_left = new CollectionSchemesMsg::ConditionNode();
+    right_leftOp->set_allocated_left_child( right_left_left );
+    auto *right_left_leftOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    right_left_left->set_allocated_node_operator( right_left_leftOp );
+    right_left_leftOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_NOT );
+
+    auto *right_left_right = new CollectionSchemesMsg::ConditionNode();
+    right_leftOp->set_allocated_right_child( right_left_right );
+    auto *right_left_rightOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    right_left_right->set_allocated_node_operator( right_left_rightOp );
+    right_left_rightOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_PLUS );
+
+    auto *right_right_left = new CollectionSchemesMsg::ConditionNode();
+    right_rightOp->set_allocated_left_child( right_right_left );
+    auto *right_right_leftOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    right_right_left->set_allocated_node_operator( right_right_leftOp );
+    right_right_leftOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MINUS );
+
+    auto *right_right_right = new CollectionSchemesMsg::ConditionNode();
+    right_rightOp->set_allocated_right_child( right_right_right );
+    auto *right_right_rightOp = new CollectionSchemesMsg::ConditionNode_NodeOperator();
+    right_right_right->set_allocated_node_operator( right_right_rightOp );
+    right_right_rightOp->set_operator_( CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MINUS );
+
+    //----------
+
+    auto *left_right_left_left = new CollectionSchemesMsg::ConditionNode();
+    left_right_leftOp->set_allocated_left_child( left_right_left_left );
+    left_right_left_left->set_node_signal_id( 19 );
+
+    auto *left_right_left_right = new CollectionSchemesMsg::ConditionNode();
+    left_right_leftOp->set_allocated_right_child( left_right_left_right );
+    left_right_left_right->set_node_double_value( 1 );
+
+    auto *left_right_right_left = new CollectionSchemesMsg::ConditionNode();
+    left_right_rightOp->set_allocated_left_child( left_right_right_left );
+    left_right_right_left->set_node_signal_id( 19 );
+
+    auto *left_right_right_right = new CollectionSchemesMsg::ConditionNode();
+    left_right_rightOp->set_allocated_right_child( left_right_right_right );
+    left_right_right_right->set_node_double_value( 1 );
+
+    auto *right_left_left_left = new CollectionSchemesMsg::ConditionNode();
+    right_left_leftOp->set_allocated_left_child( right_left_left_left );
+    right_left_left_left->set_node_signal_id( 19 );
+
+    auto *right_left_right_left = new CollectionSchemesMsg::ConditionNode();
+    right_left_rightOp->set_allocated_left_child( right_left_right_left );
+    right_left_right_left->set_node_signal_id( 19 );
+
+    auto *right_left_right_right = new CollectionSchemesMsg::ConditionNode();
+    right_left_rightOp->set_allocated_right_child( right_left_right_right );
+    right_left_right_right->set_node_double_value( 1 );
+
+    auto *right_right_left_left = new CollectionSchemesMsg::ConditionNode();
+    right_right_leftOp->set_allocated_left_child( right_right_left_left );
+    right_right_left_left->set_node_signal_id( 19 );
+
+    auto *right_right_left_right = new CollectionSchemesMsg::ConditionNode();
+    right_right_leftOp->set_allocated_right_child( right_right_left_right );
+    right_right_left_right->set_node_double_value( 1 );
+
+    auto *right_right_right_left = new CollectionSchemesMsg::ConditionNode();
+    right_right_rightOp->set_allocated_left_child( right_right_right_left );
+    right_right_right_left->set_node_signal_id( 19 );
+
+    auto *right_right_right_right = new CollectionSchemesMsg::ConditionNode();
+    right_right_rightOp->set_allocated_right_child( right_right_right_right );
+    right_right_right_right->set_node_double_value( 1 );
+
+    //----------
 
     collectionSchemeTestMessage.set_after_duration_ms( 0 );
     collectionSchemeTestMessage.set_include_active_dtcs( true );
     collectionSchemeTestMessage.set_persist_all_collected_data( true );
     collectionSchemeTestMessage.set_compress_collected_data( true );
     collectionSchemeTestMessage.set_priority( 5 );
-
-    // Add image data
-    // First device with Time based request type
-    CollectionSchemesMsg::ImageData *imageCaptureData = collectionSchemeTestMessage.add_image_data();
-    imageCaptureData->set_image_type( CollectionSchemesMsg::ImageData_ImageType::ImageData_ImageType_COMPRESSED_JPG );
-    imageCaptureData->set_image_source_node_id( 1 );
-    CollectionSchemesMsg::ImageData::TimeBasedImageData *timeImageCaptureData =
-        imageCaptureData->mutable_time_based_image_data();
-    timeImageCaptureData->set_before_duration_ms( 3 );
-    // Second device with an unsupported collection type
-    CollectionSchemesMsg::ImageData *imageCaptureData2 = collectionSchemeTestMessage.add_image_data();
-    imageCaptureData2->set_image_type( CollectionSchemesMsg::ImageData_ImageType::ImageData_ImageType_COMPRESSED_JPG );
-    imageCaptureData2->set_image_source_node_id( 2 );
 
     // Add 3 Signals
     CollectionSchemesMsg::SignalInformation *signal1 = collectionSchemeTestMessage.add_signal_information();
@@ -742,13 +829,6 @@ TEST( SchemaTest, SchemaCollectionEventBased )
     ASSERT_TRUE( collectionSchemeTest.getAfterDurationMs() == 0 );
     ASSERT_TRUE( collectionSchemeTest.isActiveDTCsIncluded() == true );
     ASSERT_TRUE( collectionSchemeTest.isTriggerOnlyOnRisingEdge() == false );
-    // Check the Image Capture settings
-    // Only 1 image capture setting will be placed as the second one is unsupported
-    ASSERT_EQ( collectionSchemeTest.getImageCaptureData().size(), 1 );
-    ASSERT_EQ( collectionSchemeTest.getImageCaptureData()[0].beforeDurationMs, 3 );
-    ASSERT_EQ( collectionSchemeTest.getImageCaptureData()[0].collectionType, ImageCollectionType::TIME_BASED );
-    ASSERT_EQ( collectionSchemeTest.getImageCaptureData()[0].deviceID, 1 );
-    ASSERT_EQ( collectionSchemeTest.getImageCaptureData()[0].imageFormat, 0 ); // Enum is mapped to int
     // Signals
     ASSERT_TRUE( collectionSchemeTest.getCollectSignals().size() == 3 );
     ASSERT_TRUE( collectionSchemeTest.getCollectSignals().at( 0 ).signalID == 19 );
@@ -783,36 +863,79 @@ TEST( SchemaTest, SchemaCollectionEventBased )
     ASSERT_TRUE( collectionSchemeTest.getMinimumPublishIntervalMs() == 650 );
 
     // Verify the AST
-    // Verify Left Side
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().size(), 22 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().size(), 52 );
+    //----------
     ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).nodeType,
                ExpressionNodeType::OPERATOR_LOGICAL_AND );
+    //----------
     ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->nodeType,
-               ExpressionNodeType::OPERATOR_LOGICAL_AND );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->nodeType,
-               ExpressionNodeType::OPERATOR_EQUAL );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->left->nodeType,
-               ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->right->nodeType,
-               ExpressionNodeType::FLOAT );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->left->signalID, 19 );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->right->floatingValue, 1 );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->nodeType,
-               ExpressionNodeType::OPERATOR_EQUAL );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->left->nodeType,
-               ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->right->nodeType,
-               ExpressionNodeType::FLOAT );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->left->signalID, 17 );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->right->floatingValue, 1 );
-    // Verify Right Side
+               ExpressionNodeType::OPERATOR_LOGICAL_OR );
     ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->nodeType,
                ExpressionNodeType::OPERATOR_SMALLER );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->nodeType, ExpressionNodeType::FLOAT );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->floatingValue, 30 );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->nodeType, ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->signalID, 3 );
-
+    //----------
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->nodeType,
+               ExpressionNodeType::OPERATOR_BIGGER );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->nodeType,
+               ExpressionNodeType::OPERATOR_NOT_EQUAL );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->nodeType,
+               ExpressionNodeType::OPERATOR_SMALLER_EQUAL );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->nodeType,
+               ExpressionNodeType::OPERATOR_SMALLER );
+    //----------
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->left->nodeType,
+               ExpressionNodeType::SIGNAL );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->right->nodeType,
+               ExpressionNodeType::FLOAT );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->right->floatingValue, 1 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->left->nodeType,
+               ExpressionNodeType::OPERATOR_ARITHMETIC_MULTIPLY );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->right->nodeType,
+               ExpressionNodeType::OPERATOR_ARITHMETIC_DIVIDE );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->left->nodeType,
+               ExpressionNodeType::OPERATOR_LOGICAL_NOT );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->right->nodeType,
+               ExpressionNodeType::OPERATOR_ARITHMETIC_PLUS );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->left->nodeType,
+               ExpressionNodeType::OPERATOR_ARITHMETIC_MINUS );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->right->nodeType,
+               ExpressionNodeType::OPERATOR_ARITHMETIC_MINUS );
+    //----------
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->left->left->nodeType,
+               ExpressionNodeType::SIGNAL );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->left->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->left->right->nodeType,
+               ExpressionNodeType::FLOAT );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->left->right->floatingValue, 1 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->right->left->nodeType,
+               ExpressionNodeType::SIGNAL );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->right->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->right->right->nodeType,
+               ExpressionNodeType::FLOAT );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->right->right->floatingValue, 1 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->left->left->nodeType,
+               ExpressionNodeType::SIGNAL );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->left->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->left->right, nullptr );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->right->left->nodeType,
+               ExpressionNodeType::SIGNAL );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->right->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->right->right->nodeType,
+               ExpressionNodeType::FLOAT );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->right->right->floatingValue, 1 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->left->left->nodeType,
+               ExpressionNodeType::SIGNAL );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->left->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->left->right->nodeType,
+               ExpressionNodeType::FLOAT );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->left->right->floatingValue, 1 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->right->left->nodeType,
+               ExpressionNodeType::SIGNAL );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->right->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->right->right->nodeType,
+               ExpressionNodeType::FLOAT );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->right->right->floatingValue, 1 );
+    //----------
     ASSERT_TRUE( collectionSchemeTest.getCondition()->booleanValue == false );
 }
 

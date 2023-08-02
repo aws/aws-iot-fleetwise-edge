@@ -3,7 +3,6 @@
 
 #include "AwsIotConnectivityModule.h"
 #include "AwsBootstrap.h"
-#include "AwsSDKMemoryManager.h"
 #include "LoggingModule.h"
 #include "TraceModule.h"
 
@@ -14,7 +13,6 @@
 #include <sstream>
 
 #include "Thread.h"
-#include <cstdio>
 
 using namespace Aws::IoTFleetWise::OffboardConnectivityAwsIot;
 using namespace Aws::Crt;
@@ -29,23 +27,24 @@ constexpr uint16_t MQTT_CONNECT_KEEP_ALIVE_SECONDS = 60;
 // If the PING request does not return within this interval, the stack will create a new one.
 constexpr uint32_t MQTT_PING_TIMOUT_MS = 3000;
 
-AwsIotConnectivityModule::AwsIotConnectivityModule()
-    : mRetryThread( *this, RETRY_FIRST_CONNECTION_START_BACKOFF_MS, RETRY_FIRST_CONNECTION_MAX_BACKOFF_MS )
+AwsIotConnectivityModule::AwsIotConnectivityModule( std::string privateKey,
+                                                    std::string certificate,
+                                                    std::string rootCA,
+                                                    std::string endpointUrl,
+                                                    std::string clientId,
+                                                    Aws::Crt::Io::ClientBootstrap *clientBootstrap,
+                                                    bool asynchronous )
+    : mPrivateKey( std::move( privateKey ) )
+    , mCertificate( std::move( certificate ) )
+    , mRootCA( std::move( rootCA ) )
+    , mEndpointUrl( std::move( endpointUrl ) )
+    , mClientId( std::move( clientId ) )
+    , mClientBootstrap( clientBootstrap )
+    , mAsynchronous( asynchronous )
+    , mRetryThread( *this, RETRY_FIRST_CONNECTION_START_BACKOFF_MS, RETRY_FIRST_CONNECTION_MAX_BACKOFF_MS )
     , mConnected( false )
     , mConnectionEstablished( false )
 {
-}
-
-std::size_t
-AwsIotConnectivityModule::reserveMemoryUsage( std::size_t bytes )
-{
-    return AwsSDKMemoryManager::getInstance().reserveMemory( bytes );
-}
-
-std::size_t
-AwsIotConnectivityModule::releaseMemoryUsage( std::size_t bytes )
-{
-    return AwsSDKMemoryManager::getInstance().releaseReservedMemory( bytes );
 }
 
 /*
@@ -53,23 +52,11 @@ AwsIotConnectivityModule::releaseMemoryUsage( std::size_t bytes )
  * example from the Aws Iot C++ SDK
  */
 bool
-AwsIotConnectivityModule::connect( const std::string &privateKey,
-                                   const std::string &certificate,
-                                   const std::string &rootCA,
-                                   const std::string &endpointUrl,
-                                   const std::string &clientId,
-                                   Aws::Crt::Io::ClientBootstrap *clientBootstrap,
-                                   bool asynchronous )
+AwsIotConnectivityModule::connect()
 {
-    mClientId = clientId.c_str() != nullptr ? clientId.c_str() : "";
-
     mConnected = false;
-    mCertificate = Crt::ByteCursorFromCString( certificate.c_str() );
-    mEndpointUrl = endpointUrl.c_str() != nullptr ? endpointUrl.c_str() : "";
-    mPrivateKey = Crt::ByteCursorFromCString( privateKey.c_str() );
-    mRootCA = Crt::ByteCursorFromCString( rootCA.c_str() );
 
-    if ( !createMqttConnection( clientBootstrap ) )
+    if ( !createMqttConnection() )
     {
         return false;
     }
@@ -78,7 +65,7 @@ AwsIotConnectivityModule::connect( const std::string &privateKey,
     // Connection callbacks
     setupCallbacks();
 
-    if ( asynchronous )
+    if ( mAsynchronous )
     {
         return mRetryThread.start();
     }
@@ -93,11 +80,10 @@ AwsIotConnectivityModule::connect( const std::string &privateKey,
     }
 }
 
-std::shared_ptr<AwsIotChannel>
-AwsIotConnectivityModule::createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager,
-                                            std::size_t maximumIotSDKHeapMemoryBytes )
+std::shared_ptr<IConnectivityChannel>
+AwsIotConnectivityModule::createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager )
 {
-    auto channel = std::make_shared<AwsIotChannel>( this, payloadManager, maximumIotSDKHeapMemoryBytes );
+    auto channel = std::make_shared<AwsIotChannel>( this, payloadManager, mConnection );
     mChannels.emplace_back( channel );
     return channel;
 }
@@ -232,21 +218,21 @@ AwsIotConnectivityModule::renameEventLoopTask()
 }
 
 bool
-AwsIotConnectivityModule::createMqttConnection( Aws::Crt::Io::ClientBootstrap *clientBootstrap )
+AwsIotConnectivityModule::createMqttConnection()
 {
-    if ( ( mCertificate.len == 0 ) || ( mPrivateKey.len == 0 ) || mEndpointUrl.empty() || mClientId.empty() )
+    if ( ( mCertificate.empty() ) || ( mPrivateKey.empty() ) || mEndpointUrl.empty() || mClientId.empty() )
     {
         FWE_LOG_ERROR( "Please provide X.509 Certificate, private Key, endpoint and client-Id" );
         return false;
     }
-    if ( clientBootstrap == nullptr )
+    if ( mClientBootstrap == nullptr )
     {
         FWE_LOG_ERROR( "ClientBootstrap failed with error" );
         return false;
     }
-    else if ( !( *clientBootstrap ) )
+    else if ( !( *mClientBootstrap ) )
     {
-        auto errString = ErrorDebugString( clientBootstrap->LastError() );
+        auto errString = ErrorDebugString( mClientBootstrap->LastError() );
         FWE_LOG_ERROR( "ClientBootstrap failed with error" );
         FWE_LOG_ERROR( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
         return false;
@@ -254,12 +240,13 @@ AwsIotConnectivityModule::createMqttConnection( Aws::Crt::Io::ClientBootstrap *c
 
     Aws::Iot::MqttClientConnectionConfigBuilder builder;
 
-    builder = Aws::Iot::MqttClientConnectionConfigBuilder( mCertificate, mPrivateKey );
-    if ( mRootCA.len > 0 )
+    builder = Aws::Iot::MqttClientConnectionConfigBuilder( Crt::ByteCursorFromCString( mCertificate.c_str() ),
+                                                           Crt::ByteCursorFromCString( mPrivateKey.c_str() ) );
+    if ( !mRootCA.empty() )
     {
-        builder.WithCertificateAuthority( mRootCA );
+        builder.WithCertificateAuthority( Crt::ByteCursorFromCString( mRootCA.c_str() ) );
     }
-    builder.WithEndpoint( mEndpointUrl );
+    builder.WithEndpoint( ( !mEndpointUrl.empty() ? mEndpointUrl.c_str() : "" ) );
 
     TraceModule::get().sectionBegin( TraceSection::BUILD_MQTT );
     auto clientConfig = builder.Build();
@@ -276,7 +263,7 @@ AwsIotConnectivityModule::createMqttConnection( Aws::Crt::Io::ClientBootstrap *c
      * Documentation of MqttClient says that the parameter objects needs to live only for the
      * function call so all the needed objects like bootstrap are on the stack.
      */
-    mMqttClient = std::make_unique<Aws::Iot::MqttClient>( *clientBootstrap );
+    mMqttClient = std::make_unique<Aws::Iot::MqttClient>( *mClientBootstrap );
     if ( !*mMqttClient )
     {
         auto errString = ErrorDebugString( mMqttClient->LastError() );
@@ -345,5 +332,5 @@ AwsIotConnectivityModule::onFinished( RetryStatus code )
 
 AwsIotConnectivityModule::~AwsIotConnectivityModule()
 {
-    disconnect();
+    AwsIotConnectivityModule::disconnect();
 }

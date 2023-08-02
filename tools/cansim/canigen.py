@@ -80,6 +80,7 @@ class Canigen:
                         f" setting it to default of {default_cycle_time_ms} ms"
                     )
                 thread = Thread(
+                    name=f"CanigenSignals-{msg.frame_id}",
                     target=self._sig_thread,
                     args=(
                         msg.name,
@@ -90,7 +91,9 @@ class Canigen:
                 self._threads.append(thread)
         if obd_config_filename is not None:
             for ecu in self._obd_config["ecus"]:
-                thread = Thread(target=self._obd_thread, args=(ecu,))
+                thread = Thread(
+                    name=f"CanigenObd-{ecu['tx_id']}", target=self._obd_thread, args=(ecu,)
+                )
                 thread.start()
                 self._threads.append(thread)
 
@@ -131,6 +134,7 @@ class Canigen:
         )
 
     def _sig_thread(self, msg_name, cycle_time):
+        send_time = time.monotonic()
         while not self._stop:
             msg = self._db.get_message_by_name(msg_name)
             vals = {}
@@ -151,7 +155,10 @@ class Canigen:
                     data=data,
                 )
                 self._can_bus.send(frame)
-            time.sleep(cycle_time / 1000.0)
+            send_time += cycle_time / 1000
+            sleep_time = send_time - time.monotonic()
+            if sleep_time >= 0:
+                time.sleep(sleep_time)
 
     def _get_supported_pids(self, num_range, ecu):
         supported = False

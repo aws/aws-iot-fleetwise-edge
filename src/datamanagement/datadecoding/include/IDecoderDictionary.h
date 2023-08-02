@@ -83,7 +83,7 @@ struct CANDecoderDictionary : DecoderDictionary
 };
 
 /**
- * @brief define shared pointer type for CAN Frame decoder dictionary
+ * @brief define shared pointer type for decoder dictionary
  */
 using ConstDecoderDictionaryConstPtr = const std::shared_ptr<const DecoderDictionary>;
 

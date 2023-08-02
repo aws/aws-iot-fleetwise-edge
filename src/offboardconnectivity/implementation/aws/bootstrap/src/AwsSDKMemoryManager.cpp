@@ -94,11 +94,32 @@ AwsSDKMemoryManager::FreeMemory( void *memoryPtr )
 }
 
 std::size_t
+AwsSDKMemoryManager::getLimit() const
+{
+    return mMaximumAwsSDKMemorySize;
+}
+
+bool
+AwsSDKMemoryManager::setLimit( size_t size )
+{
+    if ( size == 0U )
+    {
+        return false;
+    }
+    mMaximumAwsSDKMemorySize = size;
+    return true;
+}
+
+bool
 AwsSDKMemoryManager::reserveMemory( std::size_t bytes )
 {
+    if ( ( mMemoryUsedAndReserved + bytes + ALIGN_OFFSET ) > mMaximumAwsSDKMemorySize )
+    {
+        return false;
+    }
     mMemoryUsedAndReserved += ( bytes + ALIGN_OFFSET );
     TraceModule::get().setVariable( TraceVariable::MQTT_HEAP_USAGE, mMemoryUsedAndReserved );
-    return mMemoryUsedAndReserved;
+    return true;
 }
 
 std::size_t

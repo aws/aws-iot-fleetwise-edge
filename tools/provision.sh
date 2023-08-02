@@ -2,7 +2,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-set -eo pipefail
+set -euo pipefail
 
 ENDPOINT_URL=""
 ENDPOINT_URL_OPTION=""
@@ -57,15 +57,15 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --vehicle-name <NAME>                 Vehicle name"
-            echo "  --certificate-pem-outfile <FILENAME>  Certificate output file, default: ${CERT_OUT_FILE}"
-            echo "  --private-key-outfile <FILENAME>      Private key output file, default: ${PRIVATE_KEY_OUT_FILE}"
-            echo "  --endpoint-url-outfile <FILENAME>     Endpoint URL for MQTT connections output file"
-            echo "  --vehicle-name-outfile <FILENAME>     Vehicle name output file"
-            echo "  --thing-policy-outfile <FILENAME>     Thing policy output file"
-            echo "  --endpoint-url <URL>                  The endpoint URL used for AWS CLI calls"
-            echo "  --region                              The region used for AWS CLI calls, default: ${REGION}"
-            echo "  --only-clean-up                       Clean up resources created by previous runs of this script"
+            echo "  --vehicle-name <NAME>                    Vehicle name"
+            echo "  --certificate-pem-outfile <FILENAME>     Certificate output file, default: ${CERT_OUT_FILE}"
+            echo "  --private-key-outfile <FILENAME>         Private key output file, default: ${PRIVATE_KEY_OUT_FILE}"
+            echo "  --endpoint-url-outfile <FILENAME>        Endpoint URL for MQTT connections output file"
+            echo "  --vehicle-name-outfile <FILENAME>        Vehicle name output file"
+            echo "  --thing-policy-outfile <FILENAME>        Thing policy output file"
+            echo "  --endpoint-url <URL>                     The endpoint URL used for AWS CLI calls"
+            echo "  --region                                 The region used for AWS CLI calls, default: ${REGION}"
+            echo "  --only-clean-up                          Clean up resources created by previous runs of this script"
             exit 0
             ;;
         esac
@@ -194,7 +194,7 @@ aws iot attach-thing-principal \
     --thing-name ${VEHICLE_NAME} \
     --principal ${CERT_ARN}
 
-echo "Getting endpoint..."
+echo "Getting MQTT endpoint..."
 ENDPOINT=`aws iot describe-endpoint \
     ${ENDPOINT_URL_OPTION} \
     --region ${REGION} \

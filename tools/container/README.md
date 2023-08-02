@@ -1,7 +1,7 @@
-# Containerized Edge Agent
+# Containerized FWE
 
-A containerized version of the edge agent is built using Github Actions, and is available from AWS
-ECR Public Gallery: https://gallery.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge
+A containerized version of FWE is built using Github Actions, and is available from AWS ECR Public
+Gallery: https://gallery.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge
 
 ## Running the Container
 

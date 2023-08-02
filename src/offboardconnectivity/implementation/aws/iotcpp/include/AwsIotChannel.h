@@ -4,12 +4,15 @@
 #pragma once
 
 // Includes
+#include "IConnectivityChannel.h"
+#include "IConnectivityModule.h"
 #include "IReceiver.h"
 #include "ISender.h"
 #include "PayloadManager.h"
 #include <atomic>
 #include <aws/crt/Api.h>
 #include <cstddef>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -23,31 +26,7 @@ namespace IoTFleetWise
  */
 namespace OffboardConnectivityAwsIot
 {
-
-class IConnectivityModule
-{
-public:
-    virtual std::shared_ptr<Aws::Crt::Mqtt::MqttConnection> getConnection() const = 0;
-
-    /**
-     * @brief Increases atomically the memory usage
-     * @param bytes number of bytes to reserve
-     * @return number of bytes after the increase.
-     */
-    virtual std::size_t reserveMemoryUsage( std::size_t bytes ) = 0;
-
-    /**
-     * @brief Decreases atomically the memory usage
-     * @param bytes number of bytes to release
-     * @return number of bytes after the decrease.
-     */
-    virtual std::size_t releaseMemoryUsage( std::size_t bytes ) = 0;
-
-    virtual bool isAlive() const = 0;
-
-    virtual ~IConnectivityModule() = default;
-};
-
+using namespace Aws::IoTFleetWise::Platform::Linux;
 using Aws::IoTFleetWise::OffboardConnectivity::CollectionSchemeParams;
 using Aws::IoTFleetWise::OffboardConnectivity::ConnectivityError;
 
@@ -62,17 +41,13 @@ using Aws::IoTFleetWise::OffboardConnectivity::ConnectivityError;
  */
 // coverity[cert_dcl60_cpp_violation] false positive - class only defined once
 // coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
-class AwsIotChannel : public Aws::IoTFleetWise::OffboardConnectivity::ISender,
-                      public Aws::IoTFleetWise::OffboardConnectivity::IReceiver
+// coverity[misra_cpp_2008_rule_3_2_2_violation] false positive - class only defined once
+class AwsIotChannel : public IConnectivityChannel
 {
 public:
-    static constexpr std::size_t MAXIMUM_IOT_SDK_HEAP_MEMORY_BYTES =
-        10000000; /**< After the SDK allocated more than the here defined 10MB we will stop pushing data to the SDK to
-                     avoid increasing heap consumption */
-
     AwsIotChannel( IConnectivityModule *connectivityModule,
                    std::shared_ptr<PayloadManager> payloadManager,
-                   std::size_t maximumIotSDKHeapMemoryBytes = MAXIMUM_IOT_SDK_HEAP_MEMORY_BYTES );
+                   std::shared_ptr<Aws::Crt::Mqtt::MqttConnection> &mqttConnection );
     ~AwsIotChannel() override;
 
     AwsIotChannel( const AwsIotChannel & ) = delete;
@@ -88,7 +63,7 @@ public:
      * channel can receive data
      *
      */
-    void setTopic( const std::string &topicNameRef, bool subscribeAsynchronously = false );
+    void setTopic( const std::string &topicNameRef, bool subscribeAsynchronously = false ) override;
 
     /**
      * @brief Subscribe to the MQTT topic from setTopic. Necessary if data is received on the topic
@@ -96,13 +71,14 @@ public:
      * This function blocks until subscribe succeeded or failed and should be done in the setup form
      * the bootstrap thread. The connection of the connectivityModule passed in the constructor
      * must be established otherwise subscribe will fail. No retries are done to try to subscribe
-     * this needs to be done in the boostrap during the setup.
+     * this needs to be done in the bootstrap during the setup.
      * @return Success if subscribe finished correctly
      */
     ConnectivityError subscribe();
 
     /**
      * @brief After unsubscribe no data will be received over the channel
+     * @return True for success
      */
     bool unsubscribe();
 
@@ -115,11 +91,10 @@ public:
         size_t size,
         struct CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) override;
 
-    bool
-    isTopicValid()
-    {
-        return !mTopicName.empty();
-    }
+    ConnectivityError sendFile(
+        const std::string &filePath,
+        size_t size,
+        struct CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) override;
 
     void
     invalidateConnection()
@@ -127,38 +102,42 @@ public:
         std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
         std::lock_guard<std::mutex> connectivityLambdaLock( mConnectivityLambdaMutex );
         mConnectivityModule = nullptr;
-    }
+    };
 
     bool
     shouldSubscribeAsynchronously() const
     {
         return mSubscribeAsynchronously;
-    }
+    };
 
     /**
      * @brief Returns the number of payloads successfully passed to the AWS IoT SDK
      * @return Number of payloads
      */
     unsigned
-    getPayloadCountSent() const
+    getPayloadCountSent() const override
     {
         return mPayloadCountSent;
     }
 
 private:
     bool isAliveNotThreadSafe();
+    bool
+    isTopicValid()
+    {
+        return !mTopicName.empty();
+    };
 
     /** See "Message size" : "The payload for every publish request can be no larger
      * than 128 KB. AWS IoT Core rejects publish and connect requests larger than this size."
      * https://docs.aws.amazon.com/general/latest/gr/iot-core.html#limits_iot
      */
     static const size_t AWS_IOT_MAX_MESSAGE_SIZE = 131072; // = 128 KiB
-    std::size_t mMaximumIotSDKHeapMemoryBytes; /**< If the iot device sdk heap memory usage from all channels exceeds
-                                               this threshold this channel stops publishing data*/
     IConnectivityModule *mConnectivityModule;
+    std::shared_ptr<PayloadManager> mPayloadManager;
+    std::shared_ptr<Aws::Crt::Mqtt::MqttConnection> &mConnection;
     std::mutex mConnectivityMutex;
     std::mutex mConnectivityLambdaMutex;
-    std::shared_ptr<PayloadManager> mPayloadManager;
     std::string mTopicName;
     std::atomic<bool> mSubscribed;
     std::atomic<unsigned> mPayloadCountSent{};

@@ -6,6 +6,7 @@
 #include <thread>
 
 using namespace Aws::IoTFleetWise::DataManagement;
+using namespace Aws::IoTFleetWise::TestingSupport;
 
 class ExternalGpsSourceTest : public ::testing::Test
 {
@@ -43,19 +44,29 @@ TEST_F( ExternalGpsSourceTest, testDecoding ) // NOLINT
 {
     SignalBufferPtr signalBufferPtr = std::make_shared<SignalBuffer>( 100 );
     ExternalGpsSource gpsSource( signalBufferPtr );
-    gpsSource.init( 1, 1, 0, 32 );
+    ASSERT_FALSE( gpsSource.init( INVALID_CAN_SOURCE_NUMERIC_ID, 1, 0, 32 ) );
+    ASSERT_TRUE( gpsSource.init( 1, 1, 0, 32 ) );
     gpsSource.start();
-    gpsSource.setLocation( 52.5761, 12.5761 );
-    gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-
     CollectedSignal firstSignal;
     CollectedSignal secondSignal;
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+    gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+    gpsSource.setLocation( 360, 360 ); // Invalid
+    gpsSource.setLocation( 52.5761, 12.5761 );
+
     WAIT_ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
     ASSERT_TRUE( signalBufferPtr->pop( secondSignal ) );
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );
     ASSERT_NEAR( secondSignal.value.value.doubleVal, 12.5761, 0.0001 );
+
+    ASSERT_TRUE( gpsSource.init( 1, 1, 123, 456 ) ); // Invalid start bits
+    gpsSource.setLocation( 52.5761, 12.5761 );
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+
+    ASSERT_TRUE( gpsSource.stop() );
 }
 
 // Test longitude west
@@ -65,15 +76,19 @@ TEST_F( ExternalGpsSourceTest, testWestNegativeLongitude ) // NOLINT
     ExternalGpsSource gpsSource( signalBufferPtr );
     gpsSource.init( 1, 1, 0, 32 );
     gpsSource.start();
-    gpsSource.setLocation( 52.5761, -12.5761 );
-    gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-
     CollectedSignal firstSignal;
     CollectedSignal secondSignal;
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+    gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+    gpsSource.setLocation( 52.5761, -12.5761 );
+
     WAIT_ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
     ASSERT_TRUE( signalBufferPtr->pop( secondSignal ) );
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );
     ASSERT_NEAR( secondSignal.value.value.doubleVal, -12.5761, 0.0001 ); // negative number
+
+    ASSERT_TRUE( gpsSource.stop() );
 }

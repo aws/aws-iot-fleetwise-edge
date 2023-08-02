@@ -93,7 +93,7 @@ Resources:
               MetricUnit: "${metric10.unit}"
               MetricValue: "${metric10.value}"
               RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
-        Description: Used by the Remote Profiler of the AWS IoT Fleetwise Edge Client see METRICS.md
+        Description: Used by the Remote Profiler of FWE, see METRICS.md
         Sql: SELECT * FROM 'aws-iot-fleetwise-metrics-upload'
   RemoteProfilerLogRule:
     Type: AWS::IoT::TopicRule
@@ -104,7 +104,7 @@ Resources:
           - CloudwatchLogs:
               LogGroupName: AWSIotFleetWiseEdge
               RoleArn: !GetAtt RemoteProfilerCloudwatchRole.Arn
-        Description: Used by the Remote Profiler of the AWS IoT Fleetwise Edge Client see METRICS.md
+        Description: Used by the Remote Profiler of FWE, see METRICS.md
         Sql: SELECT * FROM 'aws-iot-fleetwise-logging-upload'
   RemoteProfilerLogGroup:
     Type: AWS::Logs::LogGroup

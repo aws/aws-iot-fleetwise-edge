@@ -3,6 +3,7 @@
 
 package com.aws.iotfleetwise;
 
+import android.car.Car;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -14,12 +15,14 @@ import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceManager;
+import android.preference.PreferenceScreen;
 import android.util.JsonReader;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -52,21 +55,32 @@ public class MainActivity extends PreferenceActivity
     {
         List<String> perms = new ArrayList<>();
         perms.add(Manifest.permission.ACCESS_FINE_LOCATION);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        String rationale = "Location";
+        if (((FweApplication)getApplication()).isCar()) {
+            perms.add(Car.PERMISSION_ENERGY);
+            perms.add(Car.PERMISSION_SPEED);
+            rationale += " and car information";
+        }
+        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             perms.add(Manifest.permission.BLUETOOTH_CONNECT);
+            rationale += " and Bluetooth";
         }
         String[] permsArray = perms.toArray(new String[0]);
         if (!EasyPermissions.hasPermissions(this, permsArray)) {
-            EasyPermissions.requestPermissions(this, "Location and Bluetooth access required", REQUEST_PERMISSIONS, permsArray);
+            Log.i("requestPermissions", "Requesting permissions");
+            EasyPermissions.requestPermissions(this, rationale+" access required", REQUEST_PERMISSIONS, permsArray);
         }
         else {
+            Log.i("requestPermissions", "Permissions granted, starting data acquisition");
             ((FweApplication)getApplication()).requestLocationUpdates();
         }
     }
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-        findPreference("bluetooth_device").setSummary(mPrefs.getString("bluetooth_device", "No device selected"));
+        if (!((FweApplication)getApplication()).isCar()) {
+            findPreference("bluetooth_device").setSummary(mPrefs.getString("bluetooth_device", "No device selected"));
+        }
         findPreference("vehicle_name").setSummary(mPrefs.getString("vehicle_name", "Not yet configured"));
         findPreference("update_time").setSummary(mPrefs.getString("update_time", String.valueOf(R.string.default_update_time)));
     }
@@ -106,32 +120,54 @@ public class MainActivity extends PreferenceActivity
         requestPermissions();
         onSharedPreferenceChanged(null, null);
         Preference bluetoothDevicePreference = (Preference)findPreference("bluetooth_device");
-        bluetoothDevicePreference.setOnPreferenceClickListener(preference -> {
-            startActivityForResult(new Intent(MainActivity.this, BluetoothActivity.class), REQUEST_BLUETOOTH);
-            return false;
-        });
-        Preference vehicleNamePreference = (Preference)findPreference("vehicle_name");
-        vehicleNamePreference.setOnPreferenceClickListener(preference -> {
-            startActivityForResult(new Intent(MainActivity.this, ConfigureVehicleActivity.class), REQUEST_CONFIGURE_VEHICLE);
-            return false;
-        });
+        if (((FweApplication)getApplication()).isCar()) {
+            PreferenceScreen preferenceScreen = getPreferenceScreen();
+            preferenceScreen.removePreference(bluetoothDevicePreference);
+        }
+        else {
+            bluetoothDevicePreference.setOnPreferenceClickListener(preference -> {
+                startActivityForResult(new Intent(MainActivity.this, BluetoothActivity.class), REQUEST_BLUETOOTH);
+                return false;
+            });
+            Preference vehicleNamePreference = (Preference)findPreference("vehicle_name");
+            vehicleNamePreference.setOnPreferenceClickListener(preference -> {
+                startActivityForResult(new Intent(MainActivity.this, ConfigureVehicleActivity.class), REQUEST_CONFIGURE_VEHICLE);
+                return false;
+            });
+        }
         mStatusUpdateThread.start();
 
         // Handle deep link:
-        Intent appLinkIntent = getIntent();
-        Uri appLinkData = appLinkIntent.getData();
+        Uri appLinkData = getIntent().getData();
         if (appLinkData != null) {
-            final String link = appLinkData.toString();
-            if (link != null) {
-                downloadCredentials(link);
+            downloadCredentials(appLinkData.toString());
+        }
+        // Handle ADB provided credentials:
+        String credentials = getIntent().getStringExtra("credentials");
+        if (credentials != null) {
+            InputStream inputStream = new ByteArrayInputStream(credentials.getBytes(StandardCharsets.UTF_8));
+            try {
+                configureCredentials(inputStream);
+            } catch (IOException ignored) {
+                runOnUiThread(() -> {
+                    AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create();
+                    alertDialog.setTitle("Error");
+                    alertDialog.setMessage("Invalid credentials");
+                    alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK", (dialog, which) -> dialog.dismiss());
+                    alertDialog.show();
+                });
             }
         }
     }
 
     @Override
     public void onDestroy() {
-        mStatusUpdateThread.interrupt();
-        mPrefs.unregisterOnSharedPreferenceChangeListener(this);
+        if (mStatusUpdateThread != null) {
+            mStatusUpdateThread.interrupt();
+        }
+        if (mPrefs != null) {
+            mPrefs.unregisterOnSharedPreferenceChangeListener(this);
+        }
         super.onDestroy();
     }
 
@@ -139,14 +175,14 @@ public class MainActivity extends PreferenceActivity
         startActivityForResult(new Intent(MainActivity.this, AboutActivity.class), REQUEST_ABOUT);
     }
 
-    private void downloadCredentials(String deepLink)
+    private void downloadCredentials(String provisioningLink)
     {
         Thread t = new Thread(() -> {
-            Log.i("DownloadCredentials", "Deep link: " + deepLink);
+            Log.i("DownloadCredentials", "Provisioning link: " + provisioningLink);
             final String urlParam = "url=";
 
-            // First try getting the S3 link normally from the deep link:
-            Uri uri = Uri.parse(deepLink);
+            // First try getting the S3 link normally from the provisioning link:
+            Uri uri = Uri.parse(provisioningLink);
             String fragment = uri.getFragment();
             if (fragment != null) {
                 int urlStart = fragment.indexOf(urlParam);
@@ -158,10 +194,10 @@ public class MainActivity extends PreferenceActivity
                 }
             }
 
-            // Some QR code scanning apps url decode the deep link, so try that next:
-            int urlStart = deepLink.indexOf(urlParam);
+            // Some QR code scanning apps url decode the provisioning link, so try that next:
+            int urlStart = provisioningLink.indexOf(urlParam);
             if (urlStart >= 0) {
-                String s3Link = deepLink.substring(urlStart + urlParam.length());
+                String s3Link = provisioningLink.substring(urlStart + urlParam.length());
                 if (downloadCredentialsFromS3(s3Link)) {
                     return;
                 }
@@ -171,7 +207,7 @@ public class MainActivity extends PreferenceActivity
             runOnUiThread(() -> {
                 AlertDialog alertDialog = new AlertDialog.Builder(MainActivity.this).create();
                 alertDialog.setTitle("Error");
-                alertDialog.setMessage("Invalid credentials link");
+                alertDialog.setMessage("Invalid provisioning link");
                 alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK", (dialog, which) -> dialog.dismiss());
                 alertDialog.show();
             });
@@ -179,63 +215,68 @@ public class MainActivity extends PreferenceActivity
         t.start();
     }
 
+    private boolean configureCredentials(InputStream inputStream) throws IOException {
+        JsonReader reader = new JsonReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+        String vehicleName = null;
+        String endpointUrl = null;
+        String certificate = null;
+        String privateKey = null;
+        String mqttTopicPrefix = "";
+        reader.beginObject();
+        while (reader.hasNext()) {
+            switch (reader.nextName()) {
+                case "vehicle_name":
+                    vehicleName = reader.nextString();
+                    break;
+                case "endpoint_url":
+                    endpointUrl = reader.nextString();
+                    break;
+                case "certificate":
+                    certificate = reader.nextString();
+                    break;
+                case "private_key":
+                    privateKey = reader.nextString();
+                    break;
+                case "mqtt_topic_prefix":
+                    mqttTopicPrefix = reader.nextString();
+                    break;
+                default:
+                    reader.skipValue();
+                    break;
+            }
+        }
+        reader.endObject();
+        if (vehicleName != null && endpointUrl != null && certificate != null  && privateKey != null)
+        {
+            Log.i("configureCredentials", "Configured credentials for vehicle name "+vehicleName);
+            SharedPreferences.Editor edit = mPrefs.edit();
+            edit.putString("vehicle_name", vehicleName);
+            edit.putString("mqtt_endpoint_url", endpointUrl);
+            edit.putString("mqtt_certificate", certificate);
+            edit.putString("mqtt_private_key", privateKey);
+            edit.putString("mqtt_topic_prefix", mqttTopicPrefix);
+            edit.apply();
+            return true;
+        }
+        return false;
+    }
+
     private boolean downloadCredentialsFromS3(String s3Link)
     {
+        boolean res = false;
         try {
             Log.i("DownloadCredentials", "Trying to download from " + s3Link);
             URL url = new URL(s3Link);
             HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
             try {
-                InputStream inputStream = urlConnection.getInputStream();
-                JsonReader reader = new JsonReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-                String vehicleName = null;
-                String endpointUrl = null;
-                String certificate = null;
-                String privateKey = null;
-                String mqttTopicPrefix = "";
-                reader.beginObject();
-                while (reader.hasNext()) {
-                    switch (reader.nextName()) {
-                        case "vehicle_name":
-                            vehicleName = reader.nextString();
-                            break;
-                        case "endpoint_url":
-                            endpointUrl = reader.nextString();
-                            break;
-                        case "certificate":
-                            certificate = reader.nextString();
-                            break;
-                        case "private_key":
-                            privateKey = reader.nextString();
-                            break;
-                        case "mqtt_topic_prefix":
-                            mqttTopicPrefix = reader.nextString();
-                            break;
-                        default:
-                            reader.skipValue();
-                            break;
-                    }
-                }
-                reader.endObject();
-                if (vehicleName != null && endpointUrl != null && certificate != null  && privateKey != null)
-                {
-                    Log.i("DownloadCredentials", "Downloaded credentials for vehicle name "+vehicleName);
-                    SharedPreferences.Editor edit = mPrefs.edit();
-                    edit.putString("vehicle_name", vehicleName);
-                    edit.putString("mqtt_endpoint_url", endpointUrl);
-                    edit.putString("mqtt_certificate", certificate);
-                    edit.putString("mqtt_private_key", privateKey);
-                    edit.putString("mqtt_topic_prefix", mqttTopicPrefix);
-                    edit.apply();
-                    return true;
-                }
+                res = configureCredentials(urlConnection.getInputStream());
             } finally {
                 urlConnection.disconnect();
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return false;
+        return res;
     }
 
     Thread mStatusUpdateThread = new Thread(() -> {

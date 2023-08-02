@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// This files creates a big initialization function to create mode1PIDs
-// So do not include this file in the agent code. Only in Unit tests
+// This files creates a big initialization function to create mode1PIDs,
+// so do not include this file in the main source code, only in unit tests.
 
 #include "OBDDataTypes.h"
 
@@ -26,7 +26,7 @@ struct PIDInfo
 };
 
 // This table is only used by unit test.
-// The actual Edge Agent will only use decoding manifest received from AWS
+// FWE will use decoder manifest received from the cloud
 const std::array<struct PIDInfo, 172> mode1PIDs = { {
     { 0x00, 4, { { 0, 1.0, 0, 4 } } }, // PIDs supported [01 - 20]
     { 0x01, 4, { {} } },               // Monitor status since DTCs cleared.(MIL) status and number of DTCs.
@@ -34,10 +34,10 @@ const std::array<struct PIDInfo, 172> mode1PIDs = { {
     { 0x03, 2, { { 0, 1.0, 0, 1 }, { 1, 1.0, 0, 1 } } },                    // Fuel system status
     { 0x04, 1, { { 0, (double)100 / 255, 0, 1 } } },                        // Calculated engine load
     { 0x05, 1, { { 0, 1.0, -40.0, 1 } } },                                  // Engine coolant temperature
-    { 0x06, 1, { { 0, (double)100 / 128, -100.0, 1 } } },                   // Short term fuel trim—Bank 1
-    { 0x07, 1, { { 0, (double)100 / 128, -100.0, 1 } } },                   // Long term fuel trim—Bank 1
-    { 0x08, 1, { { 0, (double)100 / 128, -100.0, 1 } } },                   // Short term fuel trim—Bank 2
-    { 0x09, 1, { { 0, (double)100 / 128, -100.0, 1 } } },                   // Long term fuel trim—Bank 2
+    { 0x06, 1, { { 0, (double)100 / 128, -100.0, 1 } } },                   // Short term fuel trim-bank 1
+    { 0x07, 1, { { 0, (double)100 / 128, -100.0, 1 } } },                   // Long term fuel trim-bank 1
+    { 0x08, 1, { { 0, (double)100 / 128, -100.0, 1 } } },                   // Short term fuel trim-bank 2
+    { 0x09, 1, { { 0, (double)100 / 128, -100.0, 1 } } },                   // Long term fuel trim-bank 2
     { 0x0A, 1, { { 0, 3.0, 0, 1 } } },                                      // Fuel pressure (gauge pressure)
     { 0x0B, 1, { { 0, 1.0, 0, 1 } } },                                      // Intake manifold absolute pressure
     { 0x0C, 2, { { 0, 0.25, 0, 2 } } },                                     // Engine speed
@@ -109,7 +109,7 @@ const std::array<struct PIDInfo, 172> mode1PIDs = { {
     { 0x4E, 2, { { 0, 1.0, 0, 1 } } },                                     // Time since trouble codes cleared
     { 0x4F,
       4,
-      { { 0, 1.0, 0, 1 }, { 1, 1.0, 0, 1 }, { 2, 1.0, 0, 1 }, { 3, 10.0, 0, 1 } } }, // Maximum value for Fuel–Air
+      { { 0, 1.0, 0, 1 }, { 1, 1.0, 0, 1 }, { 2, 1.0, 0, 1 }, { 3, 10.0, 0, 1 } } }, // Maximum value for Fuel-Air
                                                                                      // equivalence ratio,
     // oxygen sensor voltage, oxygen sensor current, and intake manifold absolute pressure
     { 0x50, 4, { {} } },                                // Maximum value for air flow rate from mass air flow sensor

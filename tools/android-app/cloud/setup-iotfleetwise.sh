@@ -205,6 +205,7 @@ aws iotfleetwise delete-vehicle \
 VEHICLE_NODE=`cat ../../cloud/vehicle-node.json`
 OBD_NODES=`cat ../../cloud/obd-nodes.json`
 DBC_NODES=`cat externalGpsNodes.json`
+AAOS_NODES=`cat aaosVhalNodes.json`
 
 echo "Checking for existing signal catalog..."
 SIGNAL_CATALOG_LIST=`aws iotfleetwise list-signal-catalogs \
@@ -267,9 +268,28 @@ else
     echo "Signals exist and are in use, continuing"
 fi
 
+echo "Updating AAOS signals in signal catalog..."
+NODE_COUNT=`echo $AAOS_NODES | jq length`
+for ((i=0; i<${NODE_COUNT}; i+=500)); do
+    NODES_SUBSET=`echo $AAOS_NODES | jq .[$i:$(($i+500))]`
+    if UPDATE_SIGNAL_CATALOG_STATUS=`aws iotfleetwise update-signal-catalog \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${SIGNAL_CATALOG_NAME} \
+        --description "AAOS signals" \
+        --nodes-to-update "${NODES_SUBSET}" 2>&1`; then
+        echo ${UPDATE_SIGNAL_CATALOG_STATUS} | jq -r .arn
+    elif ! echo ${UPDATE_SIGNAL_CATALOG_STATUS} | grep -q "InvalidSignalsException"; then
+        echo ${UPDATE_SIGNAL_CATALOG_STATUS} >&2
+        exit -1
+    else
+        echo "Signals exist and are in use, continuing"
+    fi
+done
+
 echo "Creating model manifest..."
 # Make a list of all node names:
 NODE_LIST=`( echo ${DBC_NODES} | jq -r .[].sensor.fullyQualifiedName | grep Vehicle\\. ; \
+             echo ${AAOS_NODES} | jq -r .[].sensor.fullyQualifiedName | grep Vehicle\\. ; \
              echo ${OBD_NODES} | jq -r .[].sensor.fullyQualifiedName | grep Vehicle\\. ) | jq -Rn [inputs]`
 aws iotfleetwise create-model-manifest \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
@@ -295,11 +315,23 @@ DECODER_MANIFEST_ARN=`aws iotfleetwise create-decoder-manifest \
     --signal-decoders "${OBD_SIGNAL_DECODERS}" | jq -r .arn`
 echo ${DECODER_MANIFEST_ARN}
 
+echo "Updating decoder manifest with external GPS decoders..."
 SIGNAL_DECODERS=`cat externalGpsDecoders.json`
 aws iotfleetwise update-decoder-manifest \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
     --name ${NAME}-decoder-manifest \
     --signal-decoders-to-add "${SIGNAL_DECODERS}" | jq -r .arn
+
+echo "Updating decoder manifest with AAOS VHAL decoders..."
+SIGNAL_DECODERS=`cat aaosVhalDecoders.json`
+DECODER_COUNT=`echo $SIGNAL_DECODERS | jq length`
+for ((i=0; i<${DECODER_COUNT}; i+=200)); do
+    DECODER_SUBSET=`echo $SIGNAL_DECODERS | jq .[$i:$(($i+200))]`
+    aws iotfleetwise update-decoder-manifest \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${NAME}-decoder-manifest \
+        --signal-decoders-to-add "${DECODER_SUBSET}" | jq -r .arn
+done
 
 echo "Activating decoder manifest..."
 aws iotfleetwise update-decoder-manifest \
@@ -355,6 +387,9 @@ aws iotfleetwise update-campaign \
     --name ${NAME}-campaign \
     --action APPROVE | jq -r .arn
 
-echo "========="
-echo "Finished!"
-echo "========="
+echo
+echo Finished, you can run the following SQL query to retrieve the collected data:
+echo "--------------------------------"
+echo "| Amazon Timestream SQL query: |"
+echo "--------------------------------"
+echo "SELECT * FROM \"${TIMESTREAM_DB_NAME}\".\"${TIMESTREAM_TABLE_NAME}\" WHERE vehicleName='${VEHICLE_NAME}' ORDER BY time DESC LIMIT 1000"

@@ -69,13 +69,15 @@ TEST_F( IWaveGpsSourceTest, testDecoding )
                  "$GPVTG,29.30,T,31.32,M,33.34,N,35.36,K,A*37C\n\n\n";
     nmeaFile->close();
     IWaveGpsSource gpsSource( signalBufferPtr );
-    gpsSource.init( filePath, 1, 1, 0, 32 );
+    ASSERT_FALSE( gpsSource.init( filePath, INVALID_CAN_SOURCE_NUMERIC_ID, 1, 0, 32 ) );
+    ASSERT_TRUE( gpsSource.init( filePath, 1, 1, 0, 32 ) );
     gpsSource.connect();
     gpsSource.start();
-    gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-
     CollectedSignal firstSignal;
     CollectedSignal secondSignal;
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+    gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
+
     WAIT_ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
     ASSERT_TRUE( signalBufferPtr->pop( secondSignal ) );
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
@@ -83,6 +85,9 @@ TEST_F( IWaveGpsSourceTest, testDecoding )
     // raw value from NMEA 5234.56789 01234.56789 converted to DD
     ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );
     ASSERT_NEAR( secondSignal.value.value.doubleVal, 12.5761, 0.0001 );
+
+    ASSERT_TRUE( gpsSource.stop() );
+    ASSERT_TRUE( gpsSource.disconnect() );
 }
 
 // Test longitude west
@@ -107,4 +112,7 @@ TEST_F( IWaveGpsSourceTest, testWestNegativeLongitude )
     // raw value from NMEA 5234.56789 01234.56789 converted to DD
     ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );
     ASSERT_NEAR( secondSignal.value.value.doubleVal, -12.5761, 0.0001 ); // negative number
+
+    ASSERT_TRUE( gpsSource.stop() );
+    ASSERT_TRUE( gpsSource.disconnect() );
 }

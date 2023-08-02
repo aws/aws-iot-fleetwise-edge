@@ -10,6 +10,9 @@ endif()
 if(FWE_FEATURE_EXTERNAL_GPS)
   set(EXTRA_SOURCE_FILES ${EXTRA_SOURCE_FILES} example/externalgps/src/ExternalGpsSource.cpp)
 endif()
+if(FWE_FEATURE_AAOS_VHAL)
+  set(EXTRA_SOURCE_FILES ${EXTRA_SOURCE_FILES} example/aaosvhal/src/AaosVhalSource.cpp)
+endif()
 set(SRCS
   generic/src/CustomDataSource.cpp
   ${EXTRA_SOURCE_FILES}
@@ -26,6 +29,9 @@ if(FWE_FEATURE_IWAVE_GPS)
 endif()
 if(FWE_FEATURE_EXTERNAL_GPS)
   set(EXTRA_INCLUDE_DIRS ${EXTRA_INCLUDE_DIRS} example/externalgps/include)
+endif()
+if(FWE_FEATURE_AAOS_VHAL)
+  set(EXTRA_INCLUDE_DIRS ${EXTRA_INCLUDE_DIRS} example/aaosvhal/include)
 endif()
 target_include_directories(${libraryTargetName} PUBLIC
   generic/include
@@ -55,6 +61,9 @@ endif()
 if(FWE_FEATURE_EXTERNAL_GPS)
   set(EXTRA_INSTALL_FILES ${EXTRA_INSTALL_FILES} example/externalgps/include/ExternalGpsSource.h)
 endif()
+if(FWE_FEATURE_AAOS_VHAL)
+  set(EXTRA_INSTALL_FILES ${EXTRA_INSTALL_FILES} example/aaosvhal/include/AaosVhalSource.h)
+endif()
 install(
   FILES
   generic/include/CustomDataSource.h
@@ -83,6 +92,9 @@ if(${BUILD_TESTING})
   endif()
   if(FWE_FEATURE_EXTERNAL_GPS)
     set(EXTRA_TEST_FILES ${EXTRA_TEST_FILES} example/externalgps/test/ExternalGpsSourceTest.cpp)
+  endif()
+  if(FWE_FEATURE_AAOS_VHAL)
+    set(EXTRA_TEST_FILES ${EXTRA_TEST_FILES} example/aaosvhal/test/AaosVhalSourceTest.cpp)
   endif()
   set(
     testSources

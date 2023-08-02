@@ -14,16 +14,22 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+
 import java.util.Set;
 
-public class BluetoothActivity
-        extends Activity {
+public class BluetoothActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bluetooth_device_list);
         setResult(Activity.RESULT_CANCELED);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
         ArrayAdapter<String> deviceListAdapter = new ArrayAdapter<>(this, R.layout.bluetooth_device);
         ListView deviceListView = findViewById(R.id.device_list);
         deviceListView.setAdapter(deviceListAdapter);
@@ -34,11 +40,19 @@ public class BluetoothActivity
                 return;
             }
             Set<BluetoothDevice> devices = adapter.getBondedDevices();
+            if (devices == null) {
+                deviceListAdapter.add("Error getting devices");
+                return;
+            }
             for (BluetoothDevice device : devices) {
                 ParcelUuid[] uuids = device.getUuids();
+                if (uuids == null) {
+                    continue;
+                }
                 for (ParcelUuid uuid : uuids) {
                     if (uuid.getUuid().equals(Elm327.SERIAL_PORT_UUID)) {
                         deviceListAdapter.add(device.getName() + "\t" + device.getAddress());
+                        break;
                     }
                 }
             }
@@ -57,5 +71,11 @@ public class BluetoothActivity
             setResult(Activity.RESULT_OK, intent);
             finish();
         });
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
     }
 }

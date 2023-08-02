@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "http://aws-iot-automotive.com/edgeConfiguration",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "IoTFleetWise Persistency Metadata",
+  "description": "The persistency metadata schema. Payloads are stored in separate files",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema Version"
+    },
+    "files": {
+      "type": "array",
+      "additionalProperties": false,
+      "description": "Persisted payload filenames with associated metadata",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Payload filename"
+          },
+          "payloadSize": {
+            "type": "number",
+            "description": "Payload size is used to validate that payload was persisted completely"
+          },
+          "compressionRequired": {
+            "type": "boolean",
+            "description": "Specifies if payload compression was required by campaign"
+          }
+        },
+        "required": ["filename", "payloadSize", "compressionRequired"]
+      }
+    }
+  },
+  "required": ["version", "files"]
+}

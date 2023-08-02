@@ -10,15 +10,22 @@ import android.text.method.LinkMovementMethod;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+
 import java.io.IOException;
 import java.io.InputStream;
 
-public class AboutActivity extends Activity {
+public class AboutActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_about);
         setResult(Activity.RESULT_CANCELED);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
 
         TextView githubTextView = findViewById(R.id.github);
         githubTextView.setMovementMethod(LinkMovementMethod.getInstance());
@@ -35,5 +42,11 @@ public class AboutActivity extends Activity {
             editText.setText(licenses);
         } catch (IOException ignored) {
         }
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
     }
 }

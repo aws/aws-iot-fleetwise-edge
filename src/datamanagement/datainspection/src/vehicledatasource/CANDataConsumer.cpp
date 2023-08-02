@@ -156,7 +156,7 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
                         {
                             TraceModule::get().decrementAtomicVariable(
                                 TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-                            FWE_LOG_WARN( "Signal Buffer Full" );
+                            FWE_LOG_WARN( "Signal buffer full" );
                         }
                         else
                         {

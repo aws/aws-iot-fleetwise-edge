@@ -1,1 +1,4 @@
 config/
+aaos-vhal-types.h
+aaos-vhal-fqns.txt
+fwdemo-android-*-timestream-result.json

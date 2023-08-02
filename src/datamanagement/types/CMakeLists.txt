@@ -36,7 +36,6 @@ install(
   include/GeohashInfo.h
   include/MessageTypes.h
   include/OBDDataTypes.h
-  include/SensorTypes.h
   include/SignalTypes.h
   DESTINATION
   include)

@@ -670,7 +670,7 @@ CollectionInspectionEngine::collectData( ActiveCondition &condition,
                                          InspectionTimestamp &newestSignalTimestamp )
 {
     std::shared_ptr<TriggeredCollectionSchemeData> collectedData = std::make_shared<TriggeredCollectionSchemeData>();
-    collectedData->metaData = condition.mCondition.metaData;
+    collectedData->metadata = condition.mCondition.metadata;
     collectedData->triggerTime = condition.mLastTrigger.systemTimeMs;
     // Pack signals
     for ( auto &s : condition.mCondition.signals )
@@ -842,8 +842,6 @@ CollectionInspectionEngine::collectNextDataToSend( const TimePoint &currentTime,
                 {
                     // Generate the Event ID and pack  it into the active Condition
                     condition.mEventID = generateEventID( currentTime.systemTimeMs );
-                    // Check if we need more data from other sensors
-                    evaluateAndTriggerRichSensorCapture( condition );
                     // Return the collected data
                     InspectionTimestamp newestSignalTimeStamp = 0;
                     auto cd = collectData( condition, mNextConditionToCollectedIndex, newestSignalTimeStamp );
@@ -868,35 +866,6 @@ CollectionInspectionEngine::collectNextDataToSend( const TimePoint &currentTime,
     // No Data ready to be sent
     waitTimeMs = minimumWaitTimeMs;
     return std::shared_ptr<const TriggeredCollectionSchemeData>( nullptr );
-}
-
-void
-CollectionInspectionEngine::evaluateAndTriggerRichSensorCapture( const ActiveCondition &condition )
-{
-    // Find out whether Image Data is needed.
-    if ( condition.mCondition.includeImageCapture )
-    {
-        std::vector<EventMetadata> eventMetadata;
-        // Create an Event Item for each device we want to get image from
-        for ( const auto &imageCollectionInfo : condition.mCondition.imageCollectionInfos )
-        {
-            // Make sure the same Event ID is passed to the Image capture module
-            // The event happened  afterDuration before now, and thus, the camera
-            // data should have been requested already during the condition eval,
-            // however, because the Camera request is completely not in scope of the
-            // InspectionCycle, we want to make sure that no data leaves the system
-            // if it does not fit into the probability. We also want to make sure
-            // we don 't trigger camera collection if the probably meanwhile changed.
-            // That's why the PositiveOffset is set to zero.
-            eventMetadata.emplace_back( condition.mEventID,
-                                        imageCollectionInfo.deviceID,
-                                        imageCollectionInfo.beforeDurationMs + condition.mCondition.afterDuration,
-                                        0 );
-        }
-        // This is non blocking. Listeners simply copy the metadata.
-        notifyListeners<const std::vector<EventMetadata> &>( &InspectionEventListener::onEventOfInterestDetected,
-                                                             eventMetadata );
-    }
 }
 
 void

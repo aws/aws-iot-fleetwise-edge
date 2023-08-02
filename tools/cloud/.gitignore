@@ -2,3 +2,4 @@
 *.html
 part-*
 s3-bucket-policy.json
+demo.env

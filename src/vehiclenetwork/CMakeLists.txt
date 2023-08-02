@@ -9,9 +9,6 @@ set(SRCS
   src/ISOTPOverCANReceiver.cpp
   src/ISOTPOverCANSender.cpp
   src/ISOTPOverCANSenderReceiver.cpp
-  # Camera related
-  $<$<BOOL:${FWE_FEATURE_CAMERA}>:src/CameraDataSubscriber.cpp>
-  $<$<BOOL:${FWE_FEATURE_CAMERA}>:src/CameraDataPublisher.cpp>
 )
 
 add_library(
@@ -27,18 +24,11 @@ add_library(
 target_include_directories(${libraryTargetName} PUBLIC include)
 
 find_package(Boost 1.71.0 REQUIRED COMPONENTS thread)
-if(FWE_FEATURE_CAMERA)
-  find_package(fastrtps REQUIRED)
-  find_package(fastcdr REQUIRED)
-endif()
 
 set(LIBS
   IoTFleetWise::Platform::Linux
   IoTFleetWise::Platform::Utility
   Boost::thread
-  $<$<BOOL:${FWE_FEATURE_CAMERA}>:IoTFleetWise::Idls>
-  $<$<BOOL:${FWE_FEATURE_CAMERA}>:fastrtps>
-  $<$<BOOL:${FWE_FEATURE_CAMERA}>:fastcdr>
 )
 
 target_link_libraries(
@@ -71,20 +61,6 @@ install(
   include/datatypes
 )
 
-if (FWE_FEATURE_CAMERA)
-  install(
-    FILES
-    include/dds/SensorDataListener.h
-    include/dds/DDSDataTypes.h
-    include/dds/IDDSPublisher.h
-    include/dds/IDDSSubscriber.h
-    include/dds/CameraDataSubscriber.h
-    include/dds/CameraDataPublisher.h
-    DESTINATION
-    include/dds
-  )
-endif()
-
 ### Tests ###
 # This is a list of tests that will compiled.
 # If adding a test, simply add the source file here
@@ -93,19 +69,8 @@ set(
   test/ISOTPOverCANProtocolTest.cpp
 )
 
-if(FWE_FEATURE_CAMERA)
-  set(
-    testSources
-    ${testSources}
-    test/CameraDataSubscriberTest.cpp
-    test/CameraDataPublisherTest.cpp
-  )
-endif()
-
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
-  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/CameraSubscriberTestPNG.png
-    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
   # Add the executable targets
   foreach(testSource ${testSources})

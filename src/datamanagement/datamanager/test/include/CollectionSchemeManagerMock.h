@@ -51,7 +51,7 @@ public:
     MOCK_METHOD( void, inspectionMatrixUpdater, (const sharedPtrConstInspectionMatrix &));
 
     void
-    setCollectionSchemePersistency( const std::shared_ptr<ICacheAndPersist> &collectionSchemePersistency )
+    setCollectionSchemePersistency( const std::shared_ptr<CacheAndPersist> &collectionSchemePersistency )
     {
         CollectionSchemeManager::mSchemaPersistency = collectionSchemePersistency;
     }
@@ -176,16 +176,12 @@ public:
 class mockCacheAndPersist : public CacheAndPersist
 {
 public:
-    mockCacheAndPersist()
-        : CacheAndPersist( "", 0 )
-    {
-    }
-    // ErrorCode write( const uint8_t *bufPtr, size_t size, DataType dataType );
-    MOCK_METHOD( ErrorCode, write, ( const uint8_t *, size_t, DataType ) );
+    // ErrorCode write( const uint8_t *bufPtr, size_t size, DataType dataType, const std::string &filename );
+    MOCK_METHOD( ErrorCode, write, (const uint8_t *, size_t, DataType, const std::string &));
 
-    // size_t getSize( DataType dataType );
-    MOCK_METHOD( size_t, getSize, ( DataType ) );
+    // size_t getSize( DataType dataType, const std::string &filename );
+    MOCK_METHOD( size_t, getSize, (DataType, const std::string &));
 
-    // ErrorCode read( uint8_t *const readBufPtr, size_t size, DataType dataType );
-    MOCK_METHOD( ErrorCode, read, ( uint8_t *const, size_t, DataType ) );
+    // ErrorCode read( uint8_t *const readBufPtr, size_t size, DataType dataType, const std::string &filename );
+    MOCK_METHOD( ErrorCode, read, (uint8_t *const, size_t, DataType, const std::string &));
 };

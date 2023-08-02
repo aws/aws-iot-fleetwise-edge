@@ -22,7 +22,8 @@ find_package(Boost 1.71.0 REQUIRED COMPONENTS filesystem)
 target_link_libraries(
   ${libraryTargetName}
   Boost::filesystem
-  IoTFleetWise::DataCollection
+  IoTFleetWise::DataManagementTypes
+  IoTFleetWise::Proto
   IoTFleetWise::Platform::Linux
   IoTFleetWise::Vehiclenetwork
 )

@@ -126,23 +126,6 @@ public:
         , root( nullptr )
     {
     }
-    ICollectionSchemeTest( std::string collectionSchemeID,
-                           std::string DMID,
-                           uint64_t start,
-                           uint64_t stop,
-                           Signals_t signalsIn,
-                           RawCanFrames_t rawCanFrmsIn,
-                           ImagesDataType imagesDataIn )
-        : collectionSchemeID( collectionSchemeID )
-        , decoderManifestID( DMID )
-        , startTime( start )
-        , expiryTime( stop )
-        , signals( signalsIn )
-        , rawCanFrms( rawCanFrmsIn )
-        , imagesData( imagesDataIn )
-        , root( nullptr )
-    {
-    }
     ICollectionSchemeTest( std::string collectionSchemeID, std::string DMID, uint64_t start, uint64_t stop )
         : collectionSchemeID( collectionSchemeID )
         , decoderManifestID( DMID )
@@ -190,11 +173,6 @@ public:
     {
         return rawCanFrms;
     }
-    const ImagesDataType &
-    getImageCaptureData() const
-    {
-        return imagesData;
-    }
     const struct ExpressionNode *
     getCondition() const
     {
@@ -213,7 +191,6 @@ private:
     uint64_t expiryTime;
     Signals_t signals;
     RawCanFrames_t rawCanFrms;
-    ImagesDataType imagesData;
     ExpressionNode *root;
 };
 
@@ -369,13 +346,13 @@ public:
     }
     void
     decoderDictionaryExtractor(
-        std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> &decoderDictionaryMap )
+        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap )
     {
         return CollectionSchemeManager::decoderDictionaryExtractor( decoderDictionaryMap );
     }
     void
     decoderDictionaryUpdater(
-        std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> &decoderDictionaryMap )
+        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap )
     {
         return CollectionSchemeManager::decoderDictionaryUpdater( decoderDictionaryMap );
     }
@@ -395,7 +372,7 @@ public:
         CollectionSchemeManager::mCollectionSchemeList = pl;
     }
     void
-    setCollectionSchemePersistency( std::shared_ptr<ICacheAndPersist> pp )
+    setCollectionSchemePersistency( std::shared_ptr<CacheAndPersist> pp )
     {
         CollectionSchemeManager::mSchemaPersistency = pp;
     }

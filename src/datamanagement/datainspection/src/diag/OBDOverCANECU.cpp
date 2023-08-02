@@ -168,7 +168,7 @@ OBDOverCANECU::pushPIDs( const EmissionInfo &info,
         if ( !signalBufferPtr->push( collectedSignal ) )
         {
             TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-            FWE_LOG_WARN( "Signal Buffer full with ECU " + streamRxID );
+            FWE_LOG_WARN( "Signal buffer full with ECU " + streamRxID );
         }
     }
 }

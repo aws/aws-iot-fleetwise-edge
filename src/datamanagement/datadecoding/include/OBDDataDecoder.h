@@ -58,7 +58,7 @@ public:
      * @brief Decodes an ECU response to a list of Emission related PIDs.
      * Validates first from the first byte whether it's a positive response.
      * @param sid SID for which the PIDs where requested.
-     * @param pids List of PIDs that edge agent requested from ECU
+     * @param pids List of PIDs that FWE requested from ECU
      * @param inputData raw response from the ECU
      * @param info Output vector of PID physical values
      * @return True if we received a positive response and decoded at least one supported PID.
@@ -123,7 +123,7 @@ private:
      * @brief Check if PIDs response length is valid. When the response consists of multiple PIDs,
      * this function will check whether each PID exists in response and whether each PID's response
      * matches with decoder dictionary
-     * @param pids List of PIDs that edge agent requested from ECU
+     * @param pids List of PIDs that FWE requested from ECU
      * @param ecuResponse The PID response from ECU
      * @return true if response length is valid
      * @return false if response length is invalid

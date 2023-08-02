@@ -1,21 +1,20 @@
 # Custom data source (treating data not on CAN as CAN signals)
 
-> :warning: **Internal code** structures of AWS IoT FleetWise Edge **might be fundamentally
-> restructured**, so extending the code might involve significant work when upgrading to newer
-> versions. To avoid this problems the external interfaces can be used to hand over data to AWS IoT
-> FleetWise Edge over supported communication channels. For example use a small custom separate
-> process to read data and put it to a real or a virtual CAN that is then read by AWS IoT FleetWise
-> Edge.
+> :warning: **Internal code** structures of the Reference Implementation for AWS IoT FleetWise
+> ("FWE") **might be fundamentally restructured**, so extending the code might involve significant
+> work when upgrading to newer versions. To avoid this problems the external interfaces can be used
+> to hand over data to FWE over supported communication channels. For example use a small custom
+> separate process to read data and put it to a real or a virtual CAN that is then read by FWE.
 
 Considering the warning this gives a temporary workaround to get the data directly into AWS IoT
 FleetWise _without_ ever putting it on a real or virtual SocketCAN interface. In the following we
 will read data from a custom data source (like a tty or a file etc.) convert it to a double and pass
 it on to be treated like a Signal read on CAN. All this will happen in a separate thread but inside
-the AWS IoT FleetWise Edge agent. We will use an example where we read NMEA GPS data from a file and
-handle them as if the were received on a CAN. We assume we have a the two signals
-`Vehicle.CurrentLocation.Longitude` and `Vehicle.CurrentLocation.Latitude` in our signal catalog and
-in a model manifest. For this the API calls UpdateSignalCatalog and CreateModelManifest can be used.
-Now we create a special decoder manifest
+FWE. We will use an example where we read NMEA GPS data from a file and handle them as if the were
+received on a CAN. We assume we have a the two signals `Vehicle.CurrentLocation.Longitude` and
+`Vehicle.CurrentLocation.Latitude` in our signal catalog and in a model manifest. For this the API
+calls UpdateSignalCatalog and CreateModelManifest can be used. Now we create a special decoder
+manifest
 
 ```json
 {

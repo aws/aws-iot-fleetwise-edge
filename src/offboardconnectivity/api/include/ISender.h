@@ -21,6 +21,8 @@ struct CollectionSchemeParams
     bool persist{ false };     // specifies if data needs to be persisted in case of connection loss
     bool compression{ false }; // specifies if data needs to be compressed for cloud
     uint32_t priority{ 0 };    // collectionScheme priority specified by the cloud
+    uint64_t triggerTime{ 0 }; // timestamp of event ocurred
+    uint32_t eventID{ 0 };     // event id
 };
 
 /**
@@ -68,6 +70,23 @@ public:
      */
     virtual ConnectivityError sendBuffer(
         const std::uint8_t *buf,
+        size_t size,
+        struct CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) = 0;
+
+    /**
+     * @brief called to send data from file to the cloud
+     *
+     * The function will return after async upload was successfully initiated or error occurred.
+     *
+     * @param filePath path to the file to upload
+     * @param size size of the payload
+     * @param collectionSchemeParams object containing collectionScheme related metadata for data persistency and
+     * transmission
+     *
+     * @return SUCCESS if connection is established.
+     */
+    virtual ConnectivityError sendFile(
+        const std::string &filePath,
         size_t size,
         struct CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) = 0;
 };

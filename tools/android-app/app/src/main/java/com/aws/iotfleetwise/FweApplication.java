@@ -3,7 +3,13 @@
 
 package com.aws.iotfleetwise;
 
+import android.annotation.SuppressLint;
 import android.app.Application;
+import android.car.Car;
+import android.car.VehiclePropertyIds;
+import android.car.hardware.CarPropertyConfig;
+import android.car.hardware.CarPropertyValue;
+import android.car.hardware.property.CarPropertyManager;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.location.Location;
@@ -14,10 +20,14 @@ import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class FweApplication
         extends Application
@@ -33,7 +43,10 @@ public class FweApplication
     private LocationManager mLocationManager = null;
     private Location mLastLocation = null;
     private List<Integer> mSupportedPids = null;
-    private final Object mSupportedPidsLock = new Object();
+    private final Object mSupportedSignalsLock = new Object();
+    private CarPropertyManager mCarPropertyManager = null;
+    private boolean mReadVehicleProperties = false;
+    private List<String> mSupportedVehicleProperties = null;
 
     @Override
     public void onLocationChanged(Location loc) {
@@ -73,7 +86,14 @@ public class FweApplication
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
         mPrefs.registerOnSharedPreferenceChangeListener(this);
         onSharedPreferenceChanged(null, null);
-        mElm327 = new Elm327();
+        // Try creating the CarPropertyManager to detect whether we are running on Android Automotive
+        try {
+            mCarPropertyManager = (CarPropertyManager)Car.createCar(this).getCarManager(Car.PROPERTY_SERVICE);
+        }
+        catch (NoClassDefFoundError ignored) {
+            // Not Android Automotive, fall back to ELM327 mode
+            mElm327 = new Elm327();
+        }
         mDataAcquisitionThread.start();
     }
 
@@ -163,15 +183,24 @@ public class FweApplication
             }
         }
         // Convert list to array:
-        return responseList.stream().mapToInt(Integer::intValue).toArray();
+        int[] arr = new int[responseList.size()];
+        for (int i = 0; i < responseList.size(); i++) {
+            arr[i] = responseList.get(i);
+        }
+        return arr;
     }
 
     Thread mDataAcquisitionThread = new Thread(() -> {
         while (true) {
             Log.i("FweApplication", "Starting data acquisition");
-            String bluetoothDevice = mPrefs.getString("bluetooth_device", "");
 
-            serviceOBD(bluetoothDevice);
+            if (isCar()) {
+                serviceCarProperties();
+            }
+            else {
+                String bluetoothDevice = mPrefs.getString("bluetooth_device", "");
+                serviceOBD(bluetoothDevice);
+            }
             serviceLocation();
 
             // Wait for update time:
@@ -189,10 +218,11 @@ public class FweApplication
         if (!checkVehicleConnected()) {
             return;
         }
-        int[] pidsToRequest = Arrays.stream(Fwe.getObdPidsToRequest()).sorted().toArray();
+        int[] pidsToRequest = Fwe.getObdPidsToRequest();
         if (pidsToRequest.length == 0) {
             return;
         }
+        Arrays.sort(pidsToRequest);
         List<Integer> supportedPids = new ArrayList<>();
         for (int pid : pidsToRequest) {
             if ((mSupportedPids != null) && !mSupportedPids.contains(pid)) {
@@ -206,7 +236,7 @@ public class FweApplication
                 Log.e("FweApplication", String.format("No response for PID: 0x%02X", pid));
                 // If vehicle is disconnected:
                 if (mSupportedPids != null) {
-                    synchronized (mSupportedPidsLock) {
+                    synchronized (mSupportedSignalsLock) {
                         mSupportedPids = null;
                     }
                     return;
@@ -223,7 +253,7 @@ public class FweApplication
                 sb.append(String.format("%02X ", b));
             }
             Log.i("FweApplication", "Supported PIDs: " + sb.toString());
-            synchronized (mSupportedPidsLock) {
+            synchronized (mSupportedSignalsLock) {
                 mSupportedPids = supportedPids;
             }
         }
@@ -240,6 +270,111 @@ public class FweApplication
         boolean result = (responseBytes != null) && (responseBytes.length > 0);
         Log.i("FweApplication", "Vehicle is " + (result ? "CONNECTED" : "DISCONNECTED"));
         return result;
+    }
+
+    private int[] getVehiclePropertyIds(int[][] vehiclePropertyInfo)
+    {
+        Set<Integer> propIds = new LinkedHashSet<>();
+        for (int[] info : vehiclePropertyInfo)
+        {
+            propIds.add(info[0]);
+        }
+        int[] arr = new int[propIds.size()];
+        int i = 0;
+        for (Integer id : propIds)
+        {
+            arr[i++] = id;
+        }
+        return arr;
+    }
+
+    private int getVehiclePropertySignalId(int[][] vehiclePropertyInfo, int propId, int areaIndex, int resultIndex)
+    {
+        for (int[] info : vehiclePropertyInfo)
+        {
+            if ((propId == info[0]) && (areaIndex == info[1]) && (resultIndex == info[2]))
+            {
+                return info[3];
+            }
+        }
+        return -1;
+    }
+
+    @SuppressLint("DefaultLocale")
+    private void serviceCarProperties()
+    {
+        List<String> supportedProps = new ArrayList<>();
+        int[][] propInfo = Fwe.getVehiclePropertyInfo();
+        int[] propIds = getVehiclePropertyIds(propInfo);
+        for (int propId : propIds) {
+            String propName = VehiclePropertyIds.toString(propId);
+            CarPropertyConfig config = mCarPropertyManager.getCarPropertyConfig(propId);
+            if (config == null) {
+                Log.d("serviceCarProperties", "Property unavailable: "+propName);
+                continue;
+            }
+            int[] areaIds = config.getAreaIds();
+            Class<?> clazz = config.getPropertyType();
+            for (int areaIndex = 0; areaIndex < areaIds.length; areaIndex++) {
+                int signalId = getVehiclePropertySignalId(propInfo, propId, areaIndex, 0);
+                if (signalId < 0) {
+                    Log.d("serviceCarProperties", String.format("More area IDs (%d) than expected (%d) for %s", areaIds.length, areaIndex + 1, propName));
+                    break;
+                }
+                CarPropertyValue propVal;
+                try {
+                    propVal = mCarPropertyManager.getProperty(clazz, propId, areaIds[areaIndex]);
+                } catch (IllegalArgumentException ignored) {
+                    Log.w("serviceCarProperties", String.format("Could not get %s 0x%X", propName, areaIds[areaIndex]));
+                    continue;
+                } catch (SecurityException e) {
+                    Log.w("serviceCarProperties", String.format("Access denied for %s 0x%X", propName, areaIds[areaIndex]));
+                    continue;
+                }
+                if (areaIndex == 0) {
+                    supportedProps.add(propName);
+                }
+                StringBuilder sb = new StringBuilder();
+                sb.append(String.format("%s 0x%X: ", propName, areaIds[areaIndex]));
+                if (clazz.equals(Boolean.class)) {
+                    double val = (boolean) propVal.getValue() ? 1.0 : 0.0;
+                    sb.append(val);
+                    Fwe.setVehicleProperty(signalId, val);
+                } else if (clazz.equals(Integer.class) || clazz.equals(Float.class)) {
+                    double val = ((Number)propVal.getValue()).doubleValue();
+                    sb.append(val);
+                    Fwe.setVehicleProperty(signalId, val);
+                } else if (clazz.equals(Integer[].class) || clazz.equals(Long[].class)) {
+                    sb.append("[");
+                    for (int resultIndex = 0; resultIndex < Array.getLength(propVal.getValue()); resultIndex++) {
+                        if (resultIndex > 0) {
+                            signalId = getVehiclePropertySignalId(propInfo, propId, areaIndex, resultIndex);
+                            if (signalId < 0) {
+                                Log.d("serviceCarProperties", String.format("More results (%d) than expected (%d) for %s 0x%X", Array.getLength(propVal.getValue()), resultIndex + 1, propName, areaIds[areaIndex]));
+                                break;
+                            }
+                        }
+                        double val = ((Number)Array.get(propVal.getValue(), resultIndex)).doubleValue();
+                        if (resultIndex > 0) {
+                            sb.append(", ");
+                        }
+                        sb.append(val);
+                        Fwe.setVehicleProperty(signalId, val);
+                    }
+                    sb.append("]");
+                } else {
+                    Log.w("serviceCarProperties", "Unsupported type " + clazz.toString() + " for " + propName);
+                    continue;
+                }
+                Log.i("serviceCarProperties", sb.toString());
+            }
+        }
+        if ((mSupportedVehicleProperties == null) && (supportedProps.size() > 0)) {
+            Collections.sort(supportedProps);
+            synchronized (mSupportedSignalsLock) {
+                mSupportedVehicleProperties = supportedProps;
+            }
+        }
     }
 
     Thread mFweThread = new Thread(() -> {
@@ -267,25 +402,43 @@ public class FweApplication
 
     public String getStatusSummary()
     {
-        String supportedPids;
-        synchronized (mSupportedPidsLock) {
-            if (mSupportedPids == null) {
-                supportedPids = "VEHICLE DISCONNECTED";
-            }
-            else if (mSupportedPids.size() == 0) {
-                supportedPids = "NONE";
+        StringBuilder sb = new StringBuilder();
+        synchronized (mSupportedSignalsLock) {
+            if (isCar()) {
+                if (mSupportedVehicleProperties != null) {
+                    if (mSupportedVehicleProperties.size() == 0) {
+                        sb.append("NONE");
+                    } else {
+                        sb.append("Supported vehicle properties: ")
+                                .append(String.join(", ", mSupportedVehicleProperties));
+                    }
+                }
             }
             else {
-                StringBuilder sb = new StringBuilder();
-                for (int pid : mSupportedPids) {
-                    sb.append(String.format("%02X ", pid));
+                sb.append("Bluetooth: ")
+                        .append(mElm327.getStatus())
+                        .append("\n\n")
+                        .append("Supported OBD PIDs: ");
+                if (mSupportedPids == null) {
+                    sb.append("VEHICLE DISCONNECTED");
+                } else if (mSupportedPids.size() == 0) {
+                    sb.append("NONE");
+                } else {
+                    for (int pid : mSupportedPids) {
+                        sb.append(String.format("%02X ", pid));
+                    }
                 }
-                supportedPids = sb.toString();
             }
         }
-        return "Bluetooth: " + mElm327.getStatus() + "\n\n"
-                + "Supported OBD PIDs: " + supportedPids + "\n\n"
-                + "Location: " + getLocationSummary() + "\n\n"
-                + Fwe.getStatusSummary();
+        sb.append("\n\n")
+                .append("Location: ")
+                .append(getLocationSummary())
+                .append("\n\n")
+                .append(Fwe.getStatusSummary());
+        return sb.toString();
+    }
+
+    public boolean isCar() {
+        return mCarPropertyManager != null;
     }
 }

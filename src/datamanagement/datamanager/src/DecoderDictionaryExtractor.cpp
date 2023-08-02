@@ -17,7 +17,7 @@ namespace DataManagement
 
 void
 CollectionSchemeManager::decoderDictionaryExtractor(
-    std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> &decoderDictionaryMap )
+    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap )
 {
     // Initialize the dictionary map with nullptr for each protocol, so that protocols are disabled if
     // none of the collection schemes collect data for that protocol
@@ -53,14 +53,20 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                 auto canRawFrameID = mDecoderManifest->getCANFrameAndInterfaceID( signalInfo.signalID ).first;
                 auto interfaceId = mDecoderManifest->getCANFrameAndInterfaceID( signalInfo.signalID ).second;
 
+                auto canDecoderDictionaryPtr =
+                    std::dynamic_pointer_cast<CANDecoderDictionary>( decoderDictionaryMap[networkType] );
                 auto canChannelID = mCANIDTranslator.getChannelNumericID( interfaceId );
                 if ( canChannelID == INVALID_CAN_SOURCE_NUMERIC_ID )
                 {
                     FWE_LOG_WARN( "Invalid Interface ID provided: " + interfaceId );
                 }
+                else if ( !canDecoderDictionaryPtr )
+                {
+                    FWE_LOG_WARN( "Can not cast dictionary to CANDecoderDictionary for CAN Signal ID: " +
+                                  std::to_string( signalInfo.signalID ) );
+                }
                 else
                 {
-                    auto &canDecoderDictionaryPtr = decoderDictionaryMap[networkType];
                     // Add signalID to the set of this decoder dictionary
                     canDecoderDictionaryPtr->signalIDsToCollect.insert( signalInfo.signalID );
                     // firstly check if we have canChannelID entry at dictionary top layer
@@ -102,43 +108,52 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                 // There's only one VehicleDataSourceProtocol::OBD Channel, this is just a place holder to maintain the
                 // generic dictionary structure
                 CANChannelNumericID canChannelID = 0;
-                auto &obdPidCanDecoderDictionaryPtr = decoderDictionaryMap[networkType];
-                obdPidCanDecoderDictionaryPtr->signalIDsToCollect.insert( signalInfo.signalID );
-                obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.emplace(
-                    canChannelID, std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>() );
-                if ( obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.find( canChannelID ) ==
-                     obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.end() )
+                auto obdPidCanDecoderDictionaryPtr =
+                    std::dynamic_pointer_cast<CANDecoderDictionary>( decoderDictionaryMap[networkType] );
+                if ( !obdPidCanDecoderDictionaryPtr )
                 {
-                    // create an entry for canChannelID if it's not existed yet
-                    obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID] =
-                        std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>();
+                    FWE_LOG_WARN( "Can not cast dictionary to CANDecoderDictionary for OBD Signal ID: " +
+                                  std::to_string( signalInfo.signalID ) );
                 }
-                if ( obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
-                         .find( pidDecoderFormat.mPID ) ==
-                     obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID ).end() )
+                else
                 {
-                    // There's no Dictionary Entry created for this PID yet, create one
-                    obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
-                        .emplace( pidDecoderFormat.mPID, CANMessageDecoderMethod() );
+                    obdPidCanDecoderDictionaryPtr->signalIDsToCollect.insert( signalInfo.signalID );
+                    obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.emplace(
+                        canChannelID, std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>() );
+                    if ( obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.find( canChannelID ) ==
+                         obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.end() )
+                    {
+                        // create an entry for canChannelID if it's not existed yet
+                        obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID] =
+                            std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>();
+                    }
+                    if ( obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
+                             .find( pidDecoderFormat.mPID ) ==
+                         obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID ).end() )
+                    {
+                        // There's no Dictionary Entry created for this PID yet, create one
+                        obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
+                            .emplace( pidDecoderFormat.mPID, CANMessageDecoderMethod() );
+                        obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
+                            .at( pidDecoderFormat.mPID )
+                            .format.mMessageID = pidDecoderFormat.mPID;
+                        obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
+                            .at( pidDecoderFormat.mPID )
+                            .format.mSizeInBytes = static_cast<uint8_t>( pidDecoderFormat.mPidResponseLength );
+                    }
+                    // Below is the OBD Signal format represented in generic Signal Format
+                    CANSignalFormat format;
+                    format.mSignalID = signalInfo.signalID;
+                    format.mFirstBitPosition = static_cast<uint16_t>( pidDecoderFormat.mStartByte * BYTE_SIZE +
+                                                                      pidDecoderFormat.mBitRightShift );
+                    format.mSizeInBits = static_cast<uint16_t>( ( pidDecoderFormat.mByteLength - 1 ) * BYTE_SIZE +
+                                                                pidDecoderFormat.mBitMaskLength );
+                    format.mFactor = pidDecoderFormat.mScaling;
+                    format.mOffset = pidDecoderFormat.mOffset;
                     obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
                         .at( pidDecoderFormat.mPID )
-                        .format.mMessageID = pidDecoderFormat.mPID;
-                    obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
-                        .at( pidDecoderFormat.mPID )
-                        .format.mSizeInBytes = static_cast<uint8_t>( pidDecoderFormat.mPidResponseLength );
+                        .format.mSignals.emplace_back( format );
                 }
-                // Below is the OBD Signal format represented in generic Signal Format
-                CANSignalFormat format;
-                format.mSignalID = signalInfo.signalID;
-                format.mFirstBitPosition =
-                    static_cast<uint16_t>( pidDecoderFormat.mStartByte * BYTE_SIZE + pidDecoderFormat.mBitRightShift );
-                format.mSizeInBits = static_cast<uint16_t>( ( pidDecoderFormat.mByteLength - 1 ) * BYTE_SIZE +
-                                                            pidDecoderFormat.mBitMaskLength );
-                format.mFactor = pidDecoderFormat.mScaling;
-                format.mOffset = pidDecoderFormat.mOffset;
-                obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
-                    .at( pidDecoderFormat.mPID )
-                    .format.mSignals.emplace_back( format );
             }
         }
         // Next let's iterate through the CAN Frames that collectionScheme wants to collect.
@@ -150,42 +165,50 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                 // Currently we don't have decoder dictionary for this type of network protocol, create one
                 decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] = std::make_shared<CANDecoderDictionary>();
             }
-            auto &canDecoderDictionaryPtr = decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET];
-            for ( const auto &canFrameInfo : collectionSchemePtr->getCollectRawCanFrames() )
+            auto canDecoderDictionaryPtr = std::dynamic_pointer_cast<CANDecoderDictionary>(
+                decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] );
+            if ( !canDecoderDictionaryPtr )
             {
-                auto canChannelID = mCANIDTranslator.getChannelNumericID( canFrameInfo.interfaceID );
-                if ( canChannelID == INVALID_CAN_SOURCE_NUMERIC_ID )
+                FWE_LOG_WARN( "Can not cast dictionary to CANDecoderDictionary for CAN RAW_SOCKET" );
+            }
+            else
+            {
+                for ( const auto &canFrameInfo : collectionSchemePtr->getCollectRawCanFrames() )
                 {
-                    FWE_LOG_WARN( "Invalid Interface ID provided:" + canFrameInfo.interfaceID );
-                }
-                else
-                {
-                    if ( canDecoderDictionaryPtr->canMessageDecoderMethod.find( canChannelID ) ==
-                         canDecoderDictionaryPtr->canMessageDecoderMethod.end() )
+                    auto canChannelID = mCANIDTranslator.getChannelNumericID( canFrameInfo.interfaceID );
+                    if ( canChannelID == INVALID_CAN_SOURCE_NUMERIC_ID )
                     {
-                        // create an entry for canChannelID if the dictionary doesn't have one
-                        canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID] =
-                            std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>();
-                    }
-                    // check if we already have entry for CAN Frame. If not, it means this CAN Frame doesn't contain any
-                    // Signals to decode, hence the collectType will be RAW only.
-                    auto decoderMethod =
-                        canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].find( canFrameInfo.frameID );
-                    if ( decoderMethod == canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].end() )
-                    {
-                        // there's entry for CANChannelNumericID but no corresponding canFrameID
-                        CANMessageDecoderMethod canMessageDecoderMethod;
-                        canMessageDecoderMethod.collectType = CANMessageCollectType::RAW;
-                        canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID][canFrameInfo.frameID] =
-                            canMessageDecoderMethod;
+                        FWE_LOG_WARN( "Invalid Interface ID provided:" + canFrameInfo.interfaceID );
                     }
                     else
                     {
-                        if ( decoderMethod->second.collectType == CANMessageCollectType::DECODE )
+                        if ( canDecoderDictionaryPtr->canMessageDecoderMethod.find( canChannelID ) ==
+                             canDecoderDictionaryPtr->canMessageDecoderMethod.end() )
                         {
-                            // This CAN Frame contains signal to be decoded. As we need to collect both CAN Frame and
-                            // signal, set the collectType as RAW_AND_DECODE
-                            decoderMethod->second.collectType = CANMessageCollectType::RAW_AND_DECODE;
+                            // create an entry for canChannelID if the dictionary doesn't have one
+                            canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID] =
+                                std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>();
+                        }
+                        // check if we already have entry for CAN Frame. If not, it means this CAN Frame doesn't contain
+                        // any Signals to decode, hence the collectType will be RAW only.
+                        auto decoderMethod =
+                            canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].find( canFrameInfo.frameID );
+                        if ( decoderMethod == canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].end() )
+                        {
+                            // there's entry for CANChannelNumericID but no corresponding canFrameID
+                            CANMessageDecoderMethod canMessageDecoderMethod;
+                            canMessageDecoderMethod.collectType = CANMessageCollectType::RAW;
+                            canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID][canFrameInfo.frameID] =
+                                canMessageDecoderMethod;
+                        }
+                        else
+                        {
+                            if ( decoderMethod->second.collectType == CANMessageCollectType::DECODE )
+                            {
+                                // This CAN Frame contains signal to be decoded. As we need to collect both CAN Frame
+                                // and signal, set the collectType as RAW_AND_DECODE
+                                decoderMethod->second.collectType = CANMessageCollectType::RAW_AND_DECODE;
+                            }
                         }
                     }
                 }
@@ -194,10 +217,9 @@ CollectionSchemeManager::decoderDictionaryExtractor(
     }
 }
 
-// TODO: The collection scheme manager shall support generic decoder dictionary other than only can
 void
 CollectionSchemeManager::decoderDictionaryUpdater(
-    std::map<VehicleDataSourceProtocol, std::shared_ptr<CANDecoderDictionary>> &decoderDictionaryMap )
+    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap )
 {
     for ( auto const &dict : decoderDictionaryMap )
     {

@@ -7,8 +7,6 @@ set(libraryAliasName IoTFleetWise::DataCollection)
 set(SRCS
   src/CollectionSchemeIngestion.cpp
   src/CollectionSchemeIngestionList.cpp
-  src/DataCollectionProtoWriter.cpp
-  src/DataCollectionSender.cpp
 )
 
 add_library(
@@ -45,8 +43,6 @@ install(
   include/CANInterfaceIDTranslator.h
   include/CollectionSchemeIngestion.h
   include/CollectionSchemeIngestionList.h
-  include/DataCollectionProtoWriter.h
-  include/DataCollectionSender.h
   include/ICollectionScheme.h
   include/ICollectionSchemeList.h
   DESTINATION include
@@ -55,23 +51,10 @@ install(
 if(${BUILD_TESTING})
   message(STATUS "Building tests for ${libraryTargetName}")
 
-  find_library(GMOCK_LIB
-  NAMES
-    gmock)
-
-  find_library(GMOCK_MAIN_LIBRARY
-  NAMES
-    gmock_main)
-
-  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/dm-collection-scheme-example.json
-    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
-
   set(
       testSources
-      test/DataCollectionProtoWriterTest.cpp
-      test/DataCollectionSenderTest.cpp
   )
+
    # Add the executable targets
   foreach(testSource ${testSources})
     # Need a name for each exec so use filename w/o extension
@@ -84,9 +67,7 @@ if(${BUILD_TESTING})
       ${testName}
       PRIVATE
       ${libraryTargetName}
-      Boost::filesystem
       IoTFleetWise::TestingSupport
-      ${GMOCK_LIB}
     )
 
     target_include_directories(

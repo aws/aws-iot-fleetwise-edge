@@ -3,7 +3,9 @@
 #pragma once
 
 #include "IActiveDecoderDictionaryListener.h"
+#include "SignalTypes.h"
 #include "Thread.h"
+#include <vector>
 
 namespace Aws
 {
@@ -41,7 +43,6 @@ public:
 
     /**
      * Get the unique SignalID, which is used to assign values to signals
-     * Only call from inside doWork/pollData function
      *
      * @param startBit defined in the DecoderManifest in the message given to setFilter
      *
@@ -49,6 +50,13 @@ public:
      * no signal is defined for this startBit in the DecoderManifest
      */
     SignalID getSignalIdFromStartBit( uint16_t startBit );
+
+    /**
+     * Returns the signal information from the decoder manifest
+     *
+     * @return Signal info
+     */
+    std::vector<CANSignalFormat> getSignalInfo();
 
     ~CustomDataSource() override;
     CustomDataSource( const CustomDataSource & ) = delete;

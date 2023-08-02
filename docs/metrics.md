@@ -1,9 +1,9 @@
 # Application level metrics
 
-The AWS IoT Fleetwise Edge agent includes a
+The Reference Implementation for AWS IoT Fleetwise ("FWE") includes a
 [TraceModule](../src/platform/linux/logmanagement/src/TraceModule.cpp). The TraceModule provides a
 set of metrics that are used as an entry point to efficiently diagnose issues, saving you time since
-you no longer need to review the entire log of all edge agent instances running.
+you no longer need to review the entire log of all FWE instances running.
 
 - **`RFrames0` - `RFrames19`** are monotonic counters of the number of raw can frames read on each
   bus. If these counters remain null or remain fixed for a longer runtime, the system might either
@@ -12,17 +12,17 @@ you no longer need to review the entire log of all edge agent instances running.
 - **`ConInt`** and **`ConRes`** enable you to monitor the the number of MQTT connection
   interruptions and connection resumptions. If and how long it takes to detect a connection loss
   depends on the kernel configuration parameters `/proc/sys/net/ipv4/tcp/keepalive*` and the compile
-  time constants of AWS IoT Fleetwise Edge: `MQTT_CONNECT_KEEP_ALIVE_SECONDS` and
-  `MQTT_PING_TIMOUT_MS`. If the values of the metric `ConInt` are not null, the internet coverage in
-  the tested environment might be unreliable, or `MQTT_PING_TIMOUT_MS`, which defaults to 3 seconds,
-  needs to be increased because there's high latency to the IoT Core endpoint. Changing the AWS
-  Region can help to decrease latency.
+  time constants of FWE: `MQTT_CONNECT_KEEP_ALIVE_SECONDS` and `MQTT_PING_TIMOUT_MS`. If the values
+  of the metric `ConInt` are not null, the internet coverage in the tested environment might be
+  unreliable, or `MQTT_PING_TIMOUT_MS`, which defaults to 3 seconds, needs to be increased because
+  there's high latency to the IoT Core endpoint. Changing the AWS Region can help to decrease
+  latency.
 - **`CeTrgCnt`** is a monotonic counter that monitors the number of triggers (inspection rules)
-  detected since the AWS IoT Fleetwise Edge process started. Triggers are detected if one or more
-  data collection campaign conditions are true. If this counter is larger than zero, but no data
-  appears in the cloud, either no actual data was collected ( such as a time-based data collection
-  campaign with no bus activity), or the data has been ingested to the cloud but there was an error
-  processing it. To debug this,
+  detected since the FWE process started. Triggers are detected if one or more data collection
+  campaign conditions are true. If this counter is larger than zero, but no data appears in the
+  cloud, either no actual data was collected ( such as a time-based data collection campaign with no
+  bus activity), or the data has been ingested to the cloud but there was an error processing it. To
+  debug this,
   [enable cloud logs in AWS IoT Fleetwise settings](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/logging-cw.html).
 - **`QUEUE_CONSUMER_TO_INSPECTION_SIGNALS`** monitors the current count of signals in queue to the
   signal history buffer. If this value is close to the value defined in the static config
@@ -51,8 +51,8 @@ you no longer need to review the entire log of all edge agent instances running.
 - `CeSCnt` is a monotonic counter that counts the signals decoded and processed since startup. This
   can be used for performance evaluations.
 - `CpuPercentageSum` and `CpuThread_*` tracks the CPU usage for the complete process and per thread.
-  In multi-core systems this can be above 100%. AWS IoT Fleetwise Edge uses the linux `/proc/`
-  directory to calculate this information.
+  In multi-core systems this can be above 100%. FWE uses the linux `/proc/` directory to calculate
+  this information.
 - `MemoryMaxResidentRam` gives the maximum bytes of resident RAM used by the process. If this is
   above 50 MB high consider switching from cmake Debug to Release build. Also the queue sizes in the
   static config can be reduced.
@@ -65,29 +65,29 @@ you no longer need to review the entire log of all edge agent instances running.
   campaigns to the first signal data being published. If at least one time based collection scheme
   is active this should be at most the time period of that collection scheme.
 
-# How to collect metrics from a FWE
+# How to collect metrics from FWE
 
-There are multiple ways to collect metrics depending on how AWS IoT Fleetwise Edge (FWE) is
-integrated. We describe two methods: using the RemoteProfiler and collecting processed logs and
-extract metrics (like through the AWS Systems Manager).
+There are multiple ways to collect metrics depending on how FWE is integrated. We describe two
+methods: using the RemoteProfiler and collecting processed logs and extract metrics (like through
+the AWS Systems Manager).
 
 Each method incurs charges for different AWS services like
 [AWS IoT Core](https://aws.amazon.com/iot-core/pricing/),
 [Amazon CloudWatch](https://aws.amazon.com/cloudwatch/pricing/),
 [AWS System Manager](https://aws.amazon.com/systems-manager/pricing/) and more. For example, using
-the [RemoteProfiler](#method-1-use-the-remoteprofiler-module) method, AWS Iot Fleetwise Edge uploads
-at your configured interval, which is currently ~300 metrics. Per 10 metrics data points uploaded,
-at least one message will be published to AWS IoT Core and one AWS IoT Rules Engine Action will be
-executed. If `profilerPrefix` is different for every vehicle, ~300 new Amazon CloudWatch metrics
-will be used per vehicle.
+the [RemoteProfiler](#method-1-use-the-remoteprofiler-module) method, FWE uploads at your configured
+interval, which is currently ~300 metrics. Per 10 metrics data points uploaded, at least one message
+will be published to AWS IoT Core and one AWS IoT Rules Engine Action will be executed. If
+`profilerPrefix` is different for every vehicle, ~300 new Amazon CloudWatch metrics will be used per
+vehicle.
 
 ## Method 1: Use the RemoteProfiler module
 
-The RemoteProfiler module is provided as part of the AWS IoT FleetWise Edge C++ code base. If
-activated, it will regularly ingest the metrics and logs to AWS IoT Core topics, which have
-underlying AWS IoT Core Rules and actions to route the data to Amazon CloudWatch. The same existing
-MQTT connection used to ingest the data collection campaign is reused for this purpose. In order to
-activate the RemoteProfile, add the following parameters to your config file:
+The RemoteProfiler module is provided as part of the FWE C++ code base. If activated, it will
+regularly ingest the metrics and logs to AWS IoT Core topics, which have underlying AWS IoT Core
+Rules and actions to route the data to Amazon CloudWatch. The same existing MQTT connection used to
+ingest the data collection campaign is reused for this purpose. In order to activate the
+RemoteProfile, add the following parameters to your config file:
 
 ```json
 {
@@ -147,10 +147,10 @@ can produce multiple gigabytes of logs per day. These logs can be collected full
 over ssh from single vehicles in case of need for debugging or cyclically from the whole fleet. To
 manage easy remote connections to multiple vehicles AWS Systems Manager or AWS IoT secure tunneling
 could be used. For aggregation, custom scripts can be used to filter certain log levels. The log
-levels in AWS IoT Fleetwise Edge logs go from `[ERROR]` to `[TRACE]`. To make the metrics easier to
-parse, you can set the parameter `.staticConfig.internalParameters.metricsCyclicPrintIntervalMs` in
-the static config an interval like 60000. This will cause the metrics to print in an easy parsable
-format to the log every minute. The following regex expression can be used by any log/metrics
+levels in the FWE logs go from `[ERROR]` to `[TRACE]`. To make the metrics easier to parse, you can
+set the parameter `.staticConfig.internalParameters.metricsCyclicPrintIntervalMs` in the static
+config an interval like 60000. This will cause the metrics to print in an easy parsable format to
+the log every minute. The following regex expression can be used by any log/metrics
 aggregator/uploader that supports Python. For lines that start with
 `TraceModule-ConsoleLogging-TraceAtomicVariable` or `TraceModule-ConsoleLogging-Variable`:
 
@@ -185,10 +185,9 @@ if and how to upload them to the cloud.
 
 # Adding new metrics
 
-Adding new metrics requires changing the C++ code and recompiling AWS IoT Fleetwise Edge. Add the
-Metrics to the `TraceVariable` enum in
-[TraceModule.h](../src/platform/linux/logmanagement/include/TraceModule.h) and assign a short name
-in the function `getVariableName` of
+Adding new metrics requires changing the C++ code and recompiling FWE. Add the metrics to the
+`TraceVariable` enum in [TraceModule.h](../src/platform/linux/logmanagement/include/TraceModule.h)
+and assign a short name in the function `getVariableName` of
 [TraceModule.cpp](../src/platform/linux/logmanagement/src/TraceModule.cpp). Then you can set the
 metrics anywhere by using:
 

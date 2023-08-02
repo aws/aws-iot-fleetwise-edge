@@ -196,6 +196,10 @@
             "metricsCyclicPrintIntervalMs": {
               "type": "string",
               "description": "Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never"
+            },
+            "maximumAwsSdkHeapMemoryBytes": {
+              "type": "integer",
+              "description": "Set the maximum AWS SDK heap memory bytes. Default to 10000000"
             }
           },
           "required": [
@@ -270,22 +274,49 @@
             "rootCA": {
               "type": "string",
               "description": "The root CA certificate (optional)"
+            },
+            "connectionType": {
+              "type": "string",
+              "enum": ["iotCore", "iotGreengrassV2"],
+              "description": "Choose the connection module. Default to iotCore"
             }
           },
           "required": [
-            "endpointUrl",
-            "clientId",
             "collectionSchemeListTopic",
             "decoderManifestTopic",
             "canDataTopic",
             "checkinTopic"
           ],
-          "oneOf": [
+          "anyOf": [
             {
-              "required": ["certificateFilename", "privateKeyFilename"]
+              "properties": {
+                "connectionType": { "const": "iotCore" }
+              },
+              "required": ["endpointUrl", "clientId"],
+              "oneOf": [
+                {
+                  "required": ["certificateFilename", "privateKeyFilename"]
+                },
+                {
+                  "required": ["certificate", "privateKey"]
+                }
+              ]
             },
             {
-              "required": ["certificate", "privateKey"]
+              "properties": {
+                "connectionType": { "const": "iotGreengrassV2" }
+              }
+            },
+            {
+              "required": ["endpointUrl", "clientId"],
+              "oneOf": [
+                {
+                  "required": ["certificateFilename", "privateKeyFilename"]
+                },
+                {
+                  "required": ["certificate", "privateKey"]
+                }
+              ]
             }
           ]
         }

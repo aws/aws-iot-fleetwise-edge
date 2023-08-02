@@ -514,14 +514,6 @@ private:
      */
     static EventID generateEventID( InspectionTimestamp timestamp );
 
-    /**
-     * @brief This function looks the the active condition and
-     * checks whether other sensors such as Camera needs to be requested for
-     * extra metadata. It does then notify if that's the case.
-     * @param condition current condition being inspected.
-     */
-    void evaluateAndTriggerRichSensorCapture( const ActiveCondition &condition );
-
     void clear();
 
     /**
