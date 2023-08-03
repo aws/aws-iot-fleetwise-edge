@@ -4,6 +4,7 @@
 // Includes
 #include "CacheAndPersist.h"
 #include "LoggingModule.h"
+#include <algorithm>
 #include <boost/filesystem.hpp>
 #include <cstdio>
 #include <fstream>

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "IConnectionTypes.h"
+#include <string>
 
 namespace Aws
 {
