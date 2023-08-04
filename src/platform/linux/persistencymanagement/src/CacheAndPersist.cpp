@@ -14,7 +14,9 @@ using namespace Aws::IoTFleetWise::Platform::Linux::PersistencyManagement;
 
 CacheAndPersist::CacheAndPersist( const std::string &partitionPath, size_t maxPartitionSize )
     : mPersistencyPath{ partitionPath }
-    , mPersistencyWorkspace{ partitionPath + PERSISTENCY_WORKSPACE }
+    , mPersistencyWorkspace{ partitionPath +
+                             ( ( ( partitionPath.empty() ) || ( partitionPath.back() == '/' ) ) ? "" : "/" ) +
+                             PERSISTENCY_WORKSPACE }
     , mDecoderManifestFile{ mPersistencyWorkspace + DECODER_MANIFEST_FILE }
     , mCollectionSchemeListFile{ mPersistencyWorkspace + COLLECTION_SCHEME_LIST_FILE }
     , mPayloadMetadataFile{ mPersistencyWorkspace + PAYLOAD_METADATA_FILE }
