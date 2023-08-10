@@ -119,7 +119,13 @@ install_deps() {
     cd protobuf-${VERSION_PROTOBUF}
     if [ ! -f ${NATIVE_PREFIX}/bin/protoc ]; then
         mkdir build_native && cd build_native
-        ../configure --prefix=${NATIVE_PREFIX}
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -Dprotobuf_BUILD_TESTS=Off \
+            -DCMAKE_INSTALL_PREFIX=${NATIVE_PREFIX} \
+            ..
         make install -j`nproc`
         cd ..
     fi
@@ -135,10 +141,18 @@ install_deps() {
         LD=${TOOLCHAIN}/bin/ld \
         RANLIB=${TOOLCHAIN}/bin/llvm-ranlib \
         STRIP=${TOOLCHAIN}/bin/llvm-strip \
-        ../configure \
-            --host=${HOST_PLATFORM} \
-            --prefix=${INSTALL_PREFIX} \
-            "CFLAGS=-fPIC" "CXXFLAGS=-fPIC"
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -Dprotobuf_BUILD_TESTS=Off \
+            -DANDROID_ABI=${TARGET_ARCH} \
+            -DANDROID_PLATFORM=android-${VERSION_ANDROID_API} \
+            -DCMAKE_ANDROID_NDK=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \
+            -DCMAKE_TOOLCHAIN_FILE=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK}/build/cmake/android.toolchain.cmake \
+            -DANDROID_TOOLCHAIN=clang \
+            -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
+            ..
     make install -j`nproc`
     cd ../..
 

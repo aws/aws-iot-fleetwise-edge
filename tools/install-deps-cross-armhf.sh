@@ -99,12 +99,24 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
     tar -zxf protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
     cd protobuf-${VERSION_PROTOBUF}
     mkdir build && cd build
-    ../configure --prefix=${NATIVE_PREFIX}
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+        -Dprotobuf_BUILD_TESTS=Off \
+        -DCMAKE_INSTALL_PREFIX=${NATIVE_PREFIX} \
+        ..
     make install -j`nproc`
     cd ..
     mkdir build_armhf && cd build_armhf
-    CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ \
-        ../configure --host=arm-linux --prefix=/usr/local/arm-linux-gnueabihf
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+        -Dprotobuf_BUILD_TESTS=Off \
+        -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
+        -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
+        ..
     make install -j`nproc`
     cd ../..
 

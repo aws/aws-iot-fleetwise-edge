@@ -99,12 +99,24 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/aarch64-linux-gnu ] || [ ! -d ${NATIVE_PR
     tar -zxf protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
     cd protobuf-${VERSION_PROTOBUF}
     mkdir build && cd build
-    ../configure --prefix=${NATIVE_PREFIX}
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+        -Dprotobuf_BUILD_TESTS=Off \
+        -DCMAKE_INSTALL_PREFIX=${NATIVE_PREFIX} \
+        ..
     make install -j`nproc`
     cd ..
     mkdir build_arm64 && cd build_arm64
-    CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ \
-        ../configure --host=aarch64-linux --prefix=/usr/local/aarch64-linux-gnu
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+        -Dprotobuf_BUILD_TESTS=Off \
+        -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
+        -DCMAKE_INSTALL_PREFIX=/usr/local/aarch64-linux-gnu \
+        ..
     make install -j`nproc`
     cd ../..
 

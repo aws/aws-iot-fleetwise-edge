@@ -97,7 +97,13 @@ if ${INSTALL_BUILD_TIME_DEPS} && ( ! ${USE_CACHE} || [ ! -d ${PREFIX} ] ); then
     tar -zxf protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
     cd protobuf-${VERSION_PROTOBUF}
     mkdir build && cd build
-    ../configure --prefix=${PREFIX}
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+        -Dprotobuf_BUILD_TESTS=Off \
+        -DCMAKE_INSTALL_PREFIX=${PREFIX} \
+        ..
     make install -j`nproc`
     cd ../..
 
