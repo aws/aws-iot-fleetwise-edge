@@ -1,8 +1,8 @@
 The Reference Implementation for AWS IoT FleetWise includes the following third-party
 software/licensing:
 
-** AWS SDK for C++: v1.11.111 - https://github.com/aws/aws-sdk-cpp
-** AWS IoT Device SDK for C++ v2: v1.22.0 - https://github.com/aws/aws-iot-device-sdk-cpp-v2
+** AWS SDK for C++: v1.11.148 - https://github.com/aws/aws-sdk-cpp
+** AWS IoT Device SDK for C++ v2: v1.29.0 - https://github.com/aws/aws-iot-device-sdk-cpp-v2
 ** Google Benchmark: v1.6.1 - https://github.com/google/benchmark
 ** OpenSSL: v1.1.1 - https://github.com/openssl/openssl
 

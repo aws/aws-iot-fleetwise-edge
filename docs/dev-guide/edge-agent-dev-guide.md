@@ -87,7 +87,7 @@ FleetWise at a more detailed technical level, see the
 - [Prerequisites for quick start demo](#prerequisites-for-quick-start-demo)
 - [Deploy Edge Agent](#deploy-edge-agent)
 - [Use the AWS IoT FleetWise demo](#use-the-aws-iot-fleetwise-demo)
-- [Explore collected data](#explore-collected-data)
+- [Clean up resources](#clean-up-resources)
 
 ## Prerequisites for quick start demo
 
@@ -126,63 +126,25 @@ vehicle model, register the virtual vehicle created in the previous section and 
 collect data from it.
 
 1. Open the AWS CloudShell: [Launch CloudShell](https://console.aws.amazon.com/cloudshell/home)
-1. Copy and paste the following commands to clone the latest FWE software from GitHub, install the
-   dependencies of the demo script and enable latest IoT FleetWise commands in the AWS CLI.
+1. Copy and paste the following commands to clone the latest FWE software from GitHub and install
+   the dependencies of the demo script.
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
-       && cd ~/aws-iot-fleetwise-edge/tools/cloud \
-       && pip3 install wrapt==1.10.0 plotly==5.3.1 pandas==1.3.5 cantools==36.4.0 boto3==1.18.60 fastparquet==0.8.1
+   && cd ~/aws-iot-fleetwise-edge/tools/cloud \
+   && sudo -H ./install-deps.sh
    ```
 
-   If you are using the AWS CLI v<2.11.24, update the CLI by running:
+   The above command installs the following PIP packages: `wrapt plotly pandas cantools fastparquet`
+
+1. If you are using the AWS CLI with a version lower than v2.11.24, update the CLI by running:
 
    ```bash
-   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-   unzip awscliv2.zip
-   sudo ./aws/install --update
-   rm -rf ./aws*
+   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+   && unzip -q awscliv2.zip \
+   && sudo ./aws/install --update \
+   && rm -rf ./aws*
    ```
-
-   The AWS IoT FleetWise demo script performs the following:
-
-   - Registers your AWS account with AWS IoT FleetWise, if not already registered
-   - Creates Timestream database and table for collected data for Timestream campaigns, if not
-     already created
-   - Creates S3 bucket for collected data for S3 campaigns, if not already created
-   - Creates IAM role and policy required for the service to write data to the Timestream resources
-   - Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and
-     secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list
-   - Creates a model manifest that references the signal catalog with all of the OBD and DBC signals
-   - Activates the model manifest
-   - Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for decoding
-     OBD signals from the network interfaces defined in `network-interfaces.json`
-   - Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest
-   - Updates the decoder manifest to set the status as `ACTIVE`
-   - Creates a vehicle with a name equal to `fwdemo` which is the same as the name given to the
-     CloudFormation Stack name in the previous section
-   - Creates a fleet
-   - Associates the vehicle with the fleet
-   - Creates a campaign from `campaign-brake-event.json` that contains a condition-based collection
-     scheme to capture the engine torque and the brake pressure when the brake pressure is above
-     7000, and targets the campaign at the fleet.
-   - Approves created campaign
-   - Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to the
-     fleet
-   - Waits 30 seconds and then downloads the collected data from Timestream
-   - Saves the data to an HTML file
-
-   You can enable S3 upload destination by passing the option `--enable-s3-upload`. You can pass
-   your bucket name as option `--bucket-name`. The demo script will additionally:
-
-   - Create S3 bucket for collected data for S3 campaigns, if not already created
-   - Create IAM roles and policies required for the service to write data to the S3 resources
-   - Creates 2 additional campaigns from `campaign-brake-event.json`. One campaign will upload data
-     to to S3 in JSON format, one to S3 in parquet format
-   - Wait 20 minutes for the data to propagate to S3 and then downloads it
-   - Save the data to an HTML file
-
-   This script will not delete Timestream and S3 resources.
 
 1. Run the demo script:
 
@@ -190,45 +152,92 @@ collect data from it.
    ./demo.sh --vehicle-name fwdemo
    ```
 
-   1. (Optional) To enable S3 upload, append the option `--enable-s3-upload`
+   - (Optional) To enable S3 upload, append the option `--enable-s3-upload`
 
-   ```bash
-   ./demo.sh --vehicle-name fwdemo --enable-s3-upload
-   ```
+     ```bash
+     ./demo.sh --vehicle-name fwdemo --enable-s3-upload
+     ```
 
-   1. (Optional) If you selected a `FleetSize` of greater than one above, append the option
-      `--fleet-size <SIZE>`, where `<SIZE>` is the number selected.
-   1. (Optional) If you changed `IoTCoreRegion` above, append the option `--region <REGION>`, where
-      `<REGION>` is the selected region.
-   1. (Optional) If you changed `Stack name` when creating the stack above, pass the new stack name
-      to the `--vehicle-name` option.
+   - (Optional) If you selected a `FleetSize` of greater than one above, append the option
+     `--fleet-size <SIZE>`, where `<SIZE>` is the number selected.
+   - (Optional) If you changed `IoTCoreRegion` above, append the option `--region <REGION>`, where
+     `<REGION>` is the selected region.
+   - (Optional) If you changed `Stack name` when creating the stack above, pass the new stack name
+     to the `--vehicle-name` option.
 
-   For example, if you chose to create two AWS IoT things in Europe (Frankfurt) with a stack named
-   `myfwdemo`, you must pass those values when calling `demo.sh`:
+     For example, if you chose to create two AWS IoT things in Europe (Frankfurt) with a stack named
+     `myfwdemo`, you must pass those values when calling `demo.sh`:
 
-   ```bash
-   ./demo.sh --vehicle-name myfwdemo --fleet-size 2 --region eu-central-1
-   ```
+     ```bash
+     ./demo.sh --vehicle-name myfwdemo --fleet-size 2 --region eu-central-1
+     ```
 
-1. When the script completes, a path to an HTML file is given in the format
-   `/home/cloudshell-user/aws-iot-fleetwise-edge/fwdemo-*.html`. Copy the path, then click on the
+   The demo script:
+
+   1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
+   1. Creates an Amazon Timestream database and table.
+   1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
+   1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and
+      secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list.
+   1. Creates a model manifest that references the signal catalog with all of the OBD and DBC
+      signals.
+   1. Activates the model manifest.
+   1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for decoding
+      OBD signals from the network interfaces defined in `network-interfaces.json`.
+   1. Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest.
+   1. Updates the decoder manifest to set the status as `ACTIVE`.
+   1. Creates a vehicle with a name equal to `fwdemo` which is the same as the name given to the
+      CloudFormation Stack name in the previous section.
+   1. Creates a fleet.
+   1. Associates the vehicle with the fleet.
+   1. Creates a campaign from `campaign-brake-event.json` that contains a condition-based collection
+      scheme to capture the engine torque and the brake pressure when the brake pressure is above
+      7000, and targets the campaign at the fleet.
+   1. Approves the campaign.
+   1. Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to
+      the fleet.
+   1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
+   1. Saves the data to an HTML file.
+
+   If S3 upload is enabled, the demo script will additionally:
+
+   1. Create an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
+      bucket.
+   1. Creates 2 additional campaigns from `campaign-brake-event.json`. One campaign will upload data
+      to to S3 in JSON format, one to S3 in parquet format.
+   1. Wait 20 minutes for the data to propagate to S3 and then download it.
+   1. Save the data to an HTML file.
+
+   This script will not delete Amazon Timestream or S3 resources.
+
+1. When the script completes, a path to an HTML file is given. Copy the path, then click on the
    Actions drop down menu in the top-right corner of the CloudShell window and choose **Download
    file**. Paste the path to the file, choose **Download**, and open the downloaded file in your
    browser.
 
-   If you enabled S3 upload, results are stored in
-   `/home/cloudshell-user/aws-iot-fleetwise-edge/fwdemo-*-s3-json-result.html` and
-   `/home/cloudshell-user/aws-iot-fleetwise-edge/fwdemo-*-s3-parquet-result.html`
-
-## Explore collected data
-
 1. To explore the collected data, you can click and drag to zoom in. The red line shows the
    simulated brake pressure signal. As you can see that when hard braking events occur (value above
    7000), collection is triggered and the engine torque signal data is collected.
-   1. Alternatively, if your AWS account is enrolled with Amazon QuickSight or Grafana, you may use
-      them to browse the data from Amazon Timestream directly.
 
-![](./images/collected_data_plot.png)
+   Alternatively, if your AWS account is enrolled with Amazon QuickSight or Amazon Managed Grafana,
+   you may use them to browse the data from Amazon Timestream directly.
+
+   ![](./images/collected_data_plot.png)
+
+## Clean up resources
+
+Copy and paste the following commands to AWS CloudShell to clean up resources created by the
+`provision.sh` and `demo.sh` scripts. **Note:** The Amazon Timestream and S3 resources are not
+deleted.
+
+```bash
+cd ~/aws-iot-fleetwise-edge/tools/cloud \
+&& clean-up.sh \
+&& ../provision.sh \
+   --vehicle-name fwdemo \
+   --region us-east-1 \
+   --only-clean-up
+```
 
 # Getting started guide
 
@@ -252,6 +261,7 @@ higher level that does not require use of a development machine, see the
   - [Compile your Edge Agent](#compile-your-edge-agent)
   - [Deploy your Edge Agent](#deploy-your-edge-agent)
   - [Run the AWS IoT FleetWise demo script](#run-the-aws-iot-fleetwise-demo-script)
+  - [Clean up](#clean-up)
 - [Getting started on an NXP S32G board](./edge-agent-dev-guide-nxp-s32g.md)
   - [Prerequisites for NXP S32G](./edge-agent-dev-guide-nxp-s32g.md#prerequisites)
   - [Build an SD-Card Image](./edge-agent-dev-guide-nxp-s32g.md#build-an-sd-card-image)
@@ -260,6 +270,7 @@ higher level that does not require use of a development machine, see the
   - [Provision AWS IoT Credentials](./edge-agent-dev-guide-nxp-s32g.md#provision-aws-iot-credentials)
   - [Deploy Edge Agent on NXP S32G board](./edge-agent-dev-guide-nxp-s32g.md#deploy-edge-agent-on-nxp-s32g-board)
   - [Collect OBD Data](./edge-agent-dev-guide-nxp-s32g.md#collect-obd-data)
+  - [Clean up](./edge-agent-dev-guide-nxp-s32g.md#clean-up)
 - [Getting started on a Renesas R-Car S4 board](./edge-agent-dev-guide-renesas-rcar-s4.md)
   - [Prerequisites](./edge-agent-dev-guide-renesas-rcar-s4.md#prerequisites)
   - [Build an SD-Card Image](./edge-agent-dev-guide-renesas-rcar-s4.md#build-an-sd-card-image)
@@ -268,6 +279,7 @@ higher level that does not require use of a development machine, see the
   - [Provision AWS IoT Credentials](./edge-agent-dev-guide-renesas-rcar-s4.md#provision-aws-iot-credentials)
   - [Deploy Edge Agent on R-Car S4 Spider board](./edge-agent-dev-guide-renesas-rcar-s4.md#deploy-edge-agent-on-r-car-s4-spider-board)
   - [Collect OBD Data](./edge-agent-dev-guide-renesas-rcar-s4.md#collect-obd-data)
+  - [Clean up](./edge-agent-dev-guide-renesas-rcar-s4.md#clean-up)
 
 ## Getting started on a development machine
 
@@ -313,7 +325,7 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
-       && cd ~/aws-iot-fleetwise-edge
+   && cd ~/aws-iot-fleetwise-edge
    ```
 
 1. Review, modify and supplement [the FWE source code](../../src/) to ensure it meets your use case
@@ -321,7 +333,13 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
 
 1. Install the dependencies for FWE by running the commands below.
 
-   The commands below will:
+   ```bash
+   sudo -H ./tools/install-deps-native.sh \
+   && sudo -H ./tools/install-socketcan.sh \
+   && sudo -H ./tools/install-cansim.sh
+   ```
+
+   The commands above will:
 
    1. Install the following Ubuntu packages:
       `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`.
@@ -331,16 +349,9 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
       following: `can-isotp`. It also installs a systemd service called `setup-socketcan` that
       brings up the virtual SocketCAN interface `vcan0` at startup.
    1. Install the following Ubuntu packages: `python3 python3-pip`. It then installs the following
-      PIP packages:
-      `wrapt cantools prompt_toolkit python-can can-isotp matplotlib boto3 fastparquet`. It also
+      PIP packages: `wrapt cantools prompt_toolkit python-can can-isotp matplotlib`. It also
       installs a systemd service called `cansim` that periodically transmits data on the virtual
       SocketCAN bus `vcan0` to simulate vehicle data.
-
-   ```bash
-   sudo -H ./tools/install-deps-native.sh \
-       && sudo -H ./tools/install-socketcan.sh \
-       && sudo -H ./tools/install-cansim.sh
-   ```
 
 1. Run the following to compile your own Edge Agent:
 
@@ -358,20 +369,20 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
 
    ```bash
    sudo mkdir -p /etc/aws-iot-fleetwise \
-       && sudo ./tools/provision.sh \
-           --vehicle-name fwdemo-ec2 \
-           --certificate-pem-outfile /etc/aws-iot-fleetwise/certificate.pem \
-           --private-key-outfile /etc/aws-iot-fleetwise/private-key.key \
-           --endpoint-url-outfile /etc/aws-iot-fleetwise/endpoint.txt \
-           --vehicle-name-outfile /etc/aws-iot-fleetwise/vehicle-name.txt \
-       && sudo ./tools/configure-fwe.sh \
-           --input-config-file configuration/static-config.json \
-           --output-config-file /etc/aws-iot-fleetwise/config-0.json \
-           --log-color Yes \
-           --vehicle-name `cat /etc/aws-iot-fleetwise/vehicle-name.txt` \
-           --endpoint-url `cat /etc/aws-iot-fleetwise/endpoint.txt` \
-           --can-bus0 vcan0 \
-       && sudo ./tools/install-fwe.sh
+   && sudo ./tools/provision.sh \
+      --vehicle-name fwdemo-ec2 \
+      --certificate-pem-outfile /etc/aws-iot-fleetwise/certificate.pem \
+      --private-key-outfile /etc/aws-iot-fleetwise/private-key.key \
+      --endpoint-url-outfile /etc/aws-iot-fleetwise/endpoint.txt \
+      --vehicle-name-outfile /etc/aws-iot-fleetwise/vehicle-name.txt \
+   && sudo ./tools/configure-fwe.sh \
+      --input-config-file configuration/static-config.json \
+      --output-config-file /etc/aws-iot-fleetwise/config-0.json \
+      --log-color Yes \
+      --vehicle-name `cat /etc/aws-iot-fleetwise/vehicle-name.txt` \
+      --endpoint-url `cat /etc/aws-iot-fleetwise/endpoint.txt` \
+      --can-bus0 vcan0 \
+   && sudo ./tools/install-fwe.sh
    ```
 
    1. At this point your Edge Agent is running and periodically sending 'checkins' to AWS IoT
@@ -392,27 +403,26 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
 ### Run the AWS IoT FleetWise demo script
 
 The instructions below will register your AWS account for AWS IoT FleetWise, create a demonstration
-vehicle model, register the virtual vehicle created in the previous section, and run a campaign to
+vehicle model, register the virtual vehicle created in the previous section and run a campaign to
 collect data from it.
 
-1. Run the following _on the development machine_ to install the dependencies of the AWS IoT
-   FleetWise demo script:
-
-   1. Following command installs the following Ubuntu packages: `python3 python3-pip`. It then
-      installs the following PIP packages: `wrapt plotly pandas cantools boto3 fastparquet`
+1. Run the following _on the development machine_ to install the dependencies of the demo script:
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
-       && sudo -H ./install-deps.sh
+   && sudo -H ./install-deps.sh
    ```
 
-   1. If you are using the AWS CLI v<2.11.24, update the CLI by running:
+   The above command installs the following Ubuntu packages: `python3 python3-pip`. It then installs
+   the following PIP packages: `wrapt plotly pandas cantools fastparquet`
+
+1. If you are using the AWS CLI with a version lower than v2.11.24, update the CLI by running:
 
    ```bash
-   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-   unzip awscliv2.zip
-   sudo ./aws/install --update
-   rm -rf ./aws*
+   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+   && unzip -q awscliv2.zip \
+   && sudo ./aws/install --update \
+   && rm -rf ./aws*
    ```
 
 1. Run the following to explore the AWS IoT FleetWise CLI:
@@ -427,73 +437,72 @@ collect data from it.
    ./demo.sh --vehicle-name fwdemo-ec2
    ```
 
-   1. (Optional) To enable S3 upload, append the option `--enable-s3-upload`. You can pass your
-      bucket name as option `--bucket-name`.
+   - (Optional) To enable S3 upload, append the option `--enable-s3-upload`
 
-   ```bash
-   ./demo.sh --vehicle-name fwdemo-ec2 --enable-s3-upload
-   ```
+     ```bash
+     ./demo.sh --vehicle-name fwdemo-ec2 --enable-s3-upload
+     ```
 
-   1. (Optional) If you changed the `--region` option to `provision.sh` above, append the option
-      `--region <REGION>`, where `<REGION>` is the selected region. For example, if you chose to
-      create the AWS IoT thing in Europe (Frankfurt), you must configure `--region` to
-      `eu-central-1` in the demo.sh file.
+   - (Optional) If you changed the `--region` option to `provision.sh` above, append the option
+     `--region <REGION>`, where `<REGION>` is the selected region. For example, if you chose to
+     create the AWS IoT thing in Europe (Frankfurt), you must configure `--region` to `eu-central-1`
+     in the demo.sh file.
 
-      ```bash
-      ./demo.sh --vehicle-name fwdemo-ec2 --region eu-central-1
-      ```
+     ```bash
+     ./demo.sh --vehicle-name fwdemo-ec2 --region eu-central-1
+     ```
 
-   1. The demo script:
-      1. Registers your AWS account with AWS IoT FleetWise, if not already registered
-      1. Creates Timestream database and table for collected data for Timestream campaigns, if not
-         already created
-      1. Creates IAM roles and policies required for the service to write data to the Timestream
-      1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals,
-         and secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list
-      1. Creates a model manifest that references the signal catalog with all of the OBD and DBC
-         signals
-      1. Activates the model manifest
-      1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for
-         decoding OBD signals from the network interfaces defined in `network-interfaces.json`
-      1. Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest
-      1. Updates the decoder manifest to set the status as `ACTIVE`
-      1. Creates a vehicle with a name equal to `fwdemo-ec2` which is the same as the name given to
-         the CloudFormation Stack name in the previous section
-      1. Creates a fleet
-      1. Associates the vehicle with the fleet
-      1. Create a campaign from `campaign-brake-event.json` that contain a condition1.based
-         collection scheme to capture the engine torque and the brake pressure when the brake
-         pressure is above 7000, and targets the campaign at the fleet.
-      1. Approves created campaign
-      1. Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to
-         the fleet
-      1. Waits 30 seconds and then downloads the collected data from Timestream
-      1. Saves the data to an HTML file
+   The demo script:
 
-   If you enabled S3 upload destination, the demo script will additionally:
+   1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
+   1. Creates an Amazon Timestream database and table.
+   1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
+   1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and
+      secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list.
+   1. Creates a model manifest that references the signal catalog with all of the OBD and DBC
+      signals.
+   1. Activates the model manifest.
+   1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for decoding
+      OBD signals from the network interfaces defined in `network-interfaces.json`.
+   1. Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest.
+   1. Updates the decoder manifest to set the status as `ACTIVE`.
+   1. Creates a vehicle with a name equal to `fwdemo-ec2`, the same as the name passed to
+      `provision.sh`.
+   1. Creates a fleet.
+   1. Associates the vehicle with the fleet.
+   1. Creates a campaign from `campaign-brake-event.json` that contains a condition-based collection
+      scheme to capture the engine torque and the brake pressure when the brake pressure is above
+      7000, and targets the campaign at the fleet.
+   1. Approves the campaign.
+   1. Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to
+      the fleet.
+   1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
+   1. Saves the data to an HTML file.
 
-   - Create S3 bucket for collected data for S3 campaigns, if not already created
-   - Create IAM roles and policies required for the service to write data to the S3 resources
-   - Creates 2 additional campaigns from `campaign-brake-event.json`. One campaign will upload data
-     to to S3 in JSON format, one to S3 in parquet format
-   - Wait 20 minutes for the data to propagate to S3 and then downloads it
-   - Save the data to an HTML file
+   If S3 upload is enabled, the demo script will additionally:
 
-   This script will not delete Timestream and S3 resources
+   1. Create an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
+      bucket.
+   1. Creates 2 additional campaigns from `campaign-brake-event.json`. One campaign will upload data
+      to to S3 in JSON format, one to S3 in parquet format.
+   1. Wait 20 minutes for the data to propagate to S3 and then download it.
+   1. Save the data to an HTML file.
 
-1. When the script completes, the path to the output HTML file is given. _On your local machine_,
-   use `scp` to download it, then open it in your web browser:
+   This script will not delete Amazon Timestream or S3 resources.
+
+1. When the script completes, a path to an HTML file is given. _On your local machine_, use `scp` to
+   download it, then open it in your web browser:
 
    ```bash
    scp -i <PATH_TO_PEM> ubuntu@<EC2_IP_ADDRESS>:<PATH_TO_HTML_FILE> .
    ```
 
-   To explore the collected data, you can click and drag on the graph to zoom in. The red line shows
-   the simulated brake pressure signal. As you can see that when hard braking events occur (value
-   above 7000), collection is triggered and the engine torque signal data is collected.
+1. To explore the collected data, you can click and drag to zoom in. The red line shows the
+   simulated brake pressure signal. As you can see that when hard braking events occur (value above
+   7000), collection is triggered and the engine torque signal data is collected.
 
-   Alternatively, if your AWS account is enrolled with QuickSight or Grafana, you may use them to
-   browse the data from Amazon Timestream directly.
+   Alternatively, if your AWS account is enrolled with Amazon QuickSight or Amazon Managed Grafana,
+   you may use them to browse the data from Amazon Timestream directly.
 
    ![](./images/collected_data_plot.png)
 
@@ -526,6 +535,20 @@ collect data from it.
    ./demo.sh --vehicle-name fwdemo-ec2 --dbc-file <DBC_FILE> --campaign-file <CAMPAIGN_FILE> --region eu-central-1
    ```
 
+### Clean up
+
+Run the following _on the development machine_ to clean up resources created by the `provision.sh`
+and `demo.sh` scripts. **Note:** The Amazon Timestream and S3 resources are not deleted.
+
+```bash
+cd ~/aws-iot-fleetwise-edge/tools/cloud \
+&& clean-up.sh \
+&& ../provision.sh \
+   --vehicle-name fwdemo-ec2 \
+   --region us-east-1 \
+   --only-clean-up
+```
+
 ## Getting started on a NXP S32G board
 
 [Getting started on an NXP S32G board](./edge-agent-dev-guide-nxp-s32g.md)
@@ -538,12 +561,11 @@ collect data from it.
 
 AWS IoT FleetWise is an AWS service that enables automakers to collect, store, organize, and monitor
 data from vehicles. Automakers need the ability to connect remotely to their fleet of vehicles and
-collect vehicle ECU and sensor data. The following diagram illustrates a high-level architecture of
-the system. AWS IoT FleetWise can be used by OEM engineers and data scientists to build vehicle
-models that can be used to create custom data collection schemes. These data collection schemes
-enable OEMs to optimize the data collection process by defining what signals to collect, how often
-to collect them, and most importantly the trigger conditions, or events, that enable the collection
-process.
+collect vehicle ECU and sensor data. AWS IoT FleetWise can be used by OEM engineers and data
+scientists to build vehicle models that can be used to create custom data collection schemes. These
+data collection schemes enable OEMs to optimize the data collection process by defining what signals
+to collect, how often to collect them, and most importantly the trigger conditions, or events, that
+enable the collection process.
 
 This document reviews the architecture, operation, and key features of the Reference Implementation
 for AWS IoT FleetWise ("FWE").
@@ -650,7 +672,7 @@ as the conditions are met. Once a snapshot of the signal data is available, this
 the data to the offboard connectivity layer for further processing. The mechanism of data
 transmission between these two layers uses also a message queue with a predefined maximum size.
 
-**Scheme Management**
+**Collection Scheme Management**
 
 The Cloud control plane serves FWE with data collection scheme and decoder manifests. A decoder
 manifest is an artifact that defines the vehicle signal catalog and the way each signal can get
@@ -670,41 +692,53 @@ data back to the Data Plane.
 
 This layer ensures that FWE has valid credentials to communicate securely with the Cloud APIs.
 
-**Service Control**
+**Execution Management**
 
 This layer owns the execution context of FWE within the target hardware in the vehicle. It manages
 the lifecycle of FWE, including the startup/shutdown sequences, along with acting as a local
-monitoring module to ensure smooth execution of the service. The configuration of the service is
-validated and loaded into the system in this layer of the software.
+monitoring module to ensure smooth execution of the application. The configuration of the
+application is validated and loaded into the system in this layer of the software.
 
-### Overview of the software libraries
+### Overview of the software modules
 
-The code base of the Reference Implementation consists of 6 C++ libraries that implement the
-functionalities of the layers described above. All these libraries are loaded in a POSIX user space
-application running a single process.
+The code base of the Reference Implementation consists of C++ modules that implement the
+functionalities of the layers described above. All these modules are compiled into a POSIX user
+space application running a single process.
 
-![software libraries](./images/software_libraries.png)
+**BSP Modules**
 
-These libraries are:
+```
+CacheAndPersist
+ClockHandler
+ConsoleLogger
+CPUUsageInfo
+LoggingModule
+MemoryUsageInfo
+Thread
+TraceModule
+```
 
-**BSP Library**
-
-This library includes a set of APIs and utility functions that the rest of the system use to :
+These modules include a set of APIs and utility functions that the rest of the system use to:
 
 - Create and manage platform threads via a Thread and Signal APIs.
 - Create and manage timers and clocks via a Timer and Clock APIs.
 - Create loggers and metrics via Trace and logger APIs
 - Monitor the CPU, IO and RAM usage of a module via CPU/IO/RAM utility functions.
 - Persist data into a storage location via a Persistency API. This is used to persist and reload
-  collection schemes and decoder manifest during shutdown and startup of the service.
+  collection schemes and decoder manifest during shutdown and startup of the application.
 
-This library is used uniformly by all the other libraries in the service.
+These modules are used uniformly by all the other modules in the application.
 
-**Vehicle Network Management Library**
+**Vehicle Network Management Modules**
 
-This library implements a set of wrappers around the in vehicle network communication protocols, and
-realizes the function of vehicle data acquisition. In this version of the software, this library
-includes :
+```
+ISOTPOverCANReceiver
+ISOTPOverCANSender
+ISOTPOverCANSenderReceiver
+```
+
+These modules implement a set of wrappers around the in vehicle network communication protocols, and
+realize the function of vehicle data acquisition. These modules include:
 
 - An implementation of the Linux CAN APIs, to acquire standard CAN Traffic from the network using
   raw sockets.
@@ -713,25 +747,54 @@ includes :
 
 Each of the CAN Interfaces configured in the system will have a dedicated socket open. For the
 Diagnostic session i.e. to request OBD II PIDs, a separate socket is open for writing and reading
-CAN Frames. This library abstracts away all the Socket and Linux networking details from the rest of
-the system, and exposes only a circular buffer for each network interface configured, exposing the
-raw CAN Frames to be consumed by the Data Inspection Library.
+CAN Frames. These modules abstract away all the Socket and Linux networking details from the rest of
+the system, and expose only a circular buffer for each network interface configured, exposing the
+raw CAN Frames to be consumed by the Data Inspection Modules.
 
-**Data Management Library**
+**Data Management Modules**
 
-This library implements all raw data decoders. It offers a Raw CAN Data Decoder (Standard CAN), an
+```
+CANDecoder
+CheckinAndPersistency
+CollectionSchemeIngestion
+CollectionSchemeIngestionList
+CollectionSchemeManager
+DataSenderManager
+DataSenderManagerWorkerThread
+DataSenderProtoWriter
+DecoderDictionaryExtractor
+DecoderManifestIngestion
+Geohash
+InspectionMatrixExtractor
+OBDDataDecoder
+Schema
+```
+
+These modules implement all raw data decoders. It offers a Raw CAN Data Decoder (Standard CAN), an
 OBD II (according to J1979 specification) decoder. Additionally, it implements the decoders for the
 Collection Schemes and Decoder manifests.
 
-This library is used by the Data Inspection Library to normalize and decode the raw CAN Frames, and
-by the Execution Management library to initiate the Collection Scheme and decoder Manifest decoding.
+These modules are used by the Data Inspection Modules to normalize and decode the raw CAN Frames,
+and by the Execution Management Modules to initiate the Collection Scheme and decoder Manifest
+decoding.
 
-The library also implements a serialization module to serialize the data FWE wants to send to the
+These modules also implement a serialization module to serialize the data FWE wants to send to the
 data plane. The serialization schema is described below in the data model.
 
-**Data Inspection Library**
+**Data Inspection Modules**
 
-This library implements a software module for each of the following:
+```
+CANDataConsumer
+CANDataSource
+CollectionInspectionEngine
+CollectionInspectionWorkerThread
+ExternalCANDataSource
+GeohashFunctionNode
+OBDOverCANECU
+OBDOverCANModule
+```
+
+These modules implement each of the following:
 
 - Consume, decode and normalize of the CAN Raw Frames according to the Decoder Manifest available in
   the system.
@@ -741,55 +804,69 @@ This library implements a software module for each of the following:
   provided in the Inspection Matrix.
 - Cache of the needed signals in a signal history buffer.
 
-Upon fulfillment of one or more trigger conditions, this library extracts from the signal history
-buffer a data snapshot that's shared with the offboard connectivity library for further processing.
-Again here a circular buffer is used as a transport mechanism of the data between the two libraries.
+Upon fulfillment of one or more trigger conditions, these modules extract from the signal history
+buffer a data snapshot that's shared with the offboard connectivity modules for further processing.
+Again here a circular buffer is used as a transport mechanism of the data.
 
-**Connectivity Library**
+**Offboard Connectivity Modules**
 
-This library implements the communication routines between FWE and the Cloud Control and Data Plane.
+```
+AwsBootstrap
+AwsGGChannel
+AwsGGConnectivityModule
+AwsIotChannel
+AwsIotConnectivityModule
+AwsSDKMemoryManager
+PayloadManager
+RetryThread
+RemoteProfiler
+```
+
+These modules implement the communication routines between FWE and the cloud Control Plane and Data
+Plane.
 
 Since all the communication between the device and the cloud occurs over a secure MQTT connection,
-this library uses the AWS IoT Device SDK for C++ v2 as an MQTT client. It creates exactly one
-connection to the MQTT broker.
+these modules uses the AWS SDK for C++ as an MQTT client. It creates exactly one connection to the
+MQTT broker.
 
-This library then publishes the data snapshot through that connection (through a dedicated MQTT
+These modules then publish the data snapshot through that connection (through a dedicated MQTT
 topic) and subscribes to the Scheme and decoder manifest topic (dedicated MQTT topic) for eventual
-updates. On the subscribe side, this library notifies the rest of the system on the arrival of an
+updates. On the subscribe side, these modules notifies the rest of the system on the arrival of an
 update of either the Scheme or the decoder manifests, which are enacted accordant in near real time.
 
-**Execution Management Library**
+**Execution Management Module**
 
-This library implements the bootstrap sequence of FWE. It parses the provided configuration and
-ensures that are the above libraries are provided with their corresponding settings. During
-shutdown, it ensures that all the modules and corresponding system resources (threads, loggers, and
-sockets) are stopped/closed properly.
+```
+IoTFleetWiseEngine
+```
 
-If there is no connectivity, or during shutdown of the service , this library persists the data
-snapshots that are queued for sending to the cloud. Upon re-connection, this library will attempt to
-send the data to the cloud. The persistency module in the BSP library ensures that the disk space is
-not exhausted, so this library just invokes the persistency module when it wants to read or write
-data to disk.
+This module implements the bootstrap sequence of FWE. It parses the provided configuration and
+ensures that are the other modules are provided with their corresponding settings. During shutdown,
+it ensures that all the modules and corresponding system resources (threads, loggers, and sockets)
+are stopped/closed properly.
 
-The SystemD service communicates directly with this library as it runs the main thread of the
-application.
+If there is no connectivity, or during shutdown of the application, this module persists the data
+snapshots that are queued for sending to the cloud. Upon re-connection, this module will attempt to
+send the data to the cloud. The `CacheAndPersist` module ensures that the disk space is not
+exhausted, so this module just invokes the persistency module when it wants to read or write data to
+disk.
 
 ## Programming and Execution model
 
 FWE implements a concurrent and event-based multithreading system.
 
-- **In the Vehicle Network Management library,** each CAN Network Interface spawns one thread to
+- **In the Vehicle Network Management Modules,** each CAN Network Interface spawns one thread to
   take care of opening a Socket to the network device. E.g. if the device has 4 CAN Networks
   configured, there will be one thread per network mainly doing message reception from the network
   and insertion into the corresponding circular buffer in a lock free fashion. Each of the threads
   raises a notification via a listener interface in case the underlying socket communication is
   interrupted. These threads operate in a polling mode i.e. wait on socket read in non blocking
   mode.
-- **In the Data Management Library**, one thread is created that manages the life cycle of the
+- **In the Data Management Modules**, one thread is created that manages the life cycle of the
   collection Scheme and decode manifest. This thread is busy waiting and wakes up only during an
   arrival of new collection schemes/manifest from the cloud, or during the expiry of any of the
   collection schemes in the system.
-- **In the Data Inspection Library**, each of the following modules spawn threads:
+- **In the Data Inspection Modules**, each of the following modules spawn threads:
   - The inspection rule engine that does active inspection of the signals having one thread.
   - One thread for each CAN Network consuming the data and decoding/normalizing, working in polling
     mode, and using a lock free container to read and write CAN Messages.
@@ -798,11 +875,11 @@ FWE implements a concurrent and event-based multithreading system.
     shutting down the sockets if a CAN IF is interrupted.
   - One thread that does run a Diagnostic session at a given time frequency (running J1979 PID and
     DTC request)
-- **In the Connectivity Library**, most of the execution runs in the context of the main application
+- **In the Connectivity Modules**, most of the execution runs in the context of the main application
   thread. Callbacks and notifications from the MQTT stack happen in the context of the AWS IoT
   Device SDK thread. This module intercepts the notifications and switches the thread context to one
   of FWE threads so that no real data processing happens in the MQTT connection thread.
-- **In the Execution Management Library**, there are two threads
+- **In the Execution Management Modules**, there are two threads
   - One thread which is managing all the bootstrap sequence and intercepting SystemD signals i.e.
     application main thread
   - One orchestration thread: This thread acts as a shadow for the MQTT thread i.e. swallows
@@ -858,7 +935,7 @@ with the cloud services. The persistency operates on three types of documents:
 - Decoder Manifest Data: This data set is persisted during shutdown of FWE, and re-loaded upon
   startup.
 - Data Snapshots: This data set is persisted when there is no connectivity in the system. Upon the
-  next startup of the service, the data is reloaded and send if there is connectivity.
+  next startup of the application, the data is reloaded and send if there is connectivity.
 
 The persistency module operates on a fixed/configurable maximum partition size. If there is no space
 left, the module does not persist the data.
@@ -937,7 +1014,7 @@ described below in the configuration section. Each log entry includes the follow
 | publishToCloudParameters    | maxPublishMessageCount                      | Maximum messages that can be published to the cloud in one payload                                                                                                                                                                                                                                                                                                              | integer  |
 |                             | collectionSchemeManagementCheckinIntervalMs | Time interval between collection schemes checkins(in milliseconds)                                                                                                                                                                                                                                                                                                              | integer  |
 | mqttConnection              | endpointUrl                                 | AWS account's IoT device endpoint                                                                                                                                                                                                                                                                                                                                               | string   |
-|                             | connectionType                              | The connection module type, it can be iotCore or iotGreengrassV2                                                                                                                                                                                                                                                                                                                | string   |
+|                             | connectionType                              | The connection module type. It can be `iotCore`, or `iotGreengrassV2` when `FWE_FEATURE_GREENGRASSV2` is enabled.                                                                                                                                                                                                                                                               | string   |
 |                             | clientId                                    | The ID that uniquely identifies this device in the AWS Region                                                                                                                                                                                                                                                                                                                   | string   |
 |                             | collectionSchemeListTopic                   | Topic for subscribing to Collection Scheme                                                                                                                                                                                                                                                                                                                                      | string   |
 |                             | decoderManifestTopic                        | Topic for subscribing to Decoder Manifest                                                                                                                                                                                                                                                                                                                                       | string   |

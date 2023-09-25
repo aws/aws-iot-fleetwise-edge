@@ -27,11 +27,6 @@ add_compile_options(
     $<$<CONFIG:DEBUG>:-DDEBUG>
 )
 
-# For UNIX like systems, set the Linux macro
-if(UNIX)
-  add_compile_options("-DIOTFLEETWISE_LINUX")
-endif()
-
 # Add compiler flags for security.
 if(FWE_SECURITY_COMPILE_FLAGS)
   add_compile_options("-fstack-protector")

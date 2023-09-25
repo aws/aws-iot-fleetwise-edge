@@ -1,0 +1,18 @@
+include(CMakeFindDependencyMacro)
+
+@PACKAGE_INIT@
+
+if(@FWE_STATIC_LINK@)
+  set(Boost_USE_STATIC_LIBS ON)
+  find_dependency(Boost REQUIRED COMPONENTS @REQUIRED_BOOST_COMPONENTS@)
+  find_dependency(AWSSDK REQUIRED COMPONENTS @REQUIRED_AWS_SDK_COMPONENTS@)
+  find_dependency(ZLIB REQUIRED)
+endif()
+
+if(NOT TARGET aws-iot-fleetwise-edge)
+  include("${CMAKE_CURRENT_LIST_DIR}/AwsIotFweTargets.cmake")
+  set_target_properties(AwsIotFwe::aws-iot-fleetwise-edge PROPERTIES IMPORTED_GLOBAL TRUE)
+  add_library(AwsIotFwe::AwsIotFwe ALIAS AwsIotFwe::aws-iot-fleetwise-edge)
+endif()
+
+set(AwsIotFwe_INCLUDE_DIR "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_INCLUDEDIR@")

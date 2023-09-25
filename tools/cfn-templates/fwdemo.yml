@@ -174,8 +174,8 @@ Resources:
             fi
             sudo -u ubuntu mkdir dist && cd dist
             sudo -u ubuntu tar -zxf ../aws-iot-fleetwise-edge.tar.gz
-            sudo -u ubuntu mkdir -p build/src/executionmanagement
-            sudo -u ubuntu mv aws-iot-fleetwise-edge build/src/executionmanagement
+            sudo -u ubuntu mkdir -p build
+            sudo -u ubuntu mv aws-iot-fleetwise-edge build
 
             # Install SocketCAN modules:
             ./tools/install-socketcan.sh --bus-count ${FleetSize}

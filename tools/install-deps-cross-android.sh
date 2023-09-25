@@ -90,8 +90,8 @@ install_deps() {
         --layout=system \
         --arch=${TARGET_ARCH} \
         --target-version=${VERSION_ANDROID_API} > /dev/null
-    mv build/out/${TARGET_ARCH}/lib ${INSTALL_PREFIX}
-    mv build/out/${TARGET_ARCH}/include ${INSTALL_PREFIX}
+    cp -r build/out/${TARGET_ARCH}/lib ${INSTALL_PREFIX}
+    cp -r build/out/${TARGET_ARCH}/include ${INSTALL_PREFIX}
     cd ..
 
     # Snappy
@@ -110,7 +110,7 @@ install_deps() {
         -DANDROID_TOOLCHAIN=clang \
         -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
         ..
-    make install -j`nproc`
+    make install -j`nproc` > /dev/null
     cd ../..
 
     # Protobuf
@@ -119,27 +119,31 @@ install_deps() {
     cd protobuf-${VERSION_PROTOBUF}
     if [ ! -f ${NATIVE_PREFIX}/bin/protoc ]; then
         mkdir build_native && cd build_native
-        ../configure --prefix=${NATIVE_PREFIX}
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -Dprotobuf_BUILD_TESTS=Off \
+            -DCMAKE_INSTALL_PREFIX=${NATIVE_PREFIX} \
+            ..
         make install -j`nproc`
         cd ..
     fi
     mkdir build_target && cd build_target
-    NDK=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \
-        TOOLCHAIN=${NDK}/toolchains/llvm/prebuilt/linux-x86_64 \
-        TARGET=${HOST_PLATFORM} \
-        API=${VERSION_ANDROID_API} \
-        AR=${TOOLCHAIN}/bin/llvm-ar \
-        CC=${TOOLCHAIN}/bin/${TARGET}${API}-clang \
-        AS=${CC} \
-        CXX=${TOOLCHAIN}/bin/${TARGET}${API}-clang++ \
-        LD=${TOOLCHAIN}/bin/ld \
-        RANLIB=${TOOLCHAIN}/bin/llvm-ranlib \
-        STRIP=${TOOLCHAIN}/bin/llvm-strip \
-        ../configure \
-            --host=${HOST_PLATFORM} \
-            --prefix=${INSTALL_PREFIX} \
-            "CFLAGS=-fPIC" "CXXFLAGS=-fPIC"
-    make install -j`nproc`
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+        -Dprotobuf_BUILD_TESTS=Off \
+        -Dprotobuf_BUILD_PROTOC_BINARIES=Off \
+        -DANDROID_ABI=${TARGET_ARCH} \
+        -DANDROID_PLATFORM=android-${VERSION_ANDROID_API} \
+        -DCMAKE_ANDROID_NDK=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \
+        -DCMAKE_TOOLCHAIN_FILE=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK}/build/cmake/android.toolchain.cmake \
+        -DANDROID_TOOLCHAIN=clang \
+        -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
+        ..
+    make install -j`nproc` > /dev/null
     cd ../..
 
     # JsonCpp
@@ -158,7 +162,7 @@ install_deps() {
         -DANDROID_TOOLCHAIN=clang \
         -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
         ..
-    make install -j`nproc`
+    make install -j`nproc` > /dev/null
     cd ../..
 
     # OpenSSL
@@ -169,7 +173,7 @@ install_deps() {
         PATH=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin:${PATH} \
         INSTALL_PREFIX=${INSTALL_PREFIX} SSL_TARGET=${SSL_TARGET} VERSION_ANDROID_API=${VERSION_ANDROID_API} \
         bash -c './Configure ${SSL_TARGET} -D__ANDROID_API__=${VERSION_ANDROID_API} --prefix=${INSTALL_PREFIX} no-shared \
-            && make -j`nproc`'
+            && make -j`nproc`' > /dev/null
     make install > /dev/null
     cd ..
 
@@ -200,7 +204,7 @@ install_deps() {
             --disable-rtsp \
             --host=${HOST_PLATFORM} \
             --prefix=${INSTALL_PREFIX}
-    make install -j`nproc` V=1 LDFLAGS="-static -L${INSTALL_PREFIX}/lib"
+    make install -j`nproc` V=1 LDFLAGS="-static -L${INSTALL_PREFIX}/lib" > /dev/null
     cd ..
 
     # AWS C++ SDK
@@ -222,7 +226,7 @@ install_deps() {
         -DCMAKE_FIND_ROOT_PATH=${INSTALL_PREFIX} \
         -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
         ..
-    make install -j`nproc`
+    make install -j`nproc` > /dev/null
     cd ../..
     # pthread is directly linked somewhere, so just create a dummy .a file
     ar -rc ${INSTALL_PREFIX}/lib/libpthread.a
@@ -231,20 +235,24 @@ install_deps() {
     rm -rf deps-cross-android
 }
 
-ARCH_NOT_INSTALLED="false"
 for ARCH in ${ARCHS}; do
+    TARGET_ARCH=`echo $ARCH | cut -d ':' -f1`
     HOST_PLATFORM=`echo $ARCH | cut -d ':' -f2`
-    if [  ! -d /usr/local/${HOST_PLATFORM} ]; then
-        ARCH_NOT_INSTALLED="true"
-        break
+    SSL_TARGET=`echo $ARCH | cut -d ':' -f3`
+    BUILD="false"
+    if ! ${USE_CACHE}; then
+        echo "--native-prefix defined, building..."
+        BUILD="true"
+    elif [ ! -d ${NATIVE_PREFIX} ]; then
+        echo "${NATIVE_PREFIX} does not exist, building..."
+        BUILD="true"
+    elif [  ! -d /usr/local/${HOST_PLATFORM} ]; then
+        echo "/usr/local/${HOST_PLATFORM} does not exist, building..."
+        BUILD="true"
+    else
+        echo "/usr/local/${HOST_PLATFORM} exists, not building."
+    fi
+    if ${BUILD}; then
+        install_deps ${TARGET_ARCH} ${HOST_PLATFORM} ${SSL_TARGET}
     fi
 done
-
-if ! ${USE_CACHE} || ${ARCH_NOT_INSTALLED} || [ ! -d ${NATIVE_PREFIX} ]; then
-    for ARCH in ${ARCHS}; do
-        TARGET_ARCH=`echo $ARCH | cut -d ':' -f1`
-        HOST_PLATFORM=`echo $ARCH | cut -d ':' -f2`
-        SSL_TARGET=`echo $ARCH | cut -d ':' -f3`
-        install_deps ${TARGET_ARCH} ${HOST_PLATFORM} ${SSL_TARGET}
-    done
-fi

@@ -8,8 +8,8 @@ set -e
 
 mkdir -p /var/aws-iot-fleetwise
 
-cp build/src/executionmanagement/aws-iot-fleetwise-edge /usr/bin/
-cp tools/deploy/run-fwe.sh                              /usr/bin/
-cp tools/deploy/fwe@.service                            /lib/systemd/system/
+cp build/aws-iot-fleetwise-edge /usr/bin/
+cp tools/deploy/run-fwe.sh      /usr/bin/
+cp tools/deploy/fwe@.service    /lib/systemd/system/
 
 ./tools/deploy/start-and-enable-fwe.sh

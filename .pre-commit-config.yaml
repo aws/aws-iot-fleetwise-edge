@@ -26,6 +26,23 @@ repos:
       - id: detect-aws-credentials
         args: [--allow-missing-credentials]
       - id: detect-private-key
+  - repo: local
+    hooks:
+      - id: replace-c-headers
+        name: replace-c-headers
+        entry: |
+          sed -i -e 's/#include <stdint.h>/#include <cstdint>/'
+            -e 's/#include <stddef.h>/#include <cstddef>/'
+            -e 's/#include <stdlib.h>/#include <cstdlib>/'
+            -e 's/#include <math.h>/#include <cmath>/'
+            -e 's/#include <string.h>/#include <cstring>/'
+            -e 's/#include <ctype.h>/#include <cctype>/'
+            -e 's/#include <stdio.h>/#include <cstdio>/'
+            -e 's/#include <time.h>/#include <ctime>/'
+            -e 's/#include <limits.h>/#include <climits>/'
+        language: system
+        verbose: true
+        types: [c++]
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: v10.0.1
     hooks:
@@ -81,27 +98,32 @@ repos:
     hooks:
       - id: validate-static-config
         name: validate-static-config
-        # pre-commit intentionally pass all files as args to the command.
-        # Since the json command only takes one file at once we need some shell script to split the args.
         entry:
-          bash -c 'for x in "$@"; do echo "Validating file $x"; json validate --schema-file
-          interfaces/protobuf/schemas/edgeConfiguration/staticConfiguration.json --document-file
-          "$x"; done' --
+          check-jsonschema --schemafile
+          interfaces/protobuf/schemas/edgeConfiguration/staticConfiguration.json --
         language: python
         files: "configuration/static-config.json|tools/android-app/app/src/main/assets/config-0.json"
         types: [json]
-        additional_dependencies: ["json-spec==0.10.1"]
+        additional_dependencies: ["check-jsonschema==0.25.0"]
         verbose: true
       - id: validate-persistency-metadata
         name: validate-persistency-metadata
-        # pre-commit intentionally pass all files as args to the command.
-        # Since the json command only takes one file at once we need some shell script to split the args.
         entry:
-          bash -c 'for x in "$@"; do echo "Validating file $x"; json validate --schema-file
-          interfaces/persistency/schemas/persistencyMetadataFormat.json --document-file "$x"; done'
-          --
+          check-jsonschema --schemafile
+          interfaces/persistency/schemas/persistencyMetadataFormat.json --
         language: python
         files: "interfaces/persistency/examples/persistencyMetadataFormat.json"
         types: [json]
-        additional_dependencies: ["json-spec==0.10.1"]
+        additional_dependencies: ["check-jsonschema==0.25.0"]
+        verbose: true
+      - id: validate-build-files
+        name: validate-build-files
+        entry:
+          bash -e -c 'FILE_MISSING=false; for FILE in "$@"; do if ! grep -q "${FILE}"
+          CMakeLists.txt; then echo "${FILE} is missing from CMakeLists.txt"; FILE_MISSING=true; fi;
+          done; if ${FILE_MISSING}; then exit -1; fi' --
+        language: python
+        files: "^src|^test/unit"
+        exclude: "^test/unit/support"
+        types: [c++]
         verbose: true

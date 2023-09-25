@@ -10,6 +10,7 @@
 - [Step 4: Provision AWS IoT credentials](#step-4-provision-aws-iot-credentials)
 - [Step 5: Deploy Edge Agent](#step-5-deploy-edge-agent)
 - [Step 6: Deploy a campaign to the Raspberry Pi](#step-6-deploy-a-campaign-to-the-raspberry-pi)
+- [Step 7: Clean up](#step-7-clean-up)
 
 **Copyright (C) Amazon Web Services, Inc. and/or its affiliates. All rights reserved.**
 
@@ -106,8 +107,8 @@ to take action based on your use of AWS IoT FleetWise._**
 1. Run the following to update the system and install `unzip`:
    ```bash
    sudo apt update \
-     && sudo apt upgrade -y \
-     && sudo apt install -y unzip
+   && sudo apt upgrade -y \
+   && sudo apt install -y unzip
    ```
 1. Run
    ```
@@ -158,7 +159,7 @@ Next, compile FWE for the ARM 64-bit architecture of the processor present in th
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
-     && cd ~/aws-iot-fleetwise-edge
+   && cd ~/aws-iot-fleetwise-edge
    ```
 
 1. Review, modify and supplement [the FWE source code](../../src/) to ensure it meets your use case
@@ -190,26 +191,28 @@ credentials by running the following command. Your Edge Agent binary and its con
 packaged into a ZIP file that is ready for deployment to the Raspberry Pi.
 
 ```bash
-mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
-  && cp -r ~/aws-iot-fleetwise-edge/tools . \
-  && mkdir -p build/src/executionmanagement \
-  && cp ~/aws-iot-fleetwise-edge/build/src/executionmanagement/aws-iot-fleetwise-edge \
-    build/src/executionmanagement/ \
-  && mkdir -p config && cd config \
-  && ../tools/provision.sh \
-    --vehicle-name fwdemo-rpi \
-    --certificate-pem-outfile certificate.pem \
-    --private-key-outfile private-key.key \
-    --endpoint-url-outfile endpoint.txt \
-    --vehicle-name-outfile vehicle-name.txt \
-  && ../tools/configure-fwe.sh \
-    --input-config-file ~/aws-iot-fleetwise-edge/configuration/static-config.json \
-    --output-config-file config-0.json \
-    --log-color Yes \
-    --vehicle-name `cat vehicle-name.txt` \
-    --endpoint-url `cat endpoint.txt` \
-    --can-bus0 can0 \
-  && cd .. && zip -r aws-iot-fleetwise-deploy.zip .
+mkdir -p ~/aws-iot-fleetwise-deploy \
+&& cd ~/aws-iot-fleetwise-deploy \
+&& cp -r ~/aws-iot-fleetwise-edge/tools . \
+&& mkdir -p build \
+&& cp ~/aws-iot-fleetwise-edge/build/aws-iot-fleetwise-edge build \
+&& mkdir -p config \
+&& cd config \
+&& ../tools/provision.sh \
+   --vehicle-name fwdemo-rpi \
+   --certificate-pem-outfile certificate.pem \
+   --private-key-outfile private-key.key \
+   --endpoint-url-outfile endpoint.txt \
+   --vehicle-name-outfile vehicle-name.txt \
+&& ../tools/configure-fwe.sh \
+   --input-config-file ~/aws-iot-fleetwise-edge/configuration/static-config.json \
+   --output-config-file config-0.json \
+   --log-color Yes \
+   --vehicle-name `cat vehicle-name.txt` \
+   --endpoint-url `cat endpoint.txt` \
+   --can-bus0 can0 \
+&& cd .. \
+&& zip -r aws-iot-fleetwise-deploy.zip .
 ```
 
 ## Step 5: Deploy Edge Agent
@@ -234,10 +237,10 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
    ```bash
    mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
-     && unzip -o ~/aws-iot-fleetwise-deploy.zip \
-     && sudo mkdir -p /etc/aws-iot-fleetwise \
-     && sudo cp config/* /etc/aws-iot-fleetwise \
-     && sudo ./tools/install-fwe.sh
+   && unzip -o ~/aws-iot-fleetwise-deploy.zip \
+   && sudo mkdir -p /etc/aws-iot-fleetwise \
+   && sudo cp config/* /etc/aws-iot-fleetwise \
+   && sudo ./tools/install-fwe.sh
    ```
 
 1. Install the [can-isotp](https://en.wikipedia.org/wiki/ISO_15765-2) module:
@@ -272,64 +275,73 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
 ## Step 6: Deploy a campaign to the Raspberry Pi
 
-1. On the development machine, install the AWS IoT FleetWise demo script dependencies by running the
-   following commands. The script installs the following Ubuntu packages: `python3 python3-pip`, and
-   then installs the following PIP packages: `wrapt plotly pandas cantools`.
+1. Run the following _on the development machine_ to install the dependencies of the demo script:
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
-     && sudo -H ./install-deps.sh
+   && sudo -H ./install-deps.sh
    ```
 
-1. On the development machine, deploy a heartbeat campaign that periodically collects OBD data by
-   running the following commands:
+   The above command installs the following Ubuntu packages: `python3 python3-pip`. It then installs
+   the following PIP packages: `wrapt plotly pandas cantools fastparquet`
+
+1. Deploy a heartbeat campaign that periodically collects OBD data by running the following
+   commands:
 
    ```bash
    ./demo.sh --vehicle-name fwdemo-rpi --campaign-file campaign-obd-heartbeat.json
    ```
 
-   The demo script does the following:
+   The demo script:
 
-   1. Registers your AWS account with AWS IoT FleetWise, if it's not already registered.
-   1. Creates a signal catalog. First, the demo script adds standard OBD signals based on
-      `obd-nodes.json`. Next, it adds CAN signals in a flat signal list based on the DBC file
-      `hscan.dbc`.
-   1. Creates a vehicle model, or _model manifest_, that references the signal catalog with every
-      OBD and DBC signal.
-   1. Activates the vehicle model.
-   1. Creates a decoder manifest linked to the vehicle model using `obd-decoders.json` for decoding
+   1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
+   1. Creates an Amazon Timestream database and table.
+   1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
+   1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and
+      secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list.
+   1. Creates a model manifest that references the signal catalog with all of the OBD and DBC
+      signals.
+   1. Activates the model manifest.
+   1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for decoding
       OBD signals from the network interfaces defined in `network-interfaces.json`.
    1. Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest.
    1. Updates the decoder manifest to set the status as `ACTIVE`.
-   1. Creates a vehicle with an ID equal to `fwdemo-rpi`, which is also the name passed to
+   1. Creates a vehicle with a name equal to `fwdemo-rpi`, the same as the name passed to
       `provision.sh`.
    1. Creates a fleet.
    1. Associates the vehicle with the fleet.
-   1. Creates a campaign from `campaign-obd-heartbeat.json`. This contains a time-based collection
+   1. Creates a campaign from `campaign-obd-heartbeat.json` that contains a time-based collection
       scheme that collects OBD data and targets the campaign at the fleet.
    1. Approves the campaign.
-   1. Waits until the campaign status is `HEALTHY`, which means the campaign was deployed to the
-      fleet.
+   1. Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to
+      the fleet.
    1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
    1. Saves the data to an HTML file.
 
-   If you enabled S3 upload destination by passing the option `--enable-s3-upload`, the demo script
-   will additionally:
+   This script will not delete Amazon Timestream resources.
 
-   - Create S3 bucket for collected data for S3 campaigns, if not already created
-   - Create IAM roles and policies required for the service to write data to the S3 resources
-   - Creates 2 additional campaigns from `campaign-brake-event.json`. One campaign will upload data
-     to to S3 in JSON format, one to S3 in parquet format
-   - Wait 20 minutes for the data to propagate to S3 and then downloads it
-   - Save the data to an HTML file
-
-   When the script completes, you receive the path to the output HTML file on your local machine. To
-   download it, use `scp`, and then open it in your web browser:
+1. When the script completes, a path to an HTML file is given. _On your local machine_, use `scp` to
+   download it, then open it in your web browser:
 
    ```bash
    scp -i <PATH_TO_PEM> ubuntu@<EC2_IP_ADDRESS>:<PATH_TO_HTML_FILE> .
    ```
 
-1. To explore the collected data, click and drag on the graph to zoom in. Alternatively, if your AWS
-   account is enrolled with QuickSight or Amazon Managed Grafana, you can use them to browse the
-   data from Amazon Timestream directly.
+1. To explore the collected data, you can click and drag to zoom in.
+
+   Alternatively, if your AWS account is enrolled with Amazon QuickSight or Amazon Managed Grafana,
+   you may use them to browse the data from Amazon Timestream directly.
+
+## Step 7: Clean up
+
+Run the following to clean up resources created by the `provision.sh` and `demo.sh` scripts.
+**Note:** The Amazon Timestream resources are not deleted.
+
+```bash
+cd ~/aws-iot-fleetwise-edge/tools/cloud \
+&& clean-up.sh \
+&& ../provision.sh \
+   --vehicle-name fwdemo-rpi \
+   --region us-east-1 \
+   --only-clean-up
+```

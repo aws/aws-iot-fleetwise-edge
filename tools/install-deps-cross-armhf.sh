@@ -9,6 +9,7 @@ source ${SCRIPT_DIR}/install-deps-versions.sh
 
 USE_CACHE="true"
 WITH_GREENGRASSV2_SUPPORT="false"
+SHARED_LIBS="OFF"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -21,10 +22,14 @@ parse_args() {
             USE_CACHE="false"
             shift
             ;;
+        --shared-libs)
+            SHARED_LIBS="ON"
+            ;;
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --with-greengrassv2-support  Install dependencies for Greengrass V2"
             echo "  --native-prefix              Native install prefix"
+            echo "  --shared-libs                Build shared libs, rather than static libs"
             exit 0
             ;;
         esac
@@ -40,10 +45,29 @@ if [ "${ARCH}" == "armhf" ]; then
     exit -1
 fi
 
-sed -i "s/deb http/deb [arch=${ARCH}] http/g" /etc/apt/sources.list
+print_file() {
+    echo ">>> $1: $2"
+    cat $2
+    echo ">>>"
+}
+
+print_file "Before patching" /etc/apt/sources.list
+sed -i -E "s/deb (http|mirror\+file)/deb [arch=${ARCH}] \1/g" /etc/apt/sources.list
 cp /etc/apt/sources.list /etc/apt/sources.list.d/armhf.list
-sed -i "s/deb \[arch=${ARCH}\] http/deb [arch=armhf] http/g" /etc/apt/sources.list.d/armhf.list
-sed -i -E "s#(archive|security).ubuntu.com/ubuntu#ports.ubuntu.com/ubuntu-ports#g" /etc/apt/sources.list.d/armhf.list
+sed -i -E "s/deb \[arch=${ARCH}\] (http|mirror\+file)/deb [arch=armhf] \1/g" /etc/apt/sources.list.d/armhf.list
+# GitHub uses a separate mirrors file
+if [ -f /etc/apt/apt-mirrors.txt ]; then
+    print_file "Before patching" /etc/apt/apt-mirrors.txt
+    cp /etc/apt/apt-mirrors.txt /etc/apt/apt-mirrors-armhf.txt
+    sed -i "s#/etc/apt/apt-mirrors.txt#/etc/apt/apt-mirrors-armhf.txt#g" /etc/apt/sources.list.d/armhf.list
+    PATCH_FILE="/etc/apt/apt-mirrors-armhf.txt"
+    print_file "After patching" /etc/apt/apt-mirrors-armhf.txt
+else
+    PATCH_FILE="/etc/apt/sources.list.d/armhf.list"
+fi
+sed -i -E "s#(archive|security).ubuntu.com/ubuntu#ports.ubuntu.com/ubuntu-ports#g" ${PATCH_FILE}
+print_file "After patching" /etc/apt/sources.list.d/armhf.list
+
 dpkg --add-architecture armhf
 apt update
 apt install -y \
@@ -85,7 +109,7 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
     mkdir build && cd build
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_SHARED_LIBS=OFF \
+        -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
         -DCMAKE_POSITION_INDEPENDENT_CODE=On \
         -DJSONCPP_WITH_TESTS=Off \
         -DJSONCPP_WITH_POST_BUILD_UNITTEST=Off \
@@ -99,12 +123,25 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
     tar -zxf protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
     cd protobuf-${VERSION_PROTOBUF}
     mkdir build && cd build
-    ../configure --prefix=${NATIVE_PREFIX}
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+        -Dprotobuf_BUILD_TESTS=Off \
+        -DCMAKE_INSTALL_PREFIX=${NATIVE_PREFIX} \
+        ..
     make install -j`nproc`
     cd ..
     mkdir build_armhf && cd build_armhf
-    CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ \
-        ../configure --host=arm-linux --prefix=/usr/local/arm-linux-gnueabihf
+    cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+        -Dprotobuf_BUILD_TESTS=Off \
+        -Dprotobuf_BUILD_PROTOC_BINARIES=Off \
+        -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
+        -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
+        ..
     make install -j`nproc`
     cd ../..
 
@@ -112,35 +149,41 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
     tar -zxf curl-${VERSION_CURL}.tar.gz
     cd curl-${VERSION_CURL}
     mkdir build && cd build
-    LDFLAGS="-static" PKG_CONFIG="pkg-config --static" CC=arm-linux-gnueabihf-gcc ../configure \
-        --disable-shared --enable-static --disable-ldap --enable-ipv6 --with-ssl --disable-unix-sockets \
-        --disable-rtsp --without-zstd --host=arm-linux --prefix=/usr/local/arm-linux-gnueabihf
-    make install -j`nproc` V=1 LDFLAGS="-static"
+    CURL_OPTIONS="
+        --disable-ldap
+        --enable-ipv6
+        --with-ssl
+        --disable-unix-sockets
+        --disable-rtsp
+        --without-zstd
+        --host=arm-linux
+        --prefix=/usr/local/arm-linux-gnueabihf"
+    if [ "${SHARED_LIBS}" == "OFF" ]; then
+        LDFLAGS="-static" PKG_CONFIG="pkg-config --static" CC=arm-linux-gnueabihf-gcc \
+        ../configure \
+            --disable-shared \
+            --enable-static \
+            ${CURL_OPTIONS}
+        make install -j`nproc` V=1 LDFLAGS="-static"
+    else
+        CC=arm-linux-gnueabihf-gcc \
+        ../configure \
+            --enable-shared \
+            --disable-static \
+            ${CURL_OPTIONS}
+        make install -j`nproc` V=1
+    fi
     cd ../..
 
-    git clone -b ${VERSION_AWS_SDK_CPP} --recursive https://github.com/aws/aws-sdk-cpp.git
-    cd aws-sdk-cpp
-    mkdir build && cd build
-    cmake \
-        -DENABLE_TESTING=OFF \
-        -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_ONLY='s3-crt;iot' \
-        -DAWS_CUSTOM_MEMORY_MANAGEMENT=ON \
-        -DZLIB_LIBRARY=/usr/lib/arm-linux-gnueabihf/libz.a \
-        -DCURL_LIBRARY=/usr/local/arm-linux-gnueabihf/lib/libcurl.a \
-        -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
-        -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
-        ..
-    make install -j`nproc`
-    cd ../..
-
+    # Build AWS IoT Device SDK before AWS SDK because they both include aws-crt-cpp as submodules.
+    # And although we make sure both versions match, we want the AWS SDK version to prevail so that
+    # we always use the same aws-crt-cpp regardless whether Greengrass is enabled.
     if ${WITH_GREENGRASSV2_SUPPORT}; then
         git clone -b ${VERSION_AWS_IOT_DEVICE_SDK_CPP_V2} --recursive https://github.com/aws/aws-iot-device-sdk-cpp-v2.git
         cd aws-iot-device-sdk-cpp-v2
         mkdir build && cd build
         cmake \
-            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
             -DBUILD_DEPS=ON \
             -DBUILD_TESTING=OFF \
             -DUSE_OPENSSL=ON \
@@ -151,6 +194,27 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         make install -j`nproc`
         cd ../..
     fi
+
+    git clone -b ${VERSION_AWS_SDK_CPP} --recursive https://github.com/aws/aws-sdk-cpp.git
+    cd aws-sdk-cpp
+    mkdir build && cd build
+    if [ "${SHARED_LIBS}" == "OFF" ]; then
+        AWS_SDK_CPP_OPTIONS="-DZLIB_LIBRARY=/usr/lib/arm-linux-gnueabihf/libz.a -DCURL_LIBRARY=/usr/local/arm-linux-gnueabihf/lib/libcurl.a"
+    else
+        AWS_SDK_CPP_OPTIONS=""
+    fi
+    cmake \
+        -DENABLE_TESTING=OFF \
+        -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_ONLY='s3-crt;iot' \
+        -DAWS_CUSTOM_MEMORY_MANAGEMENT=ON \
+        ${AWS_SDK_CPP_OPTIONS} \
+        -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
+        -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
+        ..
+    make install -j`nproc`
+    cd ../..
 
     cd ..
     rm -rf deps-cross-armhf

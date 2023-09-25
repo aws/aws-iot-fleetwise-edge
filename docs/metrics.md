@@ -1,9 +1,9 @@
 # Application level metrics
 
 The Reference Implementation for AWS IoT Fleetwise ("FWE") includes a
-[TraceModule](../src/platform/linux/logmanagement/src/TraceModule.cpp). The TraceModule provides a
-set of metrics that are used as an entry point to efficiently diagnose issues, saving you time since
-you no longer need to review the entire log of all FWE instances running.
+[TraceModule](../src/TraceModule.cpp). The TraceModule provides a set of metrics that are used as an
+entry point to efficiently diagnose issues, saving you time since you no longer need to review the
+entire log of all FWE instances running.
 
 - **`RFrames0` - `RFrames19`** are monotonic counters of the number of raw can frames read on each
   bus. If these counters remain null or remain fixed for a longer runtime, the system might either
@@ -186,9 +186,8 @@ if and how to upload them to the cloud.
 # Adding new metrics
 
 Adding new metrics requires changing the C++ code and recompiling FWE. Add the metrics to the
-`TraceVariable` enum in [TraceModule.h](../src/platform/linux/logmanagement/include/TraceModule.h)
-and assign a short name in the function `getVariableName` of
-[TraceModule.cpp](../src/platform/linux/logmanagement/src/TraceModule.cpp). Then you can set the
+`TraceVariable` enum in [TraceModule.h](../src/TraceModule.h) and assign a short name in the
+function `getVariableName` of [TraceModule.cpp](../src/TraceModule.cpp). Then you can set the
 metrics anywhere by using:
 
 ```cpp

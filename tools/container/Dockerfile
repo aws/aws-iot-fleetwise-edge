@@ -13,11 +13,11 @@ RUN apt-get update \
         jq \
     && rm -rf /var/lib/apt/lists/*
 
-COPY ${TARGETPLATFORM}/src/executionmanagement/aws-iot-fleetwise-edge /usr/bin/
-COPY tools/container/start-fwe.sh                                     /usr/bin
-COPY tools/configure-fwe.sh                                           /usr/bin/
-COPY LICENSE                                                          /usr/share/doc/aws-iot-fleetwise-edge/
-COPY THIRD-PARTY-LICENSES                                             /usr/share/doc/aws-iot-fleetwise-edge/
-COPY configuration/static-config.json                                 /usr/share/aws-iot-fleetwise/
+COPY ${TARGETPLATFORM}/aws-iot-fleetwise-edge /usr/bin/
+COPY tools/container/start-fwe.sh             /usr/bin
+COPY tools/configure-fwe.sh                   /usr/bin/
+COPY LICENSE                                  /usr/share/doc/aws-iot-fleetwise-edge/
+COPY THIRD-PARTY-LICENSES                     /usr/share/doc/aws-iot-fleetwise-edge/
+COPY configuration/static-config.json         /usr/share/aws-iot-fleetwise/
 
 ENTRYPOINT ["/usr/bin/start-fwe.sh"]

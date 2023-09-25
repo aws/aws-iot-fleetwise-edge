@@ -157,7 +157,15 @@ class Canigen:
                 self._can_bus.send(frame)
             send_time += cycle_time / 1000
             sleep_time = send_time - time.monotonic()
-            if sleep_time >= 0:
+            if cycle_time >= 5 and sleep_time < 2.0 / 1000.0:
+                # If multiple signal samples with millisecond time precision are
+                # put into Timestream with exact same timestamp Timstream dedupes them, which
+                # might break test scenarios as there will be only one row for multiple samples.
+                # To avoid sending multiple messages of the same id with a cyclic time
+                # above 5 milliseconds within the same milliseconds slow the catch-up down
+                # to have at least 2 milliseconds between messages.
+                time.sleep(2 / 1000)
+            elif sleep_time >= 0:
                 time.sleep(sleep_time)
 
     def _get_supported_pids(self, num_range, ecu):
