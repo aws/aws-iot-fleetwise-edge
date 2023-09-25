@@ -26,8 +26,8 @@ This section describes how to get started on a Renesas
     ```bash
     cd ~/aws-iot-fleetwise-edge
     sudo -H ./tools/install-deps-cross-arm64.sh \
-        && rm -rf build \
-        && ./tools/build-fwe-cross-arm64.sh
+    && rm -rf build \
+    && ./tools/build-fwe-cross-arm64.sh
     ```
 
 - **Internet Router with Ethernet:** The R-Car S4 Spider board must be connected to an internet
@@ -49,8 +49,8 @@ on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 1. Run the following to build SD-card image:
 
    ```bash
-    cd ~/aws-iot-fleetwise-edge \
-       && sudo ./tools/renesas-rcar-s4/make-rootfs.sh 20.04.5 spider -sd
+   cd ~/aws-iot-fleetwise-edge \
+   && sudo ./tools/renesas-rcar-s4/make-rootfs.sh 20.04.5 spider -sd
    ```
 
 ## Flash the SD-Card Image
@@ -58,7 +58,7 @@ on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 1. Run the following to write the image to micro SD-card:
 
    ```bash
-    sudo dd if=./Ubuntu-20.04.5-rootfs-image-rcar-spider-sdcard.ext4 of=/dev/sdc bs=1M status=progress
+   sudo dd if=./Ubuntu-20.04.5-rootfs-image-rcar-spider-sdcard.ext4 of=/dev/sdc bs=1M status=progress
    ```
 
 ## Specify Initial Board Configuration
@@ -84,14 +84,14 @@ on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 1. Enter following settings to flash the micro SD-card data to board
 
    ```bash
-     setenv _booti 'booti 0x48080000 - 0x48000000'
-     setenv sd1 'setenv bootargs rw root=/dev/mmcblk0p1 rootwait ip=dhcp maxcpus=1'
-     setenv sd2 ext4load mmc 0:1 0x48080000 /boot/Image
-     setenv sd3 ext4load mmc 0:1 0x48000000 /boot/r8a779f0-spider.dtb
-     setenv sd 'run sd1; run sd2; run sd3; run _booti'
-     setenv bootcmd 'run sd'
-     saveenv
-     boot
+   setenv _booti 'booti 0x48080000 - 0x48000000'
+   setenv sd1 'setenv bootargs rw root=/dev/mmcblk0p1 rootwait ip=dhcp maxcpus=1'
+   setenv sd2 ext4load mmc 0:1 0x48080000 /boot/Image
+   setenv sd3 ext4load mmc 0:1 0x48000000 /boot/r8a779f0-spider.dtb
+   setenv sd 'run sd1; run sd2; run sd3; run _booti'
+   setenv bootcmd 'run sd'
+   saveenv
+   boot
    ```
 
 1. Connect to the R-Car S4 Spider board via SSH, entering password `rcar`:
@@ -107,12 +107,13 @@ Edge Agent binary and its configuration files will be packaged into a ZIP file r
 to the board.
 
 ```bash
-mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
+mkdir -p ~/aws-iot-fleetwise-deploy \
+&& cd ~/aws-iot-fleetwise-deploy \
 && cp -r ~/aws-iot-fleetwise-edge/tools . \
-&& mkdir -p build/src/executionmanagement \
-&& cp ~/aws-iot-fleetwise-edge/build/src/executionmanagement/aws-iot-fleetwise-edge \
-  build/src/executionmanagement/ \
-&& mkdir -p config && cd config \
+&& mkdir -p build \
+&& cp ~/aws-iot-fleetwise-edge/build/aws-iot-fleetwise-edge build \
+&& mkdir -p config \
+&& cd config \
 && ../tools/provision.sh \
   --vehicle-name fwdemo-rcars4 \
   --certificate-pem-outfile certificate.pem \
@@ -126,7 +127,8 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
   --vehicle-name `cat vehicle-name.txt` \
   --endpoint-url `cat endpoint.txt` \
   --can-bus0 vcan0 \
-&& cd .. && zip -r aws-iot-fleetwise-deploy.zip .
+&& cd .. \
+&& zip -r aws-iot-fleetwise-deploy.zip .
 ```
 
 ## Deploy Edge Agent on R-Car S4 Spider board
@@ -150,14 +152,15 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    Spider board_** to install your Edge Agent as a service:
 
    ```bash
-    mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
-       && unzip -o ~/aws-iot-fleetwise-deploy.zip \
-       && sudo mkdir -p /etc/aws-iot-fleetwise \
-       && sudo cp config/* /etc/aws-iot-fleetwise
+   mkdir -p ~/aws-iot-fleetwise-deploy \
+   && cd ~/aws-iot-fleetwise-deploy \
+   && unzip -o ~/aws-iot-fleetwise-deploy.zip \
+   && sudo mkdir -p /etc/aws-iot-fleetwise \
+   && sudo cp config/* /etc/aws-iot-fleetwise
 
-    sudo ./tools/install-socketcan.sh
-    sed -i -e 's/^After/# After/' -e 's/^Wants/#Wants/' ./tools/cansim/cansim@.service
-    sudo -H ./tools/install-cansim.sh
+   sudo ./tools/install-socketcan.sh
+   sed -i -e 's/^After/# After/' -e 's/^Wants/#Wants/' ./tools/cansim/cansim@.service
+   sudo -H ./tools/install-cansim.sh
    ```
 
 1. Run the following **_on the R-Car S4 Spider board_** to view and follow the log (press CTRL+C to
@@ -177,3 +180,17 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    sudo -H ./install-deps.sh
    ./demo.sh --vehicle-name fwdemo-rcars4 --campaign-file campaign-obd-heartbeat.json
    ```
+
+## Clean up
+
+Run the following _on the development machine_ to clean up resources created by the `provision.sh`
+and `demo.sh` scripts. **Note:** The Amazon Timestream resources are not deleted.
+
+```bash
+cd ~/aws-iot-fleetwise-edge/tools/cloud \
+&& clean-up.sh \
+&& ../provision.sh \
+   --vehicle-name fwdemo-rcars4 \
+   --region us-east-1 \
+   --only-clean-up
+```

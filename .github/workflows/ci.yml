@@ -38,7 +38,7 @@ jobs:
           build-arch: "native"
           upload-arch: "amd64"
           cache-paths: /usr/local/x86_64-linux-gnu
-          dist-files: build/src/executionmanagement/aws-iot-fleetwise-edge:.
+          dist-files: build/aws-iot-fleetwise-edge:.
 
   build-arm64:
     runs-on: ubuntu-20.04
@@ -49,7 +49,7 @@ jobs:
           build-arch: "cross-arm64"
           upload-arch: "arm64"
           cache-paths: /usr/local/aarch64-linux-gnu:/usr/local/x86_64-linux-gnu
-          dist-files: build/src/executionmanagement/aws-iot-fleetwise-edge:.
+          dist-files: build/aws-iot-fleetwise-edge:.
 
   build-armhf:
     runs-on: ubuntu-20.04
@@ -60,7 +60,7 @@ jobs:
           build-arch: "cross-armhf"
           upload-arch: "armhf"
           cache-paths: /usr/local/arm-linux-gnueabihf:/usr/local/x86_64-linux-gnu
-          dist-files: build/src/executionmanagement/aws-iot-fleetwise-edge:.
+          dist-files: build/aws-iot-fleetwise-edge:.
 
   build-android:
     runs-on: ubuntu-20.04
@@ -70,11 +70,11 @@ jobs:
         with:
           build-arch: "cross-android"
           upload-arch: "android"
-          cache-paths: /usr/local/aarch64-linux-android:/usr/local/armv7a-linux-androideabi:/usr/local/x86_64-linux-gnu
+          cache-paths: /usr/local/x86_64-linux-android:/usr/local/aarch64-linux-android:/usr/local/armv7a-linux-androideabi:/usr/local/x86_64-linux-gnu
           dist-files:
-            build/x86_64/src/executionmanagement/libaws-iot-fleetwise-edge.so:x86_64
-            build/armeabi-v7a/src/executionmanagement/libaws-iot-fleetwise-edge.so:armeabi-v7a
-            build/arm64-v8a/src/executionmanagement/libaws-iot-fleetwise-edge.so:arm64-v8a
+            build/x86_64/libaws-iot-fleetwise-edge.so:x86_64
+            build/armeabi-v7a/libaws-iot-fleetwise-edge.so:armeabi-v7a
+            build/arm64-v8a/libaws-iot-fleetwise-edge.so:arm64-v8a
       - name: build-app
         run: |
           mkdir -p tools/android-app/app/src/main/jniLibs

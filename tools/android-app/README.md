@@ -21,13 +21,18 @@ available [ELM327 Bluetooth OBD adapter](https://www.amazon.com/s?k=elm327+bluet
 
 1. Open the AWS CloudShell: [Launch CloudShell](https://console.aws.amazon.com/cloudshell/home)
 
+1. Run the following command to clone the FWE repo from GitHub:
+
+   ```bash
+   git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge
+   ```
+
 1. Run the following script to provision credentials for the app to connect to your AWS account. You
    will be asked to enter the name of an existing S3 bucket, in which the credentials will be saved.
    **Note:** It is important that the chosen S3 bucket is not public.
 
    ```bash
-   git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
-   && cd ~/aws-iot-fleetwise-edge/tools/android-app/cloud \
+   cd ~/aws-iot-fleetwise-edge/tools/android-app/cloud \
    && pip3 install segno \
    && ./provision.sh --s3-qr-code
    ```
@@ -198,9 +203,9 @@ An x86_64 Ubuntu 20.04 development machine with 200GB free disk space should be 
    ```bash
    ./tools/build-fwe-cross-android.sh \
    && ./tools/build-dist.sh \
-       build/x86_64/src/executionmanagement/libaws-iot-fleetwise-edge.so:x86_64 \
-       build/arm64-v8a/src/executionmanagement/libaws-iot-fleetwise-edge.so:arm64-v8a \
-       build/armeabi-v7a/src/executionmanagement/libaws-iot-fleetwise-edge.so:armeabi-v7a
+       build/x86_64/libaws-iot-fleetwise-edge.so:x86_64 \
+       build/arm64-v8a/libaws-iot-fleetwise-edge.so:arm64-v8a \
+       build/armeabi-v7a/libaws-iot-fleetwise-edge.so:armeabi-v7a
    ```
 
 1. Build the app:

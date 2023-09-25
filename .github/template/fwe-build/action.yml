@@ -58,7 +58,7 @@ runs:
       with:
         name: build-${{ inputs.upload-arch }}
         path: |
-          build/src/executionmanagement/aws-iot-fleetwise-edge
+          build/aws-iot-fleetwise-edge
           build/aws-iot-fleetwise-edge-${{ inputs.upload-arch }}.tar.gz
           build/Testing/Temporary/
           build/**/report-*.xml

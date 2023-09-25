@@ -14,9 +14,9 @@ This section describes how to get started on an NXP S32G-VNP-RDB2 board.
 
     ```bash
     cd ~/aws-iot-fleetwise-edge \
-        && sudo -H ./tools/install-deps-cross-arm64.sh \
-        && rm -rf build \
-        && ./tools/build-fwe-cross-arm64.sh
+    && sudo -H ./tools/install-deps-cross-arm64.sh \
+    && rm -rf build \
+    && ./tools/build-fwe-cross-arm64.sh
     ```
 
 - **Internet Router with Ethernet:** The S32G-VNP-RDB2 must be connected to an internet router via
@@ -36,14 +36,14 @@ required by FWE, an updated version of the `canutils` package and a `systemd` se
 
    ```bash
    cd ~/aws-iot-fleetwise-edge \
-       && sudo ./tools/install-deps-yocto.sh
+   && sudo ./tools/install-deps-yocto.sh
    ```
 
 1. Run the following to create a build folder and setup the Yocto project:
 
    ```bash
    mkdir -p ~/yocto-build && cd ~/yocto-build \
-       && ~/aws-iot-fleetwise-edge/tools/setup-yocto-s32g.sh
+   && ~/aws-iot-fleetwise-edge/tools/setup-yocto-s32g.sh
    ```
 
 1. Run the following to run `bitbake` to create the SD-card image and compress it. This can take
@@ -52,8 +52,8 @@ required by FWE, an updated version of the `canutils` package and a `systemd` se
 
    ```bash
    source sources/poky/oe-init-build-env build_s32g274ardb2ubuntu \
-       && bitbake fsl-image-ubuntu \
-       && gzip -fk tmp/deploy/images/s32g274ardb2/fsl-image-ubuntu-s32g274ardb2.sdcard
+   && bitbake fsl-image-ubuntu \
+   && gzip -fk tmp/deploy/images/s32g274ardb2/fsl-image-ubuntu-s32g274ardb2.sdcard
    ```
 
 1. Run the following _on your local machine_ to download the compressed SD-card image:
@@ -96,26 +96,28 @@ above), to create an IoT Thing and provision credentials for it. Your Edge Agent
 configuration files will be packaged into a ZIP file ready to be deployed to the board.
 
 ```bash
-mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
+mkdir -p ~/aws-iot-fleetwise-deploy \
+&& cd ~/aws-iot-fleetwise-deploy \
 && cp -r ~/aws-iot-fleetwise-edge/tools . \
-&& mkdir -p build/src/executionmanagement \
-&& cp ~/aws-iot-fleetwise-edge/build/src/executionmanagement/aws-iot-fleetwise-edge \
-  build/src/executionmanagement/ \
-&& mkdir -p config && cd config \
+&& mkdir -p build \
+&& cp ~/aws-iot-fleetwise-edge/build/aws-iot-fleetwise-edge build \
+&& mkdir -p config \
+&& cd config \
 && ../tools/provision.sh \
-  --vehicle-name fwdemo-s32g \
-  --certificate-pem-outfile certificate.pem \
-  --private-key-outfile private-key.key \
-  --endpoint-url-outfile endpoint.txt \
-  --vehicle-name-outfile vehicle-name.txt \
+   --vehicle-name fwdemo-s32g \
+   --certificate-pem-outfile certificate.pem \
+   --private-key-outfile private-key.key \
+   --endpoint-url-outfile endpoint.txt \
+   --vehicle-name-outfile vehicle-name.txt \
 && ../tools/configure-fwe.sh \
-  --input-config-file ~/aws-iot-fleetwise-edge/configuration/static-config.json \
-  --output-config-file config-0.json \
-  --log-color Yes \
-  --vehicle-name `cat vehicle-name.txt` \
-  --endpoint-url `cat endpoint.txt` \
-  --can-bus0 can0 \
-&& cd .. && zip -r aws-iot-fleetwise-deploy.zip .
+   --input-config-file ~/aws-iot-fleetwise-edge/configuration/static-config.json \
+   --output-config-file config-0.json \
+   --log-color Yes \
+   --vehicle-name `cat vehicle-name.txt` \
+   --endpoint-url `cat endpoint.txt` \
+   --can-bus0 can0 \
+&& cd .. \
+&& zip -r aws-iot-fleetwise-deploy.zip .
 ```
 
 ## Deploy Edge Agent on NXP S32G board
@@ -139,11 +141,12 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
    your Edge Agent as a service:
 
    ```bash
-   mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
-       && unzip -o ~/aws-iot-fleetwise-deploy.zip \
-       && sudo mkdir -p /etc/aws-iot-fleetwise \
-       && sudo cp config/* /etc/aws-iot-fleetwise \
-       && sudo ./tools/install-fwe.sh
+   mkdir -p ~/aws-iot-fleetwise-deploy \
+   && cd ~/aws-iot-fleetwise-deploy \
+   && unzip -o ~/aws-iot-fleetwise-deploy.zip \
+   && sudo mkdir -p /etc/aws-iot-fleetwise \
+   && sudo cp config/* /etc/aws-iot-fleetwise \
+   && sudo ./tools/install-fwe.sh
    ```
 
 1. Run the following **_on the S32G_** to view and follow the log (press CTRL+C to exit):
@@ -159,5 +162,19 @@ mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
-       && ./demo.sh --vehicle-name fwdemo-s32g --campaign-file campaign-obd-heartbeat.json
+   && ./demo.sh --vehicle-name fwdemo-s32g --campaign-file campaign-obd-heartbeat.json
    ```
+
+## Clean up
+
+Run the following _on the development machine_ to clean up resources created by the `provision.sh`
+and `demo.sh` scripts. **Note:** The Amazon Timestream resources are not deleted.
+
+```bash
+cd ~/aws-iot-fleetwise-edge/tools/cloud \
+&& clean-up.sh \
+&& ../provision.sh \
+   --vehicle-name fwdemo-s32g \
+   --region us-east-1 \
+   --only-clean-up
+```

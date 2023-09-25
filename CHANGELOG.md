@@ -1,5 +1,31 @@
 # Change Log
 
+## v1.0.8 (2023-09-25)
+
+Bug fixes:
+
+- Update AWS C++ SDK to v1.11.148, which includes an
+  [important bugfix](https://github.com/awslabs/aws-c-mqtt/pull/311) for MQTT 3.1.1 clients.
+
+Improvements:
+
+- Add support for building as a library exported by CMake. Set the CMake option
+  `FWE_BUILD_EXECUTABLE` to `OFF`, then use `find_package(AwsIotFwe)`, `${AwsIotFwe_INCLUDE_DIR}`
+  and link with `AwsIotFwe::AwsIotFwe`.
+- Non-functional source code improvements:
+  - Simplify `src/` folder structure, removing sub-namespaces & sub-libraries, and moving unit test
+    files to `test/unit/`.
+  - Correct `#include`s using
+    [`include-what-you-use`](https://github.com/include-what-you-use/include-what-you-use).
+  - Move from compile-time mocking to link-time mocking of AWS C++ SDK using Google Mock.
+- Fix GitHub CI: support separate Ubuntu package mirror file, fix caching of Android install files.
+- Add support for shared libraries to dependency install scripts.
+- Developer guide and demo script improvements:
+  - Add clean up instructions.
+  - Better support existing S3 buckets, with check for same region & ACLs being disabled, and allow
+    setting of bucket policy.
+  - Allow HTML generation of results for custom DBC files.
+
 ## v1.0.7 (2023-08-01)
 
 Features:

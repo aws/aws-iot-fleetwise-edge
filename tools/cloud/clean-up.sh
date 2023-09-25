@@ -9,11 +9,16 @@ ENDPOINT_URL_OPTION=""
 REGION="us-east-1"
 VEHICLE_NAME=""
 DISAMBIGUATOR=""
+SIGNAL_CATALOG=""
 ACCOUNT_ID=`aws sts get-caller-identity --query "Account" --output text`
 SERVICE_ROLE="IoTFleetWiseServiceRole"
 SERVICE_ROLE_POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/"
 FLEET_SIZE=1
 BATCH_SIZE=$((`nproc`*4))
+
+if [ -f demo.env ]; then
+    source demo.env
+fi
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -28,6 +33,10 @@ parse_args() {
             ;;
         --disambiguator)
             DISAMBIGUATOR=$2
+            shift
+            ;;
+        --signal-catalog)
+            SIGNAL_CATALOG=$2
             shift
             ;;
         --endpoint-url)
@@ -45,6 +54,7 @@ parse_args() {
             echo "                             the instance number will be appended to each"
             echo "                             Vehicle name after a '-', e.g. fwdemo-42"
             echo "  --disambiguator <STRING>   The unique string used by the demo.sh script to avoid resource name conflicts"
+            echo "  --signal-catalog <NAME>    Optional: name of signal catalog to delete"
             echo "  --endpoint-url <URL>       The endpoint URL used for AWS CLI calls"
             echo "  --region <REGION>          The region used for AWS CLI calls, default: ${REGION}"
             exit 0
@@ -161,8 +171,9 @@ aws iam detach-role-policy --role-name ${SERVICE_ROLE} --policy-arn ${SERVICE_RO
 aws iam delete-policy --policy-arn ${SERVICE_ROLE_POLICY_ARN} --region ${REGION} || true
 aws iam delete-role --role-name ${SERVICE_ROLE} --region ${REGION} || true
 
-# Note: As the service currently only supports one signal catalog, do not delete it
-# echo "Deleting signal catalog..."
-# aws iotfleetwise delete-signal-catalog \
-#     ${ENDPOINT_URL_OPTION} --region ${REGION} \
-#     --name ${NAME}-signal-catalog 2> /dev/null || true
+if [ "${SIGNAL_CATALOG}" != "" ]; then
+    echo "Deleting signal catalog..."
+    aws iotfleetwise delete-signal-catalog \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${SIGNAL_CATALOG} 2> /dev/null || true
+fi

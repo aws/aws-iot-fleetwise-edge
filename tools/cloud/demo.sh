@@ -66,6 +66,9 @@ parse_args() {
             BUCKET_NAME=$2
             shift
             ;;
+        --set-bucket-policy)
+            SKIP_S3_POLICY=false
+            ;;
         --service-principal)
             SERVICE_PRINCIPAL=$2
             shift
@@ -87,6 +90,7 @@ parse_args() {
             echo "  --campaign-file <FILE>  Campaign JSON file, default: ${DEFAULT_CAMPAIGN_FILE}"
             echo "  --dbc-file <FILE>       DBC file, default: ${DEFAULT_DBC_FILE}"
             echo "  --bucket-name <NAME>    S3 bucket name, if not specified a new bucket will be created"
+            echo "  --set-bucket-policy     Sets the required bucket policy"
             echo "  --clean-up              Delete created resources"
             echo "  --enable-s3-upload      Create campaigns to upload data to S3"
             echo "  --endpoint-url <URL>    The endpoint URL used for AWS CLI calls"
@@ -168,6 +172,12 @@ fi
 save_variables() {
     # Export some variables to a .env file so that they can be referenced by other scripts
     echo "
+VEHICLE_NAME=${VEHICLE_NAME}
+FLEET_SIZE=${FLEET_SIZE}
+DISAMBIGUATOR=${DISAMBIGUATOR}
+ENDPOINT_URL=${ENDPOINT_URL}
+REGION=${REGION}
+SIGNAL_CATALOG=${CREATED_SIGNAL_CATALOG_NAME}
 TIMESTREAM_DB_NAME=${TIMESTREAM_DB_NAME}
 TIMESTREAM_TABLE_NAME=${TIMESTREAM_TABLE_NAME}
 BUCKET_NAME=${BUCKET_NAME}
@@ -177,16 +187,7 @@ BUCKET_NAME=${BUCKET_NAME}
 cleanup() {
     save_variables
     if [ ${CLEAN_UP} == true ]; then
-        ./clean-up.sh \
-            --vehicle-name ${VEHICLE_NAME} \
-            --fleet-size ${FLEET_SIZE} \
-            --disambiguator ${DISAMBIGUATOR} \
-            ${ENDPOINT_URL_OPTION} \
-            --region ${REGION}
-        if [ ! -z "${CREATED_SIGNAL_CATALOG_NAME}" ]; then
-            echo "Deleting signal catalog: ${CREATED_SIGNAL_CATALOG_NAME}"
-            aws iotfleetwise delete-signal-catalog --name ${CREATED_SIGNAL_CATALOG_NAME} ${ENDPOINT_URL_OPTION} --region=${REGION}
-        fi
+        ./clean-up.sh
     fi
 }
 
@@ -348,14 +349,14 @@ aws iam attach-role-policy \
 
 for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
     for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
-        vehicle=${VEHICLES[$((i+j))]}
-        echo "Deleting vehicle ${vehicle} if it already exists..."
+        VEHICLE=${VEHICLES[$((i+j))]}
+        echo "Deleting vehicle ${VEHICLE} if it already exists..."
         # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
         # to print stderr from the output group, but not info about the background process.
         { \
             aws iotfleetwise delete-vehicle \
                 ${ENDPOINT_URL_OPTION} --region ${REGION} \
-                --vehicle-name "${vehicle}" \
+                --vehicle-name "${VEHICLE}" | jq -r .arn \
         2>&3 &} 3>&2 2>/dev/null
     done
     # Wait for all background processes to finish
@@ -400,6 +401,22 @@ EOF
         aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file://s3-bucket-policy.json
     else
         echo "Skipping S3 bucket policy. Since bucket already existed it needs to be manually configured."
+    fi
+    echo "Getting S3 bucket region..."
+    BUCKET_REGION=`aws s3api get-bucket-location --bucket ${BUCKET_NAME} | jq -r .LocationConstraint`
+    if [ -z "${BUCKET_REGION}" ] || [ "${BUCKET_REGION}" == "null" ]; then
+        BUCKET_REGION="us-east-1"
+    fi
+    echo ${BUCKET_REGION}
+    if [ "${BUCKET_REGION}" != "${REGION}" ]; then
+        echo "Error: S3 bucket ${BUCKET_NAME} is not in region ${REGION}. Cross-region not yet supported."
+        exit -1
+    fi
+    echo "Checking bucket ACLs are disabled..."
+    if ! OWNERSHIP_CONTROLS=`aws s3api get-bucket-ownership-controls --bucket ${BUCKET_NAME} 2> /dev/null` \
+        || [ "`echo ${OWNERSHIP_CONTROLS} | jq -r '.OwnershipControls.Rules[0].ObjectOwnership'`" != "BucketOwnerEnforced" ]; then
+        echo "Error: ACLs are enabled for bucket ${BUCKET_NAME}. Disable them at https://s3.console.aws.amazon.com/s3/bucket/${BUCKET_NAME}/property/oo/edit"
+        exit -1
     fi
 fi
 
@@ -501,7 +518,7 @@ else
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
         --name ${SIGNAL_CATALOG_NAME} \
         --description "DBC Attributes" \
-        --nodes-to-add '[{
+        --nodes-to-update '[{
             "attribute": {
                 "dataType": "STRING",
                 "description": "Color",
@@ -580,10 +597,22 @@ aws iotfleetwise update-decoder-manifest \
     --name ${NAME}-decoder-manifest \
     --status ACTIVE | jq -r .arn
 
+echo "Waiting for decoder manifest to become active..."
+while true; do
+    sleep 5
+    DECODER_MANIFEST_STATUS=`aws iotfleetwise get-decoder-manifest \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${NAME}-decoder-manifest`
+    echo ${DECODER_MANIFEST_STATUS} | jq -r .arn
+    if [ `echo ${DECODER_MANIFEST_STATUS} | jq -r .status` == "ACTIVE" ]; then
+        break
+    fi
+done
+
 for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
     for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
-        echo "Creating vehicle ${vehicle}..."
-        vehicle=${VEHICLES[$((i+j))]}
+        VEHICLE=${VEHICLES[$((i+j))]}
+        echo "Creating vehicle ${VEHICLE}..."
         # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
         # to print stderr from the output group, but not info about the background process.
         { \
@@ -593,7 +622,7 @@ for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
                 --association-behavior ValidateIotThingExists \
                 --model-manifest-arn ${MODEL_MANIFEST_ARN} \
                 --attributes '{"Vehicle.Color":"Red"}' \
-                --vehicle-name "${vehicle}" >/dev/null \
+                --vehicle-name "${VEHICLE}" >/dev/null \
         2>&3 &} 3>&2 2>/dev/null
     done
     # Wait for all background processes to finish
@@ -610,15 +639,15 @@ echo ${FLEET_ARN}
 
 for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
     for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
-        vehicle=${VEHICLES[$((i+j))]}
-        echo "Associating vehicle ${vehicle}..."
+        VEHICLE=${VEHICLES[$((i+j))]}
+        echo "Associating vehicle ${VEHICLE}..."
         # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
         # to print stderr from the output group, but not info about the background process.
         { \
             aws iotfleetwise associate-vehicle-fleet \
                 ${ENDPOINT_URL_OPTION} --region ${REGION} \
                 --fleet-id ${NAME}-fleet \
-                --vehicle-name "${vehicle}" \
+                --vehicle-name "${VEHICLE}" \
         2>&3 &} 3>&2 2>/dev/null
     done
     # Wait for all background processes to finish
@@ -705,12 +734,12 @@ check_vehicle_healthy() {
 
 for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
     for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
-        vehicle=${VEHICLES[$((i+j))]}
-        echo "Waiting until status of vehicle ${vehicle} is healthy..."
+        VEHICLE=${VEHICLES[$((i+j))]}
+        echo "Waiting until status of vehicle ${VEHICLE} is healthy..."
         # This output group is run in a background process. Note that stderr is redirected to stream 3 and back,
         # to print stderr from the output group, but not info about the background process.
         { \
-            check_vehicle_healthy "${vehicle}" \
+            check_vehicle_healthy "${VEHICLE}" \
         2>&3 &} 3>&2 2>/dev/null
     done
     # Wait for all background processes to finish
@@ -724,48 +753,84 @@ sleep ${DELAY}
 echo "The DB Name is ${TIMESTREAM_DB_NAME}"
 echo "The DB Table is ${TIMESTREAM_TABLE_NAME}"
 
-for vehicle in ${VEHICLES[@]}; do
-    echo "Querying Timestream for vehicle ${vehicle}..."
+COLLECTED_DATA_DIR="collected-data-${DISAMBIGUATOR}/"
+mkdir -p ${COLLECTED_DATA_DIR}
+
+for VEHICLE in ${VEHICLES[@]}; do
+    echo "Querying Timestream for vehicle ${VEHICLE}..."
     aws timestream-query query \
         --region ${REGION} \
         --query-string "SELECT * FROM \"${TIMESTREAM_DB_NAME}\".\"${TIMESTREAM_TABLE_NAME}\" \
-            WHERE vehicleName = '${vehicle}' \
+            WHERE vehicleName = '${VEHICLE}' \
             AND time between ago(1m) and now() ORDER BY time ASC" \
-        > ${vehicle}-timestream-result.json
+        > ${COLLECTED_DATA_DIR}${VEHICLE}-timestream-result.json
 done
 
-if [ "${DBC_FILE}" == "" ]; then
-    OUTPUT_FILES=()
-    for vehicle in ${VEHICLES[@]}; do
-        echo "Converting to HTML..."
-        OUTPUT_FILE_HTML="${vehicle}.html"
-        OUTPUT_FILES+=(${OUTPUT_FILE_HTML})
-        python3 timestream-to-html.py ${vehicle}-timestream-result.json ${OUTPUT_FILE_HTML}
-    done
-
-    echo "You can now view the collected data."
-    echo "----------------------------------"
-    echo "| Collected data in HTML format: |"
-    echo "----------------------------------"
-    for file in ${OUTPUT_FILES[@]}; do
-        echo $(pwd)/${file}
-    done
+if [ "${DBC_FILE}" != "" ]; then
+    echo "----------------------------------------------------------------------------------------"
+    echo "| Note: A custom DBC file was used. If an error occurs below due to no collected data, |"
+    echo "|       you need to modify cansim.py or run FWE with a real vehicle.                   |"
+    echo "----------------------------------------------------------------------------------------"
 fi
+
+OUTPUT_FILES=()
+for VEHICLE in ${VEHICLES[@]}; do
+    echo "Converting to HTML..."
+    OUTPUT_FILE_HTML="${COLLECTED_DATA_DIR}${VEHICLE}.html"
+    OUTPUT_FILES+=(${OUTPUT_FILE_HTML})
+    python3 timestream-to-html.py \
+        ${COLLECTED_DATA_DIR}${VEHICLE}-timestream-result.json \
+        ${OUTPUT_FILE_HTML}
+done
+
+echo "You can now view the collected data."
+echo "----------------------------------"
+echo "| Collected data in HTML format: |"
+echo "----------------------------------"
+for FILE in ${OUTPUT_FILES[@]}; do
+    echo `realpath ${FILE}`
+done
 
 if [ ${S3_UPLOAD} == true ]; then
     DELAY=1200
     echo "Waiting 20 minutes for data to be collected and uploaded to S3..."
     sleep ${DELAY}
 
-    if [ "${DBC_FILE}" == "" ]; then
-        echo "Converting data from S3 to HTML..."
-        OUTPUT_FILE_HTML="${NAME}.html"
-        python3 s3-to-html.py --bucket ${BUCKET_NAME} --prefix ${NAME}-campaign-s3-${S3_SUFFIX} --json-output-filename ${NAME}-s3-json-result.html --parquet-output-filename ${NAME}-s3-parquet-result.html
-
-        echo "You can now view the collected data."
-        echo "-------------------------------------"
-        echo "| Collected S3 data in HTML format: |"
-        echo "-------------------------------------"
-        echo `pwd`/${NAME}-s3-json-result.html "and" `pwd`/${NAME}-s3-parquet-result.html
+    echo "Downloading files from S3..."
+    S3_URL="s3://${BUCKET_NAME}/${NAME}-campaign-s3-${S3_SUFFIX}/processed-data/"
+    if ! COLLECTED_FILES=`aws s3 ls --recursive ${S3_URL}`; then
+        echo "Error: no collected data was found at ${S3_URL}"
+        exit -1
     fi
+    echo "${COLLECTED_FILES}" | while read LINE; do
+        KEY=`echo ${LINE} | cut -d ' ' -f4`
+        aws s3 cp s3://${BUCKET_NAME}/${KEY} ${COLLECTED_DATA_DIR}
+    done
+
+    OUTPUT_FILES=()
+    for VEHICLE in ${VEHICLES[@]}; do
+        echo "Converting from JSON to HTML..."
+        OUTPUT_FILE_HTML="${COLLECTED_DATA_DIR}${VEHICLE}-json.html"
+        OUTPUT_FILES+=(${OUTPUT_FILE_HTML})
+        python3 firehose-to-html.py \
+            --vehicle-name ${VEHICLE} \
+            --files ${COLLECTED_DATA_DIR}part-*.json \
+            --html-filename ${OUTPUT_FILE_HTML}
+
+        echo "Converting from Parquet to HTML..."
+        OUTPUT_FILE_HTML="${COLLECTED_DATA_DIR}${VEHICLE}-parquet.html"
+        OUTPUT_FILES+=(${OUTPUT_FILE_HTML})
+        python3 firehose-to-html.py \
+            --vehicle-name ${VEHICLE} \
+            --files ${COLLECTED_DATA_DIR}part-*.parquet \
+            --html-filename ${OUTPUT_FILE_HTML}
+    done
+
+    echo "You can now view the collected data."
+    echo "----------------------------------"
+    echo "| Collected data in HTML format: |"
+    echo "----------------------------------"
+    for FILE in ${OUTPUT_FILES[@]}; do
+        echo `realpath ${FILE}`
+    done
 fi

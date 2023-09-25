@@ -107,7 +107,7 @@ See [SECURITY](./SECURITY.md) for more information
 FWE depends on the following open source libraries. Refer to the corresponding links for more
 information.
 
-- [AWS SDK for C++: v1.11.111](https://github.com/aws/aws-sdk-cpp)
+- [AWS SDK for C++: v1.11.148](https://github.com/aws/aws-sdk-cpp)
   - [Curl: v7.58.0](https://github.com/curl/curl)
   - [OpenSSL: v1.1.1](https://github.com/openssl/openssl)
   - [zlib: v1.2.11](https://github.com/madler/zlib)
@@ -121,7 +121,7 @@ information.
 Optional: The following dependencies are only required when the option `FWE_FEATURE_GREENGRASSV2` is
 enabled.
 
-- [AWS IoT Device SDK for C++ v2: v1.22.0](https://github.com/aws/aws-iot-device-sdk-cpp-v2)
+- [AWS IoT Device SDK for C++ v2: v1.29.0](https://github.com/aws/aws-iot-device-sdk-cpp-v2)
 
 See [LICENSE](./LICENSE) for more information.
 
