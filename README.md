@@ -1,9 +1,9 @@
 # Reference Implementation for AWS IoT FleetWise
 
-> :information_source: To quickly get started, jump to the
-> [Edge Agent Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md), the
-> [Android Guide](./tools/android-app/README.md), or the
-> [Raspberry Pi Tutorial](./docs/rpi-tutorial/raspberry-pi-tutorial.md)
+:information_source: To quickly get started, jump to the
+[Edge Agent Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md), the
+[Android Guide](./tools/android-app/README.md), or the
+[Raspberry Pi Tutorial](./docs/rpi-tutorial/raspberry-pi-tutorial.md).
 
 AWS IoT FleetWise is a service that makes it easy for Automotive OEMs, Fleet operators, Independent
 Software vendors (ISVs) to collect, store, organize, and monitor data from vehicles at scale. The
