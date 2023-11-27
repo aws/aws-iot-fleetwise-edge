@@ -14,6 +14,10 @@
 #include <string>
 #include <unistd.h>
 
+#ifdef FWE_FEATURE_ROS2
+#include <rclcpp/rclcpp.hpp>
+#endif
+
 // coverity[autosar_cpp14_a2_11_1_violation]
 static volatile sig_atomic_t mSignal = 0; // volatile has to be used since it will be modified by a signal handler,
                                           // executed as result of an asynchronous interrupt
@@ -87,9 +91,17 @@ main( int argc, char *argv[] )
             return EXIT_FAILURE;
         }
 
+#ifdef FWE_FEATURE_ROS2
+        rclcpp::init( argc, argv );
+#endif
         signal( SIGINT, signalHandler );
         signal( SIGTERM, signalHandler );
         signal( SIGUSR1, signalHandler );
+        // Ignore SIGPIPE, as per
+        // https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/basic-use.html#sdk-setting-options
+        // coverity[misra_cpp_2008_rule_5_2_9_violation] Using SIG_IGN is the standard method to ignore signals
+        // coverity[autosar_cpp14_m5_2_9_violation] Using SIG_IGN is the standard method to ignore signals
+        signal( SIGPIPE, SIG_IGN ); // NOLINT
         std::string configFilename = argv[1];
         Json::Value config;
         if ( !Aws::IoTFleetWise::IoTFleetWiseConfig::read( configFilename, config ) )

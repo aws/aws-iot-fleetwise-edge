@@ -32,11 +32,29 @@ using CANInterfaceID = std::string;
 static const CANInterfaceID INVALID_CAN_INTERFACE_ID{};
 
 /**
- * @brief Signal ID is an ID provided by Cloud that is unique across all signals found in the vehicle regardless of
- * network bus.
+ * @brief Signal ID is either an ID provided by Cloud that is unique across all signals found in the vehicle regardless
+ * of network bus or an internal ID see INTERNAL_SIGNAL_ID_BITMASK
  */
 using SignalID = uint32_t;
 static constexpr SignalID INVALID_SIGNAL_ID = 0xFFFFFFFF;
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+/**
+ * If this MSB is set the SignalID is an internal ID that is only valid while the process is running.
+ * An internal ID can not be used to store data to disk that should be read after restarting the process
+ * or to send the data to the cloud.
+ * If this MSB is not set than its an ID provided by cloud that together with the decoder manifest ARN is unique
+ * and always valid.
+ */
+static constexpr SignalID INTERNAL_SIGNAL_ID_BITMASK = 0x80000000;
+
+/**
+ * @brief Internally generated Id used for example when partial signal paths are used. This makes it easier
+ * to pass the value instead of passing the full signal path or a shared pointer.
+ * Always the INTERNAL_SIGNAL_ID_BITMASK has to be set.
+ */
+using PartialSignalID = SignalID;
+#endif
 
 /**
  * @brief VSS supported datatypes
@@ -56,7 +74,10 @@ enum struct SignalType
     INT64 = 7,
     FLOAT = 8,
     DOUBLE = 9,
-    BOOLEAN = 10
+    BOOLEAN = 10,
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    RAW_DATA_BUFFER_HANDLE = 11, // internal type RawData::BufferHandle is defined as uint32
+#endif
 };
 
 /**
@@ -150,6 +171,16 @@ struct CANSignalFormat
         return !( *this == other );
     }
 };
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+namespace RawData
+{
+
+using BufferHandle = uint32_t;
+static constexpr BufferHandle INVALID_BUFFER_HANDLE = 0;
+
+} // namespace RawData
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

@@ -4,7 +4,6 @@
 #include "AaosVhalSource.h"
 #include "LoggingModule.h"
 #include "TraceModule.h"
-#include <boost/lockfree/queue.hpp>
 #include <utility>
 
 namespace Aws
@@ -59,10 +58,16 @@ void
 AaosVhalSource::setVehicleProperty( SignalID signalId, double value )
 {
     auto timestamp = mClock->systemTimeSinceEpochMs();
+    CollectedSignalsGroup collectedSignalsGroup;
+    collectedSignalsGroup.push_back( CollectedSignal( signalId, timestamp, value ) );
+
     TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-    if ( !mSignalBufferPtr->push( CollectedSignal( signalId, timestamp, value ) ) )
+    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
+
+    if ( !mSignalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) )
     {
         TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
         FWE_LOG_WARN( "Signal buffer full" );
     }
 }

@@ -44,7 +44,7 @@ TEST( CPUUsageInfoTest, testCPUUsageInfo )
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
     ASSERT_TRUE( cpuUsage.reportPerThreadUsageData( infos ) );
-    ASSERT_EQ( infos.size(), 2 );
+    ASSERT_GE( infos.size(), 2 ); // AWS SDK test may have been run before, which leaves client bootstrap running
     for ( auto t : infos )
     {
         if ( t.threadName == "BusyThread" )

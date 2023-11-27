@@ -43,6 +43,11 @@ public:
                      const std::string &function,
                      const std::string &logEntry ) override;
 
+    /**
+     * @brief Try to flush any log that has been buffered
+     */
+    void flush() override;
+
 private:
     /**
      * @brief Time stamp as a String. The actual timestamp conversion and format happens

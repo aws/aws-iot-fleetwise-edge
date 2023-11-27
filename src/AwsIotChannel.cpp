@@ -5,14 +5,14 @@
 #include "AwsSDKMemoryManager.h"
 #include "CacheAndPersist.h"
 #include "IConnectivityModule.h"
-#include "IReceiver.h"
 #include "LoggingModule.h"
 #include "TraceModule.h"
-#include <aws/common/error.h>
+#include <aws/crt/Api.h>
+#include <aws/crt/Optional.h>
 #include <aws/crt/Types.h>
-#include <aws/crt/mqtt/MqttClient.h>
+#include <aws/crt/mqtt/Mqtt5Packets.h>
+#include <aws/crt/mqtt/Mqtt5Types.h>
 #include <future>
-#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -23,12 +23,15 @@ namespace IoTFleetWise
 
 AwsIotChannel::AwsIotChannel( IConnectivityModule *connectivityModule,
                               std::shared_ptr<PayloadManager> payloadManager,
-                              std::shared_ptr<MqttConnectionWrapper> &mqttConnection )
+                              std::shared_ptr<MqttClientWrapper> &mqttClient,
+                              std::string topicName,
+                              bool subscription )
     : mConnectivityModule( connectivityModule )
     , mPayloadManager( std::move( payloadManager ) )
-    , mConnection( mqttConnection )
+    , mMqttClient( mqttClient )
+    , mTopicName( std::move( topicName ) )
     , mSubscribed( false )
-    , mSubscribeAsynchronously( false )
+    , mSubscription( subscription )
 {
 }
 
@@ -46,18 +49,7 @@ AwsIotChannel::isAliveNotThreadSafe()
     {
         return false;
     }
-    return mConnectivityModule->isAlive();
-}
-
-void
-AwsIotChannel::setTopic( const std::string &topicNameRef, bool subscribeAsynchronously )
-{
-    if ( topicNameRef.empty() )
-    {
-        FWE_LOG_ERROR( "Empty ingestion topic name provided" );
-    }
-    mSubscribeAsynchronously = subscribeAsynchronously;
-    mTopicName = topicNameRef;
+    return mConnectivityModule->isAlive() && ( ( !mSubscription ) || mSubscribed );
 }
 
 ConnectivityError
@@ -69,69 +61,70 @@ AwsIotChannel::subscribe()
         FWE_LOG_ERROR( "Empty ingestion topic name provided" );
         return ConnectivityError::NotConfigured;
     }
-    if ( !isAliveNotThreadSafe() )
+    if ( !mConnectivityModule->isAlive() )
     {
         FWE_LOG_ERROR( "MQTT Connection not established, failed to subscribe" );
         return ConnectivityError::NoConnection;
     }
-    /*
-     * This is invoked upon the reception of a message on a subscribed topic.
-     */
-    auto onMessage = [&]( MqttConnectionWrapper &mqttConnection,
-                          const Aws::Crt::String &topic,
-                          const Aws::Crt::ByteBuf &byteBuf,
-                          bool dup,
-                          Aws::Crt::Mqtt::QOS qos,
-                          bool retain ) {
-        std::ostringstream os;
-        (void)mqttConnection;
-        (void)dup;
-        (void)qos;
-        (void)retain;
-        os << "Message received on topic  " << topic << " payload length: " << byteBuf.len;
-        FWE_LOG_TRACE( os.str() );
-        notifyListeners<const std::uint8_t *, size_t>(
-            &IReceiverCallback::onDataReceived, byteBuf.buffer, byteBuf.len );
-    };
 
     /*
      * Subscribe for incoming publish messages on topic.
      */
-    std::promise<void> subscribeFinishedPromise;
-    auto onSubAck = [&]( MqttConnectionWrapper &mqttConnection,
-                         uint16_t packetId,
-                         const Aws::Crt::String &topic,
-                         Aws::Crt::Mqtt::QOS qos,
-                         int errorCode ) {
-        (void)mqttConnection;
+    std::promise<bool> subscribeFinishedPromise;
+    auto onSubAck = [&]( int errorCode, std::shared_ptr<Aws::Crt::Mqtt5::SubAckPacket> subAckPacket ) {
         mSubscribed = false;
         if ( errorCode != 0 )
         {
-            auto errString = aws_error_debug_str( errorCode );
             TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
-            FWE_LOG_ERROR( "Subscribe failed with error" );
-            FWE_LOG_ERROR( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
+            auto errorString = Aws::Crt::ErrorDebugString( errorCode );
+            FWE_LOG_ERROR( "Subscribe failed with error code " + std::to_string( errorCode ) + ": " +
+                           std::string( errorString != nullptr ? errorString : "Unknown error" ) );
+            subscribeFinishedPromise.set_value( false );
+            return;
         }
-        else
+
+        std::string grantedQoS = "unknown";
+        if ( subAckPacket != nullptr )
         {
-            if ( ( packetId == 0U ) || ( qos == Aws::Crt::Mqtt::QOS::AWS_MQTT_QOS_FAILURE ) )
+            for ( auto reasonCode : subAckPacket->getReasonCodes() )
             {
-                TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_REJECT );
-                FWE_LOG_ERROR( "Subscribe rejected by the Remote broker" );
+                if ( reasonCode <= Aws::Crt::Mqtt5::SubAckReasonCode::AWS_MQTT5_SARC_GRANTED_QOS_2 )
+                {
+                    grantedQoS = std::to_string( reasonCode );
+                }
+                else if ( reasonCode >= Aws::Crt::Mqtt5::SubAckReasonCode::AWS_MQTT5_SARC_UNSPECIFIED_ERROR )
+                {
+                    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
+                    // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
+                    auto reasonString = std::string( subAckPacket->getReasonString()->c_str() != nullptr
+                                                         ? subAckPacket->getReasonString()->c_str()
+                                                         : "Unknown reason" );
+                    FWE_LOG_ERROR( "Server rejected subscription to topic " + mTopicName + ". Reason code " +
+                                   std::to_string( reasonCode ) + ": " + reasonString );
+                    subscribeFinishedPromise.set_value( false );
+                    // Just return on the first error found. There could be multiple reason codes if we request multiple
+                    // subscriptions at once, but we always request a single one.
+                    return;
+                }
             }
-            else
-            {
-                std::ostringstream os;
-                os << "Subscribe on topic  " << topic << " on packetId " << packetId << " succeeded";
-                FWE_LOG_TRACE( os.str() );
-                mSubscribed = true;
-            }
-            subscribeFinishedPromise.set_value();
         }
+
+        FWE_LOG_TRACE( "Subscribe succeeded for topic " + mTopicName + " with QoS " + grantedQoS );
+        mSubscribed = true;
+        subscribeFinishedPromise.set_value( true );
     };
 
-    FWE_LOG_TRACE( "Subscribing..." );
-    mConnection->Subscribe( mTopicName.c_str(), Aws::Crt::Mqtt::QOS::AWS_MQTT_QOS_AT_LEAST_ONCE, onMessage, onSubAck );
+    FWE_LOG_TRACE( "Subscribing to topic " + mTopicName );
+    // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
+    Aws::Crt::Mqtt5::Subscription sub1( mTopicName.c_str(), Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_LEAST_ONCE );
+    auto subPacket = std::make_shared<Aws::Crt::Mqtt5::SubscribePacket>();
+    subPacket->WithSubscription( std::move( sub1 ) );
+
+    if ( !mMqttClient->Subscribe( subPacket, onSubAck ) )
+    {
+        FWE_LOG_ERROR( "Subscribe failed" );
+        return ConnectivityError::NoConnection;
+    }
 
     // Blocked call until subscribe finished this call should quickly either fail or succeed but
     // depends on the network quality the Bootstrap needs to retry subscribing if failed.
@@ -191,7 +184,7 @@ AwsIotChannel::sendBuffer( const std::uint8_t *buf, size_t size, CollectionSchem
 
     if ( !AwsSDKMemoryManager::getInstance().reserveMemory( size ) )
     {
-        FWE_LOG_ERROR( "Not sending out the message  with size " + std::to_string( size ) +
+        FWE_LOG_ERROR( "Not sending out the message with size " + std::to_string( size ) +
                        " because IoT device SDK allocated the maximum defined memory. Payload will be stored" );
 
         if ( collectionSchemeParams.persist )
@@ -205,32 +198,8 @@ AwsIotChannel::sendBuffer( const std::uint8_t *buf, size_t size, CollectionSchem
         return ConnectivityError::QuotaReached;
     }
 
-    auto payload = Aws::Crt::ByteBufNewCopy( Aws::Crt::DefaultAllocator(), (const uint8_t *)buf, size );
+    publishMessage( buf, size );
 
-    auto onPublishComplete =
-        [payload, size, this]( MqttConnectionWrapper &mqttConnection, uint16_t packetId, int errorCode ) mutable {
-            /* This call means that the data was handed over to some lower level in the stack but not
-                that the data is actually sent on the bus or removed from RAM*/
-            (void)mqttConnection;
-            aws_byte_buf_clean_up( &payload );
-            {
-                std::lock_guard<std::mutex> connectivityLambdaLock( mConnectivityLambdaMutex );
-                AwsSDKMemoryManager::getInstance().releaseReservedMemory( size );
-            }
-            if ( ( packetId != 0U ) && ( errorCode == 0 ) )
-            {
-                FWE_LOG_TRACE( "Operation on packetId  " + std::to_string( packetId ) + " Succeeded" );
-                mPayloadCountSent++;
-            }
-            else
-            {
-                auto errSting = aws_error_debug_str( errorCode );
-                std::string errLog = errSting != nullptr ? std::string( errSting ) : std::string( "Unknown error" );
-                FWE_LOG_ERROR( std::string( "Operation failed with error" ) + errLog );
-            }
-        };
-    mConnection->Publish(
-        mTopicName.c_str(), Aws::Crt::Mqtt::QOS::AWS_MQTT_QOS_AT_MOST_ONCE, false, payload, onPublishComplete );
     return ConnectivityError::Success;
 }
 
@@ -264,7 +233,6 @@ AwsIotChannel::sendFile( const std::string &filePath, size_t size, CollectionSch
 
     if ( !isAliveNotThreadSafe() )
     {
-
         if ( collectionSchemeParams.persist )
         {
             // Only store metadata, file is already written on the disk
@@ -279,8 +247,8 @@ AwsIotChannel::sendFile( const std::string &filePath, size_t size, CollectionSch
 
     if ( !AwsSDKMemoryManager::getInstance().reserveMemory( size ) )
     {
-        FWE_LOG_ERROR( "Not sending out the message  with size " + std::to_string( size ) +
-                       " because IoT device SDK allocated the maximum defined memory. Currently allocated " );
+        FWE_LOG_ERROR( "Not sending out the message with size " + std::to_string( size ) +
+                       " because IoT device SDK allocated the maximum defined memory" );
         {
             if ( collectionSchemeParams.persist )
             {
@@ -301,52 +269,88 @@ AwsIotChannel::sendFile( const std::string &filePath, size_t size, CollectionSch
         return ConnectivityError::WrongInputData;
     }
 
-    auto payloadBuffer =
-        Aws::Crt::ByteBufNewCopy( Aws::Crt::DefaultAllocator(), (const uint8_t *)payload.data(), payload.size() );
+    publishMessage( payload.data(), payload.size() );
 
-    auto onPublishComplete =
-        [payloadBuffer, size, this]( MqttConnectionWrapper &mqttConnection, uint16_t packetId, int errorCode ) mutable {
-            /* This call means that the data was handed over to some lower level in the stack but not
-                that the data is actually sent on the bus or removed from RAM */
-            (void)mqttConnection;
-            aws_byte_buf_clean_up( &payloadBuffer );
-            {
-                std::lock_guard<std::mutex> connectivityLambdaLock( mConnectivityLambdaMutex );
-                AwsSDKMemoryManager::getInstance().releaseReservedMemory( size );
-            }
-            if ( ( packetId != 0U ) && ( errorCode == 0 ) )
-            {
-                FWE_LOG_TRACE( "Operation on packetId  " + std::to_string( packetId ) + " Succeeded" );
-            }
-            else
-            {
-                auto errSting = aws_error_debug_str( errorCode );
-                std::string errLog = errSting != nullptr ? std::string( errSting ) : std::string( "Unknown error" );
-                FWE_LOG_ERROR( std::string( "Operation failed with error" ) + errLog );
-            }
-        };
-    mConnection->Publish(
-        mTopicName.c_str(), Aws::Crt::Mqtt::QOS::AWS_MQTT_QOS_AT_MOST_ONCE, false, payloadBuffer, onPublishComplete );
     return ConnectivityError::Success;
+}
+
+void
+AwsIotChannel::publishMessage( const uint8_t *buf, size_t size )
+{
+    auto payload = Aws::Crt::ByteBufFromArray( buf, size );
+
+    auto onPublishComplete = [size, this]( int errorCode,
+                                           std::shared_ptr<Aws::Crt::Mqtt5::PublishResult> result ) mutable {
+        {
+            std::lock_guard<std::mutex> connectivityLambdaLock( mConnectivityLambdaMutex );
+            AwsSDKMemoryManager::getInstance().releaseReservedMemory( size );
+        }
+
+        if ( result->wasSuccessful() )
+        {
+            FWE_LOG_TRACE( "Publish succeeded" );
+            mPayloadCountSent++;
+        }
+        else
+        {
+            auto errorString = Aws::Crt::ErrorDebugString( errorCode );
+            FWE_LOG_ERROR( std::string( "Operation failed with error" ) +
+                           ( errorString != nullptr ? std::string( errorString ) : std::string( "Unknown error" ) ) );
+        }
+    };
+    std::shared_ptr<Aws::Crt::Mqtt5::PublishPacket> publishPacket =
+        std::make_shared<Aws::Crt::Mqtt5::PublishPacket>( mTopicName.c_str(),
+                                                          Aws::Crt::ByteCursorFromByteBuf( payload ),
+                                                          Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE );
+    mMqttClient->Publish( publishPacket, onPublishComplete );
 }
 
 bool
 AwsIotChannel::unsubscribe()
 {
     std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
-    if ( mSubscribed && isAliveNotThreadSafe() )
+    if ( isAliveNotThreadSafe() )
     {
-        std::promise<void> unsubscribeFinishedPromise;
+        std::promise<bool> unsubscribeFinishedPromise;
         FWE_LOG_TRACE( "Unsubscribing..." );
-        mConnection->Unsubscribe( mTopicName.c_str(),
-                                  [&]( MqttConnectionWrapper &mqttConnection, uint16_t packetId, int errorCode ) {
-                                      (void)mqttConnection;
-                                      (void)packetId;
-                                      (void)errorCode;
-                                      FWE_LOG_TRACE( "Unsubscribed" );
-                                      mSubscribed = false;
-                                      unsubscribeFinishedPromise.set_value();
-                                  } );
+        auto unsubPacket = std::make_shared<Aws::Crt::Mqtt5::UnsubscribePacket>();
+        // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
+        unsubPacket->WithTopicFilter( mTopicName.c_str() );
+        mMqttClient->Unsubscribe( unsubPacket, [&]( int errorCode, std::shared_ptr<UnSubAckPacket> unsubAckPacket ) {
+            if ( errorCode != 0 )
+            {
+                TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
+                auto errorString = Aws::Crt::ErrorDebugString( errorCode );
+                FWE_LOG_ERROR( "Unsubscribe failed with error code " + std::to_string( errorCode ) + ": " +
+                               std::string( errorString != nullptr ? errorString : "Unknown error" ) );
+                unsubscribeFinishedPromise.set_value( false );
+                return;
+            }
+
+            if ( unsubAckPacket != nullptr )
+            {
+                for ( Aws::Crt::Mqtt5::UnSubAckReasonCode reasonCode : unsubAckPacket->getReasonCodes() )
+                {
+                    if ( reasonCode >= Aws::Crt::Mqtt5::UnSubAckReasonCode::AWS_MQTT5_UARC_UNSPECIFIED_ERROR )
+                    {
+                        // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
+                        auto reasonString = std::string( unsubAckPacket->getReasonString().has_value()
+                                                             ? unsubAckPacket->getReasonString()->c_str()
+                                                             : "Unknown reason" );
+                        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
+                        FWE_LOG_ERROR( "Server rejected unsubscribe from topic " + mTopicName + ". Reason code " +
+                                       std::to_string( reasonCode ) + ": " + reasonString );
+                        unsubscribeFinishedPromise.set_value( false );
+                        // Just return on the first error found. There could be multiple reason codes if we unsubscribe
+                        // from multiple subscriptions at once, but we always request a single one.
+                        return;
+                    }
+                }
+            }
+            FWE_LOG_TRACE( "Unsubscribed from topic " + mTopicName );
+            mSubscribed = false;
+            unsubscribeFinishedPromise.set_value( true );
+        } );
         // Blocked call until subscribe finished this call should quickly either fail or succeed but
         // depends on the network quality the Bootstrap needs to retry subscribing if failed.
         unsubscribeFinishedPromise.get_future().wait();

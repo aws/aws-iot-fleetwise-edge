@@ -370,21 +370,21 @@ device.
 1. Review, modify and supplement [the FWE source code](../../src/) to ensure it meets your use case
    and requirements.
 
-1. Install the dependencies for FWE. The command below installs the following Ubuntu packages for
-   cross-compiling FWE for ARM 32-bit:
-
-   `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`.
-
-   Additionally, it installs the following: `jsoncpp protobuf aws-sdk-cpp`.
+1. Install the FWE dependencies:
 
    ```bash
    sudo -H ./tools/install-deps-cross-armhf.sh
    ```
 
+   The command above installs the following Ubuntu packages for cross-compiling FWE for ARM 32-bit:
+   `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libsnappy-dev`.
+
+   Additionally, it installs the following: `jsoncpp protobuf curl aws-sdk-cpp`.
+
 1. To compile your Edge Agent, run the following command:
 
    ```bash
-   ./tools/build-fwe-cross-armhf.sh
+   ./tools/build-fwe-cross-armhf.sh --with-iwave-gps-support
    ```
 
 ## Step 4: Provision AWS IoT credentials
@@ -486,7 +486,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    ```
 
    The above command installs the following Ubuntu packages: `python3 python3-pip`. It then installs
-   the following PIP packages: `wrapt plotly pandas cantools fastparquet`
+   the following PIP packages: `wrapt plotly pandas cantools pyarrow`
 
 1. Deploy a heartbeat campaign that periodically collects OBD data by running the following
    commands:

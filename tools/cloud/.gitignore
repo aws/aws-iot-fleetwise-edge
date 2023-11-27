@@ -1,3 +1,5 @@
 s3-bucket-policy.json
 demo.env
 collected-data-*
+ros2-nodes.json
+ros2-decoders.json

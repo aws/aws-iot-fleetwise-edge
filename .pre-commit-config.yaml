@@ -9,7 +9,9 @@ repos:
     rev: v4.4.0
     hooks:
       - id: trailing-whitespace
+        exclude: static/.*\.[js|css]
       - id: end-of-file-fixer
+        exclude: static/.*\.[js|css]
       - id: mixed-line-ending
         args: [--fix=lf]
       - id: check-added-large-files
@@ -94,6 +96,7 @@ repos:
     rev: v2.7.1
     hooks:
       - id: prettier
+        exclude: static/.*\.[js|css]
   - repo: local
     hooks:
       - id: validate-static-config
@@ -104,7 +107,7 @@ repos:
         language: python
         files: "configuration/static-config.json|tools/android-app/app/src/main/assets/config-0.json"
         types: [json]
-        additional_dependencies: ["check-jsonschema==0.25.0"]
+        additional_dependencies: ["check-jsonschema==0.25.0", "urllib3==1.26.17"]
         verbose: true
       - id: validate-persistency-metadata
         name: validate-persistency-metadata
@@ -114,7 +117,7 @@ repos:
         language: python
         files: "interfaces/persistency/examples/persistencyMetadataFormat.json"
         types: [json]
-        additional_dependencies: ["check-jsonschema==0.25.0"]
+        additional_dependencies: ["check-jsonschema==0.25.0", "urllib3==1.26.17"]
         verbose: true
       - id: validate-build-files
         name: validate-build-files
@@ -127,3 +130,14 @@ repos:
         exclude: "^test/unit/support"
         types: [c++]
         verbose: true
+      - id: forbid-tabs
+        name: forbid-tabs
+        language: pygrep
+        entry: "\\t"
+        types: [text]
+        exclude: \.dbc|static/.*\.[js|css]
+      - id: forbid-non-ascii-chars
+        name: forbid-non-ascii-chars
+        language: pygrep
+        entry: "[\\x80-\\xFF]"
+        types: [text]

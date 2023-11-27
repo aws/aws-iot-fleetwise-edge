@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "OBDOverCANModule.h"
+#include "Assert.h"
 #include "ISOTPOverCANOptions.h"
 #include "LoggingModule.h"
 #include "MessageTypes.h"
 #include "SignalTypes.h"
+#include "TraceModule.h"
 #include <algorithm>
-#include <boost/lockfree/spsc_queue.hpp>
-#include <csignal>
 #include <cstddef>
 #include <cstring>
 #include <linux/can.h>
@@ -45,20 +45,18 @@ OBDOverCANModule::~OBDOverCANModule()
 
 bool
 OBDOverCANModule::init( SignalBufferPtr signalBufferPtr,
-                        ActiveDTCBufferPtr activeDTCBufferPtr,
                         const std::string &gatewayCanInterfaceName,
                         uint32_t pidRequestIntervalSeconds,
                         uint32_t dtcRequestIntervalSeconds,
                         bool broadcastRequests )
 {
-    if ( ( signalBufferPtr.get() == nullptr ) || ( activeDTCBufferPtr.get() == nullptr ) )
+    if ( ( signalBufferPtr.get() == nullptr ) )
     {
         FWE_LOG_ERROR( "Received Buffer nullptr" );
         return false;
     }
 
     mSignalBufferPtr = signalBufferPtr;
-    mActiveDTCBufferPtr = activeDTCBufferPtr;
     mOBDDataDecoder = std::make_shared<OBDDataDecoder>( mDecoderDictionaryPtr );
     mGatewayCanInterfaceName = gatewayCanInterfaceName;
     mPIDRequestIntervalSeconds = pidRequestIntervalSeconds;
@@ -155,21 +153,12 @@ OBDOverCANModule::doWork( void *data )
             if ( obdModule->mBroadcastRequests )
             {
                 obdModule->mBroadcastSocket = obdModule->openISOTPBroadcastSocket( isExtendedID );
-                if ( obdModule->mBroadcastSocket < 0 )
-                {
-                    // Failure to open broadcast socket is non recoverable, hence we will send signal out to terminate
-                    std::raise( SIGUSR1 );
-                    return;
-                }
+                // Failure to open broadcast socket is non recoverable, hence we will send signal out to terminate
+                FWE_GRACEFUL_FATAL_ASSERT( obdModule->mBroadcastSocket >= 0, "Failed to open broadcast", );
             }
             // Initialize ECU for each CAN ID in canIDResponse
-            if ( !obdModule->initECUs( isExtendedID, canIDResponses, obdModule->mBroadcastSocket ) )
-            {
-                // Failure from initECUs is non recoverable, hence we will send signal out to terminate program
-                FWE_LOG_ERROR( "Fatal Error. OBDOverCANECU failed to init. Check CAN ISO-TP module" );
-                std::raise( SIGUSR1 );
-                return;
-            }
+            FWE_GRACEFUL_FATAL_ASSERT( obdModule->initECUs( isExtendedID, canIDResponses, obdModule->mBroadcastSocket ),
+                                       "OBDOverCANECU failed to init. Check CAN ISO-TP module", );
             finishECUsDetection = true;
         }
         // As we haven't detected ECUs, wait for 1 second and try again
@@ -246,10 +235,18 @@ OBDOverCANModule::doWork( void *data )
                 // there was a OBD request that did not return any SID::STORED_DTCs
                 if ( successfulDTCRequest )
                 {
-                    // Note DTC buffer is a single producer single consumer queue. This is the only
-                    // thread to push DTC Info to the queue
-                    if ( !obdModule->mActiveDTCBufferPtr->push( dtcInfo ) )
+                    TraceModule::get().incrementAtomicVariable(
+                        TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
+                    TraceModule::get().incrementAtomicVariable(
+                        TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS );
+
+                    if ( !obdModule->mSignalBufferPtr->push(
+                             CollectedDataFrame( std::make_shared<DTCInfo>( dtcInfo ) ) ) )
                     {
+                        TraceModule::get().decrementAtomicVariable(
+                            TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
+                        TraceModule::get().decrementAtomicVariable(
+                            TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS );
                         FWE_LOG_WARN( "DTC Buffer full" );
                     }
                 }

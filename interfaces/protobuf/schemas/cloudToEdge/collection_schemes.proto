@@ -7,6 +7,11 @@ option java_package = "com.amazonaws.iot.autobahn.schemas";
 package Aws.IoTFleetWise.Schemas.CollectionSchemesMsg;
 
 /*
+ * Import common types reused across the project
+ */
+import "common_types.proto";
+
+/*
  * List of collectionSchemes
  */
 message CollectionSchemes {
@@ -107,9 +112,37 @@ message CollectionScheme {
      */
     reserved 15;
     reserved "image_data";
+
+    /*
+     * Additional data for S3 upload.
+     */
+    S3UploadMetadata s3_upload_metadata = 16;
 }
 
-message Probabilities{
+message S3UploadMetadata {
+
+    /*
+     * Bucket name for the S3 upload.
+     */
+    string bucket_name = 1;
+
+    /*
+     * Prefix for object to upload.
+     */
+    string prefix = 2;
+
+    /*
+     * Region of the S3 bucket.
+     */
+    string region = 3;
+
+    /*
+     * Account ID of the bucket owner, required to enforce the expected bucket owner
+     */
+    string bucket_owner_account_id = 4;
+}
+
+message Probabilities {
     /*
      * Double between 0 and 1 giving the probability after a condition is met.
      * 0: never send, 1: send always. It is usable for both condition and time based collectionSchemes.
@@ -149,7 +182,7 @@ message ConditionBasedCollectionScheme {
     /*
      * Root condition node for the Abstract Syntax Tree.
      */
-    ConditionNode condition_tree = 3;
+    CommonTypesMsg.ConditionNode condition_tree = 3;
 
     /*
      * Edge can monitor the previous state of a condition and use this information to allow the customer to set a
@@ -187,6 +220,13 @@ message SignalInformation {
     uint32 signal_id = 1;
 
     /*
+     * signal path specifies the location of partial signal. If signal_id refers to a primitive type, like all CANSignal, signal_path is not allowed be set
+     * If signal_path for the signal defined in signal_id does not refer to a primitive type the ingestion will change to raw byte ingestion (not vehicle_data.proto)
+     * PrimitiveTypeInComplexSignal is not used here as signal_path together with the signal_id might refer to an aggregated type and not only to primitive data
+     */
+    CommonTypesMsg.SignalPath signal_path = 6;
+
+    /*
      * The size of the ring buffer that will contain the data points for this signal
      */
     uint32 sample_buffer_size = 2;
@@ -208,199 +248,6 @@ message SignalInformation {
      * its associated fixed_window_period_ms. Default is false.
      */
     bool condition_only_signal = 5;
-}
-
-/*
- * A node of the condition Abstract Syntax Tree
- */
-message ConditionNode {
-
-    /*
-     * Each Abstract Syntax Tree node can be one of the following types
-     */
-    oneof node {
-
-        /*
-         * An operator node can perform an operation or comparisons on its child node(s)
-         */
-        NodeOperator node_operator = 1;
-
-        /*
-         * Function node is a self-contained module that accomplish a specific task.
-         */
-        NodeFunction node_function = 2;
-
-        /*
-         * A node containing a floating point constant which can be used as a child node to operator nodes.
-         */
-        double node_double_value = 3;
-
-        /*
-         * A node containing a signal id, whose value will be evaluated every time that signal is received on the
-         * vehicle network bus.
-         */
-        uint32 node_signal_id = 4;
-
-        /*
-         * A node containing a boolean constant which can be used as a child node to an operator node.
-         */
-        bool node_boolean_value = 5; }
-
-    /*
-     * Operator node types contain one or two children. If they are unary operator type nodes, only the left child will
-     * be used
-     */
-    message NodeOperator{
-
-        /*
-         * Left child node
-         */
-        ConditionNode left_child = 1;
-
-        /*
-         * Right child node
-         */
-        ConditionNode right_child = 2;
-
-        /*
-         * Operator type used in this node
-         */
-        Operator operator = 3;
-
-        /*
-         * Enum of an operator which can be an binary or unary operator
-         */
-        enum Operator {
-
-            /*
-             * COMPARE operators return a bool and their children must return a double
-             */
-            COMPARE_SMALLER = 0;
-            COMPARE_BIGGER = 1;
-            COMPARE_SMALLER_EQUAL = 2;
-            COMPARE_BIGGER_EQUAL = 3;
-            COMPARE_EQUAL = 4;
-            COMPARE_NOT_EQUAL = 5;
-
-            /*
-             * LOGICAL operators return a bool and their children must return a bool
-             */
-            LOGICAL_AND = 6;
-            LOGICAL_OR = 7;
-            LOGICAL_NOT = 8; // Unary operator that will only have a left child.
-
-            /*
-             * ARITHMETIC operators return a double and their children must return a double
-             */
-            ARITHMETIC_PLUS = 9;
-            ARITHMETIC_MINUS = 10;
-            ARITHMETIC_MULTIPLY = 11;
-            ARITHMETIC_DIVIDE = 12;
-        }
-    }
-
-    /*
-     * Function node is a self-contained module that accomplish a specific task.  It takes inputs provided here and
-     * output based on specific logic
-     */
-    message NodeFunction{
-
-        /*
-         * The function node could be one of the following function types.
-         */
-        oneof functionType {
-
-            /*
-             * A Window function node will sample a signal for the duration specified by fixed_window_period_ms and then
-             * run an aggregation function over the samples and evaluate to a double.
-             */
-            WindowFunction window_function = 1;
-
-            /*
-             * Geohash function Node that evaluates whether Edge has changed Geohash. It returns true if the Geohash
-             * has changed at given precision and otherwise return false
-             */
-            GeohashFunction geohash_function = 2;
-        }
-
-        /*
-         * Geohash function evaluates whether Edge has changed Geohash at given precision
-         * It will firstly calculate Geohash with latitude and longitude
-         * It returns true if the Geohash has changed at given precision. Otherwise return false
-         */
-        message GeohashFunction{
-
-            /*
-             * signal id for latitude
-             */
-            uint32 latitude_signal_id = 1;
-
-            /*
-             * signal id for longitude
-             */
-            uint32 longitude_signal_id = 2;
-
-            /*
-             * The geohash precision for dynamic data collection Note geohash precision is defined as the length of hash
-             * characters (base 32 encoding).  Longer hash will have higher precision than shorter hash.
-             * see more details: https://en.wikipedia.org/wiki/Geohash
-             */
-            uint32 geohash_precision = 3;
-
-            /*
-             * The unit for decoded latitude / longitude signal. GPS Signal might be decoded into different unit
-             * according to the DBC file.
-             */
-            GPSUnitType gps_unit = 4;
-
-            /*
-             * The unit type for decoded latitude / longitude signal. This list might be extended in future to
-             * accommodate different vehicle models.
-             */
-            enum GPSUnitType {
-                DECIMAL_DEGREE = 0;
-                MICROARCSECOND = 1;
-                MILLIARCSECOND = 2;
-                ARCSECOND = 3;
-            }
-        }
-
-        /*
-         * Function node that will evaluate a function on a signal_id within a fixed window
-         */
-        message WindowFunction{
-
-            /*
-             * signal id of value to run a function on. The fixed_window_period_ms associated in signalInformation will
-             * be used.
-             */
-            uint32 signal_id = 1;
-
-            /*
-             * Function used over fixed window to evaluate value of physical value of signal_id
-             */
-             WindowType window_type = 2;
-
-            /*
-             * Function to be used to aggregate data in a fixed window
-             */
-            enum WindowType {
-
-                /*
-                 * LAST_WINDOW is the most recently evaluated fixed window
-                 */
-                LAST_WINDOW_MIN = 0;
-                LAST_WINDOW_MAX = 1;
-                LAST_WINDOW_AVG = 2;
-                /*
-                 * PREV_LAST_WINDOW is the fixed window previous to LAST_WINDOW
-                 */
-                PREV_LAST_WINDOW_MIN = 3;
-                PREV_LAST_WINDOW_MAX = 4;
-                PREV_LAST_WINDOW_AVG = 5;
-            }
-        }
-    }
 }
 
 /*

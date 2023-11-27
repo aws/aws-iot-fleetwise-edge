@@ -14,6 +14,14 @@
 #include <memory>
 #include <string>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "DataSenderIonWriter.h"
+#include "IActiveCollectionSchemesListener.h"
+#include "ICollectionScheme.h"
+#include "S3Sender.h"
+#include <functional>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -33,24 +41,47 @@ public:
     DataSenderManager( std::shared_ptr<ISender> mqttSender,
                        std::shared_ptr<PayloadManager> payloadManager,
                        CANInterfaceIDTranslator &canIDTranslator,
-                       unsigned transmitThreshold );
+                       unsigned transmitThreshold
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                       ,
+                       std::shared_ptr<S3Sender> s3Sender,
+                       std::shared_ptr<DataSenderIonWriter> ionWriter,
+                       std::string vehicleName
+#endif
+    );
 
     virtual ~DataSenderManager() = default;
 
     /**
      * @brief Process collection scheme parameters and prepare data for upload
      */
-    virtual void processCollectedData( const TriggeredCollectionSchemeDataPtr triggeredCollectionSchemeDataPtr );
+    virtual void processCollectedData( const TriggeredCollectionSchemeDataPtr triggeredCollectionSchemeDataPtr
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                                       ,
+                                       std::function<void( TriggeredCollectionSchemeDataPtr )> reportUploadCallback
+#endif
+    );
 
     /**
      * @brief Retrieve all the persisted data and hand it over to the correct sender
      */
     virtual void checkAndSendRetrievedData();
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    virtual void onChangeCollectionSchemeList(
+        const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes );
+#endif
+
 private:
     std::shared_ptr<ISender> mMQTTSender;
     std::shared_ptr<PayloadManager> mPayloadManager;
     DataSenderProtoWriter mProtoWriter;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    std::shared_ptr<DataSenderIonWriter> mIonWriter;
+    std::shared_ptr<S3Sender> mS3Sender; // might be nullptr
+    std::string mVehicleName;
+    std::shared_ptr<const ActiveCollectionSchemes> mActiveCollectionSchemes;
+#endif
     CollectionSchemeParams mCollectionSchemeParams;
     std::string mCollectionSchemeID;
 
@@ -71,6 +102,20 @@ private:
      * @param triggeredCollectionSchemeDataPtr collected data
      */
     void transformTelemetryDataToProto( const TriggeredCollectionSchemeDataPtr &triggeredCollectionSchemeDataPtr );
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief Put vision system data into ion in chunks. Initiate serialization, compression, and
+     * upload for each partition.
+     * @param triggeredCollectionSchemeDataPtr collected data
+     * @param uploadedDataCallback Callback after data has been successfully uploaded
+     */
+    void transformVisionSystemDataToIon(
+        const TriggeredCollectionSchemeDataPtr &triggeredCollectionSchemeDataPtr,
+        std::function<void( TriggeredCollectionSchemeDataPtr uploadedData )> uploadedDataCallback );
+
+    S3UploadMetadata getS3UploadMetadataForCollectionScheme( const std::string &collectionSchemeID );
+#endif
 
     /**
      * @brief Serializes, compresses, and uploads proto output.

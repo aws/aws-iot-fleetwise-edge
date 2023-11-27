@@ -20,23 +20,14 @@
 #ifdef FWE_FEATURE_IWAVE_GPS
 #include <fstream>
 #endif
+#ifdef FWE_FEATURE_ROS2
+#include <rclcpp/rclcpp.hpp>
+#endif
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
-
-bool
-socketAvailable()
-{
-    auto sock = socket( PF_CAN, SOCK_DGRAM, CAN_ISOTP );
-    if ( sock < 0 )
-    {
-        return false;
-    }
-    close( sock );
-    return true;
-}
 
 class IoTFleetWiseEngineTest : public ::testing::Test
 {
@@ -53,6 +44,28 @@ protected:
         iWaveGpsFile << "NO valid NMEA data";
         iWaveGpsFile.close();
 #endif
+#ifdef FWE_FEATURE_ROS2
+        rclcpp::init( 0, NULL );
+#endif
+    }
+    void
+    TearDown() override
+    {
+#ifdef FWE_FEATURE_ROS2
+        rclcpp::shutdown();
+#endif
+    }
+
+    static bool
+    socketAvailable()
+    {
+        auto sock = socket( PF_CAN, SOCK_DGRAM, CAN_ISOTP );
+        if ( sock < 0 )
+        {
+            return false;
+        }
+        close( sock );
+        return true;
     }
 };
 

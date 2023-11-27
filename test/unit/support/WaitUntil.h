@@ -87,7 +87,7 @@ const auto WAIT_TIME_OUT = std::chrono::seconds( 5 );
  * @param func: The func needs to be retried.
  * @return True when function returns true, or false if a timeout occurs.
  */
-bool
+inline bool
 waitUntil( std::function<bool()> func )
 {
     auto retry_interval_ms = std::chrono::milliseconds( 10 );
@@ -109,7 +109,7 @@ waitUntil( std::function<bool()> func )
  * @param func: The func needs to be retried.
  * @return The last result of the func after the timeout.
  */
-bool
+inline bool
 waitDelay( std::function<bool()> func )
 {
     auto retry_interval_ms = std::chrono::milliseconds( 10 );

@@ -1,5 +1,30 @@
 # Change Log
 
+## v1.1.0 (2023-11-26)
+
+Features:
+
+- Add support for 'vision system data', with initial support for collection from
+  [ROS2](https://github.com/ros2). This enables collection of complex data types including
+  structures, arrays and strings. Nested structures and arrays of structures are also supported.
+  - **Known limitations:**
+    - When no internet connection is available, collected vision system data is currently dropped,
+      i.e. it is not persisted to the filesystem for later upload when connectivity is restored.
+    - When the upload of vision system data to S3 fails, e.g. due to poor connectivity or throttling
+      by S3, currently only one retry is attempted.
+
+Improvements:
+
+- Update AWS C++ SDK to v1.11.177.
+- Update Yocto reference to kirkstone and NXP Linux BSP 37.0.
+- Switch to MQTT 5 client for better error messages. This is fully backward compatible with the
+  previous client. Please note that currently we are not using nor supporting any MQTT 5 specific
+  feature besides reason codes.
+- When a CAN interface goes down at runtime, FWE will now exit with with an error.
+- Enabled `FWE_FEATURE_IWAVE_GPS` for the GitHub `armhf` pre-built-binary, and added auto-detection
+  of the iWave GPS for backwards compatibility with configuration files without the
+  `.staticConfig.iWaveGpsExample` section.
+
 ## v1.0.8 (2023-09-25)
 
 Bug fixes:

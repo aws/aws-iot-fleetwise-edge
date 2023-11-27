@@ -130,6 +130,31 @@ public:
     }
 };
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+/**
+ * @brief Contains on ComplexSignal from the decoder manifest that can be used to decode big structured
+ *          messages. To optimize the size of the decoder manifest the decoding rules are represented as
+ *          a tree so repeating types can be just referenced by a ComplexDataTypeId. mRootTypeId gives
+ *          the root of the tree. The position of an element in the tree is used for decoding.
+ */
+struct ComplexSignalDecoderFormat
+{
+
+    ComplexDataInterfaceId mInterfaceId;
+
+    /*
+     * Interface-specific message information. The pair interface_id and message_id should be unique across all
+     * ComplexSignals. For ROS2 this is the topic on which the message is sent.
+     */
+    ComplexDataMessageId mMessageId;
+
+    /*
+     * Type id of the root signal. 0 is reserved for future usage.
+     */
+    ComplexDataTypeId mRootTypeId;
+};
+#endif
+
 /**
  * @brief Error Code for OBD-II PID Decoder Format Not Ready to read
  */
@@ -201,6 +226,22 @@ public:
      * @return invalid Decoder format if signal is not OBD PID signal
      */
     virtual PIDSignalDecoderFormat getPIDSignalDecoderFormat( SignalID signalID ) const = 0;
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief Get the Complex Signal decoder format
+     * @param signalID the unique signalID
+     * @return invalid Decoder format if signal is not a Complex Signal
+     */
+    virtual ComplexSignalDecoderFormat getComplexSignalDecoderFormat( SignalID signalID ) const = 0;
+
+    /**
+     * @brief Get the Complex Type
+     * @param typeId the unique typeId
+     * @return ComplexDataElement if complex data type does not exist
+     */
+    virtual ComplexDataElement getComplexDataType( ComplexDataTypeId typeId ) const = 0;
+#endif
 
     /**
      * @brief Used by the AWS IoT MQTT callback to copy data received from Cloud into this object without any further

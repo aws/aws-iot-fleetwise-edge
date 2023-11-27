@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "CANDataSource.h"
+#include "Assert.h"
 #include "EnumUtility.h"
 #include "LoggingModule.h"
 #include "TraceModule.h"
+#include <cerrno>
 #include <cstring>
-#include <ctime>
+#include <ctime> // IWYU pragma: keep
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <linux/errqueue.h>
@@ -170,7 +172,6 @@ CANDataSource::doWork( void *data )
         }
 
         dataSource->mTimer.reset();
-        int nmsgs = 0;
         struct canfd_frame frame[PARALLEL_RECEIVED_FRAMES_FROM_KERNEL];
         struct iovec frame_buffer[PARALLEL_RECEIVED_FRAMES_FROM_KERNEL];
         struct mmsghdr msg[PARALLEL_RECEIVED_FRAMES_FROM_KERNEL];
@@ -190,7 +191,10 @@ CANDataSource::doWork( void *data )
             msg[i].msg_hdr.msg_controllen = sizeof( cmsgReturnBuffer[i] );
         }
         // In one syscall receive up to PARALLEL_RECEIVED_FRAMES_FROM_KERNEL frames in parallel
-        nmsgs = recvmmsg( dataSource->mSocket, &msg[0], PARALLEL_RECEIVED_FRAMES_FROM_KERNEL, 0, nullptr );
+        int nmsgs = recvmmsg( dataSource->mSocket, &msg[0], PARALLEL_RECEIVED_FRAMES_FROM_KERNEL, 0, nullptr );
+        // coverity[autosar_cpp14_m19_3_1_violation]
+        // coverity[misra_cpp_2008_rule_19_3_1_violation] errno needs to be used to recognize network down
+        FWE_GRACEFUL_FATAL_ASSERT( ( nmsgs != -1 ) || ( errno != ENETDOWN ), "Network interface went down", );
         for ( int i = 0; i < nmsgs; i++ )
         {
             // After waking up the Socket Can old messages in the kernel queue need to be ignored

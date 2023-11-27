@@ -14,13 +14,14 @@ FWE. We will use an example where we read NMEA GPS data from a file and handle t
 received on a CAN. We assume we have a the two signals `Vehicle.CurrentLocation.Longitude` and
 `Vehicle.CurrentLocation.Latitude` in our signal catalog and in a model manifest. For this the API
 calls UpdateSignalCatalog and CreateModelManifest can be used. Now we create a special decoder
-manifest
+manifest. Please replace the `modelManifestArn` with a model manifest that has both signals from the
+signal catalog.
 
 ```json
 {
   "name": "IWaveGpsDecoderManifest",
   "description": "Has all the signals that are read over the custom data source from the NMEA data",
-  "modelManifestArn": "arn:aws:iotfleetwise:us-east-1:748151249882:model-manifest/IWaveGPSModel",
+  "modelManifestArn": "arn:aws:iotfleetwise:us-east-1:xxxxxxxxxxxx:model-manifest/IWaveGPSModel",
   "networkInterfaces": [
     {
       "interfaceId": "IWAVE-GPS-CAN",
@@ -38,7 +39,7 @@ manifest
       "interfaceId": "IWAVE-GPS-CAN",
       "canSignal": {
         "messageId": 1,
-        "isBigEndian": true,
+        "isBigEndian": false,
         "isSigned": true,
         "startBit": 0,
         "offset": -2000.0,
@@ -52,7 +53,7 @@ manifest
       "interfaceId": "IWAVE-GPS-CAN",
       "canSignal": {
         "messageId": 1,
-        "isBigEndian": true,
+        "isBigEndian": false,
         "isSigned": true,
         "startBit": 32,
         "offset": -2000.0,
@@ -68,7 +69,7 @@ If you want you can copy over other signals collected to this decoder manifest f
 campaigns.
 
 The custom data source implementation in the edge code must inherit from `CustomDataSource`. For
-this example we created the class `IWaveGpsSource`. The new custom data source class should than
+this example we created the class `IWaveGpsSource`. The new custom data source class should then
 have an init function to set parameters. This init function should then be called from
 `IoTFleetWiseEngine::connect()` for example like this:
 
@@ -93,14 +94,14 @@ if(mIWaveGpsSource->init(
 }
 ```
 
-Here we hand over the parameters we gave in the decoder manifest. With the interface Id, the message
-Id and the start Bit the custom data source can get the signalId if at least one active campaign
-uses one of them. For this to work we need add `canIDTranslator.add( "IWAVE-GPS-CAN");` in the end
-of the `CAN InterfaceID to InternalID Translator` section of `IoTFleetWiseEngine::connect()`. This
-is necessary because we internally use ids instead of the full name. This parameters can also be
-read from the static config as the example in `IoTFleetWiseEngine::connect()` shows where the
-optional section "iWaveGpsExample" under "staticConfig" will be used so the parameters can be
-changed without recompilation.
+Here we hand over the parameters we defined in the decoder manifest. With the interface Id, the
+message Id and the start Bit the custom data source can get the signalId if at least one active
+campaign uses one of them. For this to work we need add `canIDTranslator.add( "IWAVE-GPS-CAN");` in
+the end of the `CAN InterfaceID to InternalID Translator` section of
+`IoTFleetWiseEngine::connect()`. This is necessary because we internally use ids instead of the full
+name. This parameters can also be read from the static config as the example in
+`IoTFleetWiseEngine::connect()` shows where the optional section "iWaveGpsExample" under
+"staticConfig" will be used so the parameters can be changed without recompilation.
 
 ## ExternalGpsSource
 
@@ -112,7 +113,7 @@ decoder manifest for the latitude and longitude signals can be created as follow
 ```json
 {
   "name": "ExternalGpsDecoderManifest",
-  "modelManifestArn": "arn:aws:iotfleetwise:us-east-1:748151249882:model-manifest/ExternalGPSModel",
+  "modelManifestArn": "arn:aws:iotfleetwise:us-east-1:xxxxxxxxxxxx:model-manifest/ExternalGPSModel",
   "networkInterfaces": [
     {
       "interfaceId": "EXTERNAL-GPS-CAN",

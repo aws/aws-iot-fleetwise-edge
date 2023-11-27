@@ -12,9 +12,9 @@ entire log of all FWE instances running.
 - **`ConInt`** and **`ConRes`** enable you to monitor the the number of MQTT connection
   interruptions and connection resumptions. If and how long it takes to detect a connection loss
   depends on the kernel configuration parameters `/proc/sys/net/ipv4/tcp/keepalive*` and the compile
-  time constants of FWE: `MQTT_CONNECT_KEEP_ALIVE_SECONDS` and `MQTT_PING_TIMOUT_MS`. If the values
+  time constants of FWE: `MQTT_CONNECT_KEEP_ALIVE_SECONDS` and `MQTT_PING_TIMEOUT_MS`. If the values
   of the metric `ConInt` are not null, the internet coverage in the tested environment might be
-  unreliable, or `MQTT_PING_TIMOUT_MS`, which defaults to 3 seconds, needs to be increased because
+  unreliable, or `MQTT_PING_TIMEOUT_MS`, which defaults to 3 seconds, needs to be increased because
   there's high latency to the IoT Core endpoint. Changing the AWS Region can help to decrease
   latency.
 - **`CeTrgCnt`** is a monotonic counter that monitors the number of triggers (inspection rules)

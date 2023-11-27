@@ -1,0 +1,46 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Build Docker
+
+inputs:
+  dist-name:
+    required: true
+  push-role:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: docker/setup-qemu-action@v2
+    - uses: docker/setup-buildx-action@v2
+    - uses: aws-actions/configure-aws-credentials@v4
+      if:
+        github.repository == 'aws/aws-iot-fleetwise-edge' && (github.ref_type == 'tag' || github.ref
+        == 'refs/heads/main')
+      with:
+        role-to-assume: ${{ inputs.push-role }}
+        aws-region: us-east-1
+    - uses: aws-actions/amazon-ecr-login@v2
+      if:
+        github.repository == 'aws/aws-iot-fleetwise-edge' && (github.ref_type == 'tag' || github.ref
+        == 'refs/heads/main')
+      with:
+        registry-type: public
+    - id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: public.ecr.aws/aws-iot-fleetwise-edge/${{ inputs.dist-name }}
+    - uses: docker/build-push-action@v3
+      with:
+        context: .
+        file: "./tools/container/Dockerfile"
+        push:
+          ${{ github.repository == 'aws/aws-iot-fleetwise-edge' && ( github.ref_type == 'tag' ||
+          github.ref == 'refs/heads/main' ) }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: linux/amd64,linux/arm64,linux/arm/v7
+        build-args: DIST_NAME=${{ inputs.dist-name }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

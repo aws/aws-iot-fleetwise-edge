@@ -19,6 +19,10 @@
 #include <memory>
 #include <mutex>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "RawDataManager.h"
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -52,12 +56,13 @@ public:
     bool init(
         const std::shared_ptr<SignalBuffer> &inputSignalBuffer, /**< IVehicleDataSourceConsumer instances will
                                                                    put relevant signals in this queue */
-        const std::shared_ptr<CANBuffer>
-            &inputCANBuffer, /**< CANDataConsumers will put relevant raw can frames in this queue */
-        const std::shared_ptr<ActiveDTCBuffer> &inputActiveDTCBuffer, /**< OBDModule DTC Circular buffer */
         const std::shared_ptr<CollectedDataReadyToPublish>
             &outputCollectedData, /**< this thread will put data that should be sent to cloud into this queue */
         uint32_t idleTimeMs,      /**< if no new data is available sleep for this amount of milliseconds */
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        std::shared_ptr<RawData::BufferManager> rawBufferManager =
+            nullptr, /**< the raw buffer manager which is informed what data is used */
+#endif
         bool dataReductionProbabilityDisabled = false /**< set to true to disable data reduction using probability*/ );
 
     /**
@@ -115,11 +120,15 @@ private:
 
     static TimePoint calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs );
 
+    /**
+     * @brief Collects data ready for the upload from collection inspection engine and passes it to the data sender
+     * @return number of collected data packages successfully pushed to the upload queue
+     */
+    uint32_t collectDataAndUpload();
+
     CollectionInspectionEngine fCollectionInspectionEngine;
 
     std::shared_ptr<SignalBuffer> fInputSignalBuffer;
-    std::shared_ptr<CANBuffer> fInputCANBuffer;
-    std::shared_ptr<ActiveDTCBuffer> fInputActiveDTCBuffer;
     std::shared_ptr<CollectedDataReadyToPublish> fOutputCollectedData;
     Thread fThread;
     std::atomic<bool> fShouldStop{ false };
@@ -130,6 +139,9 @@ private:
     Signal fWait;
     uint32_t fIdleTimeMs{ DEFAULT_THREAD_IDLE_TIME_MS };
     std::shared_ptr<const Clock> fClock = ClockHandler::getClock();
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    std::shared_ptr<RawData::BufferManager> mRawBufferManager{ nullptr };
+#endif
 };
 
 } // namespace IoTFleetWise

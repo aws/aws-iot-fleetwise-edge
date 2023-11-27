@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR=$(dirname $(realpath "$0"))
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 source ${SCRIPT_DIR}/install-deps-versions.sh
 
 USE_CACHE="true"
@@ -12,6 +12,7 @@ SDK_PREFIX="/usr/local/android_sdk"
 ARCHS="x86_64:x86_64-linux-android:android-x86_64 \
        armeabi-v7a:armv7a-linux-androideabi:android-arm \
        arm64-v8a:aarch64-linux-android:android-arm64"
+WITH_VISION_SYSTEM_DATA="false"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -20,6 +21,9 @@ parse_args() {
             ARCHS=$2
             shift
             ;;
+        --with-vision-system-data-support)
+            WITH_VISION_SYSTEM_DATA="true"
+            ;;
         --native-prefix)
             NATIVE_PREFIX="$2"
             USE_CACHE="false"
@@ -27,8 +31,9 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --archs <ARCHS>  Space separated list of archs in the format <ARCH>:<HOST_PLATFORM>:<SSL_TARGET>"
-            echo "  --native-prefix  Native install prefix"
+            echo "  --archs <ARCHS>                      Space separated list of archs in the format <ARCH>:<HOST_PLATFORM>:<SSL_TARGET>"
+            echo "  --with-vision-system-data-support    Install dependencies for vision-system-data support"
+            echo "  --native-prefix                      Native install prefix"
             exit 0
             ;;
         esac
@@ -112,6 +117,27 @@ install_deps() {
         ..
     make install -j`nproc` > /dev/null
     cd ../..
+
+    if ${WITH_VISION_SYSTEM_DATA}; then
+        # Amazon Ion C
+        git clone https://github.com/amazon-ion/ion-c.git
+        cd ion-c
+        git checkout ${VERSION_ION_C}
+        git submodule update --init
+        mkdir build && cd build
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DANDROID_ABI=${TARGET_ARCH} \
+            -DANDROID_PLATFORM=android-${VERSION_ANDROID_API} \
+            -DCMAKE_ANDROID_NDK=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \
+            -DCMAKE_TOOLCHAIN_FILE=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK}/build/cmake/android.toolchain.cmake \
+            -DANDROID_TOOLCHAIN=clang \
+            -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
+            ..
+        make install -j`nproc`
+        cd ../..
+    fi
 
     # Protobuf
     wget -q https://github.com/protocolbuffers/protobuf/releases/download/${VERSION_PROTOBUF_RELEASE}/protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
@@ -215,7 +241,7 @@ install_deps() {
         -DENABLE_TESTING=OFF \
         -DBUILD_SHARED_LIBS=OFF \
         -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_ONLY='s3-crt;iot' \
+        -DBUILD_ONLY='transfer;s3-crt;iot' \
         -DAWS_CUSTOM_MEMORY_MANAGEMENT=ON \
         -DANDROID_ABI=${TARGET_ARCH} \
         -DANDROID_PLATFORM=android-${VERSION_ANDROID_API} \

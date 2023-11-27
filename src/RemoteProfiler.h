@@ -75,6 +75,11 @@ public:
                      const std::string &logEntry ) override;
 
     /**
+     * @brief Implement the ILogger interface
+     */
+    void flush() override;
+
+    /**
      * @brief implements IMetricsReceiver and uploads metrics over MQTT
      *
      * @param name the name that is displayed

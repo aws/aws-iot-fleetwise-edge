@@ -9,7 +9,6 @@
 #include "TraceModule.h"
 #include <algorithm>
 #include <array>
-#include <boost/lockfree/queue.hpp>
 #include <iterator>
 #include <map>
 #include <sstream>
@@ -142,11 +141,9 @@ OBDOverCANECU::pushPIDs( const EmissionInfo &info,
                          SignalBufferPtr &signalBufferPtr,
                          const std::string &streamRxID )
 {
+    CollectedSignalsGroup collectedSignalsGroup;
     for ( auto const &signals : info.mPIDsToValues )
     {
-        // Note Signal buffer is a multi producer single consumer queue. Besides current thread,
-        // Vehicle Data Consumer will also push signals onto this buffer
-        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
         struct CollectedSignal collectedSignal;
         const auto signalType = signals.second.signalType;
         switch ( signalType )
@@ -170,12 +167,22 @@ OBDOverCANECU::pushPIDs( const EmissionInfo &info,
                            std::to_string( signals.second.signalValue.doubleVal ) + " for ECU: " + streamRxID );
             break;
         }
-
-        if ( !signalBufferPtr->push( collectedSignal ) )
+        if ( collectedSignal.signalID != INVALID_SIGNAL_ID )
         {
-            TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-            FWE_LOG_WARN( "Signal buffer full with ECU " + streamRxID );
+            collectedSignalsGroup.push_back( collectedSignal );
         }
+    }
+
+    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
+    TraceModule::get().addToAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
+                                            collectedSignalsGroup.size() );
+
+    if ( !signalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) )
+    {
+        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
+        TraceModule::get().subtractFromAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
+                                                       collectedSignalsGroup.size() );
+        FWE_LOG_WARN( "Signal buffer full with ECU " + streamRxID );
     }
 }
 

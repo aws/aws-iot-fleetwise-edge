@@ -2,13 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "AwsIotConnectivityModule.h"
+#include "IReceiver.h"
 #include "LoggingModule.h"
 #include "Thread.h"
 #include "TraceModule.h"
 #include <algorithm>
 #include <aws/crt/Api.h>
+#include <aws/crt/Optional.h>
 #include <aws/crt/Types.h>
-#include <aws/iot/MqttClient.h>
+#include <aws/crt/mqtt/Mqtt5Client.h>
+#include <aws/crt/mqtt/Mqtt5Packets.h>
+#include <aws/crt/mqtt/Mqtt5Types.h>
+#include <cstddef>
 #include <sstream>
 #include <utility>
 
@@ -29,23 +34,15 @@ constexpr uint16_t MQTT_CONNECT_KEEP_ALIVE_SECONDS = 60;
 // Default ping timeout value in milliseconds
 // If a response is not received within this interval, the connection will be reestablished.
 // If the PING request does not return within this interval, the stack will create a new one.
-constexpr uint32_t MQTT_PING_TIMOUT_MS = 3000;
+constexpr uint32_t MQTT_PING_TIMEOUT_MS = 3000;
+constexpr uint32_t MQTT_SESSION_EXPIRY_INTERVAL_SEC = 3600;
 
-AwsIotConnectivityModule::AwsIotConnectivityModule(
-    std::string privateKey,
-    std::string certificate,
-    std::string rootCA,
-    std::string endpointUrl,
-    std::string clientId,
-    std::function<std::shared_ptr<MqttClientWrapper>()> createMqttClientWrapper,
-    bool asynchronous )
-    : mPrivateKey( std::move( privateKey ) )
-    , mCertificate( std::move( certificate ) )
-    , mRootCA( std::move( rootCA ) )
-    , mEndpointUrl( std::move( endpointUrl ) )
+AwsIotConnectivityModule::AwsIotConnectivityModule( std::string rootCA,
+                                                    std::string clientId,
+                                                    std::shared_ptr<MqttClientBuilderWrapper> mqttClientBuilder )
+    : mRootCA( std::move( rootCA ) )
     , mClientId( std::move( clientId ) )
-    , mCreateMqttClientWrapper( std::move( createMqttClientWrapper ) )
-    , mAsynchronous( asynchronous )
+    , mMqttClientBuilder( std::move( mqttClientBuilder ) )
     , mRetryThread( *this, RETRY_FIRST_CONNECTION_START_BACKOFF_MS, RETRY_FIRST_CONNECTION_MAX_BACKOFF_MS )
     , mConnected( false )
     , mConnectionEstablished( false )
@@ -61,54 +58,51 @@ AwsIotConnectivityModule::connect()
 {
     mConnected = false;
 
+    FWE_LOG_INFO( "Establishing an MQTT Connection" );
     if ( !createMqttConnection() )
     {
         return false;
     }
 
-    FWE_LOG_INFO( "Establishing an MQTT Connection" );
-    // Connection callbacks
-    setupCallbacks();
-
-    if ( mAsynchronous )
-    {
-        return mRetryThread.start();
-    }
-    else
-    {
-        if ( attempt() == RetryStatus::SUCCESS )
-        {
-            onFinished( RetryStatus::SUCCESS );
-            return true;
-        }
-        return false;
-    }
+    return mRetryThread.start();
 }
 
 std::shared_ptr<IConnectivityChannel>
-AwsIotConnectivityModule::createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager )
+AwsIotConnectivityModule::createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager,
+                                            const std::string &topicName,
+                                            bool subscription )
 {
-    auto channel = std::make_shared<AwsIotChannel>( this, payloadManager, mConnection );
+    auto channel = std::make_shared<AwsIotChannel>( this, payloadManager, mMqttClient, topicName, subscription );
     mChannels.emplace_back( channel );
+    {
+        std::lock_guard<std::mutex> lock( mTopicToChannelMutex );
+        mTopicToChannel[topicName] = channel;
+    }
     return channel;
 }
 
 bool
 AwsIotConnectivityModule::resetConnection()
 {
-    mConnectionCompletedPromise = std::promise<bool>();
-    if ( mConnectionEstablished )
+    if ( !mConnectionEstablished )
     {
-        FWE_LOG_INFO( "Closing the MQTT Connection" );
-        if ( mConnection->Disconnect() )
-        {
-            mConnectionClosedPromise.get_future().wait();
-            mConnectionClosedPromise = std::promise<void>();
-            mConnectionEstablished = false;
-            return true;
-        }
+        return false;
     }
-    return false;
+
+    mConnectionCompletedPromise = std::promise<bool>();
+    mConnectionClosedPromise = std::promise<void>();
+    // Get the future before calling the client code as get_future() is not guaranteed to be thread-safe
+    auto closedResult = mConnectionClosedPromise.get_future();
+    FWE_LOG_INFO( "Closing the MQTT Connection" );
+    if ( !mMqttClient->Stop() )
+    {
+        FWE_LOG_ERROR( "Failed to close the MQTT Connection" );
+        return false;
+    }
+
+    closedResult.wait();
+    mConnectionEstablished = false;
+    return true;
 }
 
 bool
@@ -121,93 +115,6 @@ AwsIotConnectivityModule::disconnect()
     }
     mRetryThread.stop();
     return resetConnection();
-}
-
-void
-AwsIotConnectivityModule::setupCallbacks()
-{
-    /*
-     * This will execute when an mqtt connect has completed or failed.
-     */
-    auto onConnectionCompleted = [&]( MqttConnectionWrapper &mqttConnection,
-                                      int errorCode,
-                                      Aws::Crt::Mqtt::ReturnCode returnCode,
-                                      bool sessionPresent ) {
-        (void)mqttConnection;
-        (void)sessionPresent;
-        if ( errorCode != 0 )
-        {
-            auto errString = Aws::Crt::ErrorDebugString( errorCode );
-            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_FAILED );
-            FWE_LOG_ERROR( "Connection failed with error" );
-            FWE_LOG_ERROR( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
-            mConnectionCompletedPromise.set_value( false );
-        }
-        else
-        {
-            if ( returnCode != Aws::Crt::Mqtt::ReturnCode::AWS_MQTT_CONNECT_ACCEPTED )
-            {
-                TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_REJECTED );
-                FWE_LOG_ERROR( "Connection failed with mqtt return code" );
-                FWE_LOG_ERROR( std::to_string( (int)returnCode ) );
-                mConnectionCompletedPromise.set_value( false );
-            }
-            else
-            {
-                FWE_LOG_INFO( "Connection completed successfully" );
-                mConnectionCompletedPromise.set_value( true );
-            }
-        }
-        renameEventLoopTask();
-    };
-
-    auto onInterrupted = [&]( MqttConnectionWrapper &mqttConnection, int error ) {
-        (void)mqttConnection;
-        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_INTERRUPTED );
-        std::string errorString = "The MQTT Connection has been interrupted due to: ";
-        auto errStr = Aws::Crt::ErrorDebugString( error );
-        errorString.append( errStr != nullptr ? std::string( errStr ) : std::string( "Unknown error" ) );
-        FWE_LOG_ERROR( errorString );
-        mConnected = false;
-    };
-
-    auto onResumed =
-        [&]( MqttConnectionWrapper &mqttConnection, Aws::Crt::Mqtt::ReturnCode connectCode, bool sessionPresent ) {
-            (void)mqttConnection;
-            (void)connectCode;
-            (void)sessionPresent;
-            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_RESUMED );
-            FWE_LOG_INFO( "The MQTT Connection has resumed" );
-            mConnected = true;
-        };
-
-    auto onDisconnect = [&]( MqttConnectionWrapper &connection ) {
-        (void)connection;
-        FWE_LOG_INFO( "The MQTT Connection is closed" );
-        mConnectionClosedPromise.set_value();
-        mConnected = false;
-        mConnectionEstablished = false;
-    };
-
-    mConnection->SetOnConnectionCompleted( onConnectionCompleted );
-    mConnection->SetOnDisconnect( onDisconnect );
-    mConnection->SetOnConnectionInterrupted( onInterrupted );
-    mConnection->SetOnConnectionResumed( onResumed );
-
-    mConnection->SetOnMessageHandler( [&]( MqttConnectionWrapper &mqttCon,
-                                           const Aws::Crt::String &topic,
-                                           const Aws::Crt::ByteBuf &payload,
-                                           bool dup,
-                                           Aws::Crt::Mqtt::QOS qos,
-                                           bool retain ) {
-        std::ostringstream os;
-        (void)mqttCon;
-        (void)dup;
-        (void)retain;
-        (void)qos;
-        os << "Data received on the topic:  " << topic << " with a payload length of: " << payload.len;
-        FWE_LOG_TRACE( os.str() );
-    } );
 }
 
 /**
@@ -228,67 +135,172 @@ AwsIotConnectivityModule::renameEventLoopTask()
 bool
 AwsIotConnectivityModule::createMqttConnection()
 {
-    if ( ( mCertificate.empty() ) || ( mPrivateKey.empty() ) || mEndpointUrl.empty() || mClientId.empty() )
+    if ( mMqttClientBuilder == nullptr )
     {
-        FWE_LOG_ERROR( "Please provide X.509 Certificate, private Key, endpoint and client-Id" );
+        FWE_LOG_ERROR( "Invalid MQTT client builder" );
         return false;
     }
 
-    auto builder = Aws::Iot::MqttClientConnectionConfigBuilder( Crt::ByteCursorFromCString( mCertificate.c_str() ),
-                                                                Crt::ByteCursorFromCString( mPrivateKey.c_str() ) );
+    if ( mClientId.empty() )
+    {
+        FWE_LOG_ERROR( "Please provide the client ID" );
+        return false;
+    }
+
+    // Setup connection options
+    auto connectOptions = std::make_shared<Aws::Crt::Mqtt5::ConnectPacket>();
+    // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
+    connectOptions->WithClientId( mClientId.c_str() )
+        .WithSessionExpiryIntervalSec( MQTT_SESSION_EXPIRY_INTERVAL_SEC )
+        .WithKeepAliveIntervalSec( MQTT_CONNECT_KEEP_ALIVE_SECONDS );
+
+    mMqttClientBuilder
+        ->WithClientExtendedValidationAndFlowControl(
+            Aws::Crt::Mqtt5::ClientExtendedValidationAndFlowControl::AWS_MQTT5_EVAFCO_NONE )
+        .WithConnectOptions( connectOptions )
+        .WithSessionBehavior( Aws::Crt::Mqtt5::ClientSessionBehaviorType::AWS_MQTT5_CSBT_REJOIN_POST_SUCCESS )
+        .WithPingTimeoutMs( MQTT_PING_TIMEOUT_MS );
+
     if ( !mRootCA.empty() )
     {
-        builder.WithCertificateAuthority( Crt::ByteCursorFromCString( mRootCA.c_str() ) );
+        mMqttClientBuilder->WithCertificateAuthority( Crt::ByteCursorFromCString( mRootCA.c_str() ) );
     }
-    builder.WithEndpoint( ( !mEndpointUrl.empty() ? mEndpointUrl.c_str() : "" ) );
+
+    mMqttClientBuilder->WithClientConnectionSuccessCallback(
+        [&]( const Aws::Crt::Mqtt5::OnConnectionSuccessEventData &eventData ) {
+            std::string logMessage = "Connection completed successfully";
+            if ( eventData.negotiatedSettings != nullptr )
+            {
+                // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
+                auto clientId = std::string( eventData.negotiatedSettings->getClientId().c_str() );
+                logMessage +=
+                    ". ClientId: " + clientId + ", SessionExpiryIntervalSec: " +
+                    std::to_string( eventData.negotiatedSettings->getSessionExpiryIntervalSec() ) +
+                    ", ServerKeepAliveSec: " + std::to_string( eventData.negotiatedSettings->getServerKeepAlive() ) +
+                    ", RejoinedSession: " + ( eventData.negotiatedSettings->getRejoinedSession() ? "true" : "false" );
+            }
+            FWE_LOG_INFO( logMessage );
+            mConnected = true;
+            mConnectionCompletedPromise.set_value( true );
+            mConnectionCompletedPromise = std::promise<bool>();
+            renameEventLoopTask();
+        } );
+
+    mMqttClientBuilder->WithClientConnectionFailureCallback(
+        [&]( const Aws::Crt::Mqtt5::OnConnectionFailureEventData &eventData ) {
+            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_FAILED );
+            if ( eventData.connAckPacket != nullptr )
+            {
+                std::string reasonString = std::string( eventData.connAckPacket->getReasonString().has_value()
+                                                            ? eventData.connAckPacket->getReasonString()->c_str()
+                                                            : "Unknown reason" );
+                FWE_LOG_ERROR( "Connection rejected by the server with reason code: " +
+                               std::to_string( eventData.connAckPacket->getReasonCode() ) + ": " + reasonString );
+            }
+            else
+            {
+                auto errorString = Aws::Crt::ErrorDebugString( eventData.errorCode );
+                FWE_LOG_ERROR( "Connection failed with error code " + std::to_string( eventData.errorCode ) + ": " +
+                               std::string( errorString != nullptr ? errorString : "Unknown error" ) );
+            }
+            mConnectionCompletedPromise.set_value( false );
+            mConnectionCompletedPromise = std::promise<bool>();
+            renameEventLoopTask();
+        } );
+
+    mMqttClientBuilder->WithClientAttemptingConnectCallback( [&]( const OnAttemptingConnectEventData &eventData ) {
+        (void)eventData;
+        FWE_LOG_INFO( "Attempting MQTT connection" );
+    } );
+
+    mMqttClientBuilder->WithClientDisconnectionCallback( [&]( const OnDisconnectionEventData &eventData ) {
+        // If the disconnect packet is present, it means that the client was disconnected by the server.
+        if ( eventData.disconnectPacket != nullptr )
+        {
+            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_INTERRUPTED );
+            std::string reasonString = std::string( eventData.disconnectPacket->getReasonString().has_value()
+                                                        ? eventData.disconnectPacket->getReasonString()->c_str()
+                                                        : "Unknown reason" );
+            FWE_LOG_ERROR( "The MQTT connection has been interrupted by the server with reason code: " +
+                           std::to_string( eventData.disconnectPacket->getReasonCode() ) + ": " + reasonString );
+        }
+        else if ( eventData.errorCode == AWS_ERROR_MQTT5_USER_REQUESTED_STOP )
+        {
+            FWE_LOG_TRACE( "MQTT disconnection requested by the client" );
+        }
+        else
+        {
+            auto errorString = Aws::Crt::ErrorDebugString( eventData.errorCode );
+            FWE_LOG_ERROR( "Client disconnected with error code " + std::to_string( eventData.errorCode ) + ": " +
+                           std::string( errorString != nullptr ? errorString : "Unknown error" ) );
+        }
+        mConnected = false;
+        mConnectionCompletedPromise = std::promise<bool>();
+    } );
+
+    mMqttClientBuilder->WithClientStoppedCallback( [&]( const Aws::Crt::Mqtt5::OnStoppedEventData &eventData ) {
+        (void)eventData;
+        FWE_LOG_INFO( "The MQTT connection is closed and client stopped" );
+        mConnectionClosedPromise.set_value();
+        mConnected = false;
+        mConnectionEstablished = false;
+        mConnectionCompletedPromise = std::promise<bool>();
+    } );
+
+    mMqttClientBuilder->WithPublishReceivedCallback( [&]( const Aws::Crt::Mqtt5::PublishReceivedEventData &eventData ) {
+        std::ostringstream os;
+        os << "Data received on the topic: " << eventData.publishPacket->getTopic()
+           << " with a payload length of: " << eventData.publishPacket->getPayload().len;
+        FWE_LOG_TRACE( os.str() );
+
+        // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
+        auto topic = std::string( eventData.publishPacket->getTopic().c_str() );
+        std::shared_ptr<AwsIotChannel> channel;
+        {
+            std::lock_guard<std::mutex> lock( mTopicToChannelMutex );
+            channel = mTopicToChannel[topic];
+        }
+
+        if ( channel == nullptr )
+        {
+            FWE_LOG_ERROR( "Channel not found for topic " + topic );
+            return;
+        }
+
+        channel->notifyListeners<const std::uint8_t *, size_t>( &IReceiverCallback::onDataReceived,
+                                                                eventData.publishPacket->getPayload().ptr,
+                                                                eventData.publishPacket->getPayload().len );
+    } );
 
     TraceModule::get().sectionBegin( TraceSection::BUILD_MQTT );
-    auto clientConfig = builder.Build();
+    mMqttClient = mMqttClientBuilder->Build();
     TraceModule::get().sectionEnd( TraceSection::BUILD_MQTT );
-
-    if ( !clientConfig )
-    {
-        auto errString = Aws::Crt::ErrorDebugString( clientConfig.LastError() );
-        FWE_LOG_ERROR( "Client Configuration initialization failed with error" );
-        FWE_LOG_ERROR( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
-        return false;
-    }
-    /*
-     * Documentation of MqttClient says that the parameter objects needs to live only for the
-     * function call so all the needed objects like bootstrap are on the stack.
-     */
-    mMqttClient = mCreateMqttClientWrapper();
     if ( !*mMqttClient )
     {
-        auto errString = Aws::Crt::ErrorDebugString( mMqttClient->LastError() );
-        FWE_LOG_ERROR( "MQTT Client Creation failed with error" );
-        FWE_LOG_ERROR( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
+        int lastError = mMqttClient->LastError();
+        auto errorString = Aws::Crt::ErrorDebugString( lastError );
+        FWE_LOG_ERROR( "MQTT Client Creation failed with error code " + std::to_string( lastError ) + ": " +
+                       std::string( errorString != nullptr ? errorString : "Unknown error" ) );
         return false;
     }
 
-    mConnection = mMqttClient->NewConnection( clientConfig );
-
-    // No call to SetReconnectTimeout so it uses the SDK reconnect defaults (currently starting at 1 second and max 128
-    // seconds)
-    if ( !mConnection )
-    {
-        auto errString = Aws::Crt::ErrorDebugString( mMqttClient->LastError() );
-        auto errLog = errString != nullptr ? std::string( errString ) : std::string( "Unknown error" );
-        FWE_LOG_ERROR( "MQTT Connection Creation failed with error " + errLog );
-        return false;
-    }
     return true;
 }
 
 RetryStatus
 AwsIotConnectivityModule::attempt()
 {
-    if ( !mConnection->Connect( mClientId.c_str(), false, MQTT_CONNECT_KEEP_ALIVE_SECONDS, MQTT_PING_TIMOUT_MS ) )
+    FWE_LOG_TRACE( "Starting MQTT client" );
+
+    // Get the future before calling the client code as get_future() is not guaranteed to be thread-safe
+    auto connectionResult = mConnectionCompletedPromise.get_future();
+    if ( !mMqttClient->Start() )
     {
-        std::string error = "The MQTT Connection failed due to: ";
-        auto errString = Aws::Crt::ErrorDebugString( mConnection->LastError() );
-        error.append( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) );
-        FWE_LOG_WARN( error );
+        int lastError = mMqttClient->LastError();
+        auto errorString = Aws::Crt::ErrorDebugString( lastError );
+        FWE_LOG_WARN( "The MQTT Connection failed wit error  code " + std::to_string( lastError ) + ": " +
+                      std::string( errorString != nullptr ? errorString : "Unknown error" ) );
+        mConnectionCompletedPromise = std::promise<bool>();
         return RetryStatus::RETRY;
     }
 
@@ -296,9 +308,8 @@ AwsIotConnectivityModule::attempt()
     mConnectionEstablished = true;
     // Block until the connection establishes or fails.
     // If the connection fails, the module will also fail.
-    if ( mConnectionCompletedPromise.get_future().get() )
+    if ( connectionResult.get() )
     {
-        mConnected = true;
         return RetryStatus::SUCCESS;
     }
     else

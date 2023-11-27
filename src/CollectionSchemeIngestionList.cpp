@@ -8,6 +8,10 @@
 #include <memory>
 #include <string>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include <atomic>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -104,6 +108,11 @@ CollectionSchemeIngestionList::build()
     // Ensure we start with an empty vector of collectionScheme pointers
     mVectorCollectionSchemePtr.clear();
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    // Reset partial signal id counter
+    CollectionSchemeIngestion::mPartialSignalCounter = 0;
+#endif
+
     // Iterate through all the collectionSchemes in the collectionScheme list, make a shared pointer of them
     for ( int i = 0; i < mCollectionSchemeListMsg.collection_schemes_size(); i++ )
     {
@@ -117,7 +126,7 @@ CollectionSchemeIngestionList::build()
         // Check to see if it successfully builds
         if ( pICPPtr->build() )
         {
-            FWE_LOG_TRACE( "Adding CollectionScheme index: " + std::to_string( i ) + " of " +
+            FWE_LOG_TRACE( "Adding CollectionScheme index: " + std::to_string( i + 1 ) + " of " +
                            std::to_string( mCollectionSchemeListMsg.collection_schemes_size() ) );
 
             // Add this newly created shared pointer to the vector of ICollectionScheme shared pointers.

@@ -21,12 +21,18 @@ function ifup {
     output=$(ip link show "$1" up) && [[ -n $output ]]
 }
 
-while true; do
-    if ifup ${CAN_IF}; then
-        break
-    fi
-    echo "Waiting for $CAN_IF"
-    sleep 3
-done
+if [ "${CAN_IF}" != "null" ]; then
+    while true; do
+        if ifup ${CAN_IF}; then
+            break
+        fi
+        echo "Waiting for $CAN_IF"
+        sleep 3
+    done
+fi
+
+if [ -f /opt/ros/galactic/setup.bash ]; then
+    source /opt/ros/galactic/setup.bash
+fi
 
 /usr/bin/aws-iot-fleetwise-edge ${CONFIG_FILE}

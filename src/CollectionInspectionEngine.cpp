@@ -65,12 +65,19 @@ CollectionInspectionEngine::addSignalToBuffer( const InspectionMatrixSignalColle
             return;
         }
     }
-    bufferVec.emplace_back( signalIn.sampleBufferSize, signalIn.minimumSampleIntervalMs );
+    bufferVec.emplace_back( signalIn.sampleBufferSize,
+                            signalIn.minimumSampleIntervalMs
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                            ,
+                            signalIn.signalType == SignalType::RAW_DATA_BUFFER_HANDLE
+#endif
+    );
     bufferVec.back().addFixedWindow( signalIn.fixedWindowPeriod );
 }
 
 void
-CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
+CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix,
+                                                      const TimePoint &currentTime )
 {
     // Clears everything in this class including all data in the signal history buffer
     clear();
@@ -150,8 +157,11 @@ CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<cons
             case SignalType::BOOLEAN:
                 addSignalToBuffer<bool>( s );
                 break;
-            default:
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            case SignalType::RAW_DATA_BUFFER_HANDLE:
+                addSignalToBuffer<RawData::BufferHandle>( s );
                 break;
+#endif
             }
         }
         for ( auto &c : p.canFrames )
@@ -219,6 +229,8 @@ CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<cons
                 break;
             }
         }
+        // Overwrite last trigger time 0 with current time to avoid trigger at time 0
+        ac.mLastTrigger = currentTime;
     }
 
     // Assume all conditions are currently true;
@@ -380,11 +392,16 @@ CollectionInspectionEngine::preAllocateBuffers()
                     return false;
                 }
                 break;
-            default:
-                if ( !allocateBufferVector<double>( signalID, usedBytes ) )
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            case SignalType::RAW_DATA_BUFFER_HANDLE:
+                if ( !allocateBufferVector<RawData::BufferHandle>( signalID, usedBytes ) )
                 {
                     return false;
                 }
+                break;
+#endif
+            default:
+                FWE_LOG_WARN( "Unknown type :" + std::to_string( static_cast<uint32_t>( signalType ) ) );
                 break;
             }
         }
@@ -423,6 +440,13 @@ CollectionInspectionEngine::clear()
     mConditionsWithInputSignalChanged.reset();
     mConditionsWithConditionCurrentlyTrue.reset();
     mConditionsNotTriggeredWaitingPublished.reset();
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    if ( mRawBufferManager != nullptr )
+    {
+        mRawBufferManager->resetUsageHintsForStage(
+            RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_HISTORY_BUFFER );
+    }
+#endif
 }
 
 template <typename T>
@@ -521,7 +545,6 @@ CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
     // if any sampling window times out there is a new value available to be processed by a condition
     if ( currentTime.monotonicTimeMs >= mNextWindowFunctionTimesOut )
     {
-
         updateAllFixedWindowFunctions( currentTime.monotonicTimeMs );
     }
     auto conditionsToEvaluate = ( mConditionsWithConditionCurrentlyTrue | mConditionsWithInputSignalChanged ) &
@@ -538,30 +561,31 @@ CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
         if ( conditionsToEvaluate.test( i ) )
         {
             ActiveCondition &condition = mConditions[i];
-            if ( ( ( condition.mLastTrigger.systemTimeMs == 0 ) && ( condition.mLastTrigger.monotonicTimeMs == 0 ) ) ||
-                 ( currentTime.monotonicTimeMs >=
-                   condition.mLastTrigger.monotonicTimeMs + condition.mCondition.minimumPublishIntervalMs ) )
+            InspectionValue result = 0;
+            bool resultBool = false;
+            mConditionsWithInputSignalChanged.reset( i );
+            ExpressionErrorCode ret =
+                eval( condition.mCondition.condition, condition, result, resultBool, MAX_EQUATION_DEPTH );
+            if ( ( ret == ExpressionErrorCode::SUCCESSFUL ) && resultBool )
             {
-                InspectionValue result = 0;
-                bool resultBool = false;
-                mConditionsWithInputSignalChanged.reset( i );
-                ExpressionErrorCode ret =
-                    eval( condition.mCondition.condition, condition, result, resultBool, MAX_EQUATION_DEPTH );
-                if ( ( ret == ExpressionErrorCode::SUCCESSFUL ) && resultBool )
+                // Only evaluate condition to true if minimumPublishIntervalMs has passed
+                if ( currentTime.monotonicTimeMs >=
+                     condition.mLastTrigger.monotonicTimeMs + condition.mCondition.minimumPublishIntervalMs )
                 {
                     if ( ( !condition.mCondition.triggerOnlyOnRisingEdge ) ||
                          ( !mConditionsWithConditionCurrentlyTrue.test( i ) ) )
                     {
+                        // Mark condition for the upload
                         mConditionsNotTriggeredWaitingPublished.reset( i );
                         condition.mLastTrigger = currentTime;
                     }
                     mConditionsWithConditionCurrentlyTrue.set( i );
                     oneConditionIsTrue = true;
                 }
-                else
-                {
-                    mConditionsWithConditionCurrentlyTrue.reset( i );
-                }
+            }
+            else
+            {
+                mConditionsWithConditionCurrentlyTrue.reset( i );
             }
         }
     }
@@ -612,6 +636,16 @@ CollectionInspectionEngine::collectLastSignals( InspectionSignalID id,
                 {
                     output.emplace_back( id, sample.mTimestamp, sample.mValue, signalTypeIn );
                     sample.setAlreadyConsumed( conditionId, true );
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                    if ( signalTypeIn == SignalType::RAW_DATA_BUFFER_HANDLE )
+                    {
+                        NotifyRawBufferManager<T>::increaseElementUsage(
+                            id,
+                            mRawBufferManager.get(),
+                            RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD,
+                            sample.mValue );
+                    }
+#endif
                 }
                 newestSignalTimestamp = std::max( newestSignalTimestamp, sample.mTimestamp );
                 pos--;
@@ -775,7 +809,16 @@ CollectionInspectionEngine::collectData( ActiveCondition &condition,
                                           newestSignalTimestamp,
                                           collectedData->signals );
                 break;
-            default:
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            case SignalType::RAW_DATA_BUFFER_HANDLE:
+                collectLastSignals<RawData::BufferHandle>( s.signalID,
+                                                           s.minimumSampleIntervalMs,
+                                                           s.sampleBufferSize,
+                                                           conditionId,
+                                                           s.signalType,
+                                                           newestSignalTimestamp,
+                                                           collectedData->signals );
+#endif
                 break;
             }
         }
@@ -828,6 +871,7 @@ CollectionInspectionEngine::collectNextDataToSend( const TimePoint &currentTime,
         if ( !mConditionsNotTriggeredWaitingPublished.test( mNextConditionToCollectedIndex ) )
         {
             auto &condition = mConditions[mNextConditionToCollectedIndex];
+
             if ( ( ( condition.mLastTrigger.systemTimeMs == 0 ) && ( condition.mLastTrigger.monotonicTimeMs == 0 ) ) ||
                  ( currentTime.monotonicTimeMs >=
                    condition.mLastTrigger.monotonicTimeMs + condition.mCondition.afterDuration ) )
@@ -846,6 +890,8 @@ CollectionInspectionEngine::collectNextDataToSend( const TimePoint &currentTime,
                     // collected
                     condition.mLastDataTimestampPublished =
                         std::min( newestSignalTimeStamp, currentTime.monotonicTimeMs );
+                    // Increase index before returning from the function
+                    mNextConditionToCollectedIndex++;
                     return cd;
                 }
             }

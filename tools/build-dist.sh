@@ -17,7 +17,7 @@ for FILE in $@; do
     SRC=`echo $FILE | cut -d ':' -f1`
     DEST=`echo $FILE | cut -d ':' -f2`
     mkdir -p $DEST
-    cp ../../$SRC $DEST
+    cp -r ../../$SRC $DEST
 done
 
 cp -r ../../LICENSE \

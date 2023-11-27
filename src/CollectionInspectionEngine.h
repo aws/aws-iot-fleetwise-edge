@@ -8,7 +8,6 @@
 #include "DataReduction.h"
 #include "EventTypes.h"
 #include "GeohashFunctionNode.h"
-#include "IActiveConditionProcessor.h"
 #include "ICollectionScheme.h"
 #include "InspectionEventListener.h"
 #include "Listener.h"
@@ -30,12 +29,85 @@
 #include <utility>
 #include <vector>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "RawDataManager.h"
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
 using InspectionSignalID = uint32_t;
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+// Rule A14-8-2 suggests to use class template specialization instead of function template specialization
+template <typename T>
+class NotifyRawBufferManager
+{
+public:
+    static bool
+    increaseElementUsage( InspectionSignalID id,
+                          RawData::BufferManager *rawBufferManager,
+                          RawData::BufferHandleUsageStage stage,
+                          T value )
+    {
+        // For all not specialized types do nothing
+        static_cast<void>( id );               // Unused
+        static_cast<void>( rawBufferManager ); // Unused
+        static_cast<void>( value );            // Unused
+        static_cast<void>( stage );            // Unused
+        return false;
+    }
+
+    static bool
+    decreaseElementUsage( InspectionSignalID id,
+                          RawData::BufferManager *rawBufferManager,
+                          RawData::BufferHandleUsageStage stage,
+                          T value )
+    {
+        // For all not specialized types do nothing
+        static_cast<void>( id );               // Unused
+        static_cast<void>( rawBufferManager ); // Unused
+        static_cast<void>( value );            // Unused
+        static_cast<void>( stage );            // Unused
+        return false;
+    }
+};
+
+template <>
+class NotifyRawBufferManager<RawData::BufferHandle>
+{
+public:
+    static bool
+    increaseElementUsage( InspectionSignalID id,
+                          RawData::BufferManager *rawBufferManager,
+                          RawData::BufferHandleUsageStage stage,
+                          RawData::BufferHandle value )
+    {
+        if ( rawBufferManager != nullptr )
+        {
+            rawBufferManager->increaseHandleUsageHint( id, value, stage );
+            return true;
+        }
+        return false;
+    }
+
+    static bool
+    decreaseElementUsage( InspectionSignalID id,
+                          RawData::BufferManager *rawBufferManager,
+                          RawData::BufferHandleUsageStage stage,
+                          RawData::BufferHandle value )
+    {
+        if ( rawBufferManager != nullptr )
+        {
+            rawBufferManager->decreaseHandleUsageHint( id, value, stage );
+            return true;
+        }
+        return false;
+    }
+};
+#endif
 
 /**
  * @brief Main class to implement collection and inspection engine logic
@@ -44,7 +116,7 @@ using InspectionSignalID = uint32_t;
  * are called only from one thread. This class will be instantiated and used from the Collection
  * Inspection Engine thread
  */
-class CollectionInspectionEngine : public IActiveConditionProcessor, public ThreadListeners<InspectionEventListener>
+class CollectionInspectionEngine : public ThreadListeners<InspectionEventListener>
 {
 
 public:
@@ -59,7 +131,8 @@ public:
      */
     CollectionInspectionEngine( bool sendDataOnlyOncePerCondition = true );
 
-    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) override;
+    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix,
+                                   const TimePoint &currentTime );
 
     /**
      * @brief Go through all conditions with changed condition signals and evaluate condition
@@ -137,6 +210,14 @@ public:
     {
         mDataReduction.setDisableProbability( disableProbability );
     };
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    void
+    setRawDataBufferManager( std::shared_ptr<RawData::BufferManager> rawBufferManager )
+    {
+        mRawBufferManager = std::move( rawBufferManager );
+    };
+#endif
 
     void setActiveDTCs( const DTCInfo &activeDTCs );
 
@@ -283,10 +364,19 @@ private:
     template <typename T = double>
     struct SignalHistoryBuffer
     {
-        SignalHistoryBuffer( uint32_t sizeIn, uint32_t sampleInterval )
+        SignalHistoryBuffer( uint32_t sizeIn,
+                             uint32_t sampleInterval
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                             ,
+                             bool containsRawDataHandles = false
+#endif
+                             )
             : mMinimumSampleIntervalMs( sampleInterval )
             , mSize( sizeIn )
             , mCurrentPosition( mSize - 1 )
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            , mContainsRawDataHandles( containsRawDataHandles )
+#endif
         {
         }
 
@@ -297,6 +387,9 @@ private:
         uint32_t mCurrentPosition{ 0 }; /**< position in ringbuffer needs to come after size as it depends on it */
         uint32_t mCounter{ 0 };         /**< over all recorded samples*/
         TimePoint mLastSample{ 0, 0 };
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        bool mContainsRawDataHandles{ false };
+#endif
         std::vector<FixedTimeWindowFunctionData<T>>
             mWindowFunctionData; /**< every signal buffer can have multiple windows over different time periods*/
         std::bitset<MAX_NUMBER_OF_ACTIVE_CONDITION>
@@ -645,6 +738,9 @@ private:
     InspectionTimestamp mNextWindowFunctionTimesOut{ 0 };
     DataReduction mDataReduction;
     bool mSendDataOnlyOncePerCondition{ false };
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    std::shared_ptr<RawData::BufferManager> mRawBufferManager{ nullptr };
+#endif
 };
 
 template <typename T>
@@ -677,6 +773,18 @@ CollectionInspectionEngine::addNewSignal( InspectionSignalID id, const TimePoint
             {
                 buf.mCurrentPosition = 0;
             }
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            if ( buf.mContainsRawDataHandles && ( buf.mCounter >= buf.mSize ) )
+            {
+                // release data that is going to be overwritten
+                NotifyRawBufferManager<T>::decreaseElementUsage(
+                    id,
+                    mRawBufferManager.get(),
+                    RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_HISTORY_BUFFER,
+                    buf.mBuffer[buf.mCurrentPosition].mValue );
+            }
+#endif
+
             buf.mBuffer[buf.mCurrentPosition].mValue = value;
             buf.mBuffer[buf.mCurrentPosition].mTimestamp = receiveTime.systemTimeMs;
             buf.mBuffer[buf.mCurrentPosition].setAlreadyConsumed( ALL_CONDITIONS, false );
@@ -687,6 +795,16 @@ CollectionInspectionEngine::addNewSignal( InspectionSignalID id, const TimePoint
                 window.addValue( value, receiveTime.monotonicTimeMs, mNextWindowFunctionTimesOut );
             }
             mConditionsWithInputSignalChanged |= buf.mConditionsThatEvaluateOnThisSignal;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            if ( buf.mContainsRawDataHandles )
+            {
+                NotifyRawBufferManager<T>::increaseElementUsage(
+                    id,
+                    mRawBufferManager.get(),
+                    RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_HISTORY_BUFFER,
+                    value );
+            }
+#endif
         }
     }
 }

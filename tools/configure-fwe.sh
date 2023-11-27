@@ -46,6 +46,15 @@ fi
 if [ -z "${CONNECTION_TYPE+x}" ]; then
     CONNECTION_TYPE="iotCore"
 fi
+if [ -z "${CREDS_ENDPOINT_URL+x}" ]; then
+    CREDS_ENDPOINT_URL=""
+fi
+if [ -z "${CREDS_ROLE_ALIAS+x}" ]; then
+    CREDS_ROLE_ALIAS=""
+fi
+if [ -z "${RAW_DATA_BUFFER_SIZE+x}" ]; then
+    RAW_DATA_BUFFER_SIZE=1073741824
+fi
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -106,6 +115,18 @@ parse_args() {
             LOG_COLOR=$2
             shift
             ;;
+        --creds-endpoint-url)
+            CREDS_ENDPOINT_URL=$2
+            shift
+            ;;
+        --creds-role-alias)
+            CREDS_ROLE_ALIAS=$2
+            shift
+            ;;
+        --raw-data-buffer-size)
+            RAW_DATA_BUFFER_SIZE=$2
+            shift
+            ;;
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --input-config-file <FILE>    Input JSON config file"
@@ -122,6 +143,9 @@ parse_args() {
             echo "  --topic-prefix <PREFIX>       IoT MQTT topic prefix, default: ${TOPIC_PREFIX}"
             echo "  --log-level <LEVEL>           Log level. Either: Off, Error, Warning, Info, Trace. Default: ${LOG_LEVEL}"
             echo "  --log-color <COLOR_OPTION>    Whether logs should be colored. Either: Auto, Yes, No. Default: ${LOG_COLOR}"
+            echo "  --creds-endpoint-url <URL>    Endpoint URL for AWS IoT Credentials Provider"
+            echo "  --creds-role-alias <ALIAS>    Role alias for AWS IoT Credentials Provider"
+            echo "  --raw-data-buffer-size <SIZE> Raw data buffer size, default: ${RAW_DATA_BUFFER_SIZE}"
             exit 0
             ;;
         esac
@@ -197,6 +221,18 @@ if [ "${CAN_BUS0}" != "" ]; then
         | jq ".networkInterfaces[1].interfaceId=\"0\""`
 else
     OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".networkInterfaces=[]"`
+fi
+
+if [ "${CREDS_ENDPOINT_URL}" != "" ] || [ "${CREDS_ROLE_ALIAS}" != "" ]; then
+    ROS2_INTERFACE=`echo "{}" | jq ".interfaceId=\"10\"" \
+        | jq ".type=\"ros2Interface\"" \
+        | jq ".ros2Interface.subscribeQueueLength=100" \
+        | jq ".ros2Interface.executorThreads=2" \
+        | jq ".ros2Interface.introspectionLibraryCompare=\"ErrorAndFail\""`
+    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".networkInterfaces+=[${ROS2_INTERFACE}]" \
+        | jq ".staticConfig.credentialsProvider.endpointUrl=\"${CREDS_ENDPOINT_URL}\"" \
+        | jq ".staticConfig.credentialsProvider.roleAlias=\"${CREDS_ROLE_ALIAS}\"" \
+        | jq ".staticConfig.visionSystemDataCollection.rawDataBuffer.maxSize=${RAW_DATA_BUFFER_SIZE}"`
 fi
 
 echo "${OUTPUT_CONFIG}" > ${OUTPUT_CONFIG_FILE}

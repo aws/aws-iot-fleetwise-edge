@@ -16,4 +16,4 @@ pip3 install \
     plotly==5.3.1 \
     pandas==1.3.5 \
     cantools==36.4.0 \
-    fastparquet==0.8.1
+    pyarrow==13.0.0

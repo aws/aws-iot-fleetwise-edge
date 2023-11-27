@@ -8,7 +8,6 @@
 #include "SignalTypes.h"
 #include "VehicleDataSourceTypes.h"
 #include "WaitUntil.h"
-#include <boost/lockfree/queue.hpp>
 #include <gtest/gtest.h>
 #include <memory>
 #include <unordered_map>
@@ -58,16 +57,19 @@ TEST_F( ExternalGpsSourceTest, testDecoding ) // NOLINT
     ASSERT_FALSE( gpsSource.init( INVALID_CAN_SOURCE_NUMERIC_ID, 1, 0, 32 ) );
     ASSERT_TRUE( gpsSource.init( 1, 1, 0, 32 ) );
     gpsSource.start();
-    CollectedSignal firstSignal;
-    CollectedSignal secondSignal;
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+
+    CollectedDataFrame collectedDataFrame;
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+
     gpsSource.setLocation( 360, 360 ); // Invalid
     gpsSource.setLocation( 52.5761, 12.5761 );
 
-    WAIT_ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
-    ASSERT_TRUE( signalBufferPtr->pop( secondSignal ) );
+    WAIT_ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+
+    auto firstSignal = collectedDataFrame.mCollectedSignals[0];
+    auto secondSignal = collectedDataFrame.mCollectedSignals[1];
+
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );
@@ -75,7 +77,7 @@ TEST_F( ExternalGpsSourceTest, testDecoding ) // NOLINT
 
     ASSERT_TRUE( gpsSource.init( 1, 1, 123, 456 ) ); // Invalid start bits
     gpsSource.setLocation( 52.5761, 12.5761 );
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
 
     ASSERT_TRUE( gpsSource.stop() );
 }
@@ -87,15 +89,15 @@ TEST_F( ExternalGpsSourceTest, testWestNegativeLongitude ) // NOLINT
     ExternalGpsSource gpsSource( signalBufferPtr );
     gpsSource.init( 1, 1, 0, 32 );
     gpsSource.start();
-    CollectedSignal firstSignal;
-    CollectedSignal secondSignal;
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+    CollectedDataFrame collectedDataFrame;
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
     gpsSource.setLocation( 52.5761, -12.5761 );
 
-    WAIT_ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
-    ASSERT_TRUE( signalBufferPtr->pop( secondSignal ) );
+    WAIT_ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+    auto firstSignal = collectedDataFrame.mCollectedSignals[0];
+    auto secondSignal = collectedDataFrame.mCollectedSignals[1];
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );

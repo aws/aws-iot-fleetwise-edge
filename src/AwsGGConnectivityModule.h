@@ -81,11 +81,16 @@ public:
      * @brief create a new channel sharing the connection of this module
      * This call needs to be done before calling connect for all asynchronous subscribe channel
      * @param payloadManager the payload manager used by the new channel,
+     * @param topicName the topic which this channel should subscribe/publish to
+     * @param subscription whether the channel should subscribe to the topic. Otherwise it will
+     * just publish to it.
+     *
      * @return a pointer to the newly created channel. A reference to the newly created channel is also hold inside this
      * module.
      */
-    std::shared_ptr<IConnectivityChannel> createNewChannel(
-        const std::shared_ptr<PayloadManager> &payloadManager ) override;
+    std::shared_ptr<IConnectivityChannel> createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager,
+                                                            const std::string &topicName,
+                                                            bool subscription = false ) override;
 
 private:
     std::atomic<bool> mConnected;

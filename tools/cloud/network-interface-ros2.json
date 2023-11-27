@@ -1,0 +1,10 @@
+[
+  {
+    "interfaceId": "10",
+    "type": "VEHICLE_MIDDLEWARE",
+    "vehicleMiddleware": {
+      "name": "ros2",
+      "protocolName": "ROS_2"
+    }
+  }
+]

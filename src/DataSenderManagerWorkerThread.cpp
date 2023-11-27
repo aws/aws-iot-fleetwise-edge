@@ -86,6 +86,16 @@ DataSenderManagerWorkerThread::doWork( void *data )
         sender->mTimer.reset();
         uint64_t minTimeToWaitMs = UINT64_MAX;
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        // Check if new collection scheme is available to update available senders
+        if ( sender->mUpdatedCollectionSchemeListAvailable )
+        {
+            std::lock_guard<std::mutex> lock( sender->mActiveCollectionSchemesMutex );
+            sender->mDataSenderManager->onChangeCollectionSchemeList( sender->mActiveCollectionSchemes );
+            sender->mUpdatedCollectionSchemeListAvailable = false;
+        }
+#endif
+
         if ( sender->mPersistencyUploadRetryIntervalMs > 0 )
         {
             uint64_t timeToWaitMs =
@@ -166,6 +176,11 @@ DataSenderManagerWorkerThread::doWork( void *data )
                 case SignalType::BOOLEAN:
                     firstSignalValues += std::to_string( static_cast<int>( signalValue.value.boolVal ) ) + ",";
                     break;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                case SignalType::RAW_DATA_BUFFER_HANDLE:
+                    firstSignalValues += std::to_string( signalValue.value.uint32Val ) + ",";
+                    break;
+#endif
                 }
             }
             firstSignalValues += "]";
@@ -173,7 +188,11 @@ DataSenderManagerWorkerThread::doWork( void *data )
             if ( triggeredCollectionSchemeDataPtr->signals.empty() &&
                  triggeredCollectionSchemeDataPtr->canFrames.empty() &&
                  triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.empty() &&
-                 ( !triggeredCollectionSchemeDataPtr->mGeohashInfo.hasItems() ) )
+                 ( !triggeredCollectionSchemeDataPtr->mGeohashInfo.hasItems() )
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                 && triggeredCollectionSchemeDataPtr->uploadedS3Objects.empty()
+#endif
+            )
             {
                 FWE_LOG_INFO(
                     "The trigger for Campaign:  " + triggeredCollectionSchemeDataPtr->metadata.collectionSchemeID +
@@ -191,13 +210,31 @@ DataSenderManagerWorkerThread::doWork( void *data )
                     " trigger timestamp: " + std::to_string( triggeredCollectionSchemeDataPtr->triggerTime ) +
                     " raw CAN frames:" + std::to_string( triggeredCollectionSchemeDataPtr->canFrames.size() ) +
                     " DTCs:" + std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() ) +
-                    " Geohash:" + triggeredCollectionSchemeDataPtr->mGeohashInfo.mGeohashString;
+                    " Geohash:" + triggeredCollectionSchemeDataPtr->mGeohashInfo.mGeohashString
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                    + " Uploaded S3 Objects: " +
+                    std::to_string( triggeredCollectionSchemeDataPtr->uploadedS3Objects.size() )
+#endif
+                    ;
                 FWE_LOG_INFO( message );
-                sender->mDataSenderManager->processCollectedData( triggeredCollectionSchemeDataPtr );
+                sender->mDataSenderManager->processCollectedData(
+                    triggeredCollectionSchemeDataPtr
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                    ,
+                    [sender]( TriggeredCollectionSchemeDataPtr uploadedData ) {
+                        if ( !sender->mCollectedDataQueue->push( std::move( uploadedData ) ) )
+                        {
+                            FWE_LOG_WARN( "Collected data output buffer is full" );
+                            return;
+                        }
+                        sender->mWait.notify();
+                    }
+#endif
+                );
             }
         };
 
-        auto consumedElements = sender->mCollectedDataQueue->consume_all( consumeData );
+        auto consumedElements = sender->mCollectedDataQueue->consumeAll( consumeData );
         TraceModule::get().setVariable( TraceVariable::QUEUE_INSPECTION_TO_SENDER, consumedElements );
         if ( ( !uploadedPersistedDataOnce ) ||
              ( ( sender->mPersistencyUploadRetryIntervalMs > 0 ) &&
@@ -213,6 +250,19 @@ DataSenderManagerWorkerThread::doWork( void *data )
         }
     }
 }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+void
+DataSenderManagerWorkerThread::onChangeCollectionSchemeList(
+    const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes )
+{
+    std::lock_guard<std::mutex> lock( mActiveCollectionSchemesMutex );
+    mActiveCollectionSchemes = activeCollectionSchemes;
+    mUpdatedCollectionSchemeListAvailable = true;
+    FWE_LOG_TRACE( "New list of active collections schemes was handed over" );
+    mWait.notify();
+}
+#endif
 
 bool
 DataSenderManagerWorkerThread::isAlive()

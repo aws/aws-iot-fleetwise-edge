@@ -7,10 +7,21 @@
 #include "LoggingModule.h"
 #include <google/protobuf/message.h>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "MessageTypes.h"
+#include <unordered_map>
+#include <utility>
+#include <vector>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
 {
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+std::atomic<uint32_t> CollectionSchemeIngestion::mPartialSignalCounter( 0 );
+#endif
 
 CollectionSchemeIngestion::~CollectionSchemeIngestion()
 {
@@ -61,15 +72,30 @@ CollectionSchemeIngestion::build()
         const Schemas::CollectionSchemesMsg::SignalInformation &signalInformation =
             mProtoCollectionSchemeMessagePtr->signal_information( signalIndex );
 
+        std::string additionalTraceInfo;
+
         SignalCollectionInfo signalInfo;
         // Append the signal Information to the results
-        signalInfo.signalID = signalInformation.signal_id();
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        if ( signalInformation.has_signal_path() && ( signalInformation.signal_path().signal_path_size() > 0 ) )
+        {
+            signalInfo.signalID =
+                getOrInsertPartialSignalId( signalInformation.signal_id(), signalInformation.signal_path() );
+            additionalTraceInfo +=
+                " with path length " + std::to_string( signalInformation.signal_path().signal_path_size() );
+        }
+        else
+#endif
+        {
+            signalInfo.signalID = signalInformation.signal_id();
+        }
         signalInfo.sampleBufferSize = signalInformation.sample_buffer_size();
         signalInfo.minimumSampleIntervalMs = signalInformation.minimum_sample_period_ms();
         signalInfo.fixedWindowPeriod = signalInformation.fixed_window_period_ms();
         signalInfo.isConditionOnlySignal = signalInformation.condition_only_signal();
 
-        FWE_LOG_TRACE( "Adding signalID: " + std::to_string( signalInfo.signalID ) + " to list of signals to collect" );
+        FWE_LOG_TRACE( "Adding signalID: " + std::to_string( signalInfo.signalID ) + " to list of signals to collect" +
+                       additionalTraceInfo );
         mCollectedSignals.emplace_back( signalInfo );
     }
 
@@ -135,12 +161,87 @@ CollectionSchemeIngestion::build()
         FWE_LOG_ERROR( "COLLECTION_SCHEME_TYPE_NOT_SET" );
     }
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    if ( mProtoCollectionSchemeMessagePtr->has_s3_upload_metadata() )
+    {
+        FWE_LOG_INFO( "S3 Upload Metadata was set CollectionScheme ID: " +
+                      mProtoCollectionSchemeMessagePtr->campaign_sync_id() );
+        mS3UploadMetadata.bucketName = mProtoCollectionSchemeMessagePtr->s3_upload_metadata().bucket_name();
+        mS3UploadMetadata.prefix = mProtoCollectionSchemeMessagePtr->s3_upload_metadata().prefix();
+        if ( ( mS3UploadMetadata.prefix.length() > 1 ) && ( mS3UploadMetadata.prefix[0] == '/' ) )
+        {
+            // Remove single leading slash
+            mS3UploadMetadata.prefix.erase( 0, 1 );
+        }
+        mS3UploadMetadata.region = mProtoCollectionSchemeMessagePtr->s3_upload_metadata().region();
+        mS3UploadMetadata.bucketOwner =
+            mProtoCollectionSchemeMessagePtr->s3_upload_metadata().bucket_owner_account_id();
+    }
+#endif
+
     FWE_LOG_INFO( "Successfully built CollectionScheme ID: " + mProtoCollectionSchemeMessagePtr->campaign_sync_id() );
 
     // Set ready flag to true
     mReady = true;
     return true;
 }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+PartialSignalID
+CollectionSchemeIngestion::getOrInsertPartialSignalId( SignalID signalId,
+                                                       const Schemas::CommonTypesMsg::SignalPath &path )
+{
+
+    // Search if path already exists
+    for ( auto &partialSignal : mPartialSignalIDLookup )
+    {
+        if ( partialSignal.second.first == signalId )
+        {
+            if ( path.signal_path_size() == static_cast<int>( partialSignal.second.second.size() ) )
+            {
+                bool found = true;
+                for ( int i = 0; i < path.signal_path_size(); i++ )
+                {
+                    if ( path.signal_path( i ) != partialSignal.second.second[static_cast<uint32_t>( i )] )
+                    {
+                        found = false;
+                        break;
+                    }
+                }
+                if ( found )
+                {
+                    return partialSignal.first;
+                }
+            }
+        }
+    }
+
+    // Copy signal path
+    SignalPath signal_path = SignalPath();
+    for ( int i = 0; i < path.signal_path_size(); i++ )
+    {
+        signal_path.emplace_back( path.signal_path( i ) );
+    }
+
+    // coverity[misra_cpp_2008_rule_5_2_10_violation] For std::atomic this must be performed in a single statement
+    // coverity[autosar_cpp14_m5_2_10_violation] For std::atomic this must be performed in a single statement
+    PartialSignalID newPartialSignalId = mPartialSignalCounter++ | INTERNAL_SIGNAL_ID_BITMASK;
+
+    mPartialSignalIDLookup[newPartialSignalId] = std::pair<SignalID, SignalPath>( signalId, signal_path );
+    return newPartialSignalId;
+}
+
+const ICollectionScheme::PartialSignalIDLookup &
+CollectionSchemeIngestion::getPartialSignalIdToSignalPathLookupTable() const
+{
+
+    if ( !mReady )
+    {
+        return INVALID_PARTIAL_SIGNAL_ID_LOOKUP;
+    }
+    return mPartialSignalIDLookup;
+}
+#endif
 
 const ICollectionScheme::ExpressionNode_t &
 CollectionSchemeIngestion::getAllExpressionNodes() const
@@ -155,26 +256,26 @@ CollectionSchemeIngestion::getAllExpressionNodes() const
 
 WindowFunction
 CollectionSchemeIngestion::convertFunctionType(
-    Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType function )
+    Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType function )
 {
     switch ( function )
     {
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_MIN:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_MIN:
         FWE_LOG_INFO( "Converting node to: LAST_FIXED_WINDOW_MIN" );
         return WindowFunction::LAST_FIXED_WINDOW_MIN;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_MAX:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_MAX:
         FWE_LOG_INFO( "Converting node to: LAST_FIXED_WINDOW_MAX" );
         return WindowFunction::LAST_FIXED_WINDOW_MAX;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_AVG:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_AVG:
         FWE_LOG_INFO( "Converting node to: LAST_FIXED_WINDOW_AVG" );
         return WindowFunction::LAST_FIXED_WINDOW_AVG;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_PREV_LAST_WINDOW_MIN:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_PREV_LAST_WINDOW_MIN:
         FWE_LOG_INFO( "Converting node to: PREV_LAST_FIXED_WINDOW_MIN" );
         return WindowFunction::PREV_LAST_FIXED_WINDOW_MIN;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_PREV_LAST_WINDOW_MAX:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_PREV_LAST_WINDOW_MAX:
         FWE_LOG_INFO( "Converting node to: PREV_LAST_FIXED_WINDOW_MAX" );
         return WindowFunction::PREV_LAST_FIXED_WINDOW_MAX;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_PREV_LAST_WINDOW_AVG:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_PREV_LAST_WINDOW_AVG:
         FWE_LOG_INFO( "Converting node to: PREV_LAST_FIXED_WINDOW_AVG" );
         return WindowFunction::PREV_LAST_FIXED_WINDOW_AVG;
     default:
@@ -184,47 +285,47 @@ CollectionSchemeIngestion::convertFunctionType(
 }
 
 ExpressionNodeType
-CollectionSchemeIngestion::convertOperatorType( Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator op )
+CollectionSchemeIngestion::convertOperatorType( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator op )
 {
     switch ( op )
     {
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_SMALLER" );
         return ExpressionNodeType::OPERATOR_SMALLER;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_BIGGER:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_BIGGER:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_BIGGER" );
         return ExpressionNodeType::OPERATOR_BIGGER;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER_EQUAL:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER_EQUAL:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_SMALLER_EQUAL" );
         return ExpressionNodeType::OPERATOR_SMALLER_EQUAL;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_BIGGER_EQUAL:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_BIGGER_EQUAL:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_BIGGER_EQUAL" );
         return ExpressionNodeType::OPERATOR_BIGGER_EQUAL;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_EQUAL:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_EQUAL:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_EQUAL" );
         return ExpressionNodeType::OPERATOR_EQUAL;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_NOT_EQUAL:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_NOT_EQUAL:
         FWE_LOG_INFO( "Converting operator NodeOperator_Operator_COMPARE_NOT_EQUAL to OPERATOR_NOT_EQUAL" );
         return ExpressionNodeType::OPERATOR_NOT_EQUAL;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_AND:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_AND:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_LOGICAL_AND" );
         return ExpressionNodeType::OPERATOR_LOGICAL_AND;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_OR:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_OR:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_LOGICAL_OR" );
         return ExpressionNodeType::OPERATOR_LOGICAL_OR;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_NOT:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_NOT:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_LOGICAL_NOT" );
         return ExpressionNodeType::OPERATOR_LOGICAL_NOT;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_PLUS:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_PLUS:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_ARITHMETIC_PLUS" );
         return ExpressionNodeType::OPERATOR_ARITHMETIC_PLUS;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MINUS:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MINUS:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_ARITHMETIC_MINUS" );
         return ExpressionNodeType::OPERATOR_ARITHMETIC_MINUS;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MULTIPLY:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MULTIPLY:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_ARITHMETIC_MULTIPLY" );
         return ExpressionNodeType::OPERATOR_ARITHMETIC_MULTIPLY;
-    case Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_DIVIDE:
+    case Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_DIVIDE:
         FWE_LOG_INFO( "Converting operator to: OPERATOR_ARITHMETIC_DIVIDE" );
         return ExpressionNodeType::OPERATOR_ARITHMETIC_DIVIDE;
     default:
@@ -233,14 +334,14 @@ CollectionSchemeIngestion::convertOperatorType( Schemas::CollectionSchemesMsg::C
 }
 
 uint32_t
-CollectionSchemeIngestion::getNumberOfNodes( const Schemas::CollectionSchemesMsg::ConditionNode &node, const int depth )
+CollectionSchemeIngestion::getNumberOfNodes( const Schemas::CommonTypesMsg::ConditionNode &node, const int depth )
 {
     if ( depth <= 0 )
     {
         return 0;
     }
     uint32_t sum = 1; // this is one node so start with 1;
-    if ( node.node_case() == Schemas::CollectionSchemesMsg::ConditionNode::kNodeOperator )
+    if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodeOperator )
     {
         if ( node.node_operator().has_left_child() )
         {
@@ -256,7 +357,7 @@ CollectionSchemeIngestion::getNumberOfNodes( const Schemas::CollectionSchemesMsg
 }
 
 ExpressionNode *
-CollectionSchemeIngestion::serializeNode( const Schemas::CollectionSchemesMsg::ConditionNode &node,
+CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::ConditionNode &node,
                                           std::size_t &nextIndex,
                                           int remainingDepth )
 {
@@ -276,21 +377,21 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CollectionSchemesMsg::C
     }
     nextIndex++;
 
-    if ( node.node_case() == Schemas::CollectionSchemesMsg::ConditionNode::kNodeSignalId )
+    if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodeSignalId )
     {
         currentNode->signalID = node.node_signal_id();
         currentNode->nodeType = ExpressionNodeType::SIGNAL;
         FWE_LOG_TRACE( "Creating SIGNAL node with ID: " + std::to_string( currentNode->signalID ) );
         return currentNode;
     }
-    else if ( node.node_case() == Schemas::CollectionSchemesMsg::ConditionNode::kNodeDoubleValue )
+    else if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodeDoubleValue )
     {
         currentNode->floatingValue = node.node_double_value();
         currentNode->nodeType = ExpressionNodeType::FLOAT;
         FWE_LOG_TRACE( "Creating FLOAT node with value: " + std::to_string( currentNode->floatingValue ) );
         return currentNode;
     }
-    else if ( node.node_case() == Schemas::CollectionSchemesMsg::ConditionNode::kNodeBooleanValue )
+    else if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodeBooleanValue )
     {
         currentNode->booleanValue = node.node_boolean_value();
         currentNode->nodeType = ExpressionNodeType::BOOLEAN;
@@ -298,12 +399,36 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CollectionSchemesMsg::C
                        std::to_string( static_cast<int>( currentNode->booleanValue ) ) );
         return currentNode;
     }
-    else if ( node.node_case() == Schemas::CollectionSchemesMsg::ConditionNode::kNodeFunction )
+    else if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodeFunction )
     {
         if ( node.node_function().functionType_case() ==
-             Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction::kWindowFunction )
+             Schemas::CommonTypesMsg::ConditionNode_NodeFunction::kWindowFunction )
         {
-            currentNode->signalID = node.node_function().window_function().signal_id();
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            if ( node.node_function().window_function().has_primitive_type_in_signal() )
+            {
+                if ( node.node_function().window_function().primitive_type_in_signal().has_signal_path() &&
+                     ( node.node_function()
+                           .window_function()
+                           .primitive_type_in_signal()
+                           .signal_path()
+                           .signal_path_size() > 0 ) )
+                {
+                    currentNode->signalID = getOrInsertPartialSignalId(
+                        node.node_function().window_function().primitive_type_in_signal().signal_id(),
+                        node.node_function().window_function().primitive_type_in_signal().signal_path() );
+                }
+                else
+                {
+                    currentNode->signalID =
+                        node.node_function().window_function().primitive_type_in_signal().signal_id();
+                }
+            }
+            else
+#endif
+            {
+                currentNode->signalID = node.node_function().window_function().signal_id();
+            }
             currentNode->function.windowFunction =
                 convertFunctionType( node.node_function().window_function().window_type() );
             currentNode->nodeType = ExpressionNodeType::WINDOWFUNCTION;
@@ -311,7 +436,7 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CollectionSchemesMsg::C
             return currentNode;
         }
         else if ( node.node_function().functionType_case() ==
-                  Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction::kGeohashFunction )
+                  Schemas::CommonTypesMsg::ConditionNode_NodeFunction::kGeohashFunction )
         {
             if ( ( node.node_function().geohash_function().geohash_precision() > UINT8_MAX ) ||
                  ( node.node_function().geohash_function().gps_unit() >=
@@ -346,7 +471,7 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CollectionSchemesMsg::C
             FWE_LOG_WARN( "Unsupported Function Node Type" );
         }
     }
-    else if ( node.node_case() == Schemas::CollectionSchemesMsg::ConditionNode::kNodeOperator )
+    else if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodeOperator )
     {
         // If no left node this node_operator is invalid
         if ( node.node_operator().has_left_child() )
@@ -379,6 +504,29 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CollectionSchemesMsg::C
             return currentNode;
         }
     }
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    else if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodePrimitiveTypeInSignal )
+    {
+        if ( node.node_primitive_type_in_signal().has_signal_path() &&
+             ( node.node_primitive_type_in_signal().signal_path().signal_path_size() > 0 ) )
+        {
+            currentNode->signalID = getOrInsertPartialSignalId( node.node_primitive_type_in_signal().signal_id(),
+                                                                node.node_primitive_type_in_signal().signal_path() );
+            FWE_LOG_TRACE( "Creating SIGNAL node with internal ID: " + std::to_string( currentNode->signalID ) +
+                           " used for external ID " +
+                           std::to_string( node.node_primitive_type_in_signal().signal_id() ) + " with path length:" +
+                           std::to_string( node.node_primitive_type_in_signal().signal_path().signal_path_size() ) );
+        }
+        else
+        {
+            currentNode->signalID = node.node_primitive_type_in_signal().signal_id();
+            FWE_LOG_TRACE( "Creating SIGNAL node with internal and external ID: " +
+                           std::to_string( currentNode->signalID ) + " because path size is 0" );
+        }
+        currentNode->nodeType = ExpressionNodeType::SIGNAL;
+        return currentNode;
+    }
+#endif
 
     // if not returned until here its an invalid node so remove it from buffer
     mExpressionNodes.pop_back();
@@ -576,6 +724,18 @@ CollectionSchemeIngestion::getProbabilityToSend() const
     }
     return mProtoCollectionSchemeMessagePtr->probabilities().probability_to_send();
 }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+S3UploadMetadata
+CollectionSchemeIngestion::getS3UploadMetadata() const
+{
+    if ( ( !mReady ) || ( !mProtoCollectionSchemeMessagePtr->has_s3_upload_metadata() ) )
+    {
+        return INVALID_S3_UPLOAD_METADATA;
+    }
+    return mS3UploadMetadata;
+}
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

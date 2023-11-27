@@ -58,6 +58,21 @@
       "checkinTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/checkins",
       "certificateFilename": "path/to/my-certificate.pem.crt",
       "privateKeyFilename": "path/to/my-private.pem.key"
+    },
+    "credentialsProvider": {
+      "endpointUrl": "my-endpoint.credentials.iot.my-region.amazonaws.com",
+      "roleAlias": "my-role-alias"
+    },
+    "s3Upload": {
+      "maxEnvelopeSize": 104857600,
+      "multipartSize": 5242880,
+      "maxConnections": 2
+    },
+    "visionSystemDataCollection": {
+      "rawDataBuffer": {
+        "maxSize": 1073741824,
+        "reservedSizePerSignal": 5242880
+      }
     }
   }
 }

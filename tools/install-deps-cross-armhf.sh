@@ -4,18 +4,24 @@
 
 set -euo pipefail
 
-SCRIPT_DIR=$(dirname $(realpath "$0"))
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 source ${SCRIPT_DIR}/install-deps-versions.sh
 
 USE_CACHE="true"
 WITH_GREENGRASSV2_SUPPORT="false"
 SHARED_LIBS="OFF"
+WITH_VISION_SYSTEM_DATA="false"
+WITH_ROS2_SUPPORT="false"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case $1 in
         --with-greengrassv2-support)
             WITH_GREENGRASSV2_SUPPORT="true"
+            ;;
+        --with-ros2-support)
+            WITH_ROS2_SUPPORT="true"
+            WITH_VISION_SYSTEM_DATA="true"
             ;;
         --native-prefix)
             NATIVE_PREFIX="$2"
@@ -28,6 +34,7 @@ parse_args() {
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --with-greengrassv2-support  Install dependencies for Greengrass V2"
+            echo "  --with-ros2-support          Install dependencies for ROS2 support"
             echo "  --native-prefix              Native install prefix"
             echo "  --shared-libs                Build shared libs, rather than static libs"
             exit 0
@@ -71,7 +78,8 @@ print_file "After patching" /etc/apt/sources.list.d/armhf.list
 dpkg --add-architecture armhf
 apt update
 apt install -y \
-    build-essential \
+    build-essential
+apt install -y \
     cmake \
     crossbuild-essential-armhf \
     curl \
@@ -84,6 +92,21 @@ apt install -y \
     unzip \
     wget \
     zlib1g-dev:armhf
+
+if ${WITH_ROS2_SUPPORT}; then
+    wget -q https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O /usr/share/keyrings/ros-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(source /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list
+    apt update
+    apt install -y \
+        bison \
+        python3-numpy \
+        python3-lark \
+        libasio-dev \
+        libacl1-dev:armhf \
+        liblog4cxx-dev:armhf \
+        libpython3-dev:armhf \
+        python3-colcon-common-extensions
+fi
 
 if [ ! -f /usr/include/linux/can/isotp.h ]; then
     git clone https://github.com/hartkopp/can-isotp.git
@@ -118,6 +141,22 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         ..
     make install -j`nproc`
     cd ../..
+
+    if ${WITH_VISION_SYSTEM_DATA}; then
+        git clone https://github.com/amazon-ion/ion-c.git
+        cd ion-c
+        git checkout ${VERSION_ION_C}
+        git submodule update --init
+        mkdir build && cd build
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+            -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
+            -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
+            ..
+        make install -j`nproc`
+        cd ../..
+    fi
 
     wget -q https://github.com/protocolbuffers/protobuf/releases/download/${VERSION_PROTOBUF_RELEASE}/protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
     tar -zxf protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
@@ -207,7 +246,7 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         -DENABLE_TESTING=OFF \
         -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
         -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_ONLY='s3-crt;iot' \
+        -DBUILD_ONLY='transfer;s3-crt;iot' \
         -DAWS_CUSTOM_MEMORY_MANAGEMENT=ON \
         ${AWS_SDK_CPP_OPTIONS} \
         -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
@@ -215,6 +254,63 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         ..
     make install -j`nproc`
     cd ../..
+
+    if ${WITH_ROS2_SUPPORT}; then
+        git clone -b ${VERSION_TINYXML2} https://github.com/leethomason/tinyxml2.git
+        cd tinyxml2
+        mkdir build && cd build
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+            -DBUILD_STATIC_LIBS=ON \
+            -DBUILD_TESTS=OFF \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
+            -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
+            ..
+        make install -j`nproc`
+        cd ../..
+
+        git clone -b ${VERSION_FAST_CDR} https://github.com/eProsima/Fast-CDR.git
+        cd Fast-CDR
+        mkdir build && cd build
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
+            -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
+            ..
+        make install -j`nproc`
+        cd ../..
+
+        apt install -y \
+            ros-dev-tools
+        git clone -b 0.8.0 https://github.com/eclipse-cyclonedds/cyclonedds.git
+        cd cyclonedds
+        mkdir build && cd build
+        cmake ..
+        make install -j`nproc`
+        cp bin/ddsconf /usr/local/bin
+        cd ../..
+        mkdir -p ros2_build/src && cd ros2_build
+        vcs import --input https://raw.githubusercontent.com/ros2/ros2/release-galactic-20221209/ros2.repos src
+        rosdep init
+        rosdep update
+        git apply ${SCRIPT_DIR}/ros2_fix_cross_compile.patch
+        # Without setting PythonExtra_EXTENSION_SUFFIX the .so file are armhf but have x86_64 in the name
+        colcon build \
+            --merge-install \
+            --install-base /opt/ros/galactic \
+            --packages-up-to rclcpp rosbag2 sensor_msgs \
+            --cmake-args \
+            -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
+            -DBUILD_TESTING=OFF \
+            -DPythonExtra_EXTENSION_SUFFIX=.cpython-38-arm-linux-gnueabihf \
+            --no-warn-unused-cli
+        cd ..
+        apt remove -y ros-dev-tools
+    fi
 
     cd ..
     rm -rf deps-cross-armhf

@@ -72,6 +72,11 @@ public:
                      const uint32_t lineNumber,
                      const std::string &function,
                      const std::string &logEntry );
+
+    /**
+     * @brief Try to flush any log that has been buffered
+     */
+    static void flush();
 };
 
 /**

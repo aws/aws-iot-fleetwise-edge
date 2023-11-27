@@ -10,6 +10,11 @@
 #include <memory>
 #include <string>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "SignalTypes.h"
+#include <atomic>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -68,6 +73,19 @@ public:
 
     const ExpressionNode_t &getAllExpressionNodes() const override;
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief The internal PartialSignalIDs are generated here. This ID must be unique across all campaigns.
+     * To avoid duplication this counter is used as the uppermost Bit INTERNAL_SIGNAL_ID_BITMASK must be set
+     * the MSB can never be used
+     */
+    static std::atomic<uint32_t> mPartialSignalCounter;
+
+    const PartialSignalIDLookup &getPartialSignalIdToSignalPathLookupTable() const override;
+
+    S3UploadMetadata getS3UploadMetadata() const override;
+#endif
+
 private:
     /**
      * @brief The CollectionScheme message that will hold the deserialized proto.
@@ -99,10 +117,22 @@ private:
      */
     ExpressionNode_t mExpressionNodes;
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief unordered_map from partial signal ID to pair of signal path and signal ID
+     */
+    PartialSignalIDLookup mPartialSignalIDLookup;
+
+    /**
+     * @brief Required metadata for S3 upload
+     */
+    S3UploadMetadata mS3UploadMetadata;
+#endif
+
     /**
      * @brief Function used to Flatten the Abstract Syntax Tree (AST)
      */
-    ExpressionNode *serializeNode( const Schemas::CollectionSchemesMsg::ConditionNode &node,
+    ExpressionNode *serializeNode( const Schemas::CommonTypesMsg::ConditionNode &node,
                                    std::size_t &nextIndex,
                                    int remainingDepth );
 
@@ -114,19 +144,25 @@ private:
      *
      * @return Returns the number of nodes in the AST
      */
-    uint32_t getNumberOfNodes( const Schemas::CollectionSchemesMsg::ConditionNode &node, const int depth );
+    uint32_t getNumberOfNodes( const Schemas::CommonTypesMsg::ConditionNode &node, const int depth );
 
     /**
      * @brief  Private Local Function used by the serializeNode Function to return the used Function Type
      */
     static WindowFunction convertFunctionType(
-        Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType function );
+        Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType function );
 
     /**
      * @brief Private Local Function used by the serializeNode Function to return the used Operator Type
      */
-    static ExpressionNodeType convertOperatorType(
-        Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator op );
+    static ExpressionNodeType convertOperatorType( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator op );
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief If for the Signal ID and path combination already an ID was generated return it. Otherwise generate a new.
+     */
+    PartialSignalID getOrInsertPartialSignalId( SignalID signalId, const Schemas::CommonTypesMsg::SignalPath &path );
+#endif
 };
 
 } // namespace IoTFleetWise

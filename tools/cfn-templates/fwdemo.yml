@@ -8,6 +8,10 @@ Parameters:
     Description: Binary URL (leave as default)
     Type: String
     Default: https://github.com/aws/aws-iot-fleetwise-edge/releases/latest/download/aws-iot-fleetwise-edge-arm64.tar.gz
+  BinaryUrlROS2:
+    Description: Binary URL with ROS2 support (leave as default)
+    Type: String
+    Default: https://github.com/aws/aws-iot-fleetwise-edge/releases/latest/download/aws-iot-fleetwise-edge-ros2-arm64.tar.gz
   Ec2KeyPair:
     Description: Name of SSH key pair (leave blank for none)
     Type: String
@@ -38,6 +42,19 @@ Parameters:
     Description: "IoT MQTT Topic prefix (leave as default)"
     Type: String
     Default: "$aws/iotfleetwise/"
+  EnableROS2:
+    Description: "Set to 'true' to enable ROS2 support"
+    Type: String
+    Default: "false"
+    AllowedValues: [false, true]
+  CredentialsProviderRoleAlias:
+    Description: "IoT Credentials Provider Role Alias. Applicable when EnableROS2 is true."
+    Type: String
+    Default: "credentials-provider-role"
+  RawDataBufferSize:
+    Description: "Maximum size of raw data buffer in bytes. Applicable when EnableROS2 is true."
+    Type: Number
+    Default: 2147483648
 Conditions:
   KeyPairSpecifiedCondition: !Not [!Equals [!Ref Ec2KeyPair, ""]]
 Resources:
@@ -128,7 +145,8 @@ Resources:
             done
 
             # Upgrade system and reboot if required
-            apt update && apt upgrade -y
+            apt update
+            apt upgrade -y
             if [ -f /var/run/reboot-required ]; then
               # Delete the UserData info file so that we run again after reboot
               rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
@@ -137,7 +155,8 @@ Resources:
             fi
 
             # Install helper scripts:
-            apt update && apt install -y python3-setuptools
+            apt update
+            apt install -y python3-setuptools
             mkdir -p /opt/aws/bin
             wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
             python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
@@ -157,7 +176,8 @@ Resources:
             printf "RateLimitBurst=0\nSystemMaxUse=1G\n" >> /etc/systemd/journald.conf
 
             # Install packages
-            apt update && apt install -y wget ec2-instance-connect htop jq unzip
+            apt update
+            apt install -y wget ec2-instance-connect htop jq unzip
 
             # Install AWS CLI:
             curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
@@ -167,10 +187,15 @@ Resources:
 
             # Download FWE:
             cd /home/ubuntu
-            if echo ${BinaryUrl} | grep -q 's3://'; then
-              sudo -u ubuntu aws s3 cp ${BinaryUrl} aws-iot-fleetwise-edge.tar.gz
+            if ${EnableROS2}; then
+              DOWNLOAD_URL=${BinaryUrlROS2}
             else
-              sudo -u ubuntu wget ${BinaryUrl} -O aws-iot-fleetwise-edge.tar.gz
+              DOWNLOAD_URL=${BinaryUrl}
+            fi
+            if echo ${!DOWNLOAD_URL} | grep -q 's3://'; then
+              sudo -u ubuntu aws s3 cp ${!DOWNLOAD_URL} aws-iot-fleetwise-edge.tar.gz
+            else
+              sudo -u ubuntu wget ${!DOWNLOAD_URL} -O aws-iot-fleetwise-edge.tar.gz
             fi
             sudo -u ubuntu mkdir dist && cd dist
             sudo -u ubuntu tar -zxf ../aws-iot-fleetwise-edge.tar.gz
@@ -183,11 +208,21 @@ Resources:
             # Install CAN Simulator
             ./tools/install-cansim.sh --bus-count ${FleetSize}
 
+            if ${EnableROS2}; then
+              ./tools/install-deps-native.sh --with-ros2-support --runtime-only
+              sudo HOME=/root ./tools/install-rossim.sh
+            fi
+
             # Install FWE credentials and config file
             mkdir /etc/aws-iot-fleetwise
             mkdir /var/aws-iot-fleetwise
             echo -n "${IoTThing.certificatePem}" > /etc/aws-iot-fleetwise/certificate.pem
             echo -n "${IoTThing.privateKey}" > /etc/aws-iot-fleetwise/private-key.key
+            if ${EnableROS2}; then
+              VISION_SYSTEM_DATA_OPTIONS=" --creds-role-alias ${CredentialsProviderRoleAlias} --creds-endpoint-url ${IoTThing.credsEndpoint} --raw-data-buffer-size ${RawDataBufferSize}"
+            else
+              VISION_SYSTEM_DATA_OPTIONS=""
+            fi
             if ((${FleetSize}==1)); then
               echo "Configuring ${AWS::StackName}..."
               ./tools/configure-fwe.sh \
@@ -196,7 +231,8 @@ Resources:
                 --vehicle-name "${AWS::StackName}" \
                 --endpoint-url "${IoTThing.iotEndpoint}" \
                 --topic-prefix '${IoTMqttTopicPrefix}' \
-                --can-bus0 "vcan0"
+                --can-bus0 "vcan0" \
+                ${!VISION_SYSTEM_DATA_OPTIONS}
             else
               BATCH_SIZE=$((`nproc`*4))
               for ((i=0; i<${FleetSize}; i+=${!BATCH_SIZE})); do
@@ -213,7 +249,8 @@ Resources:
                       --endpoint-url "${IoTThing.iotEndpoint}" \
                       --topic-prefix '${IoTMqttTopicPrefix}' \
                       --can-bus0 "vcan$((i+j))" \
-                      --persistency-path "/var/aws-iot-fleetwise/fwe$((i+j))"; \
+                      --persistency-path "/var/aws-iot-fleetwise/fwe$((i+j))" \
+                      ${!VISION_SYSTEM_DATA_OPTIONS}; \
                   2>&3 &} 3>&2 2>/dev/null
                 done
                 # Wait for all background processes to finish
@@ -286,7 +323,7 @@ Resources:
                       certPem = response['certificatePem']
                       privateKey = response['keyPair']['PrivateKey']
                       logger.info('Creating policy...')
-                      policyDocument = '''{
+                      policyDocument = {
                           "Version": "2012-10-17",
                           "Statement": [
                               {
@@ -298,16 +335,19 @@ Resources:
                                       "iot:Receive"
                                   ],
                                   "Resource": [
-                                      "arn:aws:iot:%s:${AWS::AccountId}:client/${AWS::StackName}*",
-                                      "arn:aws:iot:%s:${AWS::AccountId}:topic/*",
-                                      "arn:aws:iot:%s:${AWS::AccountId}:topicfilter/*"
+                                      f"arn:aws:iot:{iotCoreRegion}:${AWS::AccountId}:client/${AWS::StackName}*",
+                                      f"arn:aws:iot:{iotCoreRegion}:${AWS::AccountId}:topic/*",
+                                      f"arn:aws:iot:{iotCoreRegion}:${AWS::AccountId}:topicfilter/*"
                                   ]
                               }
                           ]
-                      }''' % (iotCoreRegion, iotCoreRegion, iotCoreRegion)
+                      }
+                      if "${EnableROS2}" == "true":
+                          policyDocument["Statement"][0]["Action"].append("iot:AssumeRoleWithCertificate")
+                          policyDocument["Statement"][0]["Resource"].append(f"arn:aws:iot:{iotCoreRegion}:${AWS::AccountId}:rolealias/${CredentialsProviderRoleAlias}")
                       response = client.create_policy(
                           policyName=inputThingName+'-policy',
-                          policyDocument=policyDocument
+                          policyDocument=json.dumps(policyDocument)
                       )
                       for i in range(fleetSize):
                           thingName = inputThingName+("" if fleetSize==1 else "-"+str(i))
@@ -327,6 +367,7 @@ Resources:
                       responseData['certificatePem'] = certPem
                       responseData['privateKey'] = privateKey
                       responseData['iotEndpoint'] = client.describe_endpoint(endpointType='iot:Data-ATS')['endpointAddress']
+                      responseData['credsEndpoint'] = client.describe_endpoint(endpointType="iot:CredentialProvider")["endpointAddress"]
                       result = cfnresponse.SUCCESS
                   elif event['RequestType'] == 'Update':
                       result = cfnresponse.SUCCESS
@@ -421,39 +462,39 @@ Mappings:
   # Ubuntu 20.04 arm64 AMIs
   AMIRegionMap:
     ap-northeast-1:
-      AMIID: ami-04620c7c89721f311
+      AMIID: ami-08c2b40b757d7a436
     ap-northeast-2:
-      AMIID: ami-0ef6c9b9c9ee930fc
+      AMIID: ami-0ae4f84503ebf3d18
     ap-northeast-3:
-      AMIID: ami-02315f10670d2dc08
+      AMIID: ami-06d46b97c052d058f
     ap-south-1:
-      AMIID: ami-044e515ad5805ed4e
+      AMIID: ami-0aedb44d8d5454af4
     ap-southeast-1:
-      AMIID: ami-0409c5b04ce681d29
+      AMIID: ami-0281c2b7875eaa573
     ap-southeast-2:
-      AMIID: ami-0e7cb42982ac39e27
+      AMIID: ami-0b1c7f9ffaf189009
     ca-central-1:
-      AMIID: ami-0a8aa6c089cc882ac
+      AMIID: ami-077fd3ca91fd436e8
     eu-central-1:
-      AMIID: ami-05158c60737714c4a
+      AMIID: ami-0eb0fc432507c6ceb
     eu-north-1:
-      AMIID: ami-0350b31cb022529db
+      AMIID: ami-0fc9d4f1e282548cb
     eu-west-1:
-      AMIID: ami-0f6cc268166e75726
+      AMIID: ami-0a7fc9991623e938a
     eu-west-2:
-      AMIID: ami-01c8c1dd0ad622492
+      AMIID: ami-00da71119c33fd647
     eu-west-3:
-      AMIID: ami-0c5b385769ca9b08a
+      AMIID: ami-00f72fc3d31abc995
     sa-east-1:
-      AMIID: ami-0a42aee4ede7f6d92
+      AMIID: ami-0418ffcf915b2ec2b
     us-east-1:
-      AMIID: ami-0f6426fe0b6419ecc
+      AMIID: ami-06978f2d3e435039f
     us-east-2:
-      AMIID: ami-03605c16ec8bff7de
+      AMIID: ami-09919781fa752ad93
     us-west-1:
-      AMIID: ami-04ad050fe219deea9
+      AMIID: ami-06de4e4d34dc642c8
     us-west-2:
-      AMIID: ami-08ade17b00c7e2172
+      AMIID: ami-0eaba58686a7d034a
   FleetSizeEc2InstanceTypeMap:
     "1":
       InstanceType: m6g.xlarge

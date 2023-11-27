@@ -9,7 +9,6 @@
 #include "VehicleDataSourceTypes.h"
 #include "WaitUntil.h"
 #include <array>
-#include <boost/lockfree/queue.hpp>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <memory>
@@ -63,11 +62,11 @@ TEST_F( AaosVhalSourceTest, testDecoding ) // NOLINT
     ASSERT_FALSE( vhalSource.init( INVALID_CAN_SOURCE_NUMERIC_ID, 1 ) );
     ASSERT_TRUE( vhalSource.init( 1, 1 ) );
     vhalSource.start();
-    CollectedSignal firstSignal;
-    CollectedSignal secondSignal;
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+
+    CollectedDataFrame collectedDataFrame;
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
     vhalSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
     auto propInfo = vhalSource.getVehiclePropertyInfo();
     ASSERT_EQ( 2, propInfo.size() );
     auto sig1Info = std::array<uint32_t, 4>{ 0x0207, 0xAA, 0x55, 0x1234 };
@@ -77,8 +76,10 @@ TEST_F( AaosVhalSourceTest, testDecoding ) // NOLINT
     vhalSource.setVehicleProperty( 0x1234, 52.5761 );
     vhalSource.setVehicleProperty( 0x5678, 12.5761 );
 
-    WAIT_ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
-    ASSERT_TRUE( signalBufferPtr->pop( secondSignal ) );
+    WAIT_ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+    auto firstSignal = collectedDataFrame.mCollectedSignals[0];
+    WAIT_ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+    auto secondSignal = collectedDataFrame.mCollectedSignals[0];
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );

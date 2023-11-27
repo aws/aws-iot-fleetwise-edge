@@ -84,5 +84,33 @@ struct CANDecoderDictionary : DecoderDictionary
  */
 using ConstDecoderDictionaryConstPtr = const std::shared_ptr<const DecoderDictionary>;
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+/**
+ * @brief In one decoder manifest never more complex types can be listed
+ */
+const uint32_t MAX_COMPLEX_TYPES = 5000;
+
+/**
+ * @brief Complex Data Decoder Dictionary can be used to decode multiple data source that can also send
+ *          bigger messages. A tree is used in this decoding dictionary. To decode for example a flat binary
+ *          buffer the  tree can be traversed in a depth first manner and every time a leaf is found the next byte(s)
+ *          of the buffer can be consumed.
+ */
+struct ComplexDataDecoderDictionary : DecoderDictionary
+{
+    using ComplexDataDecoderMethodType =
+        std::unordered_map<ComplexDataInterfaceId, std::unordered_map<ComplexDataMessageId, ComplexDataMessageFormat>>;
+
+    ComplexDataDecoderDictionary() = default;
+    ComplexDataDecoderDictionary( ComplexDataDecoderMethodType complexMsgDecoderMethod,
+                                  std::unordered_set<SignalID> signalIDsToCollectIn )
+        : DecoderDictionary( std::move( signalIDsToCollectIn ) )
+        , complexMessageDecoderMethod( std::move( complexMsgDecoderMethod ) )
+    {
+    }
+    ComplexDataDecoderMethodType complexMessageDecoderMethod;
+};
+#endif
+
 } // namespace IoTFleetWise
 } // namespace Aws

@@ -6,8 +6,9 @@
 #include <algorithm>
 #include <boost/filesystem.hpp>
 #include <cstdio>
-#include <fstream>
-#include <ios>
+#include <fstream>  // IWYU pragma: keep
+#include <ios>      // IWYU pragma: keep
+#include <iostream> // IWYU pragma: keep
 #include <memory>
 #include <vector>
 
@@ -145,6 +146,61 @@ CacheAndPersist::write( const uint8_t *bufPtr, size_t size, std::string &path )
     }
     return ErrorCode::SUCCESS;
 }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+ErrorCode
+CacheAndPersist::write( std::unique_ptr<std::streambuf> streambuf, DataType dataType, const std::string &filename )
+{
+    if ( streambuf == nullptr )
+    {
+        FWE_LOG_ERROR( "Failed to persist data: stream is empty" );
+        return ErrorCode::INVALID_DATA;
+    }
+
+    if ( filename.empty() )
+    {
+        FWE_LOG_ERROR( "Failed to persist data: filename is empty" );
+        return ErrorCode::INVALID_DATATYPE;
+    }
+
+    if ( dataType != DataType::EDGE_TO_CLOUD_PAYLOAD )
+    {
+        FWE_LOG_ERROR( "Failed to persist data: wrong datatype provided" );
+        return ErrorCode::INVALID_DATATYPE;
+    }
+
+    boost::filesystem::path path{ filename };
+    // coverity[misra_cpp_2008_rule_14_8_2_violation] - boost filesystem path header defines both template and
+    // and non-template function
+    if ( !boost::filesystem::exists( mCollectedDataPath + path.parent_path().string() ) )
+    {
+        try
+        {
+            // coverity[misra_cpp_2008_rule_14_8_2_violation] - boost filesystem path header defines both template and
+            // and non-template function
+            boost::filesystem::create_directories( mCollectedDataPath + path.parent_path().string() );
+        }
+        catch ( const boost::filesystem::filesystem_error &err )
+        {
+            FWE_LOG_ERROR( "Failed to create directory for persistency of streamed vision system data: " +
+                           std::string( err.what() ) );
+            return ErrorCode::FILESYSTEM_ERROR;
+        }
+    }
+
+    std::ofstream file( mCollectedDataPath + filename, std::ios::binary );
+    file << &( *streambuf );
+    file.close();
+
+    if ( !file.good() )
+    {
+        FWE_LOG_ERROR( "Failed to persist data: write to the file failed" );
+        return ErrorCode::FILESYSTEM_ERROR;
+    }
+
+    return ErrorCode::SUCCESS;
+}
+#endif
 
 void
 CacheAndPersist::addMetadata( Json::Value &metadata )
@@ -455,7 +511,13 @@ CacheAndPersist::cleanupPersistedData()
                      ( std::find( filenames.begin(), filenames.end(), filename ) == filenames.end() ) )
                 {
                     // Delete files after iterating over directory
-                    filesToDelete.push_back( filename );
+                    // TODO: do not skip ion files but add the metadata for them so they don't get deleted
+                    // coverity[misra_cpp_2008_rule_14_8_2_violation] - boost filesystem path header defines both
+                    // template and and non-template function
+                    if ( boost::filesystem::extension( filename ) != ".10n" ) // skip ion files
+                    {
+                        filesToDelete.push_back( filename );
+                    }
                 }
             }
         }

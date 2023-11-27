@@ -68,23 +68,15 @@ class AwsGGChannel : public IConnectivityChannel
 public:
     AwsGGChannel( IConnectivityModule *connectivityModule,
                   std::shared_ptr<PayloadManager> payloadManager,
-                  std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &ggConnection );
+                  std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &ggConnection,
+                  std::string topicName,
+                  bool subscription );
     ~AwsGGChannel() override;
 
     AwsGGChannel( const AwsGGChannel & ) = delete;
     AwsGGChannel &operator=( const AwsGGChannel & ) = delete;
     AwsGGChannel( AwsGGChannel && ) = delete;
     AwsGGChannel &operator=( AwsGGChannel && ) = delete;
-
-    /**
-     * @brief the topic must be set always before using any functionality of this class
-     * @param topicNameRef MQTT topic that will be used for sending or receiving data
-     *                      if subscribe was called
-     * @param subscribeAsynchronously if true the channel will be subscribed to the topic asynchronously so that the
-     * channel can receive data
-     *
-     */
-    void setTopic( const std::string &topicNameRef, bool subscribeAsynchronously = false ) override;
 
     /**
      * @brief Subscribe to the MQTT topic from setTopic. Necessary if data is received on the topic
@@ -126,7 +118,7 @@ public:
     bool
     shouldSubscribeAsynchronously() const
     {
-        return mSubscribeAsynchronously;
+        return mSubscription;
     }
 
     /**
@@ -158,7 +150,7 @@ private:
     std::shared_ptr<PayloadManager> mPayloadManager;
     std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &mConnection;
     std::atomic<bool> mSubscribed;
-    bool mSubscribeAsynchronously;
+    bool mSubscription;
     std::atomic<unsigned> mPayloadCountSent{};
 
     std::string mTopicName;

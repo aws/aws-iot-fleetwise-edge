@@ -19,14 +19,23 @@ class ConnectivityModuleMock : public IConnectivityModule
 public:
     MOCK_METHOD( bool, isAlive, (), ( const override ) );
 
+    std::shared_ptr<IConnectivityChannel>
+    createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager,
+                      const std::string &topicName,
+                      bool subscription = false ) override
+    {
+        return mockedCreateNewChannel( payloadManager, topicName, subscription );
+    };
+
     MOCK_METHOD( std::shared_ptr<IConnectivityChannel>,
-                 createNewChannel,
-                 ( const std::shared_ptr<PayloadManager> &payloadManager ),
-                 ( override ) );
+                 mockedCreateNewChannel,
+                 ( const std::shared_ptr<PayloadManager> &payloadManager,
+                   const std::string &topicName,
+                   bool subscription ) );
 
-    MOCK_METHOD( bool, disconnect, () );
+    MOCK_METHOD( bool, disconnect, (), ( override ) );
 
-    MOCK_METHOD( bool, connect, () );
+    MOCK_METHOD( bool, connect, (), ( override ) );
 };
 
 } // namespace Testing

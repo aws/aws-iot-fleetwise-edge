@@ -31,7 +31,7 @@ public:
     /**
      * Initialize IWaveGpsSource and set filter for CustomDataSource
      *
-     * @param pathToNmeaSource Path to the file/tty with the NMEA output with the GPS data
+     * @param pathToNmeaSource Path to the file/tty with the NMEA output with the GPS data, or blank to auto-detect
      * @param canChannel the CAN channel used in the decoder manifest
      * @param canRawFrameId the CAN message Id used in the decoder manifest
      * @param latitudeStartBit the startBit used in the decoder manifest for the latitude signal

@@ -128,6 +128,16 @@ ConsoleLogger::logMessage( LogLevel level,
     }
 }
 
+void
+ConsoleLogger::flush()
+{
+#ifdef __ANDROID__
+    // No way to flush for Android
+#else
+    std::fflush( stdout );
+#endif
+}
+
 std::string
 ConsoleLogger::timeAsString()
 {

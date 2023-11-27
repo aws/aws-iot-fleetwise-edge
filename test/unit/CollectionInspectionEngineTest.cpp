@@ -22,6 +22,11 @@
 #include <string>
 #include <vector>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "RawDataManager.h"
+#include <boost/optional/optional.hpp>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -66,6 +71,10 @@ protected:
             return static_cast<double>( sigVal ) == signalValueWrapper.value.doubleVal;
         case SignalType::BOOLEAN:
             return static_cast<bool>( sigVal ) == signalValueWrapper.value.boolVal;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        case SignalType::RAW_DATA_BUFFER_HANDLE:
+            return static_cast<RawData::BufferHandle>( sigVal ) == signalValueWrapper.value.uint32Val;
+#endif
         }
         return false;
     }
@@ -433,9 +442,10 @@ TYPED_TEST( CollectionInspectionEngineTest, TwoSignalsInConditionAndOneSignalToC
     // The condition is (signalID(1)>-100) && (signalID(2)>-500)
     this->collectionSchemes->conditions[0].condition =
         this->getTwoSignalsBiggerCondition( s1.signalID, -100.0, s2.signalID, -500.0 ).get();
-    engine.onChangeInspectionMatrix( this->consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( this->consCollectionSchemes, timestamp );
+
     TypeParam testVal1 = 10;
     TypeParam testVal2 = 20;
     TypeParam testVal3 = 30;
@@ -488,10 +498,11 @@ TEST_F( CollectionInspectionEngineDoubleTest, EndlessCondition )
     endless.left = &endless;
     endless.right = &endless;
 
-    collectionSchemes->conditions[0].condition = &endless;
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
-
     TimePoint timestamp = { 160000000, 100 };
+
+    collectionSchemes->conditions[0].condition = &endless;
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     engine.evaluateConditions( timestamp );
 
     uint32_t waitTimeMs = 0;
@@ -511,9 +522,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, TooBigForSignalBuffer )
     s1.signalType = SignalType::DOUBLE;
     addSignalToCollect( collectionSchemes->conditions[0], s1 );
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     engine.addNewSignal<double>( s1.signalID, timestamp, 0.1 ); // All signal come at the same timestamp
     engine.addNewSignal<double>( s1.signalID, timestamp + 1000, 0.2 );
     engine.addNewSignal<double>( s1.signalID, timestamp + 2000, 0.3 );
@@ -545,9 +557,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, TooBigForSignalBufferOverflow )
 
     collectionSchemes->conditions[0].minimumPublishIntervalMs = 500;
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     // All signal come at the same timestamp
     engine.addNewSignal<double>( s1.signalID, timestamp, 0.1 );
     engine.addNewSignal<double>( s1.signalID, timestamp + 1000, 0.2 );
@@ -572,9 +585,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, SignalBufferErasedAfterNewConditio
     s1.fixedWindowPeriod = 77777;
     addSignalToCollect( collectionSchemes->conditions[0], s1 );
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     // All signal come at the same timestamp
     engine.addNewSignal<double>( s1.signalID, timestamp, 0.1 );
     engine.addNewSignal<double>( s1.signalID, timestamp + 1, 0.2 );
@@ -582,7 +596,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, SignalBufferErasedAfterNewConditio
 
     // This call will flush the signal history buffer even when
     // exactly the same conditions are handed over.
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp + 3 );
 
     engine.addNewSignal<double>( s1.signalID, timestamp + 3, 0.4 );
 
@@ -607,9 +621,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, CollectBurstWithoutSubsampling )
     s1.fixedWindowPeriod = 77777;
     addSignalToCollect( collectionSchemes->conditions[0], s1 );
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     // All signal come at the same timestamp
     engine.addNewSignal<double>( s1.signalID, timestamp, 0.1 );
     engine.addNewSignal<double>( s1.signalID, timestamp, 0.2 );
@@ -638,7 +653,9 @@ TEST_F( CollectionInspectionEngineDoubleTest, IllegalSignalID )
     addSignalToCollect( collectionSchemes->conditions[0], s1 );
 
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
+
+    TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 }
 
 TEST_F( CollectionInspectionEngineDoubleTest, IllegalSampleSize )
@@ -652,7 +669,9 @@ TEST_F( CollectionInspectionEngineDoubleTest, IllegalSampleSize )
     addSignalToCollect( collectionSchemes->conditions[0], s1 );
 
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
+
+    TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 }
 
 TEST_F( CollectionInspectionEngineDoubleTest, ZeroSignalsOnlyDTCCollection )
@@ -660,9 +679,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, ZeroSignalsOnlyDTCCollection )
     CollectionInspectionEngine engine;
     collectionSchemes->conditions[0].includeActiveDtcs = true;
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     DTCInfo dtcInfo;
     dtcInfo.mDTCCodes.push_back( "B1217" );
     dtcInfo.mSID = SID::STORED_DTC;
@@ -688,9 +708,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, CollectRawCanFrames )
     collectionSchemes->conditions[0].canFrames.push_back( c1 );
 
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = { 0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0 };
     engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp, buf, sizeof( buf ) );
 
@@ -719,9 +740,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, CollectRawCanFDFrames )
     collectionSchemes->conditions[0].canFrames.push_back( c1 );
 
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = {
         0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0, 0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0 };
     engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp, buf, sizeof( buf ) );
@@ -762,9 +784,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleCanSubsampling )
     collectionSchemes->conditions[1].canFrames.push_back( c2 );
 
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = { 0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0 };
     engine.addNewRawCanFrame( c1.frameID,
                               c1.channelID,
@@ -839,9 +862,8 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleSubsamplingOfSameSignalUse
         getTwoSignalsBiggerCondition( s2.signalID, 165.0, s4.signalID, 170.0 ).get();
     collectionSchemes->conditions[1].minimumPublishIntervalMs = 10000;
 
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
-
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
     for ( int i = 0; i < 100; i++ )
     {
@@ -851,17 +873,17 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleSubsamplingOfSameSignalUse
         engine.addNewSignal<double>( s6.signalID, timestamp + i * 10, 77777 );
     }
 
-    engine.evaluateConditions( timestamp );
+    engine.evaluateConditions( timestamp + 10000 );
 
     using CollectionType = std::shared_ptr<const TriggeredCollectionSchemeData>;
     uint32_t waitTimeMs = 0;
     std::vector<CollectionType> collectedDataList;
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData =
-        engine.collectNextDataToSend( timestamp + 100 * 10, waitTimeMs );
+        engine.collectNextDataToSend( timestamp + 10000, waitTimeMs );
     while ( collectedData != nullptr )
     {
         collectedDataList.push_back( collectedData );
-        collectedData = engine.collectNextDataToSend( timestamp + 100 * 10, waitTimeMs );
+        collectedData = engine.collectNextDataToSend( timestamp + 10000, waitTimeMs );
     }
     ASSERT_EQ( collectedDataList.size(), 2 );
 
@@ -920,28 +942,27 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleFixedWindowsOfSameSignalUs
     collectionSchemes->conditions[1].condition = getLastAvgWindowBiggerCondition( s2.signalID, 150.0 ).get();
     collectionSchemes->conditions[1].minimumPublishIntervalMs = 10000;
 
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
-
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
     for ( int i = 0; i < 300; i++ )
     {
-        engine.addNewSignal<double>( s1.signalID, timestamp + i * 10, i * 2 );
-        engine.addNewSignal<double>( s5.signalID, timestamp + i * 10, 55555 );
-        engine.addNewSignal<double>( s6.signalID, timestamp + i * 10, 77777 );
+        engine.addNewSignal<double>( s1.signalID, timestamp + 10000 + i * 10, i * 2 );
+        engine.addNewSignal<double>( s5.signalID, timestamp + 10000 + i * 10, 55555 );
+        engine.addNewSignal<double>( s6.signalID, timestamp + 10000 + i * 10, 77777 );
     }
 
-    engine.evaluateConditions( timestamp );
+    engine.evaluateConditions( timestamp + 10000 );
 
     using CollectionType = std::shared_ptr<const TriggeredCollectionSchemeData>;
     uint32_t waitTimeMs = 0;
     std::vector<CollectionType> collectedDataList;
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData =
-        engine.collectNextDataToSend( timestamp + 100 * 10, waitTimeMs );
+        engine.collectNextDataToSend( timestamp + 10000 + 100 * 10, waitTimeMs );
     while ( collectedData != nullptr )
     {
         collectedDataList.push_back( collectedData );
-        collectedData = engine.collectNextDataToSend( timestamp + 300 * 10, waitTimeMs );
+        collectedData = engine.collectNextDataToSend( timestamp + 10000 + 300 * 10, waitTimeMs );
     }
 
     ASSERT_EQ( collectedDataList.size(), 2 );
@@ -977,9 +998,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, Subsampling )
     addSignalToCollect( collectionSchemes->conditions[0], s1 );
 
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     engine.addNewSignal<double>( s1.signalID, timestamp, 0.1 );
     engine.addNewSignal<double>( s1.signalID, timestamp + 1, 0.2 );
     engine.addNewSignal<double>( s1.signalID, timestamp + 9, 0.3 );
@@ -1015,21 +1037,20 @@ TEST_F( CollectionInspectionEngineDoubleTest, SendoutEverySignalOnlyOnce )
     collectionSchemes->conditions[0].minimumPublishIntervalMs = 10000;
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
 
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
-
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     engine.addNewSignal<double>( s1.signalID, timestamp, 0.1 );
     engine.evaluateConditions( timestamp );
     uint32_t waitTimeMs = 0;
 
     auto res1 = engine.collectNextDataToSend( timestamp, waitTimeMs );
-    ASSERT_NE( res1, nullptr );
-    EXPECT_EQ( res1->signals.size(), 1 );
+    ASSERT_EQ( res1, nullptr );
 
     engine.evaluateConditions( timestamp + 10000 );
     auto res2 = engine.collectNextDataToSend( timestamp + 10000, waitTimeMs );
     ASSERT_NE( res2, nullptr );
-    EXPECT_EQ( res2->signals.size(), 0 );
+    EXPECT_EQ( res2->signals.size(), 1 );
     // Very old element in queue gets pushed
     engine.addNewSignal<double>( s1.signalID, timestamp, 0.1 );
 
@@ -1054,27 +1075,83 @@ TYPED_TEST( CollectionInspectionEngineTest, HearbeatInterval )
     this->collectionSchemes->conditions[0].minimumPublishIntervalMs = 10000;
     this->collectionSchemes->conditions[0].condition = this->getAlwaysTrueCondition().get();
 
-    engine.onChangeInspectionMatrix( this->consCollectionSchemes );
-
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( this->consCollectionSchemes, timestamp );
+
     engine.addNewSignal<TypeParam>( s1.signalID, timestamp, 11 );
     engine.evaluateConditions( timestamp );
     uint32_t waitTimeMs = 0;
-    // it should have triggered and data should be available
-    EXPECT_NE( engine.collectNextDataToSend( timestamp, waitTimeMs ), nullptr );
-
-    engine.addNewSignal<TypeParam>( s1.signalID, timestamp + 500, 11 );
-    engine.evaluateConditions( timestamp + 500 );
-
-    // No new data because heartbeat did not trigger less than 10 seconds passed
-    EXPECT_EQ( engine.collectNextDataToSend( timestamp + 500, waitTimeMs ), nullptr );
+    // it should not trigger because less than 10 seconds passed
+    EXPECT_EQ( engine.collectNextDataToSend( timestamp, waitTimeMs ), nullptr );
 
     engine.addNewSignal<TypeParam>( s1.signalID, timestamp + 10000, 11 );
     engine.evaluateConditions( timestamp + 10000 );
 
-    // heartbeat MinimumPublishIntervalMs=10seconds is over so again data
+    // Triggers after 10s
     EXPECT_NE( engine.collectNextDataToSend( timestamp + 10000, waitTimeMs ), nullptr );
+
+    engine.addNewSignal<TypeParam>( s1.signalID, timestamp + 15000, 11 );
+    engine.evaluateConditions( timestamp + 15000 );
+
+    // Not triggers after 15s
+    EXPECT_EQ( engine.collectNextDataToSend( timestamp + 15000, waitTimeMs ), nullptr );
+
+    engine.addNewSignal<TypeParam>( s1.signalID, timestamp + 20000, 11 );
+    engine.evaluateConditions( timestamp + 20000 );
+
+    // Triggers after 20s
+    EXPECT_NE( engine.collectNextDataToSend( timestamp + 20000, waitTimeMs ), nullptr );
 }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+TEST_F( CollectionInspectionEngineDoubleTest, RawBufferHandleUsageHints )
+{
+    CollectionInspectionEngine engine;
+    std::shared_ptr<RawData::BufferManager> rawDataManager =
+        std::make_shared<RawData::BufferManager>( RawData::BufferManagerConfig::create().get() );
+    engine.setRawDataBufferManager( rawDataManager );
+    InspectionMatrixSignalCollectionInfo s1{};
+    s1.signalID = 1234;
+    s1.sampleBufferSize = 10;
+    s1.minimumSampleIntervalMs = 0;
+    s1.fixedWindowPeriod = 77777;
+    s1.signalType = SignalType::RAW_DATA_BUFFER_HANDLE;
+    this->addSignalToCollect( this->collectionSchemes->conditions[0], s1 );
+
+    RawData::SignalUpdateConfig signalConfig;
+    signalConfig.typeId = s1.signalID;
+
+    rawDataManager->updateConfig( { { signalConfig.typeId, signalConfig } } );
+
+    this->collectionSchemes->conditions[0].minimumPublishIntervalMs = 10000000;
+    this->collectionSchemes->conditions[0].condition = this->getAlwaysTrueCondition().get();
+
+    TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( this->consCollectionSchemes, timestamp );
+
+    for ( int i = 0; i < 10; i++ )
+    {
+        timestamp++;
+        uint8_t dummyData[] = { 0xDE, 0xAD };
+        auto handle = rawDataManager->push( dummyData, sizeof( dummyData ), timestamp.systemTimeMs, s1.signalID );
+        engine.addNewSignal<RawData::BufferHandle>( s1.signalID, timestamp, handle );
+    }
+    auto statistics = rawDataManager->getStatistics( s1.signalID );
+    EXPECT_EQ( statistics.numOfSamplesCurrentlyInMemory, 10 );
+    EXPECT_EQ( statistics.overallNumOfSamplesReceived, 10 );
+
+    for ( int i = 0; i < 10; i++ )
+    {
+        timestamp++;
+        uint8_t dummyData[] = { 0xDE, 0xAD };
+        auto handle = rawDataManager->push( dummyData, sizeof( dummyData ), timestamp.systemTimeMs, s1.signalID );
+        engine.addNewSignal<RawData::BufferHandle>( s1.signalID, timestamp, handle );
+    }
+    auto statistics2 = rawDataManager->getStatistics( s1.signalID );
+    EXPECT_EQ( statistics2.numOfSamplesCurrentlyInMemory, 10 ); //
+    EXPECT_EQ( statistics2.overallNumOfSamplesReceived, 20 );
+}
+#endif
 
 TEST_F( CollectionInspectionEngineDoubleTest, TwoCollectionSchemesWithDifferentNumberOfSamplesToCollect )
 {
@@ -1109,9 +1186,9 @@ TEST_F( CollectionInspectionEngineDoubleTest, TwoCollectionSchemesWithDifferentN
     addSignalToCollect( collectionSchemes->conditions[1], s4 );
     collectionSchemes->conditions[1].condition = getAlwaysTrueCondition().get();
 
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
-
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     for ( int i = 0; i < 10000; i++ )
     {
         timestamp++;
@@ -1162,9 +1239,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, TwoSignalsInConditionAndOneSignalT
     // The condition is (signalID(1)>-100) && (signalID(2)>-500)
     collectionSchemes->conditions[0].condition =
         getTwoSignalsBiggerCondition( s1.signalID, -100.0, s2.signalID, -500.0 ).get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     engine.addNewSignal<double>( s3.signalID, timestamp, 1000.0 );
     engine.addNewSignal<double>( s3.signalID, timestamp, 2000.0 );
     engine.addNewSignal<double>( s3.signalID, timestamp, 3000.0 );
@@ -1211,24 +1289,23 @@ TYPED_TEST( CollectionInspectionEngineTest, SendOutEverySignalOnlyOncePerCollect
     this->addSignalToCollect( this->collectionSchemes->conditions[0], s1 );
 
     // Every 10 seconds send data out
-    this->collectionSchemes->conditions[0].minimumPublishIntervalMs = 5000;
+    this->collectionSchemes->conditions[0].minimumPublishIntervalMs = 10000;
     this->collectionSchemes->conditions[0].condition = this->getAlwaysTrueCondition().get();
 
-    engine.onChangeInspectionMatrix( this->consCollectionSchemes );
-
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( this->consCollectionSchemes, timestamp );
+
     engine.addNewSignal<TypeParam>( s1.signalID, timestamp, 10 );
     engine.evaluateConditions( timestamp );
     uint32_t waitTimeMs = 0;
 
     auto res1 = engine.collectNextDataToSend( timestamp + 1, waitTimeMs );
-    ASSERT_NE( res1, nullptr );
-    EXPECT_EQ( res1->signals.size(), 1 );
+    ASSERT_EQ( res1, nullptr );
 
     engine.evaluateConditions( timestamp + 10000 );
     auto res2 = engine.collectNextDataToSend( timestamp + 10000, waitTimeMs );
     ASSERT_NE( res2, nullptr );
-    EXPECT_EQ( res2->signals.size(), 0 );
+    EXPECT_EQ( res2->signals.size(), 1 );
 
     engine.addNewSignal<TypeParam>( s1.signalID, timestamp + 15000, 10 );
 
@@ -1252,16 +1329,15 @@ TEST_F( CollectionInspectionEngineDoubleTest, SendOutEverySignalNotOnlyOncePerCo
     collectionSchemes->conditions[0].minimumPublishIntervalMs = 5000;
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
 
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
-
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     engine.addNewSignal<double>( s1.signalID, timestamp, 0.1 );
     engine.evaluateConditions( timestamp );
     uint32_t waitTimeMs = 0;
 
     auto res1 = engine.collectNextDataToSend( timestamp + 1, waitTimeMs );
-    ASSERT_NE( res1, nullptr );
-    EXPECT_EQ( res1->signals.size(), 1 );
+    ASSERT_EQ( res1, nullptr );
 
     engine.evaluateConditions( timestamp + 10000 );
     auto res2 = engine.collectNextDataToSend( timestamp + 10000, waitTimeMs );
@@ -1291,9 +1367,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, MoreCollectionSchemesThanSupported
         collectionSchemes->conditions[i].probabilityToSend = 1.0;
         addSignalToCollect( collectionSchemes->conditions[i], s1 );
     }
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     uint32_t waitTimeMs = 0;
     engine.addNewSignal<double>( s1.signalID, timestamp, 0.1 );
     engine.evaluateConditions( timestamp );
@@ -1338,9 +1415,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, GeohashFunctionNodeTrigger )
     addSignalToCollect( collectionSchemes->conditions[0], lon );
 
     collectionSchemes->conditions[0].condition = getGeohashFunctionCondition( lat.signalID, lon.signalID, 5 ).get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     // Before GPS signal is ready, we ask Inspection Engine to evaluate Geohash
     ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
     uint32_t waitTimeMs = 0;
@@ -1426,9 +1504,10 @@ TYPED_TEST( CollectionInspectionEngineTest, CollectWithAfterTime )
 
     // After the collectionScheme triggered signals should be collected for 2 more seconds
     this->collectionSchemes->conditions[0].afterDuration = 2000;
-    engine.onChangeInspectionMatrix( this->consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( this->consCollectionSchemes, timestamp );
+
     TypeParam val1 = 10;
     engine.addNewSignal<TypeParam>( s3.signalID, timestamp, val1 );
     engine.addNewSignal<double>( s1.signalID, timestamp, -90.0 );
@@ -1511,9 +1590,9 @@ TEST_F( CollectionInspectionEngineDoubleTest, ProbabilityToSendTest )
     // Set probability to send to 50%
     collectionSchemes->conditions[0].probabilityToSend = 0.5;
 
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
-
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     uint32_t waitTimeMs = 0;
     const uint32_t NR_OF_HEARTBEAT_INTERVALS = 1000;
 
@@ -1554,9 +1633,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, AvgWindowCondition )
 
     // function is: LAST_FIXED_WINDOW_AVG(SignalID(1234)) > -50.0
     collectionSchemes->conditions[0].condition = getLastAvgWindowBiggerCondition( s1.signalID, -50.0 ).get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     double currentValue = -110.0f;
     double increasePerSample = ( 100.0 ) / static_cast<double>( s1.fixedWindowPeriod );
     uint32_t waitTimeMs = 0;
@@ -1599,9 +1679,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, PrevLastAvgWindowCondition )
 
     // function is: PREV_LAST_FIXED_WINDOW_AVG(SignalID(1234)) > -50.0
     collectionSchemes->conditions[0].condition = getPrevLastAvgWindowBiggerCondition( s1.signalID, -50.0 ).get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     uint32_t waitTimeMs = 0;
     // Fill the prev last window with 0.0
     for ( uint32_t i = 0; i < s1.fixedWindowPeriod; i++ )
@@ -1635,9 +1716,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultiWindowCondition )
     //               < (LAST_FIXED_WINDOW_MAX(SignalID(1234)) * PREV_LAST_FIXED_WINDOW_MAX(SignalID(1234))))
     //              || (LAST_FIXED_WINDOW_MIN(SignalID(1234)) == PREV_LAST_FIXED_WINDOW_MIN(SignalID(1234)))
     collectionSchemes->conditions[0].condition = getMultiFixedWindowCondition( s1.signalID ).get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     engine.addNewSignal<double>( s1.signalID, timestamp, -95.0 );
     engine.addNewSignal<double>( s1.signalID, timestamp + 50, 100.0 );
     engine.addNewSignal<double>( s1.signalID, timestamp + 70, 110.0 );
@@ -1671,9 +1753,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, TestNotEqualOperator )
 
     // function is: !(!(SignalID(123) <= 0.001) && !((SignalID(123) / SignalID(456)) >= 0.5))
     collectionSchemes->conditions[0].condition = getNotEqualCondition( s1.signalID, s2.signalID ).get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     // Expression should be false because they are equal
     engine.addNewSignal<double>( s1.signalID, timestamp, 100.0 );
     engine.addNewSignal<double>( s2.signalID, timestamp, 100.0 );
@@ -1713,9 +1796,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, TwoSignalsRatioCondition )
     // function is: !(!(SignalID(123) <= 0.001) && !((SignalID(123) / SignalID(456)) >= 0.5))
     collectionSchemes->conditions[0].condition =
         getTwoSignalsRatioCondition( s1.signalID, 0.001, s2.signalID, 0.5 ).get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     // Expression should be false: (1.0 <= 0.001) || (1.0 / 100.0) >= 0.5)
     engine.addNewSignal<double>( s1.signalID, timestamp, 1.0 );
     engine.addNewSignal<double>( s2.signalID, timestamp, 100.0 );
@@ -1754,9 +1838,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, UnknownExpressionNode )
 
     // function is: (SignalID(123) <= Unknown)
     collectionSchemes->conditions[0].condition = getUnknownCondition( s1.signalID ).get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
 
     TimePoint timestamp = { 160000000, 100 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
     // Expression should be false: (1.0 <= Unknown)
     engine.addNewSignal<double>( s1.signalID, timestamp, 1.0 );
     engine.evaluateConditions( timestamp );
@@ -1775,7 +1860,8 @@ TEST_F( CollectionInspectionEngineDoubleTest, RequestTooMuchMemorySignals )
     s1.fixedWindowPeriod = 300000;
     addSignalToCollect( collectionSchemes->conditions[0], s1 );
     collectionSchemes->conditions[1].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
+    TimePoint timestamp = { 0, 0 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 }
 
 TEST_F( CollectionInspectionEngineDoubleTest, RequestTooMuchMemoryFrames )
@@ -1788,7 +1874,8 @@ TEST_F( CollectionInspectionEngineDoubleTest, RequestTooMuchMemoryFrames )
     c1.minimumSampleIntervalMs = 0;
     collectionSchemes->conditions[0].canFrames.push_back( c1 );
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
+    TimePoint timestamp = { 0, 0 };
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 }
 
 /*
@@ -1866,12 +1953,13 @@ TEST_F( CollectionInspectionEngineDoubleTest, RandomDataTest )
               << ( NUMBER_OF_SIGNALS - withoutWindow )
               << " of them with window with a window sampling size varies from " << minWindow << " to " << maxWindow
               << std::endl;
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
+
+    TimePoint START_TIMESTAMP = { 160000000, 100 };
+    TimePoint timestamp = START_TIMESTAMP;
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
     const int TIME_TO_SIMULATE_IN_MS = 5000;
     const int SIGNALS_PER_MS = 20;
-    TimePoint START_TIMESTAMP = { 160000000, 100 };
-    TimePoint timestamp = START_TIMESTAMP;
     uint32_t counter = 0;
     uint32_t dataCollected = 0;
 
@@ -1913,7 +2001,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, NoCollectionSchemes )
 {
     CollectionInspectionEngine engine;
     TimePoint timestamp = { 160000000, 100 };
-    engine.onChangeInspectionMatrix( consCollectionSchemes );
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
     ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
 }
 

@@ -34,6 +34,11 @@ public:
                              const std::string &logEntry ) = 0;
 
     /**
+     * @brief Try to flush any log that has been buffered
+     */
+    virtual void flush() = 0;
+
+    /**
      * @brief converts the Log Level enum to a human readable string
      * @param level the log level enum to convert
      * @return empty string if unrecognized LogLevel

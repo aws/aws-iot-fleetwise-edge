@@ -77,6 +77,15 @@ public:
      */
     void append( const GeohashInfo &geohashInfo );
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief Appends uploaded S3 object info to the output protobuf
+     *
+     * @param uploadedS3Object  Uploaded S3 object info
+     */
+    void append( const UploadedS3Object &uploadedS3Object );
+#endif
+
     /**
      * @brief Sets up the DTC message info in the output protobuf
      *

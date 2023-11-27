@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>iotfleetwise</name>
+  <version>1.0.3</version>
+  <maintainer email="contact-us-on-github@amazon.com">Contact us on GitHub: https://github.com/aws/aws-iot-fleetwise-edge</maintainer>
+  <description>Reference Implementation for AWS IoT FleetWise</description>
+  <license>Apache License 2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

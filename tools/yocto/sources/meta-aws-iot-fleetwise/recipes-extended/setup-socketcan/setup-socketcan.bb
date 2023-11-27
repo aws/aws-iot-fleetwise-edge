@@ -6,7 +6,9 @@ SRC_URI = "file://setup-socketcan.sh \
 
 S = "${WORKDIR}"
 
-SYSTEMD_SERVICE_${PN} = "${PN}.service"
+SYSTEMD_SERVICE:${PN} = "${PN}.service"
+
+FILES:${PN} += "${systemd_system_unitdir} ${bindir}"
 
 inherit systemd
 

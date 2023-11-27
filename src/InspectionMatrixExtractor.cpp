@@ -4,16 +4,71 @@
 #include "CollectionSchemeManager.h" // IWYU pragma: associated
 #include "ICollectionScheme.h"
 #include "LoggingModule.h"
-#include <algorithm>
+#include <algorithm> // IWYU pragma: keep
 #include <cstddef>
 #include <stack>
 #include <string>
+#include <unordered_map> // IWYU pragma: keep
 #include <utility>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+void
+CollectionSchemeManager::updateRawDataBufferConfig(
+    std::shared_ptr<Aws::IoTFleetWise::ComplexDataDecoderDictionary> complexDataDecoderDictionary )
+{
+    std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> updatedSignals;
+    // Iterate through enabled collectionScheme lists to locate the signals and CAN frames to be collected
+    for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); ++it )
+    {
+        const auto &collectionSchemePtr = it->second;
+        // first iterate through the signalID lists
+        for ( const auto &signalInfo : collectionSchemePtr->getCollectSignals() )
+        {
+            SignalID signalId = signalInfo.signalID;
+            if ( ( signalId & INTERNAL_SIGNAL_ID_BITMASK ) != 0 )
+            {
+                continue;
+            }
+
+            auto networkType = mDecoderManifest->getNetworkProtocol( signalId );
+            if ( networkType != VehicleDataSourceProtocol::COMPLEX_DATA )
+            {
+                continue;
+            }
+
+            RawData::SignalUpdateConfig signalConfig;
+            signalConfig.typeId = signalId;
+
+            auto complexSignalDecoderFormat = mDecoderManifest->getComplexSignalDecoderFormat( signalId );
+            signalConfig.interfaceId = complexSignalDecoderFormat.mInterfaceId;
+            if ( complexDataDecoderDictionary != nullptr )
+            {
+                auto interface = complexDataDecoderDictionary->complexMessageDecoderMethod.find(
+                    complexSignalDecoderFormat.mInterfaceId );
+                // Now try to find the messageId for this signal
+                if ( interface != complexDataDecoderDictionary->complexMessageDecoderMethod.end() )
+                {
+                    auto complexDataMessage = std::find_if(
+                        interface->second.begin(), interface->second.end(), [signalId]( const auto &pair ) {
+                            return pair.second.mSignalId == signalId;
+                        } );
+                    if ( complexDataMessage != interface->second.end() )
+                    {
+                        signalConfig.messageId = complexDataMessage->first;
+                    }
+                }
+            }
+            updatedSignals[signalId] = signalConfig;
+        }
+    }
+    mRawDataBufferManager->updateConfig( updatedSignals );
+}
+#endif
 
 void
 CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectionScheme,

@@ -51,9 +51,11 @@ AwsGGConnectivityModule::connect()
 }
 
 std::shared_ptr<IConnectivityChannel>
-AwsGGConnectivityModule::createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager )
+AwsGGConnectivityModule::createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager,
+                                           const std::string &topicName,
+                                           bool subscription )
 {
-    auto channel = std::make_shared<AwsGGChannel>( this, payloadManager, mConnection );
+    auto channel = std::make_shared<AwsGGChannel>( this, payloadManager, mConnection, topicName, subscription );
     mChannels.emplace_back( channel );
     return channel;
 }

@@ -22,7 +22,6 @@ TEST( IoTFleetWiseConfigTest, ReadOk )
     Json::Value config;
     ASSERT_TRUE( IoTFleetWiseConfig::read( "static-config-ok.json", config ) );
     ASSERT_EQ( 10000, config["staticConfig"]["bufferSizes"]["decodedSignalsBufferSize"].asInt() );
-    ASSERT_EQ( 10000, config["staticConfig"]["bufferSizes"]["rawCANFrameBufferSize"].asInt() );
     ASSERT_EQ( "Trace", config["staticConfig"]["internalParameters"]["systemWideLogLevel"].asString() );
 }
 
