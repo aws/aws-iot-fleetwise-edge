@@ -11,9 +11,10 @@ if command -v apt &> /dev/null; then
 fi
 
 # Install pip packages
+# Note: CloudShell currently only supports pyarrow 12.0.1
 pip3 install \
     wrapt==1.10.0 \
     plotly==5.3.1 \
     pandas==1.3.5 \
     cantools==36.4.0 \
-    pyarrow==13.0.0
+    pyarrow==12.0.1
