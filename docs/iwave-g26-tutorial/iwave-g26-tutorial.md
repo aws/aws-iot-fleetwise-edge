@@ -93,8 +93,7 @@ They require the steps below to be executed first.
   device
 - Access to an AWS account with administrator permissions
 - To be signed in to the AWS Management Console with an account in your chosen Region
-  - **Note:** AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe
-    (Frankfurt).
+  - **Note:** AWS IoT FleetWise is currently available in `us-east-1` and `eu-central-1`.
 - A SIM card
 - A local Linux or MacOS machine
 

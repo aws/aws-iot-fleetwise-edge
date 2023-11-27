@@ -7,3 +7,4 @@ build*/
 compile_commands.json
 install*/
 log/
+.ipynb_checkpoints

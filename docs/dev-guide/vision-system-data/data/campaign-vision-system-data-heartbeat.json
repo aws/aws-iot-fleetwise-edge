@@ -1,0 +1,29 @@
+{
+  "spoolingMode": "TO_DISK",
+  "collectionScheme": {
+    "timeBasedCollectionScheme": {
+      "periodMs": 10000
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.Cameras.Front.Image",
+      "maxSampleCount": 1
+    },
+    {
+      "name": "Vehicle.Speed",
+      "maxSampleCount": 10,
+      "minimumSamplingIntervalMs": 1000
+    },
+    {
+      "name": "Vehicle.Airbag.CollisionIntensity",
+      "maxSampleCount": 10,
+      "minimumSamplingIntervalMs": 1000
+    },
+    {
+      "name": "Vehicle.Acceleration",
+      "maxSampleCount": 10,
+      "minimumSamplingIntervalMs": 1000
+    }
+  ]
+}

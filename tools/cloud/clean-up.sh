@@ -70,9 +70,8 @@ parse_args() {
         echo "Error: Vehicle name not provided"
         exit -1
     fi
-    if [ "${DISAMBIGUATOR}" == "" ]; then
-        echo "Error: Disambiguator not provided"
-        exit -1
+    if [ "${DISAMBIGUATOR}" != "" ]; then
+        DISAMBIGUATOR="-${DISAMBIGUATOR}"
     fi
 }
 
@@ -88,8 +87,8 @@ else
     VEHICLES=( ${VEHICLE_NAME} )
 fi
 
-NAME="${VEHICLE_NAME}-${DISAMBIGUATOR}"
-SERVICE_ROLE="${SERVICE_ROLE}-${REGION}-${DISAMBIGUATOR}"
+NAME="${VEHICLE_NAME}${DISAMBIGUATOR}"
+SERVICE_ROLE="${SERVICE_ROLE}-${REGION}${DISAMBIGUATOR}"
 SERVICE_ROLE_POLICY_ARN="${SERVICE_ROLE_POLICY_ARN}${SERVICE_ROLE}-policy"
 
 echo -n "Date: "

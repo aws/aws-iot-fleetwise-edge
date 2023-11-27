@@ -1,0 +1,74 @@
+{
+  "configById": {
+    "Plot!vge9p8": {
+      "paths": [
+        {
+          "value": "/carla/ego_vehicle/speedometer.data",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/carla/ego_vehicle/imu.linear_acceleration.y",
+          "enabled": true
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/carla/ego_vehicle/steering_position.data",
+          "enabled": true
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/Perception/Obstacle.do_rectify",
+          "enabled": true
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": false,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240,
+      "foxglovePanelTitle": "Plot",
+      "title": "Plot"
+    },
+    "ImageViewPanel!3mnp456": {
+      "cameraTopic": "/carla/ego_vehicle/rgb_front/image_compressed",
+      "enabledMarkerTopics": [],
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "synchronize": false,
+      "transformMarkers": false,
+      "zoom": 1
+    },
+    "RawMessages!os6rgs": {
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "diffTopicPath": "",
+      "showFullMessageForDiff": false,
+      "topicPath": "/carla/ego_vehicle/imu"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "first": "Plot!vge9p8",
+    "second": {
+      "first": "ImageViewPanel!3mnp456",
+      "second": "RawMessages!os6rgs",
+      "direction": "column",
+      "splitPercentage": 64.93212669683258
+    },
+    "splitPercentage": 43.3349491032477
+  }
+}
