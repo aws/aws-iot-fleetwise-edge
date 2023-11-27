@@ -51,6 +51,26 @@ message VehicleData {
      * Captured Geohash which reflect which geohash tile the vehicle is currently located.
      */
     Geohash geohash = 8;
+
+    /*
+     * Files that were uploaded to S3.
+     */
+    repeated S3Object s3_objects = 9;
+}
+
+/*
+ * See collection_scheme.proto
+ */
+message SignalPath {
+    repeated uint32 signal_path = 1;
+}
+
+/*
+ * The signal path must always point to a primitive type inside the signal referred to by signal_id
+ */
+message PrimitiveTypeInComplexCapturedSignal{
+    uint32 signal_id = 1;
+    SignalPath signal_path = 2;
 }
 
 /*
@@ -68,10 +88,15 @@ message CapturedSignal {
      * the collection schemes and decoder manifest. Signals can come from normal CAN traffic or OBD-II PIDs. In the case
      * of OBD-II PIDs, Signal ID will only map to one of those signals, as per the decoder manifest.
      */
-    uint32 signal_id = 2;
+    oneof primitiveType{
+        uint32 signal_id = 2; // kept for backward compatibility
+        PrimitiveTypeInComplexCapturedSignal primitive_type_in_signal = 10;
+    }
 
     /*
-     * Data types of physical signal values.
+     * Data types of physical signal values. Should be same as the PrimitiveType assigned to the signal_id in decoder_arn.
+     * Currently only primitive typed signals can be ingested over this method. For complex types another ingestion method is used.
+     * Defaults to double_value if no PrimitiveType is assigned to this signal.
      */
     oneof SignalValue {
 
@@ -134,4 +159,25 @@ message Geohash {
      * string is always 9 characters long.
      */
     string prev_reported_geohash_string = 2;
+}
+
+message S3Object {
+
+    /*
+     * S3 object key of the uploaded file.
+     */
+    string key = 1;
+
+    /*
+     * Serialization format of the captured signals.
+     */
+    DataFormat data_format = 2;
+}
+
+/*
+ * Enum of possible data serialization formats that are uploaded to S3.
+ */
+enum DataFormat {
+    UNKNOWN_DATA_FORMAT = 0;
+    CDR = 1;
 }

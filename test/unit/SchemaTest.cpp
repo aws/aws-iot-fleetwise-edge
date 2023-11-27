@@ -15,6 +15,7 @@
 #include "IDecoderManifest.h"
 #include "ISender.h"
 #include "MessageTypes.h"
+#include "MqttClientWrapper.h"
 #include "SenderMock.h"
 #include "SignalTypes.h"
 #include "TimeTypes.h"
@@ -32,6 +33,10 @@
 #include <utility>
 #include <vector>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include <boost/variant.hpp>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -48,12 +53,13 @@ TEST( CollectionSchemeIngestionTest, CollectionSchemeIngestionClass )
     // Create a dummy AwsIotConnectivityModule object so that we can create dummy IReceiver objects to pass to the
     // constructor. Note that the MQTT callback aspect of CollectionSchemeProtoBuilder will not be used in this test.
     std::shared_ptr<AwsIotConnectivityModule> awsIotModule =
-        std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+        std::make_shared<AwsIotConnectivityModule>( "", "", nullptr );
 
+    std::shared_ptr<MqttClientWrapper> nullMqttClient;
     Schema collectionSchemeIngestion(
-        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, awsIotModule.get()->mConnection ),
-        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, awsIotModule.get()->mConnection ),
-        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, awsIotModule.get()->mConnection ) );
+        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, nullMqttClient, "topic", false ),
+        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, nullMqttClient, "topic", false ),
+        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, nullMqttClient, "topic", false ) );
 
     auto dummyDecoderManifest = std::make_shared<DecoderManifestIngestion>();
     auto dummyCollectionSchemeList = std::make_shared<CollectionSchemeIngestionList>();
@@ -106,14 +112,15 @@ public:
 TEST( CollectionSchemeIngestionTest, Checkins )
 {
     // Create a dummy AwsIotConnectivityModule object so that we can create dummy IReceiver objects
-    auto awsIotModule = std::make_shared<AwsIotConnectivityModule>( "", "", "", "", "", nullptr );
+    auto awsIotModule = std::make_shared<AwsIotConnectivityModule>( "", "", nullptr );
 
     // Create a mock Sender
     auto senderMock = std::make_shared<StrictMock<Testing::SenderMock>>();
 
+    std::shared_ptr<MqttClientWrapper> nullMqttClient;
     Schema collectionSchemeIngestion(
-        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, awsIotModule.get()->mConnection ),
-        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, awsIotModule.get()->mConnection ),
+        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, nullMqttClient, "topic", false ),
+        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, nullMqttClient, "topic", false ),
         senderMock );
 
     std::shared_ptr<const Clock> clock = ClockHandler::getClock();
@@ -502,6 +509,9 @@ TEST( SchemaTest, CollectionSchemeIngestionHeartBeat )
     ASSERT_TRUE( collectionSchemeTest.getCondition() == nullptr );
     ASSERT_TRUE( collectionSchemeTest.getMinimumPublishIntervalMs() == std::numeric_limits<uint32_t>::max() );
     ASSERT_TRUE( collectionSchemeTest.getAllExpressionNodes().size() == 0 );
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    ASSERT_TRUE( collectionSchemeTest.getS3UploadMetadata() == S3UploadMetadata() );
+#endif
 
     // Test for Copy and Build the message
     ASSERT_TRUE( collectionSchemeTest.copyData(
@@ -561,6 +571,11 @@ TEST( SchemaTest, CollectionSchemeIngestionHeartBeat )
     // set_time_based_collection_scheme_period_ms
     ASSERT_TRUE( collectionSchemeTest.getMinimumPublishIntervalMs() == 5000 );
     ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().size(), 1 );
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    // Verify Upload Metadata
+    ASSERT_EQ( collectionSchemeTest.getS3UploadMetadata(), collectionSchemeTest.INVALID_S3_UPLOAD_METADATA );
+#endif
 }
 
 TEST( SchemaTest, SchemaCollectionEventBased )
@@ -583,147 +598,142 @@ TEST( SchemaTest, SchemaCollectionEventBased )
     //  Build the AST Tree:
     //----------
 
-    auto *root = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *root = new Schemas::CommonTypesMsg::ConditionNode();
     message->set_allocated_condition_tree( root );
-    auto *rootOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *rootOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     root->set_allocated_node_operator( rootOp );
-    rootOp->set_operator_( Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_AND );
+    rootOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_AND );
 
     //----------
 
-    auto *left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left = new Schemas::CommonTypesMsg::ConditionNode();
     rootOp->set_allocated_left_child( left );
-    auto *leftOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *leftOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     left->set_allocated_node_operator( leftOp );
-    leftOp->set_operator_( Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_OR );
+    leftOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_OR );
 
-    auto *right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right = new Schemas::CommonTypesMsg::ConditionNode();
     rootOp->set_allocated_right_child( right );
-    auto *rightOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *rightOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     right->set_allocated_node_operator( rightOp );
-    rightOp->set_operator_( Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER );
+    rightOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER );
 
     //----------
 
-    auto *left_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left_left = new Schemas::CommonTypesMsg::ConditionNode();
     leftOp->set_allocated_left_child( left_left );
-    auto *left_leftOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *left_leftOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     left_left->set_allocated_node_operator( left_leftOp );
-    left_leftOp->set_operator_( Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_BIGGER );
+    left_leftOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_BIGGER );
 
-    auto *left_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left_right = new Schemas::CommonTypesMsg::ConditionNode();
     leftOp->set_allocated_right_child( left_right );
-    auto *left_rightOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *left_rightOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     left_right->set_allocated_node_operator( left_rightOp );
-    left_rightOp->set_operator_( Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_NOT_EQUAL );
+    left_rightOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_NOT_EQUAL );
 
-    auto *right_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_left = new Schemas::CommonTypesMsg::ConditionNode();
     rightOp->set_allocated_left_child( right_left );
-    auto *right_leftOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *right_leftOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     right_left->set_allocated_node_operator( right_leftOp );
-    right_leftOp->set_operator_(
-        Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER_EQUAL );
+    right_leftOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER_EQUAL );
 
-    auto *right_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_right = new Schemas::CommonTypesMsg::ConditionNode();
     rightOp->set_allocated_right_child( right_right );
-    auto *right_rightOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *right_rightOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     right_right->set_allocated_node_operator( right_rightOp );
-    right_rightOp->set_operator_( Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER );
+    right_rightOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER );
 
     //----------
 
-    auto *left_left_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left_left_left = new Schemas::CommonTypesMsg::ConditionNode();
     left_leftOp->set_allocated_left_child( left_left_left );
     left_left_left->set_node_signal_id( 19 );
 
-    auto *left_left_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left_left_right = new Schemas::CommonTypesMsg::ConditionNode();
     left_leftOp->set_allocated_right_child( left_left_right );
     left_left_right->set_node_double_value( 1 );
 
-    auto *left_right_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left_right_left = new Schemas::CommonTypesMsg::ConditionNode();
     left_rightOp->set_allocated_left_child( left_right_left );
-    auto *left_right_leftOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *left_right_leftOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     left_right_left->set_allocated_node_operator( left_right_leftOp );
     left_right_leftOp->set_operator_(
-        Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MULTIPLY );
+        Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MULTIPLY );
 
-    auto *left_right_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left_right_right = new Schemas::CommonTypesMsg::ConditionNode();
     left_rightOp->set_allocated_right_child( left_right_right );
-    auto *left_right_rightOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *left_right_rightOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     left_right_right->set_allocated_node_operator( left_right_rightOp );
-    left_right_rightOp->set_operator_(
-        Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_DIVIDE );
+    left_right_rightOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_DIVIDE );
 
-    auto *right_left_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_left_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_leftOp->set_allocated_left_child( right_left_left );
-    auto *right_left_leftOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *right_left_leftOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     right_left_left->set_allocated_node_operator( right_left_leftOp );
-    right_left_leftOp->set_operator_( Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_NOT );
+    right_left_leftOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_LOGICAL_NOT );
 
-    auto *right_left_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_left_right = new Schemas::CommonTypesMsg::ConditionNode();
     right_leftOp->set_allocated_right_child( right_left_right );
-    auto *right_left_rightOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *right_left_rightOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     right_left_right->set_allocated_node_operator( right_left_rightOp );
-    right_left_rightOp->set_operator_(
-        Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_PLUS );
+    right_left_rightOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_PLUS );
 
-    auto *right_right_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_right_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_rightOp->set_allocated_left_child( right_right_left );
-    auto *right_right_leftOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *right_right_leftOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     right_right_left->set_allocated_node_operator( right_right_leftOp );
-    right_right_leftOp->set_operator_(
-        Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MINUS );
+    right_right_leftOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MINUS );
 
-    auto *right_right_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_right_right = new Schemas::CommonTypesMsg::ConditionNode();
     right_rightOp->set_allocated_right_child( right_right_right );
-    auto *right_right_rightOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
+    auto *right_right_rightOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     right_right_right->set_allocated_node_operator( right_right_rightOp );
-    right_right_rightOp->set_operator_(
-        Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MINUS );
+    right_right_rightOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MINUS );
 
     //----------
 
-    auto *left_right_left_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left_right_left_left = new Schemas::CommonTypesMsg::ConditionNode();
     left_right_leftOp->set_allocated_left_child( left_right_left_left );
     left_right_left_left->set_node_signal_id( 19 );
 
-    auto *left_right_left_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left_right_left_right = new Schemas::CommonTypesMsg::ConditionNode();
     left_right_leftOp->set_allocated_right_child( left_right_left_right );
     left_right_left_right->set_node_double_value( 1 );
 
-    auto *left_right_right_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left_right_right_left = new Schemas::CommonTypesMsg::ConditionNode();
     left_right_rightOp->set_allocated_left_child( left_right_right_left );
     left_right_right_left->set_node_signal_id( 19 );
 
-    auto *left_right_right_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *left_right_right_right = new Schemas::CommonTypesMsg::ConditionNode();
     left_right_rightOp->set_allocated_right_child( left_right_right_right );
     left_right_right_right->set_node_double_value( 1 );
 
-    auto *right_left_left_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_left_left_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_left_leftOp->set_allocated_left_child( right_left_left_left );
     right_left_left_left->set_node_signal_id( 19 );
 
-    auto *right_left_right_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_left_right_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_left_rightOp->set_allocated_left_child( right_left_right_left );
     right_left_right_left->set_node_signal_id( 19 );
 
-    auto *right_left_right_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_left_right_right = new Schemas::CommonTypesMsg::ConditionNode();
     right_left_rightOp->set_allocated_right_child( right_left_right_right );
     right_left_right_right->set_node_double_value( 1 );
 
-    auto *right_right_left_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_right_left_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_leftOp->set_allocated_left_child( right_right_left_left );
     right_right_left_left->set_node_signal_id( 19 );
 
-    auto *right_right_left_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_right_left_right = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_leftOp->set_allocated_right_child( right_right_left_right );
     right_right_left_right->set_node_double_value( 1 );
 
-    auto *right_right_right_left = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_right_right_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_rightOp->set_allocated_left_child( right_right_right_left );
     right_right_right_left->set_node_signal_id( 19 );
 
-    auto *right_right_right_right = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *right_right_right_right = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_rightOp->set_allocated_right_child( right_right_right_right );
     right_right_right_right->set_node_double_value( 1 );
 
@@ -763,6 +773,15 @@ TEST( SchemaTest, SchemaCollectionEventBased )
     can1->set_can_message_id( 0x1FF );
     can1->set_sample_buffer_size( 200 );
     can1->set_minimum_sample_period_ms( 255 );
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    auto *s3_upload_metadata = new Schemas::CollectionSchemesMsg::S3UploadMetadata();
+    s3_upload_metadata->set_bucket_name( "testBucketName" );
+    s3_upload_metadata->set_prefix( "testPrefix/" );
+    s3_upload_metadata->set_region( "us-west-2" );
+    s3_upload_metadata->set_bucket_owner_account_id( "012345678901" );
+    collectionSchemeTestMessage.set_allocated_s3_upload_metadata( s3_upload_metadata );
+#endif
 
     // Serialize the protocol buffer to a string to avoid malloc with cstyle arrays
     std::string protoSerializedBuffer;
@@ -918,6 +937,15 @@ TEST( SchemaTest, SchemaCollectionEventBased )
     ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->right->right->floatingValue, 1 );
     //----------
     ASSERT_TRUE( collectionSchemeTest.getCondition()->booleanValue == false );
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    S3UploadMetadata s3UploadMetadata;
+    s3UploadMetadata.bucketName = "testBucketName";
+    s3UploadMetadata.prefix = "testPrefix/";
+    s3UploadMetadata.region = "us-west-2";
+    s3UploadMetadata.bucketOwner = "012345678901";
+    ASSERT_EQ( collectionSchemeTest.getS3UploadMetadata(), s3UploadMetadata );
+#endif
 }
 
 TEST( SchemaTest, SchemaGeohashFunctionNode )
@@ -941,20 +969,20 @@ TEST( SchemaTest, SchemaGeohashFunctionNode )
     // Root: Equal
     // Left Child: GeohashFunction
     // Right Child: 1.0
-    auto *root = new Schemas::CollectionSchemesMsg::ConditionNode();
-    auto *rootOp = new Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator();
-    rootOp->set_operator_( Schemas::CollectionSchemesMsg::ConditionNode_NodeOperator_Operator_COMPARE_EQUAL );
+    auto *root = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *rootOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
+    rootOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_EQUAL );
 
-    auto *leftChild = new Schemas::CollectionSchemesMsg::ConditionNode();
-    auto *leftChildFunction = new Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction();
-    auto *leftChildGeohashFunction = new Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction_GeohashFunction();
+    auto *leftChild = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *leftChildFunction = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction();
+    auto *leftChildGeohashFunction = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction_GeohashFunction();
     leftChildGeohashFunction->set_latitude_signal_id( 0x1 );
     leftChildGeohashFunction->set_longitude_signal_id( 0x2 );
     leftChildGeohashFunction->set_geohash_precision( 6 );
     leftChildGeohashFunction->set_gps_unit(
-        Schemas::CollectionSchemesMsg::ConditionNode_NodeFunction_GeohashFunction_GPSUnitType_MILLIARCSECOND );
+        Schemas::CommonTypesMsg::ConditionNode_NodeFunction_GeohashFunction_GPSUnitType_MILLIARCSECOND );
 
-    auto *rightChild = new Schemas::CollectionSchemesMsg::ConditionNode();
+    auto *rightChild = new Schemas::CommonTypesMsg::ConditionNode();
     rightChild->set_node_double_value( 1.0 );
 
     leftChildFunction->set_allocated_geohash_function( leftChildGeohashFunction );
@@ -1003,6 +1031,639 @@ TEST( SchemaTest, SchemaGeohashFunctionNode )
     ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->nodeType, ExpressionNodeType::FLOAT );
     ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->floatingValue, 1.0 );
 }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+TEST( SchemaTest, SchemaCollectionWithComplexTypes )
+{
+    Schemas::CollectionSchemesMsg::CollectionScheme collectionSchemeTestMessage;
+    collectionSchemeTestMessage.set_campaign_sync_id( "arn:aws:iam::2.52543243543:user/Development/complexdata/*" );
+    collectionSchemeTestMessage.set_decoder_manifest_sync_id( "model_manifest_67" );
+    collectionSchemeTestMessage.set_start_time_ms_epoch( 0 );
+    collectionSchemeTestMessage.set_expiry_time_ms_epoch( 9262144816000 );
+
+    // Create an Event/Condition Based CollectionScheme
+    Schemas::CollectionSchemesMsg::ConditionBasedCollectionScheme *message =
+        collectionSchemeTestMessage.mutable_condition_based_collection_scheme();
+    message->set_condition_minimum_interval_ms( 650 );
+    message->set_condition_language_version( 1000 );
+    message->set_condition_trigger_mode(
+        Schemas::CollectionSchemesMsg::ConditionBasedCollectionScheme_ConditionTriggerMode_TRIGGER_ALWAYS );
+
+    // Build a AST Tree.
+    // Root: Equal
+    // Left Child: average Windows of partial signal 1 in complex type
+    // Right Child: partial signal 2 in complex type + partial signal 1 in complex type
+    auto *root = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *rootOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
+    rootOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_EQUAL );
+
+    auto *leftChild = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *leftChildFunction = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction();
+    auto *leftChildAvgWindow = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction();
+    auto *leftChildPrimitivePrimitiveType = new Schemas::CommonTypesMsg::PrimitiveTypeInComplexSignal();
+    auto *leftChildSignalPath = new Schemas::CommonTypesMsg::SignalPath();
+
+    leftChildSignalPath->add_signal_path( 34574325 );
+    leftChildSignalPath->add_signal_path( 5 );
+    leftChildSignalPath->add_signal_path( 0 );
+    leftChildSignalPath->add_signal_path( 1000352312 );
+
+    leftChildPrimitivePrimitiveType->set_signal_id( 1234 );
+    leftChildPrimitivePrimitiveType->set_allocated_signal_path( leftChildSignalPath );
+
+    leftChildAvgWindow->set_window_type(
+        Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_AVG );
+    leftChildAvgWindow->set_allocated_primitive_type_in_signal( leftChildPrimitivePrimitiveType );
+
+    leftChildFunction->set_allocated_window_function( leftChildAvgWindow );
+    leftChild->set_allocated_node_function( leftChildFunction );
+
+    auto *rightChild = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *rightChildOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
+    rightChildOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_PLUS );
+
+    auto *rightChildLeft = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *rightChildLeftPrimitivePrimitiveType = new Schemas::CommonTypesMsg::PrimitiveTypeInComplexSignal();
+    auto *rightChildLeftSignalPath = new Schemas::CommonTypesMsg::SignalPath();
+
+    rightChildLeftSignalPath->add_signal_path( 34574325 );
+    rightChildLeftSignalPath->add_signal_path( 5 );
+    rightChildLeftSignalPath->add_signal_path( 0 );
+    rightChildLeftSignalPath->add_signal_path( 42 ); // this is different
+
+    rightChildLeftPrimitivePrimitiveType->set_signal_id( 1234 );
+    rightChildLeftPrimitivePrimitiveType->set_allocated_signal_path( rightChildLeftSignalPath );
+
+    rightChildLeft->set_allocated_node_primitive_type_in_signal( rightChildLeftPrimitivePrimitiveType );
+
+    auto *rightChildRight = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *rightChildRightPrimitivePrimitiveType = new Schemas::CommonTypesMsg::PrimitiveTypeInComplexSignal();
+    auto *rightChildRightSignalPath = new Schemas::CommonTypesMsg::SignalPath();
+
+    rightChildRightSignalPath->add_signal_path( 34574325 );
+    rightChildRightSignalPath->add_signal_path( 5 );
+    rightChildRightSignalPath->add_signal_path( 0 );
+    rightChildRightSignalPath->add_signal_path( 1000352312 ); // this is the same as leftChildSignalPath
+
+    rightChildRightPrimitivePrimitiveType->set_signal_id( 1234 );
+    rightChildRightPrimitivePrimitiveType->set_allocated_signal_path( rightChildRightSignalPath );
+
+    rightChildRight->set_allocated_node_primitive_type_in_signal( rightChildRightPrimitivePrimitiveType );
+
+    rightChildOp->set_allocated_left_child( rightChildLeft );
+    rightChildOp->set_allocated_right_child( rightChildRight );
+    rightChild->set_allocated_node_operator( rightChildOp );
+
+    rootOp->set_allocated_left_child( leftChild );
+    rootOp->set_allocated_right_child( rightChild );
+    root->set_allocated_node_operator( rootOp );
+
+    message->set_allocated_condition_tree( root );
+
+    // Serialize the protocol buffer to a string to avoid malloc with cstyle arrays
+    std::string protoSerializedBuffer;
+
+    // Ensure the serialization worked
+    ASSERT_TRUE( collectionSchemeTestMessage.SerializeToString( &protoSerializedBuffer ) );
+
+    // Now we have data to pack our DecoderManifestIngestion object with!
+    CollectionSchemeIngestion collectionSchemeTest;
+
+    // Test for Copy and Build the message
+    ASSERT_TRUE( collectionSchemeTest.copyData(
+        std::make_shared<Schemas::CollectionSchemesMsg::CollectionScheme>( collectionSchemeTestMessage ) ) );
+    ASSERT_TRUE( collectionSchemeTest.build() );
+
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().size(), 10 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).nodeType,
+               ExpressionNodeType::OPERATOR_EQUAL ); // assume first node is top root node
+
+    ASSERT_NE( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left, nullptr );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->function.windowFunction,
+               WindowFunction::LAST_FIXED_WINDOW_AVG );
+    auto leftGeneratedSignalID = collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->signalID;
+    ASSERT_EQ( leftGeneratedSignalID & INTERNAL_SIGNAL_ID_BITMASK,
+               INTERNAL_SIGNAL_ID_BITMASK ); // check its an internal generated ID
+
+    ASSERT_NE( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right, nullptr );
+    ASSERT_NE( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left, nullptr );
+    ASSERT_NE( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right, nullptr );
+
+    auto rightLeftGeneratedSignalId = collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->signalID;
+    auto rightRightGeneratedSignalId = collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->signalID;
+    ASSERT_EQ( rightLeftGeneratedSignalId & INTERNAL_SIGNAL_ID_BITMASK,
+               INTERNAL_SIGNAL_ID_BITMASK ); // check its an internal generated ID
+    ASSERT_EQ( rightRightGeneratedSignalId & INTERNAL_SIGNAL_ID_BITMASK,
+               INTERNAL_SIGNAL_ID_BITMASK ); // check its an internal generated ID
+
+    ASSERT_NE( leftGeneratedSignalID, rightLeftGeneratedSignalId );
+    ASSERT_EQ( leftGeneratedSignalID, rightRightGeneratedSignalId );
+}
+
+TEST( SchemaTest, SchemaCollectionWithDifferentWayToSpecifySignalIDInExpression )
+{
+    Schemas::CollectionSchemesMsg::CollectionScheme collectionSchemeTestMessage;
+    collectionSchemeTestMessage.set_campaign_sync_id( "arn:aws:iam::2.52543243543:user/Development/complexdata/*" );
+    collectionSchemeTestMessage.set_decoder_manifest_sync_id( "model_manifest_67" );
+    collectionSchemeTestMessage.set_start_time_ms_epoch( 0 );
+    collectionSchemeTestMessage.set_expiry_time_ms_epoch( 9262144816000 );
+
+    // Create an Event/Condition Based CollectionScheme
+    Schemas::CollectionSchemesMsg::ConditionBasedCollectionScheme *message =
+        collectionSchemeTestMessage.mutable_condition_based_collection_scheme();
+    message->set_condition_minimum_interval_ms( 650 );
+    message->set_condition_language_version( 1000 );
+    message->set_condition_trigger_mode(
+        Schemas::CollectionSchemesMsg::ConditionBasedCollectionScheme_ConditionTriggerMode_TRIGGER_ALWAYS );
+
+    // Build a AST Tree.
+    // Root: Equal
+    // Left Child: average Window of signal 1 (specified in primitive_type_in_signal) * signal 2 (specified in
+    // primitive_type_in_signal) Right Child: average Window of signal 3 (specified in signal_id) + signal 4 (specified
+    // in signal_id)
+    auto *root = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *rootOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
+    rootOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_EQUAL );
+
+    auto *leftChild = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *leftChildOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
+    leftChildOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MULTIPLY );
+
+    auto *leftChildLeft = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *leftChildLeftFunction = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction();
+    auto *leftChildLeftAvgWindow = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction();
+    auto *leftChildLeftPrimitivePrimitiveType = new Schemas::CommonTypesMsg::PrimitiveTypeInComplexSignal();
+    leftChildLeftPrimitivePrimitiveType->set_signal_id( 1 );
+    leftChildLeftAvgWindow->set_window_type(
+        Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction_WindowType_LAST_WINDOW_AVG );
+    leftChildLeftAvgWindow->set_allocated_primitive_type_in_signal( leftChildLeftPrimitivePrimitiveType );
+    leftChildLeftFunction->set_allocated_window_function( leftChildLeftAvgWindow );
+    leftChildLeft->set_allocated_node_function( leftChildLeftFunction );
+
+    auto *leftChildRight = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *leftChildRightPrimitivePrimitiveType = new Schemas::CommonTypesMsg::PrimitiveTypeInComplexSignal();
+    leftChildRightPrimitivePrimitiveType->set_signal_id( 2 );
+    leftChildRight->set_allocated_node_primitive_type_in_signal( leftChildRightPrimitivePrimitiveType );
+
+    leftChildOp->set_allocated_left_child( leftChildLeft );
+    leftChildOp->set_allocated_right_child( leftChildRight );
+    leftChild->set_allocated_node_operator( leftChildOp );
+
+    auto *rightChild = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *rightChildOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
+    rightChildOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_PLUS );
+
+    auto *rightChildLeft = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *rightChildLeftFunction = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction();
+    auto *rightChildLeftAvgWindow = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction_WindowFunction();
+
+    rightChildLeftAvgWindow->set_signal_id( 3 );
+    rightChildLeftFunction->set_allocated_window_function( rightChildLeftAvgWindow );
+    rightChildLeft->set_allocated_node_function( rightChildLeftFunction );
+
+    auto *rightChildRight = new Schemas::CommonTypesMsg::ConditionNode();
+    auto *rightChildRightPrimitivePrimitiveType = new Schemas::CommonTypesMsg::PrimitiveTypeInComplexSignal();
+    rightChildRightPrimitivePrimitiveType->set_signal_id( 4 );
+
+    rightChildRight->set_allocated_node_primitive_type_in_signal( rightChildRightPrimitivePrimitiveType );
+
+    rightChildOp->set_allocated_left_child( rightChildLeft );
+    rightChildOp->set_allocated_right_child( rightChildRight );
+    rightChild->set_allocated_node_operator( rightChildOp );
+
+    rootOp->set_allocated_left_child( leftChild );
+    rootOp->set_allocated_right_child( rightChild );
+    root->set_allocated_node_operator( rootOp );
+
+    message->set_allocated_condition_tree( root );
+
+    // Serialize the protocol buffer to a string to avoid malloc with cstyle arrays
+    std::string protoSerializedBuffer;
+
+    // Ensure the serialization worked
+    ASSERT_TRUE( collectionSchemeTestMessage.SerializeToString( &protoSerializedBuffer ) );
+
+    // Now we have data to pack our DecoderManifestIngestion object with!
+    CollectionSchemeIngestion collectionSchemeTest;
+
+    // Test for Copy and Build the message
+    ASSERT_TRUE( collectionSchemeTest.copyData(
+        std::make_shared<Schemas::CollectionSchemesMsg::CollectionScheme>( collectionSchemeTestMessage ) ) );
+    ASSERT_TRUE( collectionSchemeTest.build() );
+
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().size(), 14 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).nodeType,
+               ExpressionNodeType::OPERATOR_EQUAL ); // assume first node is top root node
+
+    ASSERT_NE( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left, nullptr );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->function.windowFunction,
+               WindowFunction::LAST_FIXED_WINDOW_AVG );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->left->signalID, 1 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).left->right->signalID, 2 );
+
+    ASSERT_NE( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right, nullptr );
+    ASSERT_NE( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left, nullptr );
+    ASSERT_NE( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right, nullptr );
+
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->left->signalID, 3 );
+    ASSERT_EQ( collectionSchemeTest.getAllExpressionNodes().at( 0 ).right->right->signalID, 4 );
+}
+
+TEST( SchemaTest, CollectionSchemeComplexHeartbeat )
+{
+    // Create a  collection scheme Proto Message
+    Schemas::CollectionSchemesMsg::CollectionScheme collectionSchemeTestMessage;
+    collectionSchemeTestMessage.set_campaign_sync_id( "arn:aws:iam::2.23606797749:user/Development/product_1234/*" );
+    collectionSchemeTestMessage.set_decoder_manifest_sync_id( "model_manifest_12" );
+    collectionSchemeTestMessage.set_start_time_ms_epoch( 1621448160000 );
+    collectionSchemeTestMessage.set_expiry_time_ms_epoch( 2621448160000 );
+
+    // Create a Time_based_collection_scheme
+    Schemas::CollectionSchemesMsg::TimeBasedCollectionScheme *message1 =
+        collectionSchemeTestMessage.mutable_time_based_collection_scheme();
+    message1->set_time_based_collection_scheme_period_ms( 5000 );
+
+    collectionSchemeTestMessage.set_after_duration_ms( 0 );
+    collectionSchemeTestMessage.set_include_active_dtcs( true );
+    collectionSchemeTestMessage.set_persist_all_collected_data( true );
+    collectionSchemeTestMessage.set_compress_collected_data( true );
+    collectionSchemeTestMessage.set_priority( 9 );
+
+    // Add two normal and one partial signal to collect
+    Schemas::CollectionSchemesMsg::SignalInformation *signal1 = collectionSchemeTestMessage.add_signal_information();
+    signal1->set_signal_id( 0 );
+    signal1->set_sample_buffer_size( 100 );
+    signal1->set_minimum_sample_period_ms( 1000 );
+    signal1->set_fixed_window_period_ms( 1000 );
+    signal1->set_condition_only_signal( false );
+
+    Schemas::CollectionSchemesMsg::SignalInformation *signal2 = collectionSchemeTestMessage.add_signal_information();
+    signal2->set_signal_id( 999 );
+    signal2->set_sample_buffer_size( 500 );
+    signal2->set_minimum_sample_period_ms( 1000 );
+    signal2->set_fixed_window_period_ms( 1000 );
+    signal2->set_condition_only_signal( false );
+
+    // Add partial signal to collect
+    Schemas::CollectionSchemesMsg::SignalInformation *signal3 = collectionSchemeTestMessage.add_signal_information();
+    signal3->set_signal_id( 999 );
+    signal3->set_sample_buffer_size( 800 );
+    signal3->set_minimum_sample_period_ms( 1000 );
+    signal3->set_fixed_window_period_ms( 1000 );
+    signal3->set_condition_only_signal( false );
+
+    auto *path1 = new Schemas::CommonTypesMsg::SignalPath();
+
+    path1->add_signal_path( 34574325 );
+    path1->add_signal_path( 5 );
+    signal3->set_allocated_signal_path( path1 );
+
+    // Serialize the protocol buffer to a string to avoid malloc with cstyle arrays
+    std::string protoSerializedBuffer;
+
+    // Ensure the serialization worked
+    ASSERT_TRUE( collectionSchemeTestMessage.SerializeToString( &protoSerializedBuffer ) );
+
+    // Now we have data to pack our DecoderManifestIngestion object with!
+    CollectionSchemeIngestion collectionSchemeTest;
+
+    ASSERT_TRUE( collectionSchemeTest.copyData(
+        std::make_shared<Schemas::CollectionSchemesMsg::CollectionScheme>( collectionSchemeTestMessage ) ) );
+
+    ASSERT_EQ( collectionSchemeTest.getPartialSignalIdToSignalPathLookupTable(),
+               collectionSchemeTest.INVALID_PARTIAL_SIGNAL_ID_LOOKUP );
+    ASSERT_TRUE( collectionSchemeTest.build() );
+
+    ASSERT_EQ( collectionSchemeTest.getCollectSignals().size(), 3 );
+    ASSERT_EQ( collectionSchemeTest.getCollectSignals().at( 0 ).signalID, 0 );
+    ASSERT_EQ( collectionSchemeTest.getCollectSignals().at( 1 ).signalID, 999 );
+    ASSERT_NE( collectionSchemeTest.getCollectSignals().at( 2 ).signalID, 999 );
+    ASSERT_EQ( collectionSchemeTest.getCollectSignals().at( 2 ).signalID & INTERNAL_SIGNAL_ID_BITMASK,
+               INTERNAL_SIGNAL_ID_BITMASK );
+
+    auto plt = collectionSchemeTest.getPartialSignalIdToSignalPathLookupTable();
+    ASSERT_NE( plt, collectionSchemeTest.INVALID_PARTIAL_SIGNAL_ID_LOOKUP );
+}
+
+TEST( SchemaTest, DecoderManifestIngestionComplexSignals )
+{
+    // Create a Decoder manifest protocol buffer and pack it with the data
+    Schemas::DecoderManifestMsg::DecoderManifest protoDM;
+
+    protoDM.set_sync_id( "arn:aws:iam::123456789012:user/Development/product_1234/*" );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexType1 = protoDM.add_complex_types();
+    auto *primitiveData = new Schemas::DecoderManifestMsg::PrimitiveData();
+
+    primitiveData->set_primitive_type( Schemas::DecoderManifestMsg::UINT64 );
+    protoComplexType1->set_type_id( 10 );
+    protoComplexType1->set_allocated_primitive_data( primitiveData );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexTypeForPrimitive2 = protoDM.add_complex_types();
+    auto *primitiveData2 = new Schemas::DecoderManifestMsg::PrimitiveData();
+    primitiveData2->set_primitive_type( Schemas::DecoderManifestMsg::BOOL );
+    protoComplexTypeForPrimitive2->set_type_id( 11 );
+    protoComplexTypeForPrimitive2->set_allocated_primitive_data( primitiveData2 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexTypeForPrimitive3 = protoDM.add_complex_types();
+    auto *primitiveData3 = new Schemas::DecoderManifestMsg::PrimitiveData();
+    primitiveData3->set_primitive_type( Schemas::DecoderManifestMsg::UINT8 );
+    protoComplexTypeForPrimitive3->set_type_id( 12 );
+    protoComplexTypeForPrimitive3->set_allocated_primitive_data( primitiveData3 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexTypeForPrimitive4 = protoDM.add_complex_types();
+    auto *primitiveData4 = new Schemas::DecoderManifestMsg::PrimitiveData();
+    primitiveData4->set_primitive_type( Schemas::DecoderManifestMsg::UINT16 );
+    protoComplexTypeForPrimitive4->set_type_id( 13 );
+    protoComplexTypeForPrimitive4->set_allocated_primitive_data( primitiveData4 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexTypeForPrimitive5 = protoDM.add_complex_types();
+    auto *primitiveData5 = new Schemas::DecoderManifestMsg::PrimitiveData();
+    primitiveData5->set_primitive_type( Schemas::DecoderManifestMsg::UINT32 );
+    protoComplexTypeForPrimitive5->set_type_id( 14 );
+    protoComplexTypeForPrimitive5->set_allocated_primitive_data( primitiveData5 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexTypeForPrimitive6 = protoDM.add_complex_types();
+    auto *primitiveData6 = new Schemas::DecoderManifestMsg::PrimitiveData();
+    primitiveData6->set_primitive_type( Schemas::DecoderManifestMsg::INT8 );
+    protoComplexTypeForPrimitive6->set_type_id( 15 );
+    protoComplexTypeForPrimitive6->set_allocated_primitive_data( primitiveData6 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexTypeForPrimitive7 = protoDM.add_complex_types();
+    auto *primitiveData7 = new Schemas::DecoderManifestMsg::PrimitiveData();
+    primitiveData7->set_primitive_type( Schemas::DecoderManifestMsg::INT16 );
+    protoComplexTypeForPrimitive7->set_type_id( 16 );
+    protoComplexTypeForPrimitive7->set_allocated_primitive_data( primitiveData7 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexTypeForPrimitive8 = protoDM.add_complex_types();
+    auto *primitiveData8 = new Schemas::DecoderManifestMsg::PrimitiveData();
+    primitiveData8->set_primitive_type( Schemas::DecoderManifestMsg::INT32 );
+    protoComplexTypeForPrimitive8->set_type_id( 17 );
+    protoComplexTypeForPrimitive8->set_allocated_primitive_data( primitiveData8 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexTypeForPrimitive9 = protoDM.add_complex_types();
+    auto *primitiveData9 = new Schemas::DecoderManifestMsg::PrimitiveData();
+    primitiveData9->set_primitive_type( Schemas::DecoderManifestMsg::INT64 );
+    protoComplexTypeForPrimitive9->set_type_id( 18 );
+    protoComplexTypeForPrimitive9->set_allocated_primitive_data( primitiveData9 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexTypeForPrimitive10 = protoDM.add_complex_types();
+    auto *primitiveData10 = new Schemas::DecoderManifestMsg::PrimitiveData();
+    primitiveData10->set_primitive_type( Schemas::DecoderManifestMsg::FLOAT32 );
+    protoComplexTypeForPrimitive10->set_type_id( 19 );
+    protoComplexTypeForPrimitive10->set_allocated_primitive_data( primitiveData10 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexTypeForPrimitive11 = protoDM.add_complex_types();
+    auto *primitiveData11 = new Schemas::DecoderManifestMsg::PrimitiveData();
+    primitiveData11->set_primitive_type( Schemas::DecoderManifestMsg::FLOAT64 );
+    protoComplexTypeForPrimitive11->set_type_id( 21 );
+    protoComplexTypeForPrimitive11->set_allocated_primitive_data( primitiveData11 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexType2 = protoDM.add_complex_types();
+    auto *complexStruct = new Schemas::DecoderManifestMsg::ComplexStruct();
+
+    auto *structMember1 = complexStruct->add_members();
+    structMember1->set_type_id( 10 );
+
+    auto *structMember2 = complexStruct->add_members();
+    structMember2->set_type_id( 30 );
+
+    protoComplexType2->set_type_id( 20 );
+    protoComplexType2->set_allocated_struct_( complexStruct );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexType3 = protoDM.add_complex_types();
+    auto *complexArray = new Schemas::DecoderManifestMsg::ComplexArray();
+
+    complexArray->set_type_id( 10 );
+    complexArray->set_size( 10000 );
+    protoComplexType3->set_type_id( 30 );
+    protoComplexType3->set_allocated_array( complexArray );
+
+    Schemas::DecoderManifestMsg::ComplexSignal *protoComplexSignal = protoDM.add_complex_signals();
+
+    protoComplexSignal->set_signal_id( 123 );
+    protoComplexSignal->set_interface_id( "ros2" );
+    protoComplexSignal->set_message_id( "/topic/for/ROS:/vehicle/msgs/test.msg" );
+    protoComplexSignal->set_root_type_id( 20 );
+
+    // Serialize the protocol buffer to a string to avoid malloc with cstyle arrays
+    std::string protoSerializedBuffer;
+
+    // Ensure the serialization worked
+    ASSERT_TRUE( protoDM.SerializeToString( &protoSerializedBuffer ) );
+
+    // Now we have data to pack our DecoderManifestIngestion object with!
+    DecoderManifestIngestion testPIDM;
+
+    // We need a cstyle array to mock data coming from the MQTT IoT core callback. We need to convert the const char*
+    // type of the string pointer we get from .data() to const uint8_t*. This is why reinterpret_cast is used.
+    testPIDM.copyData( reinterpret_cast<const uint8_t *>( protoSerializedBuffer.data() ),
+                       protoSerializedBuffer.length() );
+
+    ASSERT_TRUE( testPIDM.getComplexSignalDecoderFormat( 123 ).mInterfaceId.empty() );
+
+    ASSERT_EQ( testPIDM.getComplexDataType( 10 ).type(), typeid( InvalidComplexVariant ) );
+
+    ASSERT_TRUE( testPIDM.build() );
+    ASSERT_TRUE( testPIDM.isReady() );
+
+    ASSERT_EQ( testPIDM.getNetworkProtocol( 123 ), VehicleDataSourceProtocol::COMPLEX_DATA );
+
+    auto complexDecoder = testPIDM.getComplexSignalDecoderFormat( 123 );
+
+    ASSERT_EQ( complexDecoder.mInterfaceId, "ros2" );
+    ASSERT_EQ( complexDecoder.mMessageId, "/topic/for/ROS:/vehicle/msgs/test.msg" );
+    ASSERT_EQ( complexDecoder.mRootTypeId, 20 );
+
+    auto resultRoot = testPIDM.getComplexDataType( 20 );
+    ASSERT_EQ( resultRoot.type(), typeid( ComplexStruct ) );
+    auto resultStruct = boost::get<ComplexStruct>( resultRoot );
+    ASSERT_EQ( resultStruct.mOrderedTypeIds.size(), 2 );
+    ASSERT_EQ( resultStruct.mOrderedTypeIds[0], 10 );
+    ASSERT_EQ( resultStruct.mOrderedTypeIds[1], 30 );
+
+    auto resultMember1 = testPIDM.getComplexDataType( 10 );
+    ASSERT_EQ( resultMember1.type(), typeid( PrimitiveData ) );
+    auto resultPrimitive = boost::get<PrimitiveData>( resultMember1 );
+    ASSERT_EQ( resultPrimitive.mPrimitiveType, SignalType::UINT64 );
+    ASSERT_EQ( resultPrimitive.mScaling, 1.0 );
+    ASSERT_EQ( resultPrimitive.mOffset, 0.0 );
+
+    auto resultMember2 = testPIDM.getComplexDataType( 30 );
+    ASSERT_EQ( resultMember2.type(), typeid( ComplexArray ) );
+    auto resultArray = boost::get<ComplexArray>( resultMember2 );
+    ASSERT_EQ( resultArray.mSize, 10000 );
+    ASSERT_EQ( resultArray.mRepeatedTypeId, 10 );
+
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 11 ) ).mPrimitiveType, SignalType::BOOLEAN );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 12 ) ).mPrimitiveType, SignalType::UINT8 );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 13 ) ).mPrimitiveType, SignalType::UINT16 );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 14 ) ).mPrimitiveType, SignalType::UINT32 );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 15 ) ).mPrimitiveType, SignalType::INT8 );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 16 ) ).mPrimitiveType, SignalType::INT16 );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 17 ) ).mPrimitiveType, SignalType::INT32 );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 18 ) ).mPrimitiveType, SignalType::INT64 );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 19 ) ).mPrimitiveType, SignalType::FLOAT );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 21 ) ).mPrimitiveType, SignalType::DOUBLE );
+}
+
+TEST( SchemaTest, DecoderManifestWrong )
+{
+    // Create a Decoder manifest protocol buffer and pack it with the data
+    Schemas::DecoderManifestMsg::DecoderManifest protoDM;
+
+    protoDM.set_sync_id( "arn:aws:iam::123456789012:user/Development/product_1234/*" );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexType1 = protoDM.add_complex_types();
+    auto *primitiveData = new Schemas::DecoderManifestMsg::PrimitiveData();
+
+    primitiveData->set_primitive_type( Schemas::DecoderManifestMsg::UINT64 );
+    protoComplexType1->set_type_id( 10 );
+    protoComplexType1->set_allocated_primitive_data( primitiveData );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexType2 = protoDM.add_complex_types();
+    auto *primitiveData2 = new Schemas::DecoderManifestMsg::PrimitiveData();
+
+    // same id but different type. Should give a warning and ignore the second one
+    primitiveData2->set_primitive_type( Schemas::DecoderManifestMsg::UINT32 );
+    protoComplexType2->set_type_id( 10 );
+    protoComplexType2->set_allocated_primitive_data( primitiveData2 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexType3 = protoDM.add_complex_types();
+    auto *primitiveData3 = new Schemas::DecoderManifestMsg::PrimitiveData();
+
+    primitiveData3->set_primitive_type(
+        static_cast<Schemas::DecoderManifestMsg::PrimitiveType>( 0xBEEF ) ); // invalid enum
+    protoComplexType3->set_type_id( 20 );
+    protoComplexType3->set_allocated_primitive_data( primitiveData3 );
+
+    Schemas::DecoderManifestMsg::ComplexSignal *protoComplexSignal = protoDM.add_complex_signals();
+
+    protoComplexSignal->set_signal_id( 123 );
+    protoComplexSignal->set_interface_id( "ros2" );
+    protoComplexSignal->set_message_id( "/topic/for/ROS:/vehicle/msgs/test.msg" );
+    protoComplexSignal->set_root_type_id( 10 );
+
+    Schemas::DecoderManifestMsg::ComplexSignal *protoComplexSignal2 = protoDM.add_complex_signals();
+    protoComplexSignal2->set_signal_id( 456 );
+    // Empty interface id should result in a warning
+    protoComplexSignal2->set_interface_id( "" );
+    protoComplexSignal2->set_message_id( "/topic/for/ROS:/vehicle/msgs/test2.msg" );
+    protoComplexSignal2->set_root_type_id( 10 );
+
+    // Serialize the protocol buffer to a string to avoid malloc with cstyle arrays
+    std::string protoSerializedBuffer;
+
+    // Ensure the serialization worked
+    ASSERT_TRUE( protoDM.SerializeToString( &protoSerializedBuffer ) );
+
+    // Now we have data to pack our DecoderManifestIngestion object with!
+    DecoderManifestIngestion testPIDM;
+
+    // We need a cstyle array to mock data coming from the MQTT IoT core callback. We need to convert the const char*
+    // type of the string pointer we get from .data() to const uint8_t*. This is why reinterpret_cast is used.
+    testPIDM.copyData( reinterpret_cast<const uint8_t *>( protoSerializedBuffer.data() ),
+                       protoSerializedBuffer.length() );
+
+    ASSERT_TRUE( testPIDM.build() );
+    ASSERT_TRUE( testPIDM.isReady() );
+
+    auto resultMember1 = testPIDM.getComplexDataType( 10 );
+    ASSERT_EQ( resultMember1.type(), typeid( PrimitiveData ) );
+    auto resultPrimitive = boost::get<PrimitiveData>( resultMember1 );
+    ASSERT_EQ( resultPrimitive.mPrimitiveType, SignalType::UINT64 );
+    ASSERT_EQ( resultPrimitive.mScaling, 1.0 );
+    ASSERT_EQ( resultPrimitive.mOffset, 0.0 );
+
+    // unkown types default to UINT8
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( 20 ) ).mPrimitiveType, SignalType::UINT8 );
+
+    ASSERT_FALSE( testPIDM.getComplexSignalDecoderFormat( 123 ).mInterfaceId.empty() );
+    ASSERT_FALSE( testPIDM.getComplexSignalDecoderFormat( 123 ).mMessageId.empty() );
+
+    // Signal with empty interface ID should be ignored an not be set at all
+    ASSERT_TRUE( testPIDM.getComplexSignalDecoderFormat( 456 ).mInterfaceId.empty() );
+    ASSERT_TRUE( testPIDM.getComplexSignalDecoderFormat( 456 ).mMessageId.empty() );
+}
+
+TEST( SchemaTest, DecoderManifestIngestionComplexStringAsArray )
+{
+    // Create a Decoder manifest protocol buffer and pack it with the data
+    Schemas::DecoderManifestMsg::DecoderManifest protoDM;
+
+    protoDM.set_sync_id( "arn:aws:iam::123456789012:user/Development/product_1234/*" );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexType1 = protoDM.add_complex_types();
+    auto *stringDataUtf8 = new Schemas::DecoderManifestMsg::StringData();
+
+    stringDataUtf8->set_size( 55 );
+    stringDataUtf8->set_encoding( Schemas::DecoderManifestMsg::StringEncoding::UTF_8 );
+    protoComplexType1->set_type_id( 100 );
+    protoComplexType1->set_allocated_string_data( stringDataUtf8 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexType2 = protoDM.add_complex_types();
+    auto *stringDataUtf16 = new Schemas::DecoderManifestMsg::StringData();
+
+    stringDataUtf16->set_size( 77 );
+    stringDataUtf16->set_encoding( Schemas::DecoderManifestMsg::StringEncoding::UTF_16 );
+    protoComplexType2->set_type_id( 200 );
+    protoComplexType2->set_allocated_string_data( stringDataUtf16 );
+
+    Schemas::DecoderManifestMsg::ComplexType *protoComplexType3 = protoDM.add_complex_types();
+    auto *complexStruct = new Schemas::DecoderManifestMsg::ComplexStruct();
+
+    auto *structMember1 = complexStruct->add_members();
+    structMember1->set_type_id( 100 );
+
+    auto *structMember2 = complexStruct->add_members();
+    structMember2->set_type_id( 200 );
+
+    protoComplexType3->set_type_id( 20 );
+    protoComplexType3->set_allocated_struct_( complexStruct );
+
+    Schemas::DecoderManifestMsg::ComplexSignal *protoComplexSignal = protoDM.add_complex_signals();
+
+    protoComplexSignal->set_signal_id( 123 );
+    protoComplexSignal->set_interface_id( "ros2" );
+    protoComplexSignal->set_message_id( "/topic/for/ROS:/vehicle/msgs/test.msg" );
+    protoComplexSignal->set_root_type_id( 20 );
+
+    // Serialize the protocol buffer to a string to avoid malloc with cstyle arrays
+    std::string protoSerializedBuffer;
+
+    // Ensure the serialization worked
+    ASSERT_TRUE( protoDM.SerializeToString( &protoSerializedBuffer ) );
+
+    // Now we have data to pack our DecoderManifestIngestion object with!
+    DecoderManifestIngestion testPIDM;
+
+    // We need a cstyle array to mock data coming from the MQTT IoT core callback. We need to convert the const char*
+    // type of the string pointer we get from .data() to const uint8_t*. This is why reinterpret_cast is used.
+    testPIDM.copyData( reinterpret_cast<const uint8_t *>( protoSerializedBuffer.data() ),
+                       protoSerializedBuffer.length() );
+
+    ASSERT_TRUE( testPIDM.getComplexSignalDecoderFormat( 123 ).mInterfaceId.empty() );
+
+    ASSERT_TRUE( testPIDM.build() );
+    ASSERT_TRUE( testPIDM.isReady() );
+
+    ASSERT_EQ( testPIDM.getNetworkProtocol( 123 ), VehicleDataSourceProtocol::COMPLEX_DATA );
+
+    auto resultMember2 = testPIDM.getComplexDataType( 100 );
+    ASSERT_EQ( resultMember2.type(), typeid( ComplexArray ) );
+    auto resultArray = boost::get<ComplexArray>( resultMember2 );
+    ASSERT_EQ( resultArray.mSize, 55 );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( resultArray.mRepeatedTypeId ) ).mPrimitiveType,
+               SignalType::UINT8 );
+
+    auto resultMember3 = testPIDM.getComplexDataType( 200 );
+    ASSERT_EQ( resultMember3.type(), typeid( ComplexArray ) );
+    auto resultArray2 = boost::get<ComplexArray>( resultMember3 );
+    ASSERT_EQ( resultArray2.mSize, 77 );
+    ASSERT_EQ( boost::get<PrimitiveData>( testPIDM.getComplexDataType( resultArray2.mRepeatedTypeId ) ).mPrimitiveType,
+               SignalType::UINT32 );
+}
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

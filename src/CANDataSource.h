@@ -62,8 +62,6 @@ stringToCanTimestampType( std::string const &timestampType, CanTimestampType &ou
  * @brief Linux CAN Bus implementation. Uses Raw Sockets to listen to CAN
  * data on 1 single CAN IF.
  */
-// coverity[cert_dcl60_cpp_violation] false positive - class only defined once
-// coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
 class CANDataSource : public IActiveDecoderDictionaryListener
 {
 public:

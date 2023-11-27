@@ -126,6 +126,18 @@ DataSenderProtoWriter::append( const GeohashInfo &geohashInfo )
     geohashProto->set_prev_reported_geohash_string( geohashInfo.mPrevReportedGeohashString );
 }
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+void
+DataSenderProtoWriter::append( const UploadedS3Object &uploadedS3Object )
+{
+    auto uploadedS3Objects = mVehicleData.add_s3_objects();
+    mVehicleDataMsgCount++;
+    uploadedS3Objects->set_key( uploadedS3Object.key );
+    uploadedS3Objects->set_data_format(
+        static_cast<Schemas::VehicleDataMsg::DataFormat>( uploadedS3Object.dataFormat ) );
+}
+#endif
+
 unsigned
 DataSenderProtoWriter::getVehicleDataMsgCount() const
 {

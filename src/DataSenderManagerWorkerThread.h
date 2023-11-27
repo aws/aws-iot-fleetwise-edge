@@ -15,12 +15,20 @@
 #include <memory>
 #include <mutex>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "IActiveCollectionSchemesListener.h"
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
 class DataSenderManagerWorkerThread : public IDataReadyToPublishListener
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    ,
+                                      public IActiveCollectionSchemesListener
+#endif
 {
 public:
     DataSenderManagerWorkerThread( std::shared_ptr<IConnectivityModule> connectivityModule,
@@ -41,6 +49,11 @@ public:
      * publish the data to the cloud.
      */
     void onDataReadyToPublish() override;
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    void onChangeCollectionSchemeList(
+        const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes ) override;
+#endif
 
     /**
      * @brief Stops the internal thread if started and wait until it finishes
@@ -76,6 +89,12 @@ private:
     Signal mWait;
     std::shared_ptr<DataSenderManager> mDataSenderManager;
     std::shared_ptr<IConnectivityModule> mConnectivityModule;
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    std::shared_ptr<const ActiveCollectionSchemes> mActiveCollectionSchemes;
+    std::mutex mActiveCollectionSchemesMutex;
+    std::atomic<bool> mUpdatedCollectionSchemeListAvailable{ false };
+#endif
 
     Timer mTimer;
     Timer mRetrySendingPersistedDataTimer;

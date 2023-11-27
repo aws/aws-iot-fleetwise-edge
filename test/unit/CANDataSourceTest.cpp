@@ -11,7 +11,6 @@
 #include "VehicleDataSourceTypes.h"
 #include "WaitUntil.h"
 #include <array>
-#include <boost/lockfree/queue.hpp>
 #include <cstdint>
 #include <cstring>
 #include <gtest/gtest.h>
@@ -191,9 +190,8 @@ protected:
 TEST_F( CANDataSourceTest, invalidInit )
 {
     auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
-    auto canRawBufferPtr = std::make_shared<CANBuffer>( 10 );
 
-    CANDataConsumer consumer{ signalBufferPtr, canRawBufferPtr };
+    CANDataConsumer consumer{ signalBufferPtr };
     CANDataSource dataSource{
         INVALID_CAN_SOURCE_NUMERIC_ID, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_FALSE( dataSource.init() );
@@ -203,16 +201,13 @@ TEST_F( CANDataSourceTest, testNoDecoderDictionary )
 {
     ASSERT_TRUE( mSocketFD != -1 );
     auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
-    auto canRawBufferPtr = std::make_shared<CANBuffer>( 10 );
 
-    CANDataConsumer consumer{ signalBufferPtr, canRawBufferPtr };
+    CANDataConsumer consumer{ signalBufferPtr };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
-    CollectedSignal signal;
-    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBufferPtr->pop( signal ) );
-    CollectedCanRawFrame frame;
-    ASSERT_FALSE( canRawBufferPtr->pop( frame ) );
+    CollectedDataFrame collectedDataFrame;
+    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
     // No disconnect to test destructor disconnect
 }
 
@@ -220,44 +215,40 @@ TEST_F( CANDataSourceTest, testValidDecoderDictionary )
 {
     ASSERT_TRUE( mSocketFD != -1 );
     auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
-    auto canRawBufferPtr = std::make_shared<CANBuffer>( 10 );
 
-    CANDataConsumer consumer{ signalBufferPtr, canRawBufferPtr };
+    CANDataConsumer consumer{ signalBufferPtr };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-    CollectedSignal signal;
-    WAIT_ASSERT_TRUE( sendTestMessage( mSocketFD ) && signalBufferPtr->pop( signal ) );
+    CollectedDataFrame collectedDataFrame;
+    WAIT_ASSERT_TRUE( sendTestMessage( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
+    auto signal = collectedDataFrame.mCollectedSignals[0];
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_EQ( signal.signalID, 1 );
     ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x10203 );
-    ASSERT_TRUE( signalBufferPtr->pop( signal ) );
+    signal = collectedDataFrame.mCollectedSignals[1];
     ASSERT_EQ( signal.signalID, 7 );
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x4050607 );
-    CollectedCanRawFrame frame;
-    ASSERT_TRUE( canRawBufferPtr->pop( frame ) );
-    ASSERT_EQ( frame.channelId, 0 );
-    ASSERT_EQ( frame.frameID, 0x123 );
-    ASSERT_EQ( frame.size, 8 );
+    auto frame = collectedDataFrame.mCollectedCanRawFrame;
+    ASSERT_EQ( frame->channelId, 0 );
+    ASSERT_EQ( frame->frameID, 0x123 );
+    ASSERT_EQ( frame->size, 8 );
     for ( auto i = 0; i < 8; i++ )
     {
-        ASSERT_EQ( frame.data[i], i );
+        ASSERT_EQ( frame->data[i], i );
     }
 
     // Test message a different message ID is not received
-    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD, 0x456 ) &&
-                        ( signalBufferPtr->pop( signal ) || canRawBufferPtr->pop( frame ) ) );
+    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD, 0x456 ) && signalBufferPtr->pop( collectedDataFrame ) );
 
     // Test invalidation of decoder dictionary
     dataSource.onChangeOfActiveDictionary( nullptr, VehicleDataSourceProtocol::RAW_SOCKET );
-    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) &&
-                        ( signalBufferPtr->pop( signal ) || canRawBufferPtr->pop( frame ) ) );
+    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
     // Check it ignores dictionaries for other protocols
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::OBD );
-    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) &&
-                        ( signalBufferPtr->pop( signal ) || canRawBufferPtr->pop( frame ) ) );
+    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
     ASSERT_TRUE( dataSource.disconnect() );
 }
 
@@ -267,33 +258,30 @@ TEST_F( CANDataSourceTest, testCanFDSocketMode )
     mSocketFD = setup( true );
     ASSERT_TRUE( mSocketFD != -1 );
     auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
-    auto canRawBufferPtr = std::make_shared<CANBuffer>( 10 );
 
-    CANDataConsumer consumer{ signalBufferPtr, canRawBufferPtr };
+    CANDataConsumer consumer{ signalBufferPtr };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_SOFTWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-    CollectedSignal signal;
-    WAIT_ASSERT_TRUE( sendTestFDMessage( mSocketFD ) && signalBufferPtr->pop( signal ) );
+    CollectedDataFrame collectedDataFrame;
+    WAIT_ASSERT_TRUE( sendTestFDMessage( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
+    auto signal = collectedDataFrame.mCollectedSignals[0];
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_EQ( signal.signalID, 1 );
     ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x10203 );
-    ASSERT_TRUE( signalBufferPtr->pop( signal ) );
+    signal = collectedDataFrame.mCollectedSignals[1];
     ASSERT_EQ( signal.signalID, 7 );
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x4050607 );
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( signal ) );
-    CollectedCanRawFrame frame;
-    ASSERT_TRUE( canRawBufferPtr->pop( frame ) );
-    ASSERT_EQ( frame.channelId, 0 );
-    ASSERT_EQ( frame.frameID, 0x123 );
-    ASSERT_EQ( frame.size, 64 );
+    auto frame = collectedDataFrame.mCollectedCanRawFrame;
+    ASSERT_EQ( frame->channelId, 0 );
+    ASSERT_EQ( frame->frameID, 0x123 );
+    ASSERT_EQ( frame->size, 64 );
     for ( auto i = 0; i < 64; i++ )
     {
-        ASSERT_EQ( frame.data[i], i );
+        ASSERT_EQ( frame->data[i], i );
     }
-    ASSERT_FALSE( signalBufferPtr->pop( signal ) );
     ASSERT_TRUE( dataSource.disconnect() );
 }
 
@@ -301,33 +289,30 @@ TEST_F( CANDataSourceTest, testExtractExtendedID )
 {
     ASSERT_TRUE( mSocketFD != -1 );
     auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
-    auto canRawBufferPtr = std::make_shared<CANBuffer>( 10 );
 
-    CANDataConsumer consumer{ signalBufferPtr, canRawBufferPtr };
+    CANDataConsumer consumer{ signalBufferPtr };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-    CollectedSignal signal;
-    WAIT_ASSERT_TRUE( sendTestMessageExtendedID( mSocketFD ) && signalBufferPtr->pop( signal ) );
+    CollectedDataFrame collectedDataFrame;
+    WAIT_ASSERT_TRUE( sendTestMessageExtendedID( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
+    auto signal = collectedDataFrame.mCollectedSignals[0];
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_EQ( signal.signalID, 1 );
     ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x10203 );
-    ASSERT_TRUE( signalBufferPtr->pop( signal ) );
+    signal = collectedDataFrame.mCollectedSignals[1];
     ASSERT_EQ( signal.signalID, 7 );
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x4050607 );
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( signal ) );
-    CollectedCanRawFrame frame;
-    ASSERT_TRUE( canRawBufferPtr->pop( frame ) );
-    ASSERT_EQ( frame.channelId, 0 );
-    ASSERT_EQ( frame.frameID, 0x123 );
-    ASSERT_EQ( frame.size, 8 );
+    auto frame = collectedDataFrame.mCollectedCanRawFrame;
+    ASSERT_EQ( frame->channelId, 0 );
+    ASSERT_EQ( frame->frameID, 0x123 );
+    ASSERT_EQ( frame->size, 8 );
     for ( auto i = 0; i < 8; i++ )
     {
-        ASSERT_EQ( frame.data[i], i );
+        ASSERT_EQ( frame->data[i], i );
     }
-    ASSERT_FALSE( signalBufferPtr->pop( signal ) );
     ASSERT_TRUE( dataSource.disconnect() );
 }
 

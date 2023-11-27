@@ -17,12 +17,15 @@ namespace IoTFleetWise
 
 AwsGGChannel::AwsGGChannel( IConnectivityModule *connectivityModule,
                             std::shared_ptr<PayloadManager> payloadManager,
-                            std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &ggConnection )
+                            std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &ggConnection,
+                            std::string topicName,
+                            bool subscription )
     : mConnectivityModule( connectivityModule )
     , mPayloadManager( std::move( payloadManager ) )
     , mConnection( ggConnection )
     , mSubscribed( false )
-    , mSubscribeAsynchronously( false )
+    , mSubscription( subscription )
+    , mTopicName( std::move( topicName ) )
 {
 }
 
@@ -40,18 +43,7 @@ AwsGGChannel::isAliveNotThreadSafe()
     {
         return false;
     }
-    return mConnectivityModule->isAlive();
-}
-
-void
-AwsGGChannel::setTopic( const std::string &topicNameRef, bool subscribeAsynchronously )
-{
-    if ( topicNameRef.empty() )
-    {
-        FWE_LOG_ERROR( "Empty ingestion topic name provided" );
-    }
-    mSubscribeAsynchronously = subscribeAsynchronously;
-    mTopicName = topicNameRef;
+    return mConnectivityModule->isAlive() && ( ( !mSubscription ) || mSubscribed );
 }
 
 ConnectivityError
@@ -63,7 +55,7 @@ AwsGGChannel::subscribe()
         FWE_LOG_ERROR( "Empty ingestion topic name provided" );
         return ConnectivityError::NotConfigured;
     }
-    if ( !isAliveNotThreadSafe() )
+    if ( !mConnectivityModule->isAlive() )
     {
         FWE_LOG_ERROR( "MQTT Connection not established, failed to subscribe" );
         return ConnectivityError::NoConnection;
@@ -180,9 +172,10 @@ AwsGGChannel::sendBuffer( const std::uint8_t *buf, size_t size, CollectionScheme
         }
         return ConnectivityError::NoConnection;
     }
-    if ( !( AwsSDKMemoryManager::getInstance().reserveMemory( size ) ) )
+
+    if ( !AwsSDKMemoryManager::getInstance().reserveMemory( size ) )
     {
-        FWE_LOG_ERROR( "Not sending out the message  with size " + std::to_string( size ) +
+        FWE_LOG_ERROR( "Not sending out the message with size " + std::to_string( size ) +
                        " because IoT device SDK allocated the maximum defined memory. Payload will be stored" );
 
         if ( collectionSchemeParams.persist )
@@ -304,8 +297,8 @@ AwsGGChannel::sendFile( const std::string &filePath, size_t size, CollectionSche
 
     if ( !AwsSDKMemoryManager::getInstance().reserveMemory( size ) )
     {
-        FWE_LOG_ERROR( "Not sending out the message  with size " + std::to_string( size ) +
-                       " because IoT device SDK allocated the maximum defined memory. Currently allocated " );
+        FWE_LOG_ERROR( "Not sending out the message with size " + std::to_string( size ) +
+                       " because IoT device SDK allocated the maximum defined memory" );
         {
             if ( collectionSchemeParams.persist )
             {
@@ -394,7 +387,7 @@ bool
 AwsGGChannel::unsubscribe()
 {
     std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
-    if ( mSubscribed && isAliveNotThreadSafe() )
+    if ( isAliveNotThreadSafe() )
     {
         mSubscribeOperation->Close().wait();
         mSubscribed = false;

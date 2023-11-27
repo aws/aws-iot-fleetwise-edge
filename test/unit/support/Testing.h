@@ -13,13 +13,13 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-TimePoint
+inline TimePoint
 operator+( const TimePoint &time, Timestamp increment )
 {
     return { time.systemTimeMs + increment, time.monotonicTimeMs + increment };
 }
 
-TimePoint &
+inline TimePoint &
 operator+=( TimePoint &time, Timestamp increment )
 {
     time.systemTimeMs += increment;
@@ -27,14 +27,14 @@ operator+=( TimePoint &time, Timestamp increment )
     return time;
 }
 
-TimePoint
+inline TimePoint
 operator++( TimePoint &time, int )
 {
     time += 1;
     return time;
 }
 
-bool
+inline bool
 operator==( const TimePoint &left, const TimePoint &right )
 {
     return left.systemTimeMs == right.systemTimeMs && left.monotonicTimeMs == right.monotonicTimeMs;
@@ -138,7 +138,7 @@ const auto allSignalTypes = testing::Values( SignalType::UINT8,
 const auto signedSignalTypes = testing::Values(
     SignalType::INT8, SignalType::INT16, SignalType::INT32, SignalType::INT64, SignalType::FLOAT, SignalType::DOUBLE );
 
-void
+inline void
 assertSignalValue( const SignalValueWrapper &signalValueWrapper,
                    double expectedSignalValue,
                    SignalType expectedSignalType )
@@ -193,7 +193,7 @@ assertSignalValue( const SignalValueWrapper &signalValueWrapper,
  * @param info
  * @return A string that can be used as the parameter name
  */
-std::string
+inline std::string
 signalTypeToString( const testing::TestParamInfo<SignalType> &info )
 {
     SignalType signalType = info.param;
@@ -226,17 +226,17 @@ signalTypeToString( const testing::TestParamInfo<SignalType> &info )
     }
 }
 
-std::size_t operator""_KiB( unsigned long long sizeBytes )
+constexpr inline std::size_t operator""_KiB( unsigned long long sizeBytes )
 {
     return static_cast<size_t>( sizeBytes * 1024 );
 }
 
-std::size_t operator""_MiB( unsigned long long sizeBytes )
+constexpr inline std::size_t operator""_MiB( unsigned long long sizeBytes )
 {
     return static_cast<size_t>( sizeBytes * 1024 * 1024 );
 }
 
-std::size_t operator""_GiB( unsigned long long sizeBytes )
+constexpr inline std::size_t operator""_GiB( unsigned long long sizeBytes )
 {
     return static_cast<size_t>( sizeBytes * 1024 * 1024 * 1024 );
 }

@@ -19,7 +19,14 @@ PayloadManager::PayloadManager( std::shared_ptr<CacheAndPersist> persistencyPtr 
 }
 
 bool
-PayloadManager::storeData( const std::uint8_t *buf, size_t size, const CollectionSchemeParams &collectionSchemeParams )
+PayloadManager::storeData( const std::uint8_t *buf,
+                           size_t size,
+                           const CollectionSchemeParams &collectionSchemeParams
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                           ,
+                           const S3UploadParams &s3UploadParams
+#endif
+)
 {
     if ( mPersistencyPtr == nullptr )
     {
@@ -35,6 +42,13 @@ PayloadManager::storeData( const std::uint8_t *buf, size_t size, const Collectio
     }
 
     std::string filename;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    if ( s3UploadParams != S3UploadParams() )
+    {
+        filename = s3UploadParams.objectName;
+    }
+    else
+#endif
     {
         filename = std::to_string( collectionSchemeParams.eventID ) + "-" +
                    std::to_string( collectionSchemeParams.triggerTime ) + ".bin";
@@ -55,20 +69,64 @@ PayloadManager::storeData( const std::uint8_t *buf, size_t size, const Collectio
     FWE_LOG_TRACE( "Payload of size : " + std::to_string( size ) + " Bytes has been successfully persisted in file " +
                    filename );
 
-    storeMetadata( filename, size, collectionSchemeParams );
+    storeMetadata( filename,
+                   size,
+                   collectionSchemeParams
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                   ,
+                   s3UploadParams
+#endif
+    );
     return true;
 }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+bool
+PayloadManager::storeIonData( std::unique_ptr<std::streambuf> streambuf, std::string filename )
+{
+    if ( streambuf == nullptr )
+    {
+        FWE_LOG_ERROR( "No stream provided" );
+        return false;
+    }
+
+    ErrorCode writeStatus = mPersistencyPtr->write( std::move( streambuf ), DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
+    if ( writeStatus != ErrorCode::SUCCESS )
+    {
+        FWE_LOG_ERROR( "Failed to persist collected data on disk" );
+        return false;
+    }
+
+    FWE_LOG_TRACE( "Payload has been successfully persisted in file " + filename );
+    return true;
+}
+#endif
 
 void
 PayloadManager::storeMetadata( const std::string filename,
                                size_t size,
-                               const CollectionSchemeParams &collectionSchemeParams )
+                               const CollectionSchemeParams &collectionSchemeParams
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                               ,
+                               const S3UploadParams &s3UploadParams
+#endif
+)
 {
     std::lock_guard<std::mutex> lock( mMetadataMutex );
     Json::Value metadata;
     metadata["filename"] = filename;
     metadata["payloadSize"] = static_cast<Json::Value::UInt64>( size );
     metadata["compressionRequired"] = collectionSchemeParams.compression;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    if ( s3UploadParams != S3UploadParams() )
+    {
+        metadata["s3UploadMetadata"]["bucketName"] = s3UploadParams.bucketName;
+        metadata["s3UploadMetadata"]["bucketOwner"] = s3UploadParams.bucketOwner;
+        metadata["s3UploadMetadata"]["region"] = s3UploadParams.region;
+        metadata["s3UploadMetadata"]["uploadID"] = s3UploadParams.uploadID;
+        metadata["s3UploadMetadata"]["partNumber"] = s3UploadParams.multipartID;
+    }
+#endif
     mPersistencyPtr->addMetadata( metadata );
     FWE_LOG_TRACE( "Metadata for file " + filename + " has been successfully added" );
 }

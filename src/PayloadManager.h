@@ -12,10 +12,45 @@
 #include <mutex>
 #include <string>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include <streambuf>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
 {
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+/**
+ * @brief Struct that specifies the persistence and transmission attributes
+ *        for the S3 upload
+ */
+struct S3UploadParams
+{
+    std::string region{ "" };      // bucket region, set on the campaign level, attribute of S3 client
+    std::string bucketName{ "" };  // bucket name, set on the campaign level, attribute of S3 request
+    std::string bucketOwner{ "" }; // bucket owner account ID, set on the campaign level, attribute of S3 request
+    std::string objectName{ "" };  // object key, attribute of S3 request
+    std::string uploadID{ "" };    // upload ID of the multipart upload
+    uint16_t multipartID{ 0 }; // multipartID of a single part of the multipart upload, allowed values are 1 to 10000
+
+public:
+    bool
+    operator==( const S3UploadParams &other ) const
+    {
+        return ( bucketName == other.bucketName ) && ( bucketOwner == other.bucketOwner ) &&
+               ( objectName == other.objectName ) && ( region == other.region ) && ( uploadID == other.uploadID ) &&
+               ( multipartID == other.multipartID );
+    }
+
+    bool
+    operator!=( const S3UploadParams &other ) const
+    {
+        return !( *this == other );
+    }
+};
+#endif
 
 /**
  * @brief Class that handles offline data storage/retrieval and data compression before transmission
@@ -37,7 +72,26 @@ public:
         size_t size,                                         /**< size number of accessible bytes in buf */
         const CollectionSchemeParams &collectionSchemeParams /**< object containing collectionScheme related
                                                                        metadata for data persistency and transmission */
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        ,
+        const struct S3UploadParams &s3UploadParams =
+            S3UploadParams() /**< object containing metadata related to the S3 upload for data persistency and
+                                transmission. If object is not passed or contains default values, no S3 related
+                                parameters are written to the JSON metadata file. */
+#endif
     );
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief Calls CacheAndPersist module to write the Ion file
+     *
+     * @param streambuf  stream with the Ion data
+     * @param filename full name of the file to store
+     *
+     * @return true if data was persisted and metadata was added, else false
+     */
+    virtual bool storeIonData( std::unique_ptr<std::streambuf> streambuf, std::string filename );
+#endif
 
     /**
      * @brief Constructs and writes payload metadata JSON object.
@@ -46,13 +100,20 @@ public:
         const std::string filename, /**< filename file to construct metadata for */
         size_t size,                /**< size of the payload */
         const CollectionSchemeParams
-            &collectionSchemeParams /**< collectionSchemeParams object containing
-                                         collectionScheme related metadata for data persistency and transmission */
+            &collectionSchemeParams /**< collectionSchemeParams object containing collectionScheme
+                                       related metadata for data persistency and transmission */
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        ,
+        const struct S3UploadParams &s3UploadParams =
+            S3UploadParams() /**< object containing metadata related to the S3 upload for data persistency and
+                                transmission. If object is not passed or contains default values, no S3 related
+                                parameters are written to the JSON metadata file. */
+#endif
     );
 
     /**
-     * @brief Retrieves metadata for all persisted files from the JSON file and removes extracted metadata from the JSON
-     * file.
+     * @brief Retrieves metadata for all persisted files from the JSON file and removes extracted metadata from the
+     * JSON file.
      *
      * @param files JSON object for all persisted files
      *

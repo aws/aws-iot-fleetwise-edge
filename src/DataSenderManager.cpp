@@ -13,24 +13,54 @@
 #include <utility>
 #include <vector>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "S3Sender.h"
+#include "SignalTypes.h"
+#include "StreambufBuilder.h"
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
+namespace
+{
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+constexpr char DEFAULT_KEY_SUFFIX[] = ".10n"; // Ion is the only supported format
+#endif
+} // namespace
+
 DataSenderManager::DataSenderManager( std::shared_ptr<ISender> mqttSender,
                                       std::shared_ptr<PayloadManager> payloadManager,
                                       CANInterfaceIDTranslator &canIDTranslator,
-                                      unsigned transmitThreshold )
+                                      unsigned transmitThreshold
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                                      ,
+                                      std::shared_ptr<S3Sender> s3Sender,
+                                      std::shared_ptr<DataSenderIonWriter> ionWriter,
+                                      std::string vehicleName
+#endif
+                                      )
     : mMQTTSender( std::move( mqttSender ) )
     , mPayloadManager( std::move( payloadManager ) )
     , mProtoWriter( canIDTranslator )
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    , mIonWriter( std::move( ionWriter ) )
+    , mS3Sender{ std::move( s3Sender ) }
+    , mVehicleName( std::move( vehicleName ) )
+#endif
 {
     mTransmitThreshold = ( transmitThreshold > 0U ) ? transmitThreshold : UINT_MAX;
 }
 
 void
-DataSenderManager::processCollectedData( const TriggeredCollectionSchemeDataPtr triggeredCollectionSchemeDataPtr )
+DataSenderManager::processCollectedData( const TriggeredCollectionSchemeDataPtr triggeredCollectionSchemeDataPtr
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                                         ,
+                                         std::function<void( TriggeredCollectionSchemeDataPtr )> reportUploadCallback
+#endif
+)
 {
     if ( triggeredCollectionSchemeDataPtr == nullptr )
     {
@@ -41,6 +71,9 @@ DataSenderManager::processCollectedData( const TriggeredCollectionSchemeDataPtr 
     setCollectionSchemeParameters( triggeredCollectionSchemeDataPtr );
 
     transformTelemetryDataToProto( triggeredCollectionSchemeDataPtr );
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    transformVisionSystemDataToIon( triggeredCollectionSchemeDataPtr, reportUploadCallback );
+#endif
 }
 
 void
@@ -65,6 +98,11 @@ DataSenderManager::transformTelemetryDataToProto(
     // Iterate through all the signals and add to the protobuf
     for ( const auto &signal : triggeredCollectionSchemeDataPtr->signals )
     {
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        // Filter out the raw data and internal signals
+        if ( ( signal.value.type != SignalType::RAW_DATA_BUFFER_HANDLE ) &&
+             ( ( signal.signalID & INTERNAL_SIGNAL_ID_BITMASK ) == 0 ) )
+#endif
         {
             appendMessageToProto( triggeredCollectionSchemeDataPtr, signal );
         }
@@ -95,6 +133,13 @@ DataSenderManager::transformTelemetryDataToProto(
         appendMessageToProto( triggeredCollectionSchemeDataPtr, triggeredCollectionSchemeDataPtr->mGeohashInfo );
     }
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    for ( const auto &object : triggeredCollectionSchemeDataPtr->uploadedS3Objects )
+    {
+        appendMessageToProto( triggeredCollectionSchemeDataPtr, object );
+    }
+#endif
+
     // Serialize and transmit any remaining messages
     if ( mProtoWriter.getVehicleDataMsgCount() >= 1U )
     {
@@ -102,6 +147,105 @@ DataSenderManager::transformTelemetryDataToProto(
         uploadProto();
     }
 }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+void
+DataSenderManager::onChangeCollectionSchemeList(
+    const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes )
+{
+    FWE_LOG_INFO( "New active collection scheme list was handed over to Data Sender" );
+    mActiveCollectionSchemes = activeCollectionSchemes;
+}
+
+S3UploadMetadata
+DataSenderManager::getS3UploadMetadataForCollectionScheme( const std::string &collectionSchemeID )
+{
+    if ( mActiveCollectionSchemes != nullptr )
+    {
+        for ( const auto &scheme : mActiveCollectionSchemes->activeCollectionSchemes )
+        {
+            if ( scheme->getCollectionSchemeID() == collectionSchemeID )
+            {
+                return scheme->getS3UploadMetadata();
+            }
+        }
+    }
+    return S3UploadMetadata();
+}
+
+void
+DataSenderManager::transformVisionSystemDataToIon(
+    const TriggeredCollectionSchemeDataPtr &triggeredCollectionSchemeDataPtr,
+    std::function<void( TriggeredCollectionSchemeDataPtr uploadedData )> uploadedDataCallback )
+{
+    if ( triggeredCollectionSchemeDataPtr->signals.empty() )
+    {
+        return;
+    }
+    if ( mS3Sender == nullptr )
+    {
+        FWE_LOG_ERROR( "Can not send data to S3 as S3Sender is not initalized. Please make sure config parameters in "
+                       "section credentialsProvider are correct" );
+        return;
+    }
+    if ( mIonWriter == nullptr )
+    {
+        FWE_LOG_WARN( "IonWriter is not set for the upload to S3" );
+        return;
+    }
+    bool rawDataAvailableToSend = false;
+    bool vehicleDataIsSet = false;
+    // Append signals with raw data to Ion file
+    for ( const auto &signal : triggeredCollectionSchemeDataPtr->signals )
+    {
+        if ( signal.value.type != SignalType::RAW_DATA_BUFFER_HANDLE )
+        {
+            continue;
+        }
+        rawDataAvailableToSend = true;
+        if ( !vehicleDataIsSet )
+        {
+            vehicleDataIsSet = true;
+            // Setup the next Ion file data only once
+            mIonWriter->setupVehicleData( triggeredCollectionSchemeDataPtr );
+        }
+        mIonWriter->append( signal );
+    }
+    if ( !rawDataAvailableToSend )
+    {
+        return;
+    }
+
+    auto s3UploadMetadata =
+        getS3UploadMetadataForCollectionScheme( triggeredCollectionSchemeDataPtr->metadata.collectionSchemeID );
+    if ( s3UploadMetadata == S3UploadMetadata() )
+    {
+        FWE_LOG_WARN( "Collection scheme " + triggeredCollectionSchemeDataPtr->metadata.collectionSchemeID +
+                      " no longer active" );
+        return;
+    }
+
+    // Get stream for the Ion file and upload it with S3 sender
+    auto streambufBuilder = mIonWriter->getStreambufBuilder();
+
+    std::string objectKey = s3UploadMetadata.prefix + std::to_string( triggeredCollectionSchemeDataPtr->eventID ) +
+                            "-" + std::to_string( triggeredCollectionSchemeDataPtr->triggerTime ) +
+                            &DEFAULT_KEY_SUFFIX[0];
+    auto resultCallback = [objectKey, triggeredCollectionSchemeDataPtr, uploadedDataCallback]( bool success ) -> void {
+        if ( !success )
+        {
+            return;
+        }
+        auto collectedData = std::make_shared<TriggeredCollectionSchemeData>();
+        collectedData->metadata = triggeredCollectionSchemeDataPtr->metadata;
+        collectedData->eventID = triggeredCollectionSchemeDataPtr->eventID;
+        collectedData->triggerTime = triggeredCollectionSchemeDataPtr->triggerTime;
+        collectedData->uploadedS3Objects.push_back( UploadedS3Object{ objectKey, UploadedS3ObjectDataFormat::Cdr } );
+        uploadedDataCallback( collectedData );
+    };
+    mS3Sender->sendStream( std::move( streambufBuilder ), s3UploadMetadata, objectKey, resultCallback );
+}
+#endif
 
 bool
 DataSenderManager::serialize( std::string &output )

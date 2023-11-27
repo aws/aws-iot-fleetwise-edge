@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR=$(dirname $(realpath "$0"))
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 source ${SCRIPT_DIR}/install-deps-versions.sh
 
 NATIVE_PREFIX="/usr/local/`gcc -dumpmachine`"
@@ -36,6 +36,10 @@ parse_args() {
 
 parse_args "$@"
 
+if [ -z "${FWE_ADDITIONAL_CMAKE_ARGS+x}" ]; then
+    FWE_ADDITIONAL_CMAKE_ARGS=""
+fi
+
 export PATH=/usr/local/android_sdk/cmake/${VERSION_CMAKE}/bin:${NATIVE_PREFIX}/bin:${PATH}
 mkdir -p build && cd build
 
@@ -47,11 +51,11 @@ build() {
     LDFLAGS=-L/usr/local/${HOST_PLATFORM}/lib cmake \
         -DFWE_STATIC_LINK=On \
         -DFWE_STRIP_SYMBOLS=On \
-        -DFWE_FEATURE_CUSTOM_DATA_SOURCE=On \
         -DFWE_FEATURE_EXTERNAL_GPS=On \
         -DFWE_FEATURE_AAOS_VHAL=On \
         -DFWE_BUILD_EXECUTABLE=Off \
         -DFWE_BUILD_ANDROID_SHARED_LIBRARY=On \
+        ${FWE_ADDITIONAL_CMAKE_ARGS} \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_TESTING=Off \
         -DANDROID_ABI=${TARGET_ARCH} \

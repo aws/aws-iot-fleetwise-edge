@@ -13,97 +13,135 @@
     "networkInterfaces": {
       "description": "HW network interface information for decoding signals",
       "type": "array",
-      "anyOf": [
-        {
-          "required": ["canInterface"]
-        },
-        {
-          "required": ["obdInterface"]
-        }
-      ],
-      "properties": {
-        "canInterface": {
-          "type": "object",
-          "additionalProperties": false,
-          "description": "CAN Signal network interface information",
-          "items": {
-            "$ref": "#/definitions/canInterface"
-          }
-        },
-        "obdInterface": {
-          "type": "object",
-          "additionalProperties": false,
-          "description": "OBD Signal network interface information",
-          "items": {
-            "$ref": "#/definitions/obdInterface"
-          }
-        },
-        "interfaceId": {
-          "type": "string",
-          "description": "Every CAN/OBD signal decoder is associated with a signal/OBD network interface using a unique Id"
-        },
-        "type": {
-          "type": "string",
-          "description": "Specifies the interface type- CAN, OBD, etc"
-        }
-      },
-      "definitions": {
-        "canInterface": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "interfaceName": {
-              "type": "string",
-              "description": "Interface name for CAN channel"
+      "additionalProperties": false,
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "canInterface": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "interfaceName": {
+                    "type": "string",
+                    "description": "Interface name for CAN channel"
+                  },
+                  "protocolName": {
+                    "type": "string",
+                    "description": "Protocol used- CAN or CAN FD"
+                  },
+                  "protocolVersion": {
+                    "type": "string",
+                    "description": "Protocol version used- CAN 2.0A, 2.0B"
+                  },
+                  "timestampType": {
+                    "type": "string",
+                    "description": "Defines which timestamp type should be used: Software, Hardware or Polling. Default is Software"
+                  }
+                },
+                "required": ["interfaceName", "protocolName", "protocolVersion"]
+              },
+              "interfaceId": {
+                "type": "string",
+                "description": "Every CAN/OBD signal decoder is associated with a signal/OBD network interface using a unique Id"
+              },
+              "type": {
+                "type": "string",
+                "description": "Specifies the interface type- CAN, OBD, ROS2 etc"
+              }
             },
-            "protocolName": {
-              "type": "string",
-              "description": "Protocol used- CAN or CAN FD"
-            },
-            "protocolVersion": {
-              "type": "string",
-              "description": "Protocol version used- CAN 2.0A, 2.0B"
-            },
-            "timestampType": {
-              "type": "string",
-              "description": "Defines which timestamp type should be used: Software, Hardware or Polling. Default is Software"
-            }
+            "required": ["canInterface", "interfaceId", "type"]
           },
-          "required": ["interfaceName", "protocolName", "protocolVersion"]
-        },
-        "obdInterface": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "interfaceName": {
-              "type": "string",
-              "description": "CAN Interface Name where the OBD stack on the ECU is running"
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "obdInterface": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "interfaceName": {
+                    "type": "string",
+                    "description": "CAN Interface Name where the OBD stack on the ECU is running"
+                  },
+                  "obdStandard": {
+                    "type": "string",
+                    "description": "OBD Standard (eg. J1979 or Enhanced (for advanced standards))"
+                  },
+                  "pidRequestIntervalSeconds": {
+                    "type": "integer",
+                    "description": "Interval used to schedule PID requests (in seconds)"
+                  },
+                  "dtcRequestIntervalSeconds": {
+                    "type": "integer",
+                    "description": "Interval  used to schedule DTC requests (in seconds)"
+                  },
+                  "broadcastRequests": {
+                    "type": "boolean",
+                    "description": "Specifies whether OBD requests should be sent in broadcast (functional) mode, rather than the unicast (physical) mode"
+                  }
+                },
+                "required": [
+                  "interfaceName",
+                  "obdStandard",
+                  "pidRequestIntervalSeconds",
+                  "dtcRequestIntervalSeconds",
+                  "broadcastRequests"
+                ]
+              },
+              "interfaceId": {
+                "type": "string",
+                "description": "Every CAN/OBD signal decoder is associated with a signal/OBD network interface using a unique Id"
+              },
+              "type": {
+                "type": "string",
+                "description": "Specifies the interface type- CAN, OBD, ROS2 etc"
+              }
             },
-            "obdStandard": {
-              "type": "string",
-              "description": "OBD Standard (eg. J1979 or Enhanced (for advanced standards))"
-            },
-            "pidRequestIntervalSeconds": {
-              "type": "integer",
-              "description": "Interval used to schedule PID requests (in seconds)"
-            },
-            "dtcRequestIntervalSeconds": {
-              "type": "integer",
-              "description": "Interval  used to schedule DTC requests (in seconds)"
-            },
-            "broadcastRequests": {
-              "type": "boolean",
-              "description": "Specifies whether OBD requests should be sent in broadcast (functional) mode, rather than the unicast (physical) mode"
-            }
+            "required": ["obdInterface", "interfaceId", "type"]
           },
-          "required": [
-            "interfaceName",
-            "obdStandard",
-            "pidRequestIntervalSeconds",
-            "dtcRequestIntervalSeconds",
-            "broadcastRequests"
-          ]
-        }
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "ros2Interface": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "subscribeQueueLength": {
+                    "type": "integer",
+                    "description": "For every topic this ROS2 Interface will subscribe subscribeQueueLength will be used to construct QoS. This means how many historic messages can be queued before being replaced"
+                  },
+                  "executorThreads": {
+                    "type": "integer",
+                    "description": "How many threads will be used for the ROS2 MultiThreadedExecutor"
+                  },
+                  "introspectionLibraryCompare": {
+                    "type": "string",
+                    "enum": ["ErrorAndFail", "Warn", "Ignore"],
+                    "description": "The ROS2 introspection library provides type information at compile time. This can differ from the type information received from cloud. A difference can lead to misinterpreted data on edge and in the cloud. This will only detect type differences but not renames of fields. This field defines how to handle a difference: ErrorAndFail, Warn or Ignore."
+                  }
+                },
+                "required": [
+                  "subscribeQueueLength",
+                  "executorThreads",
+                  "introspectionLibraryCompare"
+                ]
+              },
+              "interfaceId": {
+                "type": "string",
+                "description": "Every CAN/OBD/ROS signal decoder is associated with a network interface using a unique Id. This must match the interface Id configured in the cloud"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["ros2Interface"]
+              }
+            },
+            "required": ["ros2Interface", "interfaceId", "type"]
+          }
+        ]
       }
     },
     "staticConfig": {
@@ -117,18 +155,18 @@
           "properties": {
             "dtcBufferSize": {
               "type": "integer",
-              "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer. This is a single producer single consumer buffer."
+              "description": "(Deprecated) decodedSignalsBufferSize is used for all signals."
             },
             "decodedSignalsBufferSize": {
               "type": "integer",
-              "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer for OBD and CAN signals.This is a multiple producer single consumer buffer."
+              "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer for OBD and CAN signals, raw CAN frames, active DTCs, and Vision System Data. This is a multiple producer single consumer buffer."
             },
             "rawCANFrameBufferSize": {
               "type": "integer",
-              "description": "Max size of the buffer shared between Network Channel Consumer and data collection module ( Collection Engine). This buffer stores raw CAN frames coming in from the CAN Bus. This is a lock-free multi-producer single consumer buffer. "
+              "description": "(Deprecated) decodedSignalsBufferSize is used for all signals."
             }
           },
-          "required": ["dtcBufferSize", "decodedSignalsBufferSize", "rawCANFrameBufferSize"]
+          "required": ["decodedSignalsBufferSize"]
         },
         "threadIdleTimes": {
           "type": "object",
@@ -225,6 +263,7 @@
         },
         "mqttConnection": {
           "type": "object",
+          "description": "Currently all primitive data types will be ingested over MQTT",
           "additionalProperties": false,
           "properties": {
             "endpointUrl": {
@@ -319,6 +358,113 @@
               ]
             }
           ]
+        },
+        "credentialsProvider": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "To access APIs directly over HTTP the AWS IoT Core Credential Provider is used to get the credentials over MQTT. If only MQTT is used for ingesting data this section is not needed",
+          "properties": {
+            "endpointUrl": {
+              "type": "string",
+              "description": "AWS IoT Core Credential Provider endpoint to use"
+            },
+            "roleAlias": {
+              "type": "string",
+              "description": "This role alias will be used to access APIs"
+            }
+          },
+          "required": ["roleAlias", "endpointUrl"]
+        },
+        "s3Upload": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Configuration parameters for S3 upload",
+          "properties": {
+            "maxEnvelopeSize": {
+              "type": "integer",
+              "description": "Max size of envelope (group of collected messages) for S3 upload in bytes"
+            },
+            "maxConnections": {
+              "type": "integer",
+              "description": "Specifies the maximum number of HTTP connections to a single S3 server"
+            },
+            "multipartSize": {
+              "type": "integer",
+              "description": "Size of part for S3 multipart upload in bytes. S3 limitation is 5 MiB to 5 GiB"
+            }
+          },
+          "required": ["maxEnvelopeSize", "maxConnections", "multipartSize"]
+        },
+        "visionSystemDataCollection": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Configuration parameters for Vision System Data collection",
+          "properties": {
+            "rawDataBuffer": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Configuration parameters for raw data buffer used to store samples of complex signals",
+              "properties": {
+                "maxSize": {
+                  "type": "integer",
+                  "description": "Size (bytes) of memory allocated for raw data buffer manager"
+                },
+                "reservedSizePerSignal": {
+                  "type": "integer",
+                  "description": "Size (bytes) of memory that will be reserved for each signal. This won't be available to other signals, even if it is unused."
+                },
+                "maxSamplesPerSignal": {
+                  "type": "integer",
+                  "description": "Max number of samples that will be stored in the raw data buffer for each signal"
+                },
+                "maxSizePerSample": {
+                  "type": "integer",
+                  "description": "Max size (bytes) of memory that can be used by a single sample. Larger samples will be discarded."
+                },
+                "maxSizePerSignal": {
+                  "type": "integer",
+                  "description": "Max size (bytes) of memory that can be used for each signal"
+                },
+                "overridesPerSignal": {
+                  "type": "array",
+                  "description": "List of config overrides for specific signals",
+                  "additionalProperties": false,
+                  "items": {
+                    "type": "object",
+                    "description": "Configuration parameters for raw data buffer that should be applied to a specific signal",
+                    "additionalProperties": false,
+                    "properties": {
+                      "interfaceId": {
+                        "type": "string",
+                        "description": "That is the interfaceId that is associated to the signal. Together with messageId, it uniquely identifies this signal."
+                      },
+                      "messageId": {
+                        "type": "string",
+                        "description": "This is the messageId passed in the decoder manifest. Together with interfaceId, it uniquely identifies this signal."
+                      },
+                      "reservedSize": {
+                        "type": "integer",
+                        "description": "Size (bytes) of memory that will be reserved for this signal. This won't be available to other signals, even if it is unused."
+                      },
+                      "maxSamples": {
+                        "type": "integer",
+                        "description": "Max number of samples that will be stored in the raw data buffer for this signal"
+                      },
+                      "maxSizePerSample": {
+                        "type": "integer",
+                        "description": "Max size (bytes) of memory that can be used by a single sample of this signal. Larger samples will be discarded."
+                      },
+                      "maxSize": {
+                        "type": "integer",
+                        "description": "Max size (bytes) of memory that can be used for this signal"
+                      }
+                    },
+                    "required": ["interfaceId", "messageId"]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "required": [

@@ -2,9 +2,10 @@
 
 cmake_minimum_required(VERSION 3.10.2)
 
-project(iotfleetwise VERSION 1.0.8)
+project(iotfleetwise VERSION 1.1.0)
 
 # FWE uses C++14 for compatibility reasons with Automotive middlewares (Adaptive AUTOSAR, ROS2)
+# Note: When built with FWE_FEATURE_ROS2, colcon will override these settings
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
@@ -28,19 +29,35 @@ option(FWE_FEATURE_CUSTOM_DATA_SOURCE "Include the custom data source interface"
 option(FWE_FEATURE_IWAVE_GPS "Include the IWave GPS example for a custom data source" OFF)
 option(FWE_FEATURE_EXTERNAL_GPS "Include the external GPS example for a custom data source" OFF)
 option(FWE_FEATURE_AAOS_VHAL "Include the Android Automotive VHAL example for a custom data source" OFF)
+option(FWE_FEATURE_VISION_SYSTEM_DATA "Include support for vision-system-data sources" OFF)
+option(FWE_FEATURE_ROS2 "Include support for ROS2 as a vision-system-data source. Implies FWE_FEATURE_VISION_SYSTEM_DATA." OFF)
 option(FWE_BUILD_EXECUTABLE "Build the executable, otherwise build a library" ON)
 option(FWE_BUILD_ANDROID_SHARED_LIBRARY "Build the android shared library" OFF)
 if(FWE_FEATURE_IWAVE_GPS)
+  set(FWE_FEATURE_CUSTOM_DATA_SOURCE ON FORCE)
   add_compile_options("-DFWE_FEATURE_IWAVE_GPS")
 endif()
 if(FWE_FEATURE_EXTERNAL_GPS)
+  set(FWE_FEATURE_CUSTOM_DATA_SOURCE ON FORCE)
   add_compile_options("-DFWE_FEATURE_EXTERNAL_GPS")
 endif()
 if(FWE_FEATURE_AAOS_VHAL)
+  set(FWE_FEATURE_CUSTOM_DATA_SOURCE ON FORCE)
   add_compile_options("-DFWE_FEATURE_AAOS_VHAL")
 endif()
 if(FWE_FEATURE_GREENGRASSV2)
   add_compile_options("-DFWE_FEATURE_GREENGRASSV2")
+endif()
+if(FWE_FEATURE_ROS2)
+  set(FWE_FEATURE_VISION_SYSTEM_DATA ON FORCE)
+  add_compile_options("-DFWE_FEATURE_ROS2")
+  find_package(ament_cmake REQUIRED)
+  find_package(rclcpp REQUIRED)
+  find_package(fastcdr REQUIRED)
+  ament_package()
+endif()
+if(FWE_FEATURE_VISION_SYSTEM_DATA)
+  add_compile_options("-DFWE_FEATURE_VISION_SYSTEM_DATA;-DDECNUMDIGITS=34")
 endif()
 
 # Define the default build type
@@ -79,6 +96,7 @@ configure_file(src/IoTFleetWiseVersion.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/IoTFle
 # Protobuf
 find_package(Protobuf REQUIRED)
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
+  interfaces/protobuf/schemas/cloudToEdge/common_types.proto
   interfaces/protobuf/schemas/cloudToEdge/collection_schemes.proto
   interfaces/protobuf/schemas/cloudToEdge/decoder_manifest.proto
   interfaces/protobuf/schemas/edgeToCloud/checkin.proto
@@ -95,6 +113,7 @@ target_include_directories(fwe-proto PUBLIC
 set_source_files_properties(${PROTO_SRCS} PROPERTIES COMPILE_FLAGS "-Wno-conversion -Wno-pedantic")
 
 set(HEADER_FILES
+  src/Assert.h
   src/AwsBootstrap.h
   src/AwsIotChannel.h
   src/AwsIotConnectivityModule.h
@@ -156,7 +175,6 @@ set(HEADER_FILES
   src/MemoryUsageInfo.h
   src/MessageTypes.h
   src/MqttClientWrapper.h
-  src/MqttConnectionWrapper.h
   src/OBDDataDecoder.h
   src/OBDDataTypes.h
   src/OBDOverCANECU.h
@@ -168,6 +186,7 @@ set(HEADER_FILES
   src/SchemaListener.h
   src/Signal.h
   src/SignalTypes.h
+  src/StreambufBuilder.h
   src/Thread.h
   src/Timer.h
   src/TimeTypes.h
@@ -220,6 +239,7 @@ set(SRC_FILES
   src/Thread.cpp
   src/TraceModule.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/IoTFleetWiseVersion.cpp
+  $<TARGET_OBJECTS:fwe-proto>
 )
 
 # Test files
@@ -229,7 +249,6 @@ set(TEST_FILES
   test/unit/CANDataSourceTest.cpp
   test/unit/CANDecoderTest.cpp
   test/unit/CheckinAndPersistencyTest.cpp
-  test/unit/ClockHandlerBenchmarkTest.cpp
   test/unit/ClockHandlerTest.cpp
   test/unit/CollectionInspectionEngineTest.cpp
   test/unit/CollectionInspectionWorkerThreadTest.cpp
@@ -260,7 +279,7 @@ set(TEST_FILES
   test/unit/WaitUntilTest.cpp
 )
 
-set(BENCHMARK_FILES # Also in list TEST_FILES above, but will be tested using Benchmark
+set(BENCHMARK_TEST_FILES
   test/unit/ClockHandlerBenchmarkTest.cpp
 )
 
@@ -289,11 +308,33 @@ if(FWE_FEATURE_GREENGRASSV2)
   set(SRC_FILES ${SRC_FILES} src/AwsGGConnectivityModule.cpp src/AwsGGChannel.cpp)
   set(HEADER_FILES ${HEADER_FILES} src/AwsGGChannel.h src/AwsGGConnectivityModule.h)
 endif()
-if(FWE_TEST_FAKETIME)
-  set(TEST_FILES ${TEST_FILES} test/unit/FakeSystemTimeTest.cpp)
-  set(FAKETIME_FILES # Also in list TEST_FILES above, but will be tested using FakeTime
-    test/unit/FakeSystemTimeTest.cpp
+if(FWE_FEATURE_VISION_SYSTEM_DATA)
+  set(SRC_FILES ${SRC_FILES}
+    src/Credentials.cpp
+    src/DataSenderIonWriter.cpp
+    src/RawDataManager.cpp
+    src/S3Sender.cpp
   )
+  set(TEST_FILES ${TEST_FILES}
+    test/unit/CredentialsTest.cpp
+    test/unit/DataSenderIonWriterTest.cpp
+    test/unit/RawDataManagerTest.cpp
+    test/unit/S3SenderTest.cpp
+  )
+  set(HEADER_FILES ${HEADER_FILES}
+    src/Credentials.h
+    src/DataSenderIonWriter.h
+    src/RawDataManager.h
+    src/S3Sender.h
+    src/TransferManagerWrapper.h
+  )
+endif()
+if(FWE_FEATURE_ROS2)
+  set(SRC_FILES ${SRC_FILES} src/ROS2DataSource.cpp)
+  set(HEADER_FILES ${HEADER_FILES} src/ROS2DataSource.h)
+endif()
+if(FWE_TEST_FAKETIME)
+  set(FAKETIME_TEST_FILES test/unit/FakeSystemTimeTest.cpp)
 endif()
 
 # Dependencies
@@ -329,6 +370,9 @@ endif()
 separate_arguments(FWE_AWS_SDK_EXTRA_LIBS)
 
 set(REQUIRED_AWS_SDK_COMPONENTS "core")
+if(FWE_FEATURE_VISION_SYSTEM_DATA)
+  set(REQUIRED_AWS_SDK_COMPONENTS "transfer;s3-crt;${REQUIRED_AWS_SDK_COMPONENTS}")
+endif()
 set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 set(BUILD_SHARED_LIBS ${FWE_AWS_SDK_SHARED_LIBS})
 # Note: this should only be called once
@@ -363,7 +407,22 @@ target_link_libraries(fwe
   ${Protobuf_LIBRARIES}
   Boost::thread
   Boost::filesystem
+  $<$<BOOL:${FWE_FEATURE_ROS2}>:fastcdr>
 )
+
+if(FWE_FEATURE_VISION_SYSTEM_DATA)
+  find_package(IonC)
+  target_link_libraries(fwe
+    $<$<BOOL:${FWE_STATIC_LINK}>:IonC::ionc_static>
+    $<$<BOOL:${FWE_STATIC_LINK}>:IonC::decNumber_static>
+    $<$<NOT:$<BOOL:${FWE_STATIC_LINK}>>:IonC::ionc>
+    $<$<NOT:$<BOOL:${FWE_STATIC_LINK}>>:IonC::decNumber>
+  )
+endif()
+
+if(FWE_FEATURE_ROS2)
+  ament_target_dependencies(fwe rclcpp)
+endif()
 
 # Executable or library output binary
 if(FWE_BUILD_EXECUTABLE)
@@ -428,41 +487,98 @@ set_target_properties(aws-iot-fleetwise-edge fwe fwe-proto
 
 # Unit tests
 if(${BUILD_TESTING})
+
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/unit/support/static-config-ok.json           DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/unit/support/static-config-corrupt.json      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/unit/support/static-config-inline-creds.json DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-  find_package(benchmark REQUIRED)
+
   find_package(GTest REQUIRED)
   find_library(GMOCK_LIB NAMES gmock)
-  foreach(TEST_FILE ${TEST_FILES})
-    get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
-    set(TEST_SRC ${TEST_FILE})
-    set(TEST_LIBS
-      fwe
-      fwe-proto
+  find_package(benchmark REQUIRED)
+
+  # Google Test executable
+  add_executable(fwe-gtest
+    ${TEST_FILES}
+    test/unit/support/main.cpp
+  )
+  target_include_directories(fwe-gtest PUBLIC
+    src
+    test/unit/support
+    ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  target_link_libraries(fwe-gtest
+    fwe
+    fwe-proto
+    ${GMOCK_LIB}
+    GTest::GTest
+  )
+  add_unit_test(fwe-gtest)
+  add_valgrind_test(fwe-gtest)
+
+  # Google Benchmark executable
+  add_executable(fwe-benchmark
+    ${BENCHMARK_TEST_FILES}
+  )
+  target_include_directories(fwe-benchmark PUBLIC
+    src
+    test/unit/support
+    ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  target_link_libraries(fwe-benchmark
+    fwe
+    fwe-proto
+    benchmark::benchmark
+  )
+  add_test(
+    NAME fwe-benchmark
+    COMMAND fwe-benchmark --benchmark_out=benchmark-report.txt --benchmark_out_format=console
+  )
+
+  if(FWE_TEST_FAKETIME)
+    # Faketime test executable
+    add_executable(fwe-faketime
+      ${FAKETIME_TEST_FILES}
+      test/unit/support/main.cpp
     )
-    if(${TEST_FILE} IN_LIST BENCHMARK_FILES)
-      set(TEST_LIBS ${TEST_LIBS} benchmark::benchmark)
-    else()
-      set(TEST_SRC ${TEST_SRC} test/unit/support/main.cpp)
-      set(TEST_LIBS ${TEST_LIBS} ${GMOCK_LIB} GTest::GTest)
-    endif()
-    add_executable(${TEST_NAME} ${TEST_SRC})
-    target_include_directories(${TEST_NAME} PUBLIC
+    target_include_directories(fwe-faketime PUBLIC
       src
       test/unit/support
       ${CMAKE_CURRENT_BINARY_DIR}
     )
-    target_link_libraries(${TEST_NAME} ${TEST_LIBS})
-    if(${TEST_FILE} IN_LIST FAKETIME_FILES)
-      if(FWE_TEST_FAKETIME)
-        add_unit_test_with_faketime(${TEST_NAME})
-      endif()
-    elseif(${TEST_FILE} IN_LIST BENCHMARK_FILES)
-      add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME} --benchmark_out=benchmark-report-${TEST_NAME}.txt --benchmark_out_format=console)
-    else()
-      add_unit_test(${TEST_NAME})
-      add_valgrind_test(${TEST_NAME})
-    endif()
-  endforeach()
+    target_link_libraries(fwe-faketime
+      fwe
+      fwe-proto
+      ${GMOCK_LIB}
+      GTest::GTest
+    )
+    add_unit_test_with_faketime(fwe-faketime)
+  endif()
+
+  # TODO: Special case for ROS2DataSourceTest as it uses compile-time mocking
+  if(FWE_FEATURE_ROS2)
+    add_executable(ROS2DataSourceTest
+      test/unit/ROS2DataSourceTest.cpp
+      src/ROS2DataSource.cpp
+      src/Thread.cpp
+      src/LoggingModule.cpp
+      src/ClockHandler.cpp
+      src/RawDataManager.cpp
+      src/ConsoleLogger.cpp
+      test/unit/support/main.cpp
+    )
+    target_include_directories(ROS2DataSourceTest PUBLIC
+      src
+      test/unit/support
+      ${CMAKE_CURRENT_BINARY_DIR}
+      test/unit/support/ros2-mock-include
+    )
+    target_link_libraries(ROS2DataSourceTest
+      ${JSONCPP_LIBRARY}
+      fastcdr
+      ${GMOCK_LIB}
+      GTest::GTest
+    )
+    add_unit_test(ROS2DataSourceTest)
+    add_valgrind_test(ROS2DataSourceTest)
+  endif()
 endif()

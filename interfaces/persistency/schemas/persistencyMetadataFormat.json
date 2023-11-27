@@ -29,6 +29,33 @@
           "compressionRequired": {
             "type": "boolean",
             "description": "Specifies if payload compression was required by campaign"
+          },
+          "s3UploadMetadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "bucketName": {
+                "type": "string",
+                "description": "S3 bucket name set in campaign"
+              },
+              "bucketOwner": {
+                "type": "string",
+                "description": "Account ID of the bucket owner"
+              },
+              "region": {
+                "type": "string",
+                "description": "Region of S3 bucket set in campaign"
+              },
+              "uploadID": {
+                "type": "string",
+                "description": "Upload ID for multipart upload"
+              },
+              "partNumber": {
+                "type": "number",
+                "description": "ID of multipart for multipart upload"
+              }
+            },
+            "required": ["bucketName", "region"]
           }
         },
         "required": ["filename", "payloadSize", "compressionRequired"]

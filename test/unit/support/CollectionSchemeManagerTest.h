@@ -4,7 +4,7 @@
 
 #include "CacheAndPersist.h"
 #include "CollectionInspectionAPITypes.h"
-#include "CollectionInspectionEngine.h"
+#include "CollectionInspectionWorkerThread.h"
 #include "CollectionSchemeIngestion.h"
 #include "CollectionSchemeIngestionList.h"
 #include "CollectionSchemeManagementListener.h"
@@ -57,13 +57,26 @@ public:
     }
     IDecoderManifestTest(
         std::string id,
-        std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> &formatMap,
+        std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap,
         std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID,
-        std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat )
+        std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        ,
+        std::unordered_map<SignalID, ComplexSignalDecoderFormat> complexSignalMap =
+            std::unordered_map<SignalID, ComplexSignalDecoderFormat>(),
+        std::unordered_map<ComplexDataTypeId, ComplexDataElement> complexDataTypeMap =
+            std::unordered_map<ComplexDataTypeId, ComplexDataElement>()
+#endif
+            )
         : ID( id )
-        , mFormatMap( formatMap )
-        , mSignalToFrameAndNodeID( signalToFrameAndNodeID )
-        , mSignalIDToPIDDecoderFormat( signalIDToPIDDecoderFormat )
+        , mFormatMap( std::move( formatMap ) )
+        , mSignalToFrameAndNodeID( std::move( signalToFrameAndNodeID ) )
+        , mSignalIDToPIDDecoderFormat( std::move( signalIDToPIDDecoderFormat ) )
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        , mComplexSignalMap( std::move( complexSignalMap ) )
+        , mComplexDataTypeMap( std::move( complexDataTypeMap ) )
+#endif
+
     {
     }
 
@@ -99,6 +112,12 @@ public:
         {
             return VehicleDataSourceProtocol::OBD;
         }
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        else if ( signalID < 0xFFFFFF00 )
+        {
+            return VehicleDataSourceProtocol::COMPLEX_DATA;
+        }
+#endif
         else
         {
             return VehicleDataSourceProtocol::INVALID_PROTOCOL;
@@ -114,11 +133,39 @@ public:
         return NOT_FOUND_PID_DECODER_FORMAT;
     }
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    ComplexSignalDecoderFormat
+    getComplexSignalDecoderFormat( SignalID signalID ) const override
+    {
+        auto s = mComplexSignalMap.find( signalID );
+        if ( s == mComplexSignalMap.end() )
+        {
+            return ComplexSignalDecoderFormat();
+        }
+        return s->second;
+    }
+
+    ComplexDataElement
+    getComplexDataType( ComplexDataTypeId typeId ) const override
+    {
+        auto c = mComplexDataTypeMap.find( typeId );
+        if ( c == mComplexDataTypeMap.end() )
+        {
+            return ComplexDataElement( InvalidComplexVariant() );
+        }
+        return c->second;
+    }
+#endif
+
 private:
     std::string ID;
     std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> mFormatMap;
     std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> mSignalToFrameAndNodeID;
     std::unordered_map<SignalID, PIDSignalDecoderFormat> mSignalIDToPIDDecoderFormat;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    std::unordered_map<SignalID, ComplexSignalDecoderFormat> mComplexSignalMap;
+    std::unordered_map<ComplexDataTypeId, ComplexDataElement> mComplexDataTypeMap;
+#endif
 };
 class ICollectionSchemeTest : public CollectionSchemeIngestion
 {
@@ -128,21 +175,40 @@ public:
                            uint64_t start,
                            uint64_t stop,
                            Signals_t signalsIn,
-                           RawCanFrames_t rawCanFrmsIn )
+                           RawCanFrames_t rawCanFrmsIn
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                           ,
+                           PartialSignalIDLookup partialSignalLookup = PartialSignalIDLookup()
+#endif
+                               )
         : collectionSchemeID( collectionSchemeID )
         , decoderManifestID( DMID )
         , startTime( start )
         , expiryTime( stop )
         , signals( signalsIn )
         , rawCanFrms( rawCanFrmsIn )
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        , partialSignalLookup( partialSignalLookup )
+#endif
         , root( nullptr )
     {
     }
-    ICollectionSchemeTest( std::string collectionSchemeID, std::string DMID, uint64_t start, uint64_t stop )
+    ICollectionSchemeTest( std::string collectionSchemeID,
+                           std::string DMID,
+                           uint64_t start,
+                           uint64_t stop
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                           ,
+                           S3UploadMetadata s3UploadMetadata = S3UploadMetadata()
+#endif
+                               )
         : collectionSchemeID( collectionSchemeID )
         , decoderManifestID( DMID )
         , startTime( start )
         , expiryTime( stop )
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        , s3UploadMetadata( s3UploadMetadata )
+#endif
         , root( nullptr )
     {
     }
@@ -196,6 +262,19 @@ public:
         return true;
     }
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    const PartialSignalIDLookup &
+    getPartialSignalIdToSignalPathLookupTable() const override
+    {
+        return partialSignalLookup;
+    }
+    S3UploadMetadata
+    getS3UploadMetadata() const override
+    {
+        return s3UploadMetadata;
+    }
+#endif
+
 private:
     std::string collectionSchemeID;
     std::string decoderManifestID;
@@ -203,6 +282,10 @@ private:
     uint64_t expiryTime;
     Signals_t signals;
     RawCanFrames_t rawCanFrms;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    PartialSignalIDLookup partialSignalLookup;
+    S3UploadMetadata s3UploadMetadata;
+#endif
     ExpressionNode *root;
 };
 
@@ -275,20 +358,20 @@ private:
 };
 
 /* mock Collection Inspection Engine class that receive Inspection Matrix update from PM */
-class CollectionInspectionEngineMock : public CollectionInspectionEngine
+class CollectionInspectionWorkerThreadMock : public CollectionInspectionWorkerThread
 {
 public:
-    CollectionInspectionEngineMock()
+    CollectionInspectionWorkerThreadMock()
         : mUpdateFlag( false )
     {
     }
-    ~CollectionInspectionEngineMock()
+    ~CollectionInspectionWorkerThreadMock()
     {
     }
     void
-    onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) override
+    onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
     {
-        CollectionInspectionEngine::onChangeInspectionMatrix( inspectionMatrix );
+        CollectionInspectionWorkerThread::onChangeInspectionMatrix( inspectionMatrix );
         mUpdateFlag = true;
     }
     void
@@ -392,6 +475,16 @@ public:
     {
         CollectionSchemeManager::inspectionMatrixExtractor( inspectionMatrix );
     }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    void
+    updateRawDataBufferConfig(
+        std::shared_ptr<Aws::IoTFleetWise::ComplexDataDecoderDictionary> complexDataDecoderDictionary )
+    {
+        CollectionSchemeManager::updateRawDataBufferConfig( complexDataDecoderDictionary );
+    }
+#endif
+
     void
     inspectionMatrixUpdater( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
     {

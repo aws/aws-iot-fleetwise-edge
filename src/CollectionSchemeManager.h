@@ -33,6 +33,11 @@
 #include <string>
 #include <vector>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "MessageTypes.h"
+#include "RawDataManager.h"
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -103,6 +108,12 @@ public:
                    &schemaPersistencyPtr,                /**< shared pointer to collectionSchemePersistency object */
                CANInterfaceIDTranslator &canIDTranslator /**< canIDTranslator used to translate the cloud used Interface
                                                             ID to the the internal channel id */
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+               ,
+               std::shared_ptr<RawData::BufferManager> rawDataBufferManager =
+                   nullptr /**< rawDataBufferManager Optional manager to handle raw data. If not given, raw data
+                              collection will be disabled */
+#endif
     );
     /**
      * @brief Sets up connection with CollectionScheme Ingestion and start main thread.
@@ -268,6 +279,29 @@ protected:
     void decoderDictionaryExtractor(
         std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap );
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief only executed from within decoderDictionaryExtractor to put a complex signal into the dictionary
+     * @param complexSignal the signal to put in dictionary. If complexSignal.mSignalId is not set it will be set to
+     * signalID and the object will be initialized
+     * @param signalID the signal ID for which complexSignal should be used
+     * @param partialSignalID the ID that should be used for a partial signal. Only used if signalPath is not empty
+     * @param signalPath if not empty this signal is a partialSignal and partialSignalID will be use
+     * @param complexSignalRootType the root complex type of this signal
+     */
+    void putComplexSignalInDictionary( ComplexDataMessageFormat &complexSignal,
+                                       SignalID signalID,
+                                       PartialSignalID partialSignalID,
+                                       SignalPath &signalPath,
+                                       ComplexDataTypeId complexSignalRootType );
+
+    /**
+     * @brief Fills up and creates the BufferConfig and sends it to the Raw Buffer Manager
+     */
+    void updateRawDataBufferConfig(
+        std::shared_ptr<Aws::IoTFleetWise::ComplexDataDecoderDictionary> complexDataDecoderDictionary );
+#endif
+
     /**
      * @brief This function invoke all the listener for decoder dictionary update. The listener can be any types of
      * Networks
@@ -315,11 +349,20 @@ private:
     // Shared pointer to a SchemaListener Object allow CollectionSchemeManagement to send data to Schema
     SchemaListenerPtr mSchemaListenerPtr;
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    // Shared pointer to a Raw Data Buffer Manager Object allow CollectionSchemeManagement to send BufferConfig to
+    // the Manager
+    std::shared_ptr<RawData::BufferManager> mRawDataBufferManager;
+#endif
+
     // Idle collectionScheme collection
     std::map<std::string, ICollectionSchemePtr> mIdleCollectionSchemeMap;
 
     // Enabled collectionScheme collection
     std::map<std::string, ICollectionSchemePtr> mEnabledCollectionSchemeMap;
+
+    // Builds vector of ActiveCollectionSchemes and notifies listeners about the update
+    void updateActiveSchemesListeners();
 
     // ID for the decoder manifest currently in use
     std::string mCurrentDecoderManifestID;

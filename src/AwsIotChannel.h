@@ -7,7 +7,7 @@
 #include "IConnectivityChannel.h"
 #include "IConnectivityModule.h"
 #include "ISender.h"
-#include "MqttConnectionWrapper.h"
+#include "MqttClientWrapper.h"
 #include "PayloadManager.h"
 #include <atomic>
 #include <cstddef>
@@ -38,23 +38,15 @@ class AwsIotChannel : public IConnectivityChannel
 public:
     AwsIotChannel( IConnectivityModule *connectivityModule,
                    std::shared_ptr<PayloadManager> payloadManager,
-                   std::shared_ptr<MqttConnectionWrapper> &mqttConnection );
+                   std::shared_ptr<MqttClientWrapper> &mqttClient,
+                   std::string topicName,
+                   bool subscription );
     ~AwsIotChannel() override;
 
     AwsIotChannel( const AwsIotChannel & ) = delete;
     AwsIotChannel &operator=( const AwsIotChannel & ) = delete;
     AwsIotChannel( AwsIotChannel && ) = delete;
     AwsIotChannel &operator=( AwsIotChannel && ) = delete;
-
-    /**
-     * @brief the topic must be set always before using any functionality of this class
-     * @param topicNameRef MQTT topic that will be used for sending or receiving data
-     *                      if subscribe was called
-     * @param subscribeAsynchronously if true the channel will be subscribed to the topic asynchronously so that the
-     * channel can receive data
-     *
-     */
-    void setTopic( const std::string &topicNameRef, bool subscribeAsynchronously = false ) override;
 
     /**
      * @brief Subscribe to the MQTT topic from setTopic. Necessary if data is received on the topic
@@ -96,7 +88,7 @@ public:
     bool
     shouldSubscribeAsynchronously() const
     {
-        return mSubscribeAsynchronously;
+        return mSubscription;
     };
 
     /**
@@ -117,6 +109,8 @@ private:
         return !mTopicName.empty();
     };
 
+    void publishMessage( const uint8_t *buf, size_t size );
+
     /** See "Message size" : "The payload for every publish request can be no larger
      * than 128 KB. AWS IoT Core rejects publish and connect requests larger than this size."
      * https://docs.aws.amazon.com/general/latest/gr/iot-core.html#limits_iot
@@ -124,14 +118,14 @@ private:
     static const size_t AWS_IOT_MAX_MESSAGE_SIZE = 131072; // = 128 KiB
     IConnectivityModule *mConnectivityModule;
     std::shared_ptr<PayloadManager> mPayloadManager;
-    std::shared_ptr<MqttConnectionWrapper> &mConnection;
+    std::shared_ptr<MqttClientWrapper> &mMqttClient;
     std::mutex mConnectivityMutex;
     std::mutex mConnectivityLambdaMutex;
     std::string mTopicName;
     std::atomic<bool> mSubscribed;
     std::atomic<unsigned> mPayloadCountSent{};
 
-    bool mSubscribeAsynchronously;
+    bool mSubscription;
 };
 
 } // namespace IoTFleetWise

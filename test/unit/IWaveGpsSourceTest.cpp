@@ -8,7 +8,6 @@
 #include "SignalTypes.h"
 #include "VehicleDataSourceTypes.h"
 #include "WaitUntil.h"
-#include <boost/lockfree/queue.hpp>
 #include <climits>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -82,13 +81,16 @@ TEST_F( IWaveGpsSourceTest, testDecoding )
     ASSERT_TRUE( gpsSource.init( filePath, 1, 1, 0, 32 ) );
     gpsSource.connect();
     gpsSource.start();
-    CollectedSignal firstSignal;
-    CollectedSignal secondSignal;
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( firstSignal ) );
+
+    CollectedDataFrame collectedDataFrame;
+    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    WAIT_ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
-    ASSERT_TRUE( signalBufferPtr->pop( secondSignal ) );
+    WAIT_ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+
+    auto firstSignal = collectedDataFrame.mCollectedSignals[0];
+    auto secondSignal = collectedDataFrame.mCollectedSignals[1];
+
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     // raw value from NMEA 5234.56789 01234.56789 converted to DD
@@ -112,10 +114,12 @@ TEST_F( IWaveGpsSourceTest, testWestNegativeLongitude )
     gpsSource.start();
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    CollectedSignal firstSignal;
-    CollectedSignal secondSignal;
-    WAIT_ASSERT_TRUE( signalBufferPtr->pop( firstSignal ) );
-    ASSERT_TRUE( signalBufferPtr->pop( secondSignal ) );
+    CollectedDataFrame collectedDataFrame;
+    WAIT_ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+
+    auto firstSignal = collectedDataFrame.mCollectedSignals[0];
+    auto secondSignal = collectedDataFrame.mCollectedSignals[1];
+
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     // raw value from NMEA 5234.56789 01234.56789 converted to DD

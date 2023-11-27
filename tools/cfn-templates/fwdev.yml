@@ -117,7 +117,8 @@ Resources:
             done
 
             # Upgrade system and reboot if required
-            apt update && apt upgrade -y
+            apt update
+            apt upgrade -y
             if [ -f /var/run/reboot-required ]; then
               # Delete the UserData info file so that we run again after reboot
               rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
@@ -126,7 +127,8 @@ Resources:
             fi
 
             # Install helper scripts:
-            apt update && apt install -y python3-setuptools
+            apt update
+            apt install -y python3-setuptools
             mkdir -p /opt/aws/bin
             wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
             python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
@@ -139,7 +141,8 @@ Resources:
             trap error_handler ERR
 
             # Install packages
-            apt update && apt install -y ec2-instance-connect htop jq unzip zip
+            apt update
+            apt install -y ec2-instance-connect htop jq unzip zip
 
             # Install AWS CLI:
             curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
@@ -163,39 +166,39 @@ Mappings:
   # Ubuntu 20.04 arm64 AMIs
   AMIRegionMap:
     ap-northeast-1:
-      AMIID: ami-04620c7c89721f311
+      AMIID: ami-08c2b40b757d7a436
     ap-northeast-2:
-      AMIID: ami-0ef6c9b9c9ee930fc
+      AMIID: ami-0ae4f84503ebf3d18
     ap-northeast-3:
-      AMIID: ami-02315f10670d2dc08
+      AMIID: ami-06d46b97c052d058f
     ap-south-1:
-      AMIID: ami-044e515ad5805ed4e
+      AMIID: ami-0aedb44d8d5454af4
     ap-southeast-1:
-      AMIID: ami-0409c5b04ce681d29
+      AMIID: ami-0281c2b7875eaa573
     ap-southeast-2:
-      AMIID: ami-0e7cb42982ac39e27
+      AMIID: ami-0b1c7f9ffaf189009
     ca-central-1:
-      AMIID: ami-0a8aa6c089cc882ac
+      AMIID: ami-077fd3ca91fd436e8
     eu-central-1:
-      AMIID: ami-05158c60737714c4a
+      AMIID: ami-0eb0fc432507c6ceb
     eu-north-1:
-      AMIID: ami-0350b31cb022529db
+      AMIID: ami-0fc9d4f1e282548cb
     eu-west-1:
-      AMIID: ami-0f6cc268166e75726
+      AMIID: ami-0a7fc9991623e938a
     eu-west-2:
-      AMIID: ami-01c8c1dd0ad622492
+      AMIID: ami-00da71119c33fd647
     eu-west-3:
-      AMIID: ami-0c5b385769ca9b08a
+      AMIID: ami-00f72fc3d31abc995
     sa-east-1:
-      AMIID: ami-0a42aee4ede7f6d92
+      AMIID: ami-0418ffcf915b2ec2b
     us-east-1:
-      AMIID: ami-0f6426fe0b6419ecc
+      AMIID: ami-06978f2d3e435039f
     us-east-2:
-      AMIID: ami-03605c16ec8bff7de
+      AMIID: ami-09919781fa752ad93
     us-west-1:
-      AMIID: ami-04ad050fe219deea9
+      AMIID: ami-06de4e4d34dc642c8
     us-west-2:
-      AMIID: ami-08ade17b00c7e2172
+      AMIID: ami-0eaba58686a7d034a
 Outputs:
   Ec2InstanceId:
     Description: "EC2 instance ID"

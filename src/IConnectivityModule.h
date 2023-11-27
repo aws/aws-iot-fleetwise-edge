@@ -23,7 +23,9 @@ public:
     virtual bool isAlive() const = 0;
 
     virtual std::shared_ptr<IConnectivityChannel> createNewChannel(
-        const std::shared_ptr<PayloadManager> &payloadManager ) = 0;
+        const std::shared_ptr<PayloadManager> &payloadManager,
+        const std::string &topicName,
+        bool subscription = false ) = 0;
 
     virtual bool disconnect() = 0;
 

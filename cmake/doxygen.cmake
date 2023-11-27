@@ -6,7 +6,6 @@ if(DOXYGEN_FOUND)
   message(STATUS "Building documentation")
 
   set(DOXYGEN_DOT_IMAGE_FORMAT svg)
-  set(DOXYGEN_EXPAND_ONLY_PREDEF YES)
   set(DOXYGEN_EXTRACT_ALL YES)
   set(DOXYGEN_EXTRACT_PRIVATE YES)
   set(DOXYGEN_EXTRACT_STATIC YES)
@@ -30,6 +29,12 @@ if(DOXYGEN_FOUND)
   set(DOXYGEN_TOC_INCLUDE_HEADINGS 5)
   set(DOXYGEN_UML_LOOK YES)
   set(DOXYGEN_EXCLUDE_PATTERNS "*.md")
+
+  foreach(directive FWE_FEATURE_VISION_SYSTEM_DATA FWE_FEATURE_ROS2)
+    if(${directive})
+      set(DOXYGEN_PREDEFINED "${DOXYGEN_PREDEFINED};${directive}")
+    endif()
+  endforeach()
 
   doxygen_add_docs(
     doc_doxygen

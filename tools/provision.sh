@@ -15,6 +15,9 @@ PRIVATE_KEY_OUT_FILE="private-key.key"
 ENDPOINT_URL_OUT_FILE=""
 VEHICLE_NAME_OUT_FILE=""
 THING_POLICY_OUT_FILE=""
+CREDS_ROLE_ALIAS=""
+CREDS_ROLE_ALIAS_OUT_FILE=""
+CREDS_ENDPOINT_URL_OUT_FILE=""
 ONLY_CLEAN_UP=false
 
 parse_args() {
@@ -22,6 +25,10 @@ parse_args() {
         case $1 in
         --vehicle-name)
             VEHICLE_NAME=$2
+            shift
+            ;;
+        --creds-role-alias)
+            CREDS_ROLE_ALIAS=$2
             shift
             ;;
         --certificate-pem-outfile)
@@ -44,6 +51,14 @@ parse_args() {
             THING_POLICY_OUT_FILE=$2
             shift
             ;;
+        --creds-role-alias-outfile)
+            CREDS_ROLE_ALIAS_OUT_FILE=$2
+            shift
+            ;;
+        --creds-endpoint-url-outfile)
+            CREDS_ENDPOINT_URL_OUT_FILE=$2
+            shift
+            ;;
         --endpoint-url)
             ENDPOINT_URL=$2
             shift
@@ -58,11 +73,14 @@ parse_args() {
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --vehicle-name <NAME>                    Vehicle name"
+            ehco "  --creds-role-alias <ALIAS>               Role alias for AWS IoT Credentials Provider"
             echo "  --certificate-pem-outfile <FILENAME>     Certificate output file, default: ${CERT_OUT_FILE}"
             echo "  --private-key-outfile <FILENAME>         Private key output file, default: ${PRIVATE_KEY_OUT_FILE}"
             echo "  --endpoint-url-outfile <FILENAME>        Endpoint URL for MQTT connections output file"
             echo "  --vehicle-name-outfile <FILENAME>        Vehicle name output file"
             echo "  --thing-policy-outfile <FILENAME>        Thing policy output file"
+            echo "  --creds-role-alias-outfile <FILENAME>    Role alias for AWS IoT Credentials Provider output file"
+            echo "  --creds-endpoint-url-outfile <FILENAME>  Endpoint URL for AWS IoT Credentials Provider output file"
             echo "  --endpoint-url <URL>                     The endpoint URL used for AWS CLI calls"
             echo "  --region                                 The region used for AWS CLI calls, default: ${REGION}"
             echo "  --only-clean-up                          Clean up resources created by previous runs of this script"
@@ -162,6 +180,12 @@ IOT_POLICY=`echo "${IOT_POLICY}" \
     | jq ".Statement[0].Resource[1]=\"arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/*\"" \
     | jq ".Statement[0].Resource[2]=\"arn:aws:iot:${REGION}:${ACCOUNT_ID}:topicfilter/*\""`
 
+if [ "${CREDS_ROLE_ALIAS}" != "" ]; then
+    IOT_POLICY=`echo "${IOT_POLICY}" \
+        | jq ".Statement[0].Action+=[\"iot:AssumeRoleWithCertificate\"]" \
+        | jq ".Statement[0].Resource+=[\"arn:aws:iot:${REGION}:${ACCOUNT_ID}:rolealias/${CREDS_ROLE_ALIAS}\"]"`
+fi
+
 echo "Creating policy..."
 aws iot create-policy \
     ${ENDPOINT_URL_OPTION} \
@@ -206,10 +230,26 @@ if [ "${ENDPOINT_URL_OUT_FILE}" != "" ]; then
     echo ${ENDPOINT} > ${ENDPOINT_URL_OUT_FILE}
 fi
 
+echo "Getting Credentials Provider endpoint..."
+CREDS_ENDPOINT=`aws iot describe-endpoint \
+    ${ENDPOINT_URL_OPTION} \
+    --region ${REGION} \
+    --endpoint-type "iot:CredentialProvider" \
+    | jq -j .endpointAddress`
+echo ${CREDS_ENDPOINT}
+
+if [ "${CREDS_ENDPOINT_URL_OUT_FILE}" != "" ]; then
+    echo ${CREDS_ENDPOINT} > ${CREDS_ENDPOINT_URL_OUT_FILE}
+fi
+
 if [ "${VEHICLE_NAME_OUT_FILE}" != "" ]; then
     echo -n $VEHICLE_NAME > ${VEHICLE_NAME_OUT_FILE}
 fi
 
 if [ "${THING_POLICY_OUT_FILE}" != "" ]; then
     echo -n ${NAME}-IoT-Policy > ${THING_POLICY_OUT_FILE}
+fi
+
+if [ "${CREDS_ROLE_ALIAS_OUT_FILE}" != "" ]; then
+    echo ${CREDS_ROLE_ALIAS} > ${CREDS_ROLE_ALIAS_OUT_FILE}
 fi

@@ -10,7 +10,6 @@
 #include "TraceModule.h"
 #include <algorithm>
 #include <array>
-#include <boost/lockfree/queue.hpp>
 #include <linux/can.h>
 #include <string>
 #include <unordered_map>
@@ -22,9 +21,8 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-CANDataConsumer::CANDataConsumer( SignalBufferPtr signalBufferPtr, CANBufferPtr canBufferPtr )
-    : mCANBufferPtr{ std::move( canBufferPtr ) }
-    , mSignalBufferPtr{ std::move( signalBufferPtr ) }
+CANDataConsumer::CANDataConsumer( SignalBufferPtr signalBufferPtr )
+    : mSignalBufferPtr{ std::move( signalBufferPtr ) }
 {
 }
 
@@ -92,9 +90,11 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
         const auto &format = currentMessageDecoderMethod.format;
         const auto &collectType = currentMessageDecoderMethod.collectType;
 
+        // Create Collected Data Frame
+        CollectedDataFrame collectedDataFrame;
         // Check if we want to collect RAW CAN Frame; If so we also need to ensure Buffer is valid
-        if ( ( mCANBufferPtr.get() != nullptr ) && ( ( collectType == CANMessageCollectType::RAW ) ||
-                                                     ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ) )
+        if ( ( mSignalBufferPtr.get() != nullptr ) && ( ( collectType == CANMessageCollectType::RAW ) ||
+                                                        ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ) )
         {
             // prepare the raw CAN Frame
             struct CollectedCanRawFrame canRawFrame;
@@ -104,21 +104,8 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
             // CollectedCanRawFrame receive up to 64 CAN Raw Bytes
             canRawFrame.size = std::min( static_cast<uint8_t>( dataLength ), MAX_CAN_FRAME_BYTE_SIZE );
             std::copy( data, data + canRawFrame.size, canRawFrame.data.begin() );
-            // Push raw CAN Frame to the Buffer for next stage to consume
-            // Note buffer is lock_free buffer and multiple Vehicle Data Source Instance could push
-            // data to it.
-            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
-            if ( !mCANBufferPtr->push( canRawFrame ) )
-            {
-                TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
-                FWE_LOG_WARN( "RAW CAN Frame Buffer Full" );
-            }
-            else
-            {
-                // Enable below logging for debugging
-                // FWE_LOG_TRACE( "CANDataConsumer::doWork",
-                //                "Collect RAW CAN Frame ID: " + std::to_string( messageId ) );
-            }
+            // collectedDataFrame will be pushed to the Buffer for next stage to consume
+            collectedDataFrame.mCollectedCanRawFrame = std::make_shared<CollectedCanRawFrame>( canRawFrame );
         }
         // check if we want to decode can frame into signals and collect signals
         if ( ( mSignalBufferPtr.get() != nullptr ) && ( ( collectType == CANMessageCollectType::DECODE ) ||
@@ -129,6 +116,8 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
                 std::vector<CANDecodedSignal> decodedSignals;
                 if ( CANDecoder::decodeCANMessage( data, dataLength, format, signalIDsToCollect, decodedSignals ) )
                 {
+                    // Create vector of Collected Signal Object
+                    CollectedSignalsGroup collectedSignalsGroup;
                     for ( auto const &signal : decodedSignals )
                     {
                         // Create Collected Signal Object
@@ -155,23 +144,13 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
                                                                signal.mSignalType };
                             break;
                         }
-
-                        // Push collected signal to the Signal Buffer
-                        TraceModule::get().incrementAtomicVariable(
-                            TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-                        if ( !mSignalBufferPtr->push( collectedSignal ) )
+                        // Only add valid signals to the vector
+                        if ( collectedSignal.signalID != INVALID_SIGNAL_ID )
                         {
-                            TraceModule::get().decrementAtomicVariable(
-                                TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-                            FWE_LOG_WARN( "Signal buffer full" );
-                        }
-                        else
-                        {
-                            // Enable below logging for debugging
-                            // FWE_LOG_TRACE( "CANDataConsumer::doWork",
-                            //               "Acquire Signal ID: " + std::to_string( signal.mSignalID ) );
+                            collectedSignalsGroup.push_back( collectedSignal );
                         }
                     }
+                    collectedDataFrame.mCollectedSignals = collectedSignalsGroup;
                 }
                 else
                 {
@@ -186,7 +165,36 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
                               " can message id: " + std::to_string( messageId ) +
                               " on CAN Channel Id: " + std::to_string( channelId ) );
             }
-            TraceModule::get().sectionEnd( traceSection );
+        }
+
+        TraceModule::get().sectionEnd( traceSection );
+
+        // Increase all queue metrics before pushing data to the buffer
+        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
+
+        auto collectedSignals = collectedDataFrame.mCollectedSignals.size();
+        TraceModule::get().addToAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
+                                                collectedSignals );
+
+        bool canRawFrameCollected = collectedDataFrame.mCollectedCanRawFrame != nullptr;
+        if ( canRawFrameCollected )
+        {
+            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
+        }
+
+        if ( !mSignalBufferPtr->push( std::move( collectedDataFrame ) ) )
+        {
+            TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
+
+            if ( canRawFrameCollected )
+            {
+                TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
+            }
+
+            TraceModule::get().subtractFromAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
+                                                           collectedSignals );
+
+            FWE_LOG_WARN( "Signal buffer full" );
         }
     }
 }

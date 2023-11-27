@@ -25,6 +25,13 @@ LoggingModule::log( LogLevel level,
     logger.logMessage( level, filename, lineNumber, function, logEntry );
 }
 
+void
+LoggingModule::flush()
+{
+    static ConsoleLogger logger;
+    logger.flush();
+}
+
 std::string
 getStringFromBytes( const std::vector<uint8_t> &inputBytes )
 {

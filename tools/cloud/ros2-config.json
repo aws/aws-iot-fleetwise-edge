@@ -1,0 +1,28 @@
+{
+  "messages": [
+    {
+      "fullyQualifiedName": "Vehicle.Cameras.Front.Image",
+      "interfaceId": "10",
+      "topic": "/carla/ego_vehicle/rgb_front/image_compressed",
+      "type": "sensor_msgs/msg/CompressedImage"
+    },
+    {
+      "fullyQualifiedName": "Vehicle.Speed",
+      "interfaceId": "10",
+      "topic": "/carla/ego_vehicle/speedometer",
+      "type": "std_msgs/msg/Float32"
+    },
+    {
+      "fullyQualifiedName": "Vehicle.Airbag.CollisionIntensity",
+      "interfaceId": "10",
+      "topic": "/carla/ego_vehicle/collision_intensity",
+      "type": "std_msgs/msg/Float32"
+    },
+    {
+      "fullyQualifiedName": "Vehicle.Acceleration",
+      "interfaceId": "10",
+      "topic": "/carla/ego_vehicle/imu",
+      "type": "sensor_msgs/msg/Imu"
+    }
+  ]
+}

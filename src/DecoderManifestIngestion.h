@@ -62,6 +62,12 @@ public:
 
     PIDSignalDecoderFormat getPIDSignalDecoderFormat( SignalID signalID ) const override;
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    ComplexSignalDecoderFormat getComplexSignalDecoderFormat( SignalID signalID ) const override;
+
+    ComplexDataElement getComplexDataType( ComplexDataTypeId typeId ) const override;
+#endif
+
     bool copyData( const std::uint8_t *inputBuffer, const size_t size ) override;
 
     inline const std::vector<uint8_t> &
@@ -125,6 +131,28 @@ private:
 
     using SignalIDToTypeMap = std::unordered_map<SignalID, SignalType>;
     SignalIDToTypeMap mSignalIDToTypeMap;
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief stores all the ComplexSignalDecoderFormat for SignalID. All SignalID are set by cloud so no
+     * PartialSignalID
+     */
+    std::unordered_map<SignalID, ComplexSignalDecoderFormat> mSignalToComplexDecoderFormat;
+
+    /**
+     * @brief complex types can consist of other complex types. Then the ComplexDataElement has a ComplexDataTypeId
+     * that can be looked up again in this map.
+     */
+    std::unordered_map<ComplexDataTypeId, ComplexDataElement> mComplexTypeMap;
+
+    /**
+     * @brief In the protobuf a different enum if used to represent the different types like uint8, uint16 etc.
+     * @param primitiveType the enum type of the protobuf
+     *
+     * @return the type C++ enum used by the DecoderDictionary
+     */
+    static SignalType convertPrimitiveTypeToSignalType( Schemas::DecoderManifestMsg::PrimitiveType primitiveType );
+#endif
 };
 
 } // namespace IoTFleetWise

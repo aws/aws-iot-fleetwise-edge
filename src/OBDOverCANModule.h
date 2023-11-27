@@ -61,7 +61,6 @@ public:
     /**
      * @brief Initializes the OBD Diagnostic Session.
      * @param signalBufferPtr Signal Buffer shared pointer.
-     * @param activeDTCBufferPtr Active DTC buffer shared pointer
      * @param gatewayCanInterfaceName CAN IF Name where the OBD stack on the ECU
      * is running. Typically on the Gateway ECU.
      * @param pidRequestIntervalSeconds Interval in seconds used to schedule PID requests
@@ -71,7 +70,6 @@ public:
      * and dtcRequestIntervalSeconds are zero i.e. no collection
      */
     bool init( SignalBufferPtr signalBufferPtr,
-               ActiveDTCBufferPtr activeDTCBufferPtr,
                const std::string &gatewayCanInterfaceName,
                uint32_t pidRequestIntervalSeconds,
                uint32_t dtcRequestIntervalSeconds,
@@ -114,17 +112,6 @@ public:
     getSignalBufferPtr() const
     {
         return mSignalBufferPtr;
-    }
-
-    /**
-     * @brief Handle of the DTC Output Buffer. This buffer shared between Collection Engine
-     * and OBDOverCANModule.
-     * @return shared object pointer to the DTC buffer.
-     */
-    inline ActiveDTCBufferPtr
-    getActiveDTCBufferPtr() const
-    {
-        return mActiveDTCBufferPtr;
     }
 
     /**
@@ -210,8 +197,6 @@ private:
 
     // Signal Buffer shared pointer
     SignalBufferPtr mSignalBufferPtr;
-    // Active DTC Buffer shared pointer
-    ActiveDTCBufferPtr mActiveDTCBufferPtr;
     uint32_t mPIDRequestIntervalSeconds{ 0 };
     uint32_t mDTCRequestIntervalSeconds{ 0 };
     bool mBroadcastRequests{ false };

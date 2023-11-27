@@ -1,0 +1,237 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+option java_package = "com.amazonaws.iot.autobahn.schemas";
+package Aws.IoTFleetWise.Schemas.CommonTypesMsg;
+
+/*
+ * The signal path must always point to a primitive type inside the signal referred to by signal_id
+ */
+message PrimitiveTypeInComplexSignal{
+    uint32 signal_id = 1;
+    SignalPath signal_path = 2;
+}
+
+/*
+ * The signal path provide reference to partial signal which can be a primitive field or another complex type field.
+ * eg: for ROS2 signal Vehicle.detected_objects
+ * DetectedObjectArray.msg
+ * DetectedObjectDetails[30] data
+ *
+ * DetectedObjectDetails.msg
+ * unit16 color
+ * unit32 duration_detected
+ * uint16 danger_level
+ *
+ * To refer the obstacle_confidence of second Obstacle: Vehicle.detected_objects.data[15].duration_detected, signal path is [0, 15, 1]
+ *
+ * Signal ID is used to refer the entire ROS2 signal in which the signal path shall be left empty []
+ */
+message SignalPath {
+    repeated uint32 signal_path = 1;
+}
+
+/*
+ * A node of the condition Abstract Syntax Tree
+ */
+message ConditionNode {
+
+    /*
+     * Each Abstract Syntax Tree node can be one of the following types
+     */
+    oneof node {
+
+        /*
+         * An operator node can perform an operation or comparisons on its child node(s)
+         */
+        NodeOperator node_operator = 1;
+
+        /*
+         * Function node is a self-contained module that accomplish a specific task.
+         */
+        NodeFunction node_function = 2;
+
+        /*
+         * A node containing a floating point constant which can be used as a child node to operator nodes.
+         */
+        double node_double_value = 3;
+
+        /*
+         * A node containing a signal id, whose value will be evaluated every time that signal is received on the
+         * vehicle network bus.
+         * This is kept for backwards compatibility and always has to refer to a signal with a primitive type like CANSignal
+         */
+        uint32 node_signal_id = 4;
+
+        /*
+         * A node containing a boolean constant which can be used as a child node to an operator node.
+         */
+        bool node_boolean_value = 5;
+
+        /*
+         * The expression currently only supports primitive types so for complex signals this has to be used and not node_signal_id
+         */
+        PrimitiveTypeInComplexSignal node_primitive_type_in_signal = 6;
+    }
+
+    /*
+     * Operator node types contain one or two children. If they are unary operator type nodes, only the left child will
+     * be used
+     */
+    message NodeOperator{
+
+        /*
+         * Left child node
+         */
+        ConditionNode left_child = 1;
+
+        /*
+         * Right child node
+         */
+        ConditionNode right_child = 2;
+
+        /*
+         * Operator type used in this node
+         */
+        Operator operator = 3;
+
+        /*
+         * Enum of an operator which can be an binary or unary operator
+         */
+        enum Operator {
+
+            /*
+             * COMPARE operators return a bool and their children must return a double
+             */
+            COMPARE_SMALLER = 0;
+            COMPARE_BIGGER = 1;
+            COMPARE_SMALLER_EQUAL = 2;
+            COMPARE_BIGGER_EQUAL = 3;
+            COMPARE_EQUAL = 4;
+            COMPARE_NOT_EQUAL = 5;
+
+            /*
+             * LOGICAL operators return a bool and their children must return a bool
+             */
+            LOGICAL_AND = 6;
+            LOGICAL_OR = 7;
+            LOGICAL_NOT = 8; // Unary operator that will only have a left child.
+
+            /*
+             * ARITHMETIC operators return a double and their children must return a double
+             */
+            ARITHMETIC_PLUS = 9;
+            ARITHMETIC_MINUS = 10;
+            ARITHMETIC_MULTIPLY = 11;
+            ARITHMETIC_DIVIDE = 12;
+        }
+    }
+
+    /*
+     * Function node is a self-contained module that accomplish a specific task.  It takes inputs provided here and
+     * output based on specific logic
+     */
+    message NodeFunction{
+
+        /*
+         * The function node could be one of the following function types.
+         */
+        oneof functionType {
+
+            /*
+             * A Window function node will sample a signal for the duration specified by fixed_window_period_ms and then
+             * run an aggregation function over the samples and evaluate to a double.
+             */
+            WindowFunction window_function = 1;
+
+            /*
+             * Geohash function Node that evaluates whether Edge has changed Geohash. It returns true if the Geohash
+             * has changed at given precision and otherwise return false
+             */
+            GeohashFunction geohash_function = 2;
+        }
+
+        /*
+         * Geohash function evaluates whether Edge has changed Geohash at given precision
+         * It will firstly calculate Geohash with latitude and longitude
+         * It returns true if the Geohash has changed at given precision. Otherwise return false
+         */
+        message GeohashFunction{
+
+            /*
+             * signal id for latitude
+             */
+            uint32 latitude_signal_id = 1;
+
+            /*
+             * signal id for longitude
+             */
+            uint32 longitude_signal_id = 2;
+
+            /*
+             * The geohash precision for dynamic data collection Note geohash precision is defined as the length of hash
+             * characters (base 32 encoding).  Longer hash will have higher precision than shorter hash.
+             * see more details: https://en.wikipedia.org/wiki/Geohash
+             */
+            uint32 geohash_precision = 3;
+
+            /*
+             * The unit for decoded latitude / longitude signal. GPS Signal might be decoded into different unit
+             * according to the DBC file.
+             */
+            GPSUnitType gps_unit = 4;
+
+            /*
+             * The unit type for decoded latitude / longitude signal. This list might be extended in future to
+             * accommodate different vehicle models.
+             */
+            enum GPSUnitType {
+                DECIMAL_DEGREE = 0;
+                MICROARCSECOND = 1;
+                MILLIARCSECOND = 2;
+                ARCSECOND = 3;
+            }
+        }
+
+        /*
+         * Function node that will evaluate a function on a signal_id within a fixed window
+         */
+        message WindowFunction{
+
+            /*
+             * signal id of value to run a function on. The fixed_window_period_ms associated in signalInformation will
+             * be used. This can not be used if in signalInformation the signal_id and signal_path are not referring to a primitive type
+             */
+            oneof primitiveTypes{
+                uint32 signal_id = 1; // Kept for backwards compatibility
+                PrimitiveTypeInComplexSignal  primitive_type_in_signal = 3;
+            }
+
+            /*
+             * Function used over fixed window to evaluate value of physical value of signal_id
+             */
+            WindowType window_type = 2;
+
+            /*
+             * Function to be used to aggregate data in a fixed window
+             */
+            enum WindowType {
+
+                /*
+                 * LAST_WINDOW is the most recently evaluated fixed window
+                 */
+                LAST_WINDOW_MIN = 0;
+                LAST_WINDOW_MAX = 1;
+                LAST_WINDOW_AVG = 2;
+                /*
+                 * PREV_LAST_WINDOW is the fixed window previous to LAST_WINDOW
+                 */
+                PREV_LAST_WINDOW_MIN = 3;
+                PREV_LAST_WINDOW_MAX = 4;
+                PREV_LAST_WINDOW_AVG = 5;
+            }
+        }
+    }
+}

@@ -9,8 +9,6 @@
 #include "MessageTypes.h"
 #include "OBDDataTypes.h"
 #include "SignalTypes.h"
-#include <boost/lockfree/queue.hpp>      // multi producer queue
-#include <boost/lockfree/spsc_queue.hpp> // single producer queue
 #include <mutex>
 #include <queue>
 #include <vector>
@@ -294,6 +292,11 @@ struct CollectedSignal
         case SignalType::BOOLEAN:
             value.setVal<bool>( static_cast<bool>( sigValue ), sigType );
             break;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        case SignalType::RAW_DATA_BUFFER_HANDLE:
+            value.setVal<uint32_t>( static_cast<uint32_t>( sigValue ), sigType );
+            break;
+#endif
         }
     }
 
@@ -310,32 +313,120 @@ struct CollectedSignal
     }
 };
 
-using SignalBuffer =
-    boost::lockfree::queue<CollectedSignal>; /**<  multi NetworkChannel Consumers fill this queue and only one
-                                                instance of the Inspection and Collection Engine consumes it. It is used
-                                                for Can and OBD based signals */
-using CANBuffer =
-    boost::lockfree::queue<CollectedCanRawFrame>; /**<  contains only raw can messages which at least one
-                                                     collectionScheme needs to publish in a raw format. multi
-                                                     NetworkChannel Consumers fill this queue and only one instance of
-                                                     the Inspection and Collection Engine consumes it */
-using ActiveDTCBuffer =
-    boost::lockfree::spsc_queue<DTCInfo>; /**<  Set of currently active DTCs. produced by OBD NetworkChannel Consumer
-                                             and consumed by Inspection and CollectionEngine */
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+enum class UploadedS3ObjectDataFormat
+{
+    Unknown = 0,
+    Cdr = 1,
+};
 
-// Shared Pointer type to the buffer that send data to Collection Engine
+struct UploadedS3Object
+{
+    std::string key;
+    UploadedS3ObjectDataFormat dataFormat;
+};
+#endif
+
+// Vector of collected decoded signals or raw buffer handles
+using CollectedSignalsGroup = std::vector<CollectedSignal>;
+using CollectedRawCanFramePtr = std::shared_ptr<CollectedCanRawFrame>;
+using DTCInfoPtr = std::shared_ptr<DTCInfo>;
+
+// Each collected data frame is processed and evaluated separately by collection inspection engine
+struct CollectedDataFrame
+{
+    CollectedDataFrame() = default;
+    CollectedDataFrame( CollectedSignalsGroup collectedSignals )
+        : mCollectedSignals( std::move( collectedSignals ) )
+    {
+    }
+    CollectedDataFrame( CollectedSignalsGroup collectedSignals, CollectedRawCanFramePtr collectedCanRawFrame )
+        : mCollectedSignals( std::move( collectedSignals ) )
+        , mCollectedCanRawFrame( std::move( collectedCanRawFrame ) )
+    {
+    }
+    CollectedDataFrame( DTCInfoPtr dtcInfo )
+        : mActiveDTCs( std::move( dtcInfo ) )
+    {
+    }
+    CollectedSignalsGroup mCollectedSignals;
+    CollectedRawCanFramePtr mCollectedCanRawFrame;
+    DTCInfoPtr mActiveDTCs;
+};
+
+// Thread-safe queue with mutex
+template <typename T>
+struct LockedQueue
+{
+public:
+    LockedQueue( size_t maxSize )
+        : mMaxSize( maxSize )
+    {
+    }
+    bool
+    push( const T &&element )
+    {
+        std::lock_guard<std::mutex> lock( mMutex );
+        if ( ( mQueue.size() + 1 ) > mMaxSize )
+        {
+            return false;
+        }
+        mQueue.push( element );
+        return true;
+    }
+    bool
+    pop( T &element )
+    {
+        std::lock_guard<std::mutex> lock( mMutex );
+        if ( mQueue.empty() )
+        {
+            return false;
+        }
+        element = mQueue.front();
+        mQueue.pop();
+        return true;
+    }
+    template <typename Functor>
+    size_t
+    consumeAll( const Functor &functor )
+    {
+        size_t consumed = 0;
+        T element;
+        while ( pop( element ) )
+        {
+            functor( element );
+            consumed++;
+        }
+        return consumed;
+    }
+    bool
+    isEmpty()
+    {
+        std::lock_guard<std::mutex> lock( mMutex );
+        return mQueue.empty();
+    }
+
+private:
+    std::mutex mMutex;
+    size_t mMaxSize;
+    std::queue<T> mQueue;
+};
+
+// Buffer that sends data to Collection Engine
+using SignalBuffer = LockedQueue<CollectedDataFrame>;
+// Shared Pointer type to the buffer that sends data to Collection Engine
 using SignalBufferPtr = std::shared_ptr<SignalBuffer>;
-using CANBufferPtr = std::shared_ptr<CANBuffer>;
-using ActiveDTCBufferPtr = std::shared_ptr<ActiveDTCBuffer>;
 
 // Output of collection Inspection Engine
-
 struct TriggeredCollectionSchemeData
 {
     PassThroughMetadata metadata;
     Timestamp triggerTime;
     std::vector<CollectedSignal> signals;
     std::vector<CollectedCanRawFrame> canFrames;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    std::vector<UploadedS3Object> uploadedS3Objects;
+#endif
     DTCInfo mDTCInfo;
     GeohashInfo mGeohashInfo; // Because Geohash is not a physical signal from VSS, we decided to not using SignalID for
     // geohash. In future we might introduce virtual signal concept which will include geohash.
@@ -343,55 +434,7 @@ struct TriggeredCollectionSchemeData
 };
 
 using TriggeredCollectionSchemeDataPtr = std::shared_ptr<const TriggeredCollectionSchemeData>;
-struct CollectedDataReadyToPublish
-{
-public:
-    CollectedDataReadyToPublish( size_t maxSize )
-        : mMaxSize( maxSize )
-    {
-    }
-    bool
-    push( const TriggeredCollectionSchemeDataPtr &data )
-    {
-        std::lock_guard<std::mutex> lock( mMutex );
-        if ( ( mQueue.size() + 1 ) > mMaxSize )
-        {
-            return false;
-        }
-        mQueue.push( data );
-        return true;
-    }
-    bool
-    pop( TriggeredCollectionSchemeDataPtr &data )
-    {
-        std::lock_guard<std::mutex> lock( mMutex );
-        if ( mQueue.empty() )
-        {
-            return false;
-        }
-        data = mQueue.front();
-        mQueue.pop();
-        return true;
-    }
-    template <typename Functor>
-    size_t
-    consume_all( const Functor &functor )
-    {
-        size_t consumed = 0;
-        TriggeredCollectionSchemeDataPtr data;
-        while ( pop( data ) )
-        {
-            functor( data );
-            consumed++;
-        }
-        return consumed;
-    }
-
-private:
-    std::mutex mMutex;
-    size_t mMaxSize;
-    std::queue<TriggeredCollectionSchemeDataPtr> mQueue; /**< As the data can be big only a shared_ptr is handed over*/
-};
+using CollectedDataReadyToPublish = LockedQueue<TriggeredCollectionSchemeDataPtr>;
 
 } // namespace IoTFleetWise
 } // namespace Aws

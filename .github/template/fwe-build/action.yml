@@ -8,6 +8,10 @@ inputs:
     required: true
   upload-arch:
     required: true
+  extra-options:
+    required: false
+  dist-name:
+    required: true
   cache-paths:
     required: true
   dist-files:
@@ -21,51 +25,60 @@ runs:
       uses: actions/cache@v3
       with:
         path: cache
-        key: deps-${{ inputs.build-arch }}-${{ hashFiles('tools/install-deps-*.sh') }}
+        # prettier-ignore
+        key: ${{ inputs.dist-name }}-${{ inputs.build-arch }}-${{ hashFiles('tools/install-deps-*.sh') }}
 
     - name: install-deps
       shell: bash
       run: |
+        IFS=":"
+        CACHE_PATHS=${{ inputs.cache-paths }}
         if [ -d cache ]; then
-          sudo cp -r cache/* /usr/local
+          for P in ${CACHE_PATHS}; do
+            sudo mkdir -p `dirname ${P}`
+            sudo cp -r cache${P} ${P}
+          done
         fi
-        sudo ./tools/install-deps-${{ inputs.build-arch }}.sh
+        sudo ./tools/install-deps-${{ inputs.build-arch }}.sh ${{ inputs.extra-options }}
         if [ ! -d cache ]; then
-          mkdir cache
-          IFS=":"
-          for P in ${{ inputs.cache-paths }}; do
-            cp -r ${P} cache
+          for P in ${CACHE_PATHS}; do
+            mkdir -p cache`dirname ${P}`
+            cp -r ${P} cache${P}
           done
         fi
 
     - name: build
       shell: bash
       run: |
-        ./tools/build-fwe-${{ inputs.build-arch }}.sh
+        ./tools/build-fwe-${{ inputs.build-arch }}.sh ${{ inputs.extra-options }}
         ./tools/build-dist.sh ${{ inputs.dist-files }}
         # If the output file changes, make sure to update the upload-asset job below
-        mv build/aws-iot-fleetwise-edge.tar.gz build/aws-iot-fleetwise-edge-${{ inputs.upload-arch }}.tar.gz
+        mv build/aws-iot-fleetwise-edge.tar.gz build/${{ inputs.dist-name }}-${{ inputs.upload-arch }}.tar.gz
+        if [ "${{ inputs.dist-name }}" == "aws-iot-fleetwise-edge-ros2" ]; then
+          tar --exclude /opt/ros/galactic/include --exclude /opt/ros/galactic/cmake -zcf build/opt.tar.gz /opt/ros
+        fi
 
     - name: unit-test
       shell: bash
       if: inputs.build-arch  == 'native'
       run: |
-        cd build
-        CTEST_OUTPUT_ON_FAILURE=1 ctest
+        ./tools/test-fwe.sh ${{ inputs.extra-options }}
 
     - name: upload-artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: build-${{ inputs.upload-arch }}
+        name: ${{ inputs.dist-name }}-${{ inputs.upload-arch }}
         path: |
           build/aws-iot-fleetwise-edge
-          build/aws-iot-fleetwise-edge-${{ inputs.upload-arch }}.tar.gz
+          build/iotfleetwise/aws-iot-fleetwise-edge
+          build/${{ inputs.dist-name }}-${{ inputs.upload-arch }}.tar.gz
           build/Testing/Temporary/
           build/**/report-*.xml
+          build/opt.tar.gz
 
     - name: upload-asset
       if: github.ref_type == 'tag'
       shell: bash
       run: |
         RELEASE_VERSION="${GITHUB_REF/refs\/tags\//}"
-        gh release upload ${RELEASE_VERSION} build/aws-iot-fleetwise-edge-${{ inputs.upload-arch }}.tar.gz
+        gh release upload ${RELEASE_VERSION} build/${{ inputs.dist-name }}-${{ inputs.upload-arch }}.tar.gz

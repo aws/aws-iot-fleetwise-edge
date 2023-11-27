@@ -1,0 +1,11 @@
+[Unit]
+Description=ROS2 Simulator
+
+[Service]
+Restart=always
+RestartSec=1
+ExecStart=/bin/bash -c "HOME=/root /usr/share/rossim/run-rossim.sh"
+WorkingDirectory=/usr/share/rossim
+
+[Install]
+WantedBy=multi-user.target

@@ -139,6 +139,12 @@ RemoteProfiler::logMessage( LogLevel level,
 }
 
 void
+RemoteProfiler::flush()
+{
+    sendLogsOut();
+}
+
+void
 RemoteProfiler::setMetric( const std::string &name, double value, const std::string &unit )
 {
     if ( fCurrentMetricsPending > MAX_PARALLEL_METRICS )

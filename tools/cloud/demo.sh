@@ -25,8 +25,14 @@ BUCKET_NAME=""
 SKIP_S3_POLICY=true
 CAMPAIGN_FILE=""
 DEFAULT_CAMPAIGN_FILE="campaign-brake-event.json"
+S3_CAMPAIGN_FILE=""
+DEFAULT_S3_CAMPAIGN_FILE=${DEFAULT_CAMPAIGN_FILE}
+DEFAULT_S3_CAMPAIGN_FILE_VISION_SYSTEM_DATA="campaign-brake-event-vision-system-data.json"
 DBC_FILE=""
 DEFAULT_DBC_FILE="hscan.dbc"
+ROS2_ENABLED=false
+ROS2_CONFIG_FILE=""
+DEFAULT_ROS2_CONFIG_FILE="ros2-config.json"
 CLEAN_UP=false
 S3_UPLOAD=false
 FLEET_SIZE=1
@@ -36,6 +42,18 @@ MAX_ATTEMPTS_ON_REGISTRATION_FAILURE=5
 FORCE_REGISTRATION=false
 MIN_CLI_VERSION="aws-cli/2.11.24"
 CREATED_SIGNAL_CATALOG_NAME=""
+CREATED_S3_BUCKET=""
+INCLUDED_SIGNALS=""
+DEFAULT_INCLUDED_SIGNALS="
+    Vehicle.ECM.DemoEngineTorque,
+    Vehicle.ABS.DemoBrakePedalPressure,"
+DEFAULT_INCLUDED_SIGNALS_VISION_SYSTEM_DATA="
+    Vehicle.Acceleration.linear_acceleration.x,
+    Vehicle.Acceleration.linear_acceleration.y,
+    Vehicle.Speed.data,
+    Vehicle.Acceleration.angular_velocity.z,
+    Vehicle.Cameras.Front.Image.data,"
+EXCLUDED_SIGNALS=""
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -58,8 +76,22 @@ parse_args() {
             CAMPAIGN_FILE=$2
             shift
             ;;
+        --s3-campaign-file)
+            S3_CAMPAIGN_FILE=$2
+            shift
+            ;;
         --dbc-file)
             DBC_FILE=$2
+            shift
+            ;;
+        --enable-ros2)
+            ROS2_ENABLED=true
+            S3_UPLOAD=true
+            ;;
+        --ros2-config-file)
+            ROS2_ENABLED=true
+            S3_UPLOAD=true
+            ROS2_CONFIG_FILE=$2
             shift
             ;;
         --bucket-name)
@@ -81,21 +113,35 @@ parse_args() {
             REGION=$2
             shift
             ;;
+        --included-signals)
+            INCLUDED_SIGNALS="$2"
+            shift
+            ;;
+        --excluded-signals)
+            EXCLUDED_SIGNALS="$2"
+            shift
+            ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --vehicle-name <NAME>   Vehicle name"
-            echo "  --fleet-size <SIZE>     Size of fleet, default: ${FLEET_SIZE}. When greater than 1,"
-            echo "                          the instance number will be appended to each"
-            echo "                          Vehicle name after a '-', e.g. ${DEFAULT_VEHICLE_NAME}-42"
-            echo "  --campaign-file <FILE>  Campaign JSON file, default: ${DEFAULT_CAMPAIGN_FILE}"
-            echo "  --dbc-file <FILE>       DBC file, default: ${DEFAULT_DBC_FILE}"
-            echo "  --bucket-name <NAME>    S3 bucket name, if not specified a new bucket will be created"
-            echo "  --set-bucket-policy     Sets the required bucket policy"
-            echo "  --clean-up              Delete created resources"
-            echo "  --enable-s3-upload      Create campaigns to upload data to S3"
-            echo "  --endpoint-url <URL>    The endpoint URL used for AWS CLI calls"
-            echo "  --service-principal <PRINCIPAL>    AWS service principal for policies, default: ${SERVICE_PRINCIPAL}"
-            echo "  --region <REGION>       The region used for AWS CLI calls, default: ${REGION}"
+            echo "  --vehicle-name <NAME>            Vehicle name"
+            echo "  --fleet-size <SIZE>              Size of fleet, default: ${FLEET_SIZE}. When greater than 1,"
+            echo "                                   the instance number will be appended to each"
+            echo "                                   Vehicle name after a '-', e.g. ${DEFAULT_VEHICLE_NAME}-42"
+            echo "  --campaign-file <FILE>           Campaign JSON file, default: ${DEFAULT_CAMPAIGN_FILE}"
+            echo "  --s3-campaign-file <FILE>        Campaign JSON file for S3 collection, default: ${DEFAULT_S3_CAMPAIGN_FILE}, or"
+            echo "                                   ${DEFAULT_S3_CAMPAIGN_FILE_VISION_SYSTEM_DATA} with --enable-ros2."
+            echo "  --dbc-file <FILE>                DBC file, default: ${DEFAULT_DBC_FILE}"
+            echo "  --bucket-name <NAME>             S3 bucket name, if not specified a new bucket will be created"
+            echo "  --set-bucket-policy              Sets the required bucket policy"
+            echo "  --clean-up                       Delete created resources"
+            echo "  --enable-s3-upload               Create campaigns to upload data to S3"
+            echo "  --enable-ros2                    Enables ROS2 collection. Implies --enable-s3-upload."
+            echo "  --ros2-config-file <FILE>        ROS2 config file, default: ${DEFAULT_ROS2_CONFIG_FILE}. Implies --enable-ros2."
+            echo "  --included-signals <CSV>         Comma separated list of signals to include in HTML plot"
+            echo "  --excluded-signals <CSV>         Comma separated list of signals to exclude from HTML plot"
+            echo "  --endpoint-url <URL>             The endpoint URL used for AWS CLI calls"
+            echo "  --service-principal <PRINCIPAL>  AWS service principal for policies, default: ${SERVICE_PRINCIPAL}"
+            echo "  --region <REGION>                The region used for AWS CLI calls, default: ${REGION}"
             exit 0
             ;;
         esac
@@ -125,7 +171,14 @@ if [ "${VEHICLE_NAME}" == "" ]; then
     fi
 fi
 
-if [ "${DBC_FILE}" != "" ] && [ "${CAMPAIGN_FILE}" == "" ]; then
+if [ "${DBC_FILE}" == "" ] && [ "${CAMPAIGN_FILE}" == "" ]; then
+    INCLUDED_SIGNALS="${DEFAULT_INCLUDED_SIGNALS}"
+fi
+if [ "${ROS2_CONFIG_FILE}" == "" ] && [ "${S3_CAMPAIGN_FILE}" == "" ]; then
+    INCLUDED_SIGNALS="${INCLUDED_SIGNALS}${DEFAULT_INCLUDED_SIGNALS_VISION_SYSTEM_DATA}"
+fi
+
+if ( [ "${DBC_FILE}" != "" ] && [ "${CAMPAIGN_FILE}" == "" ] ); then
     echo -n "Enter campaign file name: "
     read CAMPAIGN_FILE
     if [ "${CAMPAIGN_FILE}" == "" ]; then
@@ -133,13 +186,42 @@ if [ "${DBC_FILE}" != "" ] && [ "${CAMPAIGN_FILE}" == "" ]; then
         exit -1
     fi
 fi
+if ( [ "${ROS2_CONFIG_FILE}" != "" ] && [ "${S3_CAMPAIGN_FILE}" == "" ] ); then
+    echo -n "Enter S3 campaign file name: "
+    read S3_CAMPAIGN_FILE
+    if [ "${S3_CAMPAIGN_FILE}" == "" ]; then
+        echo "Error: Please provide campaign file name for ROS2 config file" >&2
+        exit -1
+    fi
+fi
+
+if ${ROS2_ENABLED} && [ "${BUCKET_NAME}" == "" ]; then
+    echo -n "Enter the name of an existing S3 bucket created in ${REGION}: "
+    read BUCKET_NAME
+    if [ "${BUCKET_NAME}" == "" ]; then
+        echo "Error: Please provide an existing S3 bucket" >&2
+        exit -1
+    fi
+fi
 
 if [ "${CAMPAIGN_FILE}" == "" ]; then
     CAMPAIGN_FILE=${DEFAULT_CAMPAIGN_FILE}
 fi
+if [ "${S3_CAMPAIGN_FILE}" == "" ]; then
+    if ${ROS2_ENABLED}; then
+        S3_CAMPAIGN_FILE=${DEFAULT_S3_CAMPAIGN_FILE_VISION_SYSTEM_DATA}
+    else
+        S3_CAMPAIGN_FILE=${DEFAULT_S3_CAMPAIGN_FILE}
+    fi
+fi
+
+if [ "${ROS2_CONFIG_FILE}" == "" ]; then
+    ROS2_CONFIG_FILE="${DEFAULT_ROS2_CONFIG_FILE}"
+fi
 
 if [ ${S3_UPLOAD} == true ] && [ "${BUCKET_NAME}" == "" ]; then
-    BUCKET_NAME="iot-fleetwise-demo-${S3_SUFFIX}"
+    CREATED_S3_BUCKET="iot-fleetwise-demo-${S3_SUFFIX}"
+    BUCKET_NAME=${CREATED_S3_BUCKET}
     SKIP_S3_POLICY=false
 fi
 
@@ -169,6 +251,12 @@ if [[ "${CLI_VERSION}" < "${MIN_CLI_VERSION}" ]]; then
     exit -1
 fi
 
+if ${ROS2_ENABLED} && ! ( aws iotfleetwise create-decoder-manifest help | grep -q ros2 ); then
+    echo "Error: The AWS CLI does not yet support the vision system data feature."
+    echo "       Please update your AWS CLI and/or try again later."
+    exit -1
+fi
+
 save_variables() {
     # Export some variables to a .env file so that they can be referenced by other scripts
     echo "
@@ -180,7 +268,7 @@ REGION=${REGION}
 SIGNAL_CATALOG=${CREATED_SIGNAL_CATALOG_NAME}
 TIMESTREAM_DB_NAME=${TIMESTREAM_DB_NAME}
 TIMESTREAM_TABLE_NAME=${TIMESTREAM_TABLE_NAME}
-BUCKET_NAME=${BUCKET_NAME}
+BUCKET_NAME=${CREATED_S3_BUCKET}
 " > demo.env
 }
 
@@ -232,7 +320,7 @@ echo "Getting account registration status..."
 if REGISTER_ACCOUNT_STATUS=`get_account_status 2>&1`; then
     ACCOUNT_STATUS=`echo "${REGISTER_ACCOUNT_STATUS}" | jq -r .accountStatus`
 elif ! echo ${REGISTER_ACCOUNT_STATUS} | grep -q "ResourceNotFoundException"; then
-    echo ${REGISTER_ACCOUNT_STATUS} >&2
+    echo "${REGISTER_ACCOUNT_STATUS}" >&2
     exit -1
 else
     ACCOUNT_STATUS="NOT_REGISTERED"
@@ -307,6 +395,7 @@ aws iam wait role-exists \
     --role-name "${SERVICE_ROLE}"
 
 echo "Creating service role policy..."
+# TODO: VISION_SYSTEMS_DATA_PREVIEW: Remove timestream:DescribeTable after issue fixed in cloud
 SERVICE_ROLE_POLICY=$(cat <<'EOF'
 {
     "Version": "2012-10-17",
@@ -316,7 +405,8 @@ SERVICE_ROLE_POLICY=$(cat <<'EOF'
             "Effect": "Allow",
             "Action": [
                 "timestream:WriteRecords",
-                "timestream:Select"
+                "timestream:Select",
+                "timestream:DescribeTable"
             ]
         },
         {
@@ -370,6 +460,9 @@ if [ ${S3_UPLOAD} == true ]; then
     BUCKET_LIST=$( aws s3 ls )
     if grep -q "$BUCKET_NAME" <<< "$BUCKET_LIST"; then
         echo "S3 bucket already exists"
+    elif ${ROS2_ENABLED}; then
+        echo "Error: S3 bucket '${BUCKET_NAME}' does not exist" >&2
+        exit -1
     else
         echo "Creating S3 bucket..."
         aws s3 mb s3://$BUCKET_NAME --region $REGION
@@ -427,6 +520,12 @@ if [ "${DBC_FILE}" == "" ]; then
 else
     DBC_NODES=`python3 dbc-to-nodes.py ${DBC_FILE}`
 fi
+if ! ${ROS2_ENABLED}; then
+    ROS2_NODES="[]"
+else
+    python3 ros2-to-nodes.py --config ${ROS2_CONFIG_FILE} --output ros2-nodes.json
+    ROS2_NODES=`cat ros2-nodes.json`
+fi
 
 if SIGNAL_CATALOG_ARN=`aws iotfleetwise create-signal-catalog \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
@@ -449,6 +548,15 @@ if SIGNAL_CATALOG_ARN=`aws iotfleetwise create-signal-catalog \
         --name ${NAME}-signal-catalog \
         --description "DBC signals" \
         --nodes-to-add "${DBC_NODES}" | jq -r .arn
+
+    if ${ROS2_ENABLED}; then
+        echo "Adding ROS2 signals to signal catalog..."
+        aws iotfleetwise update-signal-catalog \
+            ${ENDPOINT_URL_OPTION} --region ${REGION} \
+            --name ${NAME}-signal-catalog \
+            --description "ROS2 signals" \
+            --nodes-to-update "${ROS2_NODES}" | jq -r .arn
+    fi
 
     echo "Add an attribute to signal catalog..."
     aws iotfleetwise update-signal-catalog \
@@ -479,7 +587,7 @@ else
         --nodes-to-update "${VEHICLE_NODE}" 2>&1`; then
         echo ${UPDATE_SIGNAL_CATALOG_STATUS} | jq -r .arn
     elif ! echo ${UPDATE_SIGNAL_CATALOG_STATUS} | grep -q "InvalidSignalsException"; then
-        echo ${UPDATE_SIGNAL_CATALOG_STATUS} >&2
+        echo "${UPDATE_SIGNAL_CATALOG_STATUS}" >&2
         exit -1
     else
         echo "Node exists and is in use, continuing"
@@ -493,7 +601,7 @@ else
         --nodes-to-update "${OBD_NODES}" 2>&1`; then
         echo ${UPDATE_SIGNAL_CATALOG_STATUS} | jq -r .arn
     elif ! echo ${UPDATE_SIGNAL_CATALOG_STATUS} | grep -q "InvalidSignalsException"; then
-        echo ${UPDATE_SIGNAL_CATALOG_STATUS} >&2
+        echo "${UPDATE_SIGNAL_CATALOG_STATUS}" >&2
         exit -1
     else
         echo "Signals exist and are in use, continuing"
@@ -507,10 +615,26 @@ else
         --nodes-to-update "${DBC_NODES}" 2>&1`; then
         echo ${UPDATE_SIGNAL_CATALOG_STATUS} | jq -r .arn
     elif ! echo ${UPDATE_SIGNAL_CATALOG_STATUS} | grep -q "InvalidSignalsException"; then
-        echo ${UPDATE_SIGNAL_CATALOG_STATUS} >&2
+        echo "${UPDATE_SIGNAL_CATALOG_STATUS}" >&2
         exit -1
     else
         echo "Signals exist and are in use, continuing"
+    fi
+
+    if ${ROS2_ENABLED}; then
+        echo "Updating ROS2 signals in signal catalog..."
+        if UPDATE_SIGNAL_CATALOG_STATUS=`aws iotfleetwise update-signal-catalog \
+            ${ENDPOINT_URL_OPTION} --region ${REGION} \
+            --name ${SIGNAL_CATALOG_NAME} \
+            --description "ROS2 signals" \
+            --nodes-to-update "${ROS2_NODES}" 2>&1`; then
+            echo ${UPDATE_SIGNAL_CATALOG_STATUS} | jq -r .arn
+        elif ! echo ${UPDATE_SIGNAL_CATALOG_STATUS} | grep -q "InvalidSignalsException"; then
+            echo "${UPDATE_SIGNAL_CATALOG_STATUS}" >&2
+            exit -1
+        else
+            echo "Signals exist and are in use, continuing"
+        fi
     fi
 
     echo "Updating color attribute"
@@ -528,7 +652,7 @@ else
         ]' 2>&1`; then
         echo ${UPDATE_SIGNAL_CATALOG_STATUS} | jq -r .arn
     elif ! echo ${UPDATE_SIGNAL_CATALOG_STATUS} | grep -q "InvalidSignalsException"; then
-        echo ${UPDATE_SIGNAL_CATALOG_STATUS} >&2
+        echo "${UPDATE_SIGNAL_CATALOG_STATUS}" >&2
         exit -1
     else
         echo "Signals exist and are in use, continuing"
@@ -537,8 +661,13 @@ fi
 
 echo "Creating model manifest..."
 # Make a list of all node names:
-NODE_LIST=`( echo ${DBC_NODES} | jq -r .[].sensor.fullyQualifiedName | grep Vehicle\\. ; \
-             echo ${OBD_NODES} | jq -r .[].sensor.fullyQualifiedName | grep Vehicle\\. ) | jq -Rn [inputs]`
+NODE_LIST=`echo ${DBC_NODES} | jq -r .[].sensor.fullyQualifiedName | grep Vehicle\\. ; \
+           echo ${OBD_NODES} | jq -r .[].sensor.fullyQualifiedName | grep Vehicle\\.`
+if ${ROS2_ENABLED}; then
+    NODE_LIST=`echo "${NODE_LIST}" ; \
+               echo ${ROS2_NODES} | jq -r .[].sensor.fullyQualifiedName | grep Vehicle\\.`
+fi
+NODE_LIST=`echo "${NODE_LIST}" | jq -Rn [inputs]`
 aws iotfleetwise create-model-manifest \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
     --name ${NAME}-model-manifest \
@@ -559,8 +688,13 @@ MODEL_MANIFEST_ARN=`aws iotfleetwise update-model-manifest \
     --status ACTIVE | jq -r .arn`
 echo ${MODEL_MANIFEST_ARN}
 
-echo "Creating decoder manifest with OBD signals..."
 NETWORK_INTERFACES=`cat network-interfaces.json`
+if ${ROS2_ENABLED}; then
+    ROS2_NETWORK_INTERFACE=`cat network-interface-ros2.json`
+    NETWORK_INTERFACES=`echo ${NETWORK_INTERFACES} | jq -r ". += ${ROS2_NETWORK_INTERFACE}"`
+fi
+
+echo "Creating decoder manifest with OBD signals..."
 OBD_SIGNAL_DECODERS=`cat obd-decoders.json`
 DECODER_MANIFEST_ARN=`aws iotfleetwise create-decoder-manifest \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
@@ -584,11 +718,22 @@ if [ "${DBC_FILE}" == "" ]; then
         --name ${NAME}-decoder-manifest \
         --network-file-definitions "${NETWORK_FILE_DEFINITIONS}" | jq -r .arn
 else
-    SIGNAL_DECODERS=`python3 dbc-to-json.py ${DBC_FILE}`
+    SIGNAL_DECODERS=`python3 dbc-to-decoders.py ${DBC_FILE}`
     aws iotfleetwise update-decoder-manifest \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
         --name ${NAME}-decoder-manifest \
         --signal-decoders-to-add "${SIGNAL_DECODERS}" | jq -r .arn
+fi
+
+if ${ROS2_ENABLED}; then
+    echo "Adding ROS2 signals to decoder manifest..."
+    python3 ros2-to-decoders.py --config ${ROS2_CONFIG_FILE} --output ros2-decoders.json
+    ROS2_DECODERS=`cat ros2-decoders.json`
+    DECODER_MANIFEST_ARN=`aws iotfleetwise update-decoder-manifest \
+        ${ENDPOINT_URL_OPTION} --region ${REGION} \
+        --name ${NAME}-decoder-manifest \
+        --signal-decoders-to-add "${ROS2_DECODERS}" | jq -r .arn`
+    echo ${DECODER_MANIFEST_ARN}
 fi
 
 echo "Activating decoder manifest..."
@@ -666,8 +811,8 @@ aws iotfleetwise create-campaign \
 approve_campaign ${NAME}-campaign
 
 if [ ${S3_UPLOAD} == true ]; then
-    echo "Creating campaign from ${CAMPAIGN_FILE} for S3..."
-    CAMPAIGN=`cat ${CAMPAIGN_FILE} \
+    echo "Creating campaign from ${S3_CAMPAIGN_FILE} for S3..."
+    CAMPAIGN=`cat ${S3_CAMPAIGN_FILE} \
         | jq .name=\"${NAME}-campaign-s3-json\" \
         | jq .signalCatalogArn=\"${SIGNAL_CATALOG_ARN}\" \
         | jq .targetArn=\"${FLEET_ARN}\"`
@@ -677,8 +822,8 @@ if [ ${S3_UPLOAD} == true ]; then
 
     approve_campaign ${NAME}-campaign-s3-json
 
-    echo "Creating campaign from ${CAMPAIGN_FILE} for S3..."
-    CAMPAIGN=`cat ${CAMPAIGN_FILE} \
+    echo "Creating campaign from ${S3_CAMPAIGN_FILE} for S3..."
+    CAMPAIGN=`cat ${S3_CAMPAIGN_FILE} \
         | jq .name=\"${NAME}-campaign-s3-parquet\" \
         | jq .signalCatalogArn=\"${SIGNAL_CATALOG_ARN}\" \
         | jq .targetArn=\"${FLEET_ARN}\"`
@@ -775,12 +920,15 @@ fi
 
 OUTPUT_FILES=()
 for VEHICLE in ${VEHICLES[@]}; do
-    echo "Converting to HTML..."
+    echo "Converting from Timestream JSON to HTML..."
     OUTPUT_FILE_HTML="${COLLECTED_DATA_DIR}${VEHICLE}.html"
     OUTPUT_FILES+=(${OUTPUT_FILE_HTML})
     python3 timestream-to-html.py \
-        ${COLLECTED_DATA_DIR}${VEHICLE}-timestream-result.json \
-        ${OUTPUT_FILE_HTML}
+        --vehicle-name ${VEHICLE} \
+        --files ${COLLECTED_DATA_DIR}${VEHICLE}-timestream-result.json \
+        --html-filename ${OUTPUT_FILE_HTML} \
+        --include-signals "${INCLUDED_SIGNALS}" \
+        --exclude-signals "${EXCLUDED_SIGNALS}"
 done
 
 echo "You can now view the collected data."
@@ -791,7 +939,7 @@ for FILE in ${OUTPUT_FILES[@]}; do
     echo `realpath ${FILE}`
 done
 
-if [ ${S3_UPLOAD} == true ]; then
+if ${S3_UPLOAD}; then
     DELAY=1200
     echo "Waiting 20 minutes for data to be collected and uploaded to S3..."
     sleep ${DELAY}
@@ -807,30 +955,50 @@ if [ ${S3_UPLOAD} == true ]; then
         aws s3 cp s3://${BUCKET_NAME}/${KEY} ${COLLECTED_DATA_DIR}
     done
 
-    OUTPUT_FILES=()
     for VEHICLE in ${VEHICLES[@]}; do
-        echo "Converting from JSON to HTML..."
+        echo "Converting from Firehose JSON to HTML..."
         OUTPUT_FILE_HTML="${COLLECTED_DATA_DIR}${VEHICLE}-json.html"
-        OUTPUT_FILES+=(${OUTPUT_FILE_HTML})
+        OUTPUT_FILE_S3_LINKS="${COLLECTED_DATA_DIR}${VEHICLE}-s3-links-json.txt"
         python3 firehose-to-html.py \
             --vehicle-name ${VEHICLE} \
             --files ${COLLECTED_DATA_DIR}part-*.json \
-            --html-filename ${OUTPUT_FILE_HTML}
+            --html-filename ${OUTPUT_FILE_HTML} \
+            --s3-links-filename ${OUTPUT_FILE_S3_LINKS} \
+            --include-signals "${INCLUDED_SIGNALS}" \
+            --exclude-signals "${EXCLUDED_SIGNALS}"
 
-        echo "Converting from Parquet to HTML..."
+        if [ -s ${OUTPUT_FILE_S3_LINKS} ]; then
+            echo "Downloading the first 10 linked files..."
+            i=0
+            cat ${OUTPUT_FILE_S3_LINKS} | while read LINE; do
+                if ((i < 10)); then
+                IMAGE_FILE=`basename ${LINE}.jpg`
+                # Remove random prefix so that filenames begin with date
+                IMAGE_FILE=`echo ${IMAGE_FILE} | sed -E 's/^[0-9a-f]{8}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{4}\-[0-9a-f]{12}\-//'`
+                    aws s3 cp ${LINE} ${COLLECTED_DATA_DIR}${IMAGE_FILE}
+                fi
+                i=$((i+1))
+            done
+        fi
+
+        echo "Converting from Firehose Parquet to HTML..."
         OUTPUT_FILE_HTML="${COLLECTED_DATA_DIR}${VEHICLE}-parquet.html"
-        OUTPUT_FILES+=(${OUTPUT_FILE_HTML})
+        OUTPUT_FILE_S3_LINKS="${COLLECTED_DATA_DIR}${VEHICLE}-s3-links-parquet.txt"
         python3 firehose-to-html.py \
             --vehicle-name ${VEHICLE} \
             --files ${COLLECTED_DATA_DIR}part-*.parquet \
-            --html-filename ${OUTPUT_FILE_HTML}
+            --html-filename ${OUTPUT_FILE_HTML} \
+            --s3-links-filename ${OUTPUT_FILE_S3_LINKS} \
+            --include-signals "${INCLUDED_SIGNALS}" \
+            --exclude-signals "${EXCLUDED_SIGNALS}"
     done
 
+    echo "Zipping up collected data..."
+    zip ${COLLECTED_DATA_DIR}${NAME}.zip ${COLLECTED_DATA_DIR}*
+
     echo "You can now view the collected data."
-    echo "----------------------------------"
-    echo "| Collected data in HTML format: |"
-    echo "----------------------------------"
-    for FILE in ${OUTPUT_FILES[@]}; do
-        echo `realpath ${FILE}`
-    done
+    echo "----------------------"
+    echo "| Collected S3 data: |"
+    echo "----------------------"
+    echo `realpath ${COLLECTED_DATA_DIR}${NAME}.zip`
 fi

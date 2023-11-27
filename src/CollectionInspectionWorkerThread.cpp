@@ -4,14 +4,13 @@
 #include "CollectionInspectionWorkerThread.h"
 #include "CANDataTypes.h"
 #include "LoggingModule.h"
-#include "OBDDataTypes.h"
 #include "SignalTypes.h"
 #include "TraceModule.h"
 #include <algorithm>
 #include <array>
-#include <boost/lockfree/queue.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace Aws
 {
@@ -20,15 +19,14 @@ namespace IoTFleetWise
 
 bool
 CollectionInspectionWorkerThread::init( const std::shared_ptr<SignalBuffer> &inputSignalBuffer,
-                                        const std::shared_ptr<CANBuffer> &inputCANBuffer,
-                                        const std::shared_ptr<ActiveDTCBuffer> &inputActiveDTCBuffer,
                                         const std::shared_ptr<CollectedDataReadyToPublish> &outputCollectedData,
                                         uint32_t idleTimeMs,
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                                        std::shared_ptr<RawData::BufferManager> rawBufferManager,
+#endif
                                         bool dataReductionProbabilityDisabled )
 {
     fInputSignalBuffer = inputSignalBuffer;
-    fInputCANBuffer = inputCANBuffer;
-    fInputActiveDTCBuffer = inputActiveDTCBuffer;
     fOutputCollectedData = outputCollectedData;
     if ( idleTimeMs != 0 )
     {
@@ -36,14 +34,17 @@ CollectionInspectionWorkerThread::init( const std::shared_ptr<SignalBuffer> &inp
     }
     fCollectionInspectionEngine.setDataReductionParameters( dataReductionProbabilityDisabled );
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    fCollectionInspectionEngine.setRawDataBufferManager( rawBufferManager );
+    mRawBufferManager = std::move( rawBufferManager );
+#endif
     return true;
 }
 
 bool
 CollectionInspectionWorkerThread::start()
 {
-    if ( ( fInputCANBuffer == nullptr ) || ( fInputCANBuffer == nullptr ) || ( fInputActiveDTCBuffer == nullptr ) ||
-         ( fOutputCollectedData == nullptr ) )
+    if ( ( fInputSignalBuffer == nullptr ) || ( fOutputCollectedData == nullptr ) )
     {
         FWE_LOG_ERROR( "Collection Engine cannot be started without correct configurations" );
         return false;
@@ -114,7 +115,6 @@ CollectionInspectionWorkerThread::doWork( void *data )
 {
 
     CollectionInspectionWorkerThread *consumer = static_cast<CollectionInspectionWorkerThread *>( data );
-    Timestamp lastInputTimeEvaluated = 0;
     TimePoint lastTimeEvaluated = { 0, 0 };
     Timestamp lastTraceOutput = 0;
     uint64_t inputCounterSinceLastEvaluate = 0;
@@ -132,170 +132,163 @@ CollectionInspectionWorkerThread::doWork( void *data )
                 consumer->fUpdatedInspectionMatrixAvailable = false;
                 newInspectionMatrix = consumer->fUpdatedInspectionMatrix;
             }
-            consumer->fCollectionInspectionEngine.onChangeInspectionMatrix( newInspectionMatrix );
+            consumer->fCollectionInspectionEngine.onChangeInspectionMatrix( newInspectionMatrix,
+                                                                            consumer->fClock->timeSinceEpoch() );
         }
         // Only run the main inspection loop if there is an inspection matrix
         // Otherwise, go to sleep.
         if ( consumer->fUpdatedInspectionMatrix )
         {
-            bool readyToSleep = true;
-            Timestamp latestSignalTime = 0;
             CollectedSignal inputSignal( 0, 0, 0.0 );
             std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = {};
             CollectedCanRawFrame inputCANFrame( 0, 0, 0, buf, 0 );
             TimePoint currentTime = consumer->fClock->timeSinceEpoch();
-            // Consume any new signals and pass them over to the inspection Engine
-            if ( consumer->fInputSignalBuffer->pop( inputSignal ) )
-            {
-                TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-                TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_SIGNALS );
-                readyToSleep = false;
-                auto signalValue = inputSignal.getValue();
-                switch ( signalValue.getType() )
-                {
-                case SignalType::UINT8:
-                    consumer->fCollectionInspectionEngine.addNewSignal<uint8_t>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.uint8Val );
-                    break;
-                case SignalType::INT8:
-                    consumer->fCollectionInspectionEngine.addNewSignal<int8_t>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.int8Val );
-                    break;
-                case SignalType::UINT16:
-                    consumer->fCollectionInspectionEngine.addNewSignal<uint16_t>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.uint16Val );
-                    break;
-                case SignalType::INT16:
-                    consumer->fCollectionInspectionEngine.addNewSignal<int16_t>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.int16Val );
-                    break;
-                case SignalType::UINT32:
-                    consumer->fCollectionInspectionEngine.addNewSignal<uint32_t>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.uint32Val );
-                    break;
-                case SignalType::INT32:
-                    consumer->fCollectionInspectionEngine.addNewSignal<int32_t>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.int32Val );
-                    break;
-                case SignalType::UINT64:
-                    consumer->fCollectionInspectionEngine.addNewSignal<uint64_t>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.uint64Val );
-                    break;
-                case SignalType::INT64:
-                    consumer->fCollectionInspectionEngine.addNewSignal<int64_t>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.int64Val );
-                    break;
-                case SignalType::FLOAT:
-                    consumer->fCollectionInspectionEngine.addNewSignal<float>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.floatVal );
-                    break;
-                case SignalType::DOUBLE:
-                    consumer->fCollectionInspectionEngine.addNewSignal<double>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.doubleVal );
-                    break;
-                case SignalType::BOOLEAN:
-                    consumer->fCollectionInspectionEngine.addNewSignal<bool>(
-                        inputSignal.signalID,
-                        calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
-                        signalValue.value.boolVal );
-                    break;
-                default:
-                    break;
-                }
-                latestSignalTime = std::max( latestSignalTime, inputSignal.receiveTime );
-                inputCounterSinceLastEvaluate++;
-                statisticInputMessagesProcessed++;
-            }
-            // Consume any raw frames
-            if ( consumer->fInputCANBuffer->pop( inputCANFrame ) )
-            {
-                TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
-                TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_CAN_FRAMES );
-                readyToSleep = false;
-                consumer->fCollectionInspectionEngine.addNewRawCanFrame(
-                    inputCANFrame.frameID,
-                    inputCANFrame.channelId,
-                    calculateMonotonicTime( currentTime, inputCANFrame.receiveTime ),
-                    inputCANFrame.data,
-                    inputCANFrame.size );
-                latestSignalTime = std::max( latestSignalTime, inputCANFrame.receiveTime );
-                inputCounterSinceLastEvaluate++;
-                statisticInputMessagesProcessed++;
-            }
-
-            // Consume any Active DTCs
-            // We could check if the DTCs have changed here, but not necessary
-            // as we are looking at only the latest known DTCs.
-            // We only pop one item from the Buffer for a reason : DTCs represent
-            // the health of all ECUs in the network. The Inspection Engine does
-            // not need to know that topology and thus counts on the OBD Module
-            // to aggregate all DTCs from all ECUs in one single Item.
-            DTCInfo activeDTCs = {};
-            if ( consumer->fInputActiveDTCBuffer->pop( activeDTCs ) )
-            {
-                consumer->fCollectionInspectionEngine.setActiveDTCs( activeDTCs );
-            }
-
-            // Trigger inspection on whatever that has been consumed.
-            if ( ( ( latestSignalTime - lastInputTimeEvaluated ) >= EVALUATE_INTERVAL_MS ) ||
-                 ( inputCounterSinceLastEvaluate >= 256 ) )
-            {
-                lastInputTimeEvaluated = latestSignalTime;
-                lastTimeEvaluated = consumer->fClock->timeSinceEpoch();
-                consumer->fCollectionInspectionEngine.evaluateConditions( lastTimeEvaluated );
-                inputCounterSinceLastEvaluate = 0;
-            }
-
-            // before going to sleep do another evaluation if last evaluation is more than EVALUATE_INTERVAL_MS ago
-            if ( readyToSleep && ( ( consumer->fClock->monotonicTimeSinceEpochMs() -
-                                     lastTimeEvaluated.monotonicTimeMs ) >= EVALUATE_INTERVAL_MS ) )
-            {
-                lastInputTimeEvaluated = latestSignalTime;
-                lastTimeEvaluated = consumer->fClock->timeSinceEpoch();
-                consumer->fCollectionInspectionEngine.evaluateConditions( lastTimeEvaluated );
-                inputCounterSinceLastEvaluate = 0;
-            }
             uint32_t waitTimeMs = consumer->fIdleTimeMs;
-            std::shared_ptr<const TriggeredCollectionSchemeData> collectedData =
-                consumer->fCollectionInspectionEngine.collectNextDataToSend( consumer->fClock->timeSinceEpoch(),
-                                                                             waitTimeMs );
-            while ( ( collectedData != nullptr ) && ( !consumer->shouldStop() ) )
-            {
-                TraceModule::get().incrementVariable( TraceVariable::CE_TRIGGERS );
-                if ( !consumer->fOutputCollectedData->push( collectedData ) )
-                {
-                    FWE_LOG_WARN( "Collected data output buffer is full" );
-                }
-                else
-                {
-                    statisticDataSentOut++;
-                    consumer->notifyListeners<>( &IDataReadyToPublishListener::onDataReadyToPublish );
-                }
-                collectedData = consumer->fCollectionInspectionEngine.collectNextDataToSend(
-                    consumer->fClock->timeSinceEpoch(), waitTimeMs );
-            }
+            // Consume any new signals and pass them over to the inspection Engine
+            auto consumeSignalGroups = [&]( const CollectedDataFrame &dataFrame ) {
+                TraceModule::get().decrementAtomicVariable(
+                    TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
+                TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_DATA_FRAMES );
 
-            if ( readyToSleep )
+                if ( !dataFrame.mCollectedSignals.empty() )
+                {
+                    for ( auto &inputSignal : dataFrame.mCollectedSignals )
+                    {
+                        TraceModule::get().decrementAtomicVariable(
+                            TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+                        TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_SIGNALS );
+                        auto signalValue = inputSignal.getValue();
+                        switch ( signalValue.getType() )
+                        {
+                        case SignalType::UINT8:
+                            consumer->fCollectionInspectionEngine.addNewSignal<uint8_t>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.uint8Val );
+                            break;
+                        case SignalType::INT8:
+                            consumer->fCollectionInspectionEngine.addNewSignal<int8_t>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.int8Val );
+                            break;
+                        case SignalType::UINT16:
+                            consumer->fCollectionInspectionEngine.addNewSignal<uint16_t>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.uint16Val );
+                            break;
+                        case SignalType::INT16:
+                            consumer->fCollectionInspectionEngine.addNewSignal<int16_t>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.int16Val );
+                            break;
+                        case SignalType::UINT32:
+                            consumer->fCollectionInspectionEngine.addNewSignal<uint32_t>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.uint32Val );
+                            break;
+                        case SignalType::INT32:
+                            consumer->fCollectionInspectionEngine.addNewSignal<int32_t>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.int32Val );
+                            break;
+                        case SignalType::UINT64:
+                            consumer->fCollectionInspectionEngine.addNewSignal<uint64_t>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.uint64Val );
+                            break;
+                        case SignalType::INT64:
+                            consumer->fCollectionInspectionEngine.addNewSignal<int64_t>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.int64Val );
+                            break;
+                        case SignalType::FLOAT:
+                            consumer->fCollectionInspectionEngine.addNewSignal<float>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.floatVal );
+                            break;
+                        case SignalType::DOUBLE:
+                            consumer->fCollectionInspectionEngine.addNewSignal<double>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.doubleVal );
+                            break;
+                        case SignalType::BOOLEAN:
+                            consumer->fCollectionInspectionEngine.addNewSignal<bool>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.boolVal );
+                            break;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                        case SignalType::RAW_DATA_BUFFER_HANDLE:
+                            consumer->fCollectionInspectionEngine.addNewSignal<RawData::BufferHandle>(
+                                inputSignal.signalID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                signalValue.value.uint32Val );
+                            if ( consumer->mRawBufferManager != nullptr )
+                            {
+                                consumer->mRawBufferManager->decreaseHandleUsageHint(
+                                    inputSignal.signalID,
+                                    signalValue.value.uint32Val,
+                                    RawData::BufferHandleUsageStage::COLLECTED_NOT_IN_HISTORY_BUFFER );
+                            }
+                            break;
+#endif
+                        }
+                        statisticInputMessagesProcessed++;
+                    }
+                }
+                if ( dataFrame.mCollectedCanRawFrame != nullptr )
+                {
+                    // Consume any raw frames
+                    TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
+                    TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_CAN_FRAMES );
+
+                    consumer->fCollectionInspectionEngine.addNewRawCanFrame(
+                        dataFrame.mCollectedCanRawFrame->frameID,
+                        dataFrame.mCollectedCanRawFrame->channelId,
+                        calculateMonotonicTime( currentTime, dataFrame.mCollectedCanRawFrame->receiveTime ),
+                        dataFrame.mCollectedCanRawFrame->data,
+                        dataFrame.mCollectedCanRawFrame->size );
+                    inputCounterSinceLastEvaluate++;
+                    statisticInputMessagesProcessed++;
+                }
+
+                // Consume any Active DTCs
+                // We could check if the DTCs have changed here, but not necessary
+                // as we are looking at only the latest known DTCs.
+                // We only pop one item from the Buffer for a reason : DTCs represent
+                // the health of all ECUs in the network. The Inspection Engine does
+                // not need to know that topology and thus counts on the OBD Module
+                // to aggregate all DTCs from all ECUs in one single Item.
+                if ( dataFrame.mActiveDTCs != nullptr )
+                {
+                    TraceModule::get().decrementAtomicVariable(
+                        TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS );
+                    TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_DTCS );
+                    consumer->fCollectionInspectionEngine.setActiveDTCs( *dataFrame.mActiveDTCs.get() );
+                    statisticInputMessagesProcessed++;
+                }
+
+                lastTimeEvaluated = consumer->fClock->timeSinceEpoch();
+                consumer->fCollectionInspectionEngine.evaluateConditions( lastTimeEvaluated );
+
+                // Initiate data collection and upload after every condition evaluation
+                statisticDataSentOut += consumer->collectDataAndUpload();
+            };
+            consumer->fInputSignalBuffer->consumeAll( consumeSignalGroups );
+
+            // Repeat data collection and upload after queue was emptied
+            statisticDataSentOut += consumer->collectDataAndUpload();
+
+            if ( consumer->fInputSignalBuffer->isEmpty() )
             {
                 // Nothing is in the ring buffer to consume. Go to idle mode for some time.
                 uint32_t timeToWait = std::min( waitTimeMs, consumer->fIdleTimeMs );
@@ -327,6 +320,31 @@ CollectionInspectionWorkerThread::doWork( void *data )
             break;
         }
     }
+}
+
+uint32_t
+CollectionInspectionWorkerThread::collectDataAndUpload()
+{
+    uint32_t collectedDataPackages = 0;
+    uint32_t waitTimeMs = this->fIdleTimeMs;
+    std::shared_ptr<const TriggeredCollectionSchemeData> collectedData =
+        this->fCollectionInspectionEngine.collectNextDataToSend( this->fClock->timeSinceEpoch(), waitTimeMs );
+    while ( ( collectedData != nullptr ) && ( !this->shouldStop() ) )
+    {
+        TraceModule::get().incrementVariable( TraceVariable::CE_TRIGGERS );
+        if ( !this->fOutputCollectedData->push( std::move( collectedData ) ) )
+        {
+            FWE_LOG_WARN( "Collected data output buffer is full" );
+        }
+        else
+        {
+            collectedDataPackages++;
+            this->notifyListeners<>( &IDataReadyToPublishListener::onDataReadyToPublish );
+        }
+        collectedData =
+            this->fCollectionInspectionEngine.collectNextDataToSend( this->fClock->timeSinceEpoch(), waitTimeMs );
+    }
+    return collectedDataPackages;
 }
 
 TimePoint

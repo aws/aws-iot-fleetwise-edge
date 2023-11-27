@@ -8,6 +8,11 @@
 #include <json/json.h>
 #include <string>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include <memory>
+#include <streambuf>
+#endif
+
 // max buffer to be allocated for a read buffer
 // this matches the Max Send Size on the AWS IoT channel
 constexpr size_t MAX_DATA_RD_SIZE = 131072;
@@ -90,6 +95,25 @@ public:
                              size_t size,
                              DataType dataType,
                              const std::string &filename = std::string() );
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief Writes to the non volatile memory(NVM) from stream to the Ion file.
+     *
+     * @param streambuf     data stream to write the data from
+     * @param dataType   specifies if the data is an edge to cloud payload, collectionScheme list, etc.
+     * @param filename full name of the file to store
+     *
+     * @return ErrorCode   SUCCESS if the write is successful,
+     *                     MEMORY_FULL if the partition size is reached,
+     *                     INVALID_DATA if the buffer ptr is NULL,
+     *                     INVALID_DATATYPE if filename is empty,
+     *                     FILESYSTEM_ERROR in case of any file I/O errors.
+     */
+    ErrorCode write( std::unique_ptr<std::streambuf> streambuf,
+                     DataType dataType,
+                     const std::string &filename = std::string() );
+#endif
 
     /**
      * @brief Adds new file metadata to existing JSON object.
@@ -187,7 +211,7 @@ private:
     static constexpr const char *DEPRECATED_COLLECTED_DATA_FILE = "CollectedData.bin";
 
     static constexpr const char *METADATA_SCHEME_VERSION = "1.0.0";
-    // Estimate size of metadata: expected average for Proto payload is 100
+    // Estimate size of metadata: expected average for Proto payload is 100, for Ion 200-250
     static constexpr size_t ESTIMATED_METADATA_SIZE_PER_FILE = 400;
 
     std::string mPersistencyPath;

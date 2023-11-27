@@ -37,6 +37,7 @@ jobs:
         with:
           build-arch: "native"
           upload-arch: "amd64"
+          dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/x86_64-linux-gnu
           dist-files: build/aws-iot-fleetwise-edge:.
 
@@ -48,6 +49,7 @@ jobs:
         with:
           build-arch: "cross-arm64"
           upload-arch: "arm64"
+          dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/aarch64-linux-gnu:/usr/local/x86_64-linux-gnu
           dist-files: build/aws-iot-fleetwise-edge:.
 
@@ -59,8 +61,49 @@ jobs:
         with:
           build-arch: "cross-armhf"
           upload-arch: "armhf"
+          extra-options: "--with-iwave-gps-support"
+          dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/arm-linux-gnueabihf:/usr/local/x86_64-linux-gnu
           dist-files: build/aws-iot-fleetwise-edge:.
+
+  build-ros2-amd64:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: "./.github/template/fwe-build"
+        with:
+          build-arch: "native"
+          upload-arch: "amd64"
+          extra-options: "--with-ros2-support"
+          dist-name: "aws-iot-fleetwise-edge-ros2"
+          cache-paths: /usr/local/x86_64-linux-gnu:/opt/ros
+          dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
+
+  build-ros2-arm64:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: "./.github/template/fwe-build"
+        with:
+          build-arch: "cross-arm64"
+          upload-arch: "arm64"
+          extra-options: "--with-ros2-support"
+          dist-name: "aws-iot-fleetwise-edge-ros2"
+          cache-paths: /usr/local/aarch64-linux-gnu:/usr/local/x86_64-linux-gnu:/opt/ros
+          dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
+
+  build-ros2-armhf:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: "./.github/template/fwe-build"
+        with:
+          build-arch: "cross-armhf"
+          upload-arch: "armhf"
+          extra-options: "--with-ros2-support"
+          dist-name: "aws-iot-fleetwise-edge-ros2"
+          cache-paths: /usr/local/arm-linux-gnueabihf:/usr/local/x86_64-linux-gnu:/opt/ros
+          dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
 
   build-android:
     runs-on: ubuntu-20.04
@@ -70,6 +113,7 @@ jobs:
         with:
           build-arch: "cross-android"
           upload-arch: "android"
+          dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/x86_64-linux-android:/usr/local/aarch64-linux-android:/usr/local/armv7a-linux-androideabi:/usr/local/x86_64-linux-gnu
           dist-files:
             build/x86_64/libaws-iot-fleetwise-edge.so:x86_64
@@ -133,38 +177,44 @@ jobs:
       - uses: actions/download-artifact@v3
       - name: Move artifacts to match buildx TARGETPLATFORM structure
         run: |
-          mkdir -p linux/arm
-          mv build-amd64 linux/amd64
-          mv build-arm64 linux/arm64
-          mv build-armhf linux/arm/v7
-          find linux -name aws-iot-fleetwise-edge -exec chmod +x {} \;
-      - uses: docker/setup-qemu-action@v2
-      - uses: docker/setup-buildx-action@v2
-      - uses: aws-actions/configure-aws-credentials@v2
-        if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
+          mkdir -p linux/amd64
+          mv aws-iot-fleetwise-edge-amd64/aws-iot-fleetwise-edge-amd64.tar.gz linux/amd64/aws-iot-fleetwise-edge.tar.gz
+          tar -zcf linux/amd64/opt.tar.gz -T /dev/null # Create empty tar.gz
+          mkdir -p linux/arm64
+          mv aws-iot-fleetwise-edge-arm64/aws-iot-fleetwise-edge-arm64.tar.gz linux/arm64/aws-iot-fleetwise-edge.tar.gz
+          tar -zcf linux/arm64/opt.tar.gz -T /dev/null # Create empty tar.gz
+          mkdir -p linux/arm/v7
+          mv aws-iot-fleetwise-edge-armhf/aws-iot-fleetwise-edge-armhf.tar.gz linux/arm/v7/aws-iot-fleetwise-edge.tar.gz
+          tar -zcf linux/arm/v7/opt.tar.gz -T /dev/null # Create empty tar.gz
+      - uses: "./.github/template/docker-build"
         with:
-          role-to-assume: ${{ secrets.PUBLIC_ECR_PUSH_ROLE }}
-          aws-region: us-east-1
-      - uses: aws-actions/amazon-ecr-login@v1
-        if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
+          dist-name: aws-iot-fleetwise-edge
+          push-role: ${{ secrets.PUBLIC_ECR_PUSH_ROLE }}
+
+  build-docker-ros2:
+    runs-on: ubuntu-20.04
+    needs:
+      - build-ros2-amd64
+      - build-ros2-arm64
+      - build-ros2-armhf
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+      - name: Move artifacts to match buildx TARGETPLATFORM structure
+        run: |
+          mkdir -p linux/amd64
+          mv aws-iot-fleetwise-edge-ros2-amd64/aws-iot-fleetwise-edge-ros2-amd64.tar.gz linux/amd64/aws-iot-fleetwise-edge.tar.gz
+          mv aws-iot-fleetwise-edge-ros2-amd64/opt.tar.gz                               linux/amd64/opt.tar.gz
+          mkdir -p linux/arm64
+          mv aws-iot-fleetwise-edge-ros2-arm64/aws-iot-fleetwise-edge-ros2-arm64.tar.gz linux/arm64/aws-iot-fleetwise-edge.tar.gz
+          mv aws-iot-fleetwise-edge-ros2-arm64/opt.tar.gz                               linux/arm64/opt.tar.gz
+          mkdir -p linux/arm/v7
+          mv aws-iot-fleetwise-edge-ros2-armhf/aws-iot-fleetwise-edge-ros2-armhf.tar.gz linux/arm/v7/aws-iot-fleetwise-edge.tar.gz
+          mv aws-iot-fleetwise-edge-ros2-armhf/opt.tar.gz                               linux/arm/v7/opt.tar.gz
+      - uses: "./.github/template/docker-build"
         with:
-          registry-type: public
-      - id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: public.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge
-      - uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: "./tools/container/Dockerfile"
-          push:
-            ${{ github.repository == 'aws/aws-iot-fleetwise-edge' && ( github.ref_type == 'tag' ||
-            github.ref == 'refs/heads/main' ) }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          dist-name: aws-iot-fleetwise-edge-ros2
+          push-role: ${{ secrets.PUBLIC_ECR_PUSH_ROLE }}
 
   copy-cfn-templates:
     runs-on: ubuntu-20.04

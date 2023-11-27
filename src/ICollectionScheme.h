@@ -20,7 +20,8 @@ namespace IoTFleetWise
 struct SignalCollectionInfo
 {
     /**
-     * @brief Unique Signal ID provided by Cloud
+     * @brief Unique Signal ID provided by Cloud or Partial Signal Id generated internally see
+     * INTERNAL_SIGNAL_ID_BITMASK
      */
     SignalID signalID{ 0 };
 
@@ -172,6 +173,55 @@ struct ExpressionNode
     ExpressionFunction function;
 };
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+struct S3UploadMetadata
+{
+    /**
+     * @brief Bucket name for S3 upload
+     */
+    std::string bucketName;
+
+    /**
+     * @brief Prefix to add to every upload object
+     */
+    std::string prefix;
+
+    /**
+     * @brief Region of the S3 bucket for upload
+     */
+    std::string region;
+
+    /**
+     * @brief Account ID of bucket owner
+     */
+    std::string bucketOwner;
+
+public:
+    /**
+     * @brief Overload of the == operator for S3UploadMetadata
+     * @param other Other S3UploadMetadata object to compare
+     * @return true if ==, false otherwise
+     */
+    bool
+    operator==( const S3UploadMetadata &other ) const
+    {
+        return ( bucketName == other.bucketName ) && ( prefix == other.prefix ) && ( region == other.region ) &&
+               ( bucketOwner == other.bucketOwner );
+    }
+
+    /**
+     * @brief Overloaded != operator for S3UploadMetadata.
+     * @param other Other S3UploadMetadata to compare to.
+     * @return True if !=, false otherwise.
+     */
+    bool
+    operator!=( const S3UploadMetadata &other ) const
+    {
+        return !( *this == other );
+    }
+};
+#endif
+
 /**
  * @brief ICollectionScheme is used to exchange CollectionScheme between components
  *
@@ -200,6 +250,17 @@ public:
      */
     using RawCanFrames_t = std::vector<CanFrameCollectionInfo>;
     const RawCanFrames_t INVALID_RAW_CAN_COLLECTED_SIGNALS = std::vector<CanFrameCollectionInfo>();
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief Complex signals can have multiple PartialSignalID. As complex signals are represented as a tree
+     *          the SignalPath give the path inside the SignalID that contains the PartialSignalID.
+     */
+    using PartialSignalIDLookup = std::unordered_map<PartialSignalID, std::pair<SignalID, SignalPath>>;
+    const PartialSignalIDLookup INVALID_PARTIAL_SIGNAL_ID_LOOKUP = PartialSignalIDLookup();
+
+    const S3UploadMetadata INVALID_S3_UPLOAD_METADATA = S3UploadMetadata();
+#endif
 
     /**
      * @brief Signals_t is a vector that represents the AST Expression Tree per collectionScheme provided.
@@ -343,6 +404,23 @@ public:
      * @return if not ready an empty vector
      */
     virtual const ExpressionNode_t &getAllExpressionNodes() const = 0;
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    /**
+     * @brief Returns a lookup table to translate internal PartialSignalId to the signal id and path
+     *         provided by cloud
+     *
+     * @return if not ready an empty unordered_map
+     */
+    virtual const PartialSignalIDLookup &getPartialSignalIdToSignalPathLookupTable() const = 0;
+
+    /**
+     * @brief Returns S3 Upload Metadata
+     *
+     * @return if not ready empty struct
+     */
+    virtual S3UploadMetadata getS3UploadMetadata() const = 0;
+#endif
 
     virtual ~ICollectionScheme() = default;
 };

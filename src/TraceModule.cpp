@@ -145,6 +145,16 @@ TraceModule::getVariableName( TraceVariable variable )
         return "MqttHeapSize";
     case TraceVariable::SIGNAL_BUFFER_SIZE:
         return "SigBufSize";
+    case TraceVariable::RAW_DATA_OVERWRITTEN_DATA_WITH_USED_HANDLE:
+        return "RawOverw_id62";
+    case TraceVariable::RAW_DATA_BUFFER_ELEMENTS_PER_TYPE:
+        return "RawElementsPerType";
+    case TraceVariable::RAW_DATA_BUFFER_MANAGER_BYTES:
+        return "RawBufferBytes";
+    case TraceVariable::CE_PROCESSED_DATA_FRAMES:
+        return "CEProcessedDataFrames";
+    case TraceVariable::CE_PROCESSED_DTCS:
+        return "CEProcessedDTCs";
     default:
         return nullptr;
     }
@@ -161,6 +171,10 @@ TraceModule::getAtomicVariableName( TraceAtomicVariable variable )
         return "QUEUE_CONSUMER_TO_INSPECTION_SIGNALS_id0";
     case TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN:
         return "QUEUE_CONSUMER_TO_INSPECTION_CAN_id1";
+    case TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES:
+        return "QueueConsumerToInspectionDataFrames";
+    case TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS:
+        return "QueueConsumerToInspectionDataFrames";
     case TraceAtomicVariable::NOT_TIME_MONOTONIC_FRAMES:
         return "nTime_id2";
     case TraceAtomicVariable::SUBSCRIBE_ERROR:

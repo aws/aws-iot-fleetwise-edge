@@ -1,0 +1,17 @@
+{
+  "ImageTopic": {
+    "data": [],
+    "encoding": "",
+    "header": {
+      "frame_id": "",
+      "stamp": {
+        "nanosec": 0,
+        "sec": 0
+      }
+    },
+    "height": 0,
+    "is_bigendian": 0,
+    "step": 0,
+    "width": 0
+  }
+}

@@ -8,6 +8,10 @@
 #include "OBDDataTypes.h"
 #include <google/protobuf/message.h>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include <boost/variant.hpp>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -111,6 +115,34 @@ DecoderManifestIngestion::getPIDSignalDecoderFormat( SignalID signalID ) const
     return NOT_FOUND_PID_DECODER_FORMAT;
 }
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+ComplexSignalDecoderFormat
+DecoderManifestIngestion::getComplexSignalDecoderFormat( SignalID signalID ) const
+{
+
+    auto iterator = mSignalToComplexDecoderFormat.find( signalID );
+    if ( ( !mReady ) || ( iterator == mSignalToComplexDecoderFormat.end() ) )
+    {
+        return ComplexSignalDecoderFormat();
+    }
+    return iterator->second;
+}
+
+ComplexDataElement
+DecoderManifestIngestion::getComplexDataType( ComplexDataTypeId typeId ) const
+{
+    auto iterator = mComplexTypeMap.find( typeId );
+    if ( ( !mReady ) || ( iterator == mComplexTypeMap.end() ) )
+    {
+        return ComplexDataElement( InvalidComplexVariant() );
+    }
+    else
+    {
+        return iterator->second;
+    }
+}
+#endif
+
 bool
 DecoderManifestIngestion::copyData( const std::uint8_t *inputBuffer, const size_t size )
 {
@@ -172,8 +204,12 @@ DecoderManifestIngestion::build()
         return false;
     }
 
-    // Do some validation of the DecoderManifest. Either CAN or OBD or both should be specified.
-    if ( ( mProtoDecoderManifest.can_signals_size() == 0 ) && ( mProtoDecoderManifest.obd_pid_signals_size() == 0 ) )
+    // Do some validation of the DecoderManifest. Either CAN or OBD or complex signals should at least be specified.
+    if ( ( mProtoDecoderManifest.can_signals_size() == 0 ) && ( mProtoDecoderManifest.obd_pid_signals_size() == 0 )
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+         && ( mProtoDecoderManifest.complex_signals_size() == 0 )
+#endif
+    )
     {
         // Error, missing required decoding information in the Decoder mProtoDecoderManifest
         FWE_LOG_ERROR(
@@ -287,11 +323,151 @@ DecoderManifestIngestion::build()
         mSignalIDToTypeMap[pidSignal.signal_id()] = SignalType::DOUBLE; // using double as default
     }
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    for ( int i = 0; i < mProtoDecoderManifest.complex_types_size(); i++ )
+    {
+        const Schemas::DecoderManifestMsg::ComplexType &complexType = mProtoDecoderManifest.complex_types( i );
+        if ( ( complexType.type_id() == RESERVED_UTF8_UINT8_TYPE_ID ) ||
+             ( complexType.type_id() == RESERVED_UTF16_UINT32_TYPE_ID ) )
+        {
+            FWE_LOG_WARN( "Complex type id:" + std::to_string( complexType.type_id() ) +
+                          " is reserved and can not be used" );
+            continue;
+        }
+        if ( mComplexTypeMap.find( complexType.type_id() ) != mComplexTypeMap.end() )
+        {
+            FWE_LOG_WARN( "Complex type with same type id already exists id:" +
+                          std::to_string( complexType.type_id() ) );
+            continue;
+        }
+        if ( complexType.variant_case() == Schemas::DecoderManifestMsg::ComplexType::kPrimitiveData )
+        {
+            auto &primitiveData = complexType.primitive_data();
+            auto scaling = primitiveData.scaling();
+            scaling = ( scaling == 0.0 ? 1.0 : scaling ); // If scaling is not set in protobuf or set to invalid 0
+                                                          // replace it by default scaling: 1
+            auto convertedType = convertPrimitiveTypeToSignalType( primitiveData.primitive_type() );
+            mComplexTypeMap[complexType.type_id()] =
+                ComplexDataElement( PrimitiveData{ convertedType, scaling, primitiveData.offset() } );
+            FWE_LOG_TRACE( "Adding PrimitiveData with complex type id: " + std::to_string( complexType.type_id() ) +
+                           " of type:" + std::to_string( static_cast<int>( convertedType ) ) );
+        }
+        else if ( complexType.variant_case() == Schemas::DecoderManifestMsg::ComplexType::kStruct )
+        {
+            ComplexStruct newStruct;
+            for ( auto &complexStructMember : complexType.struct_().members() )
+            {
+                newStruct.mOrderedTypeIds.emplace_back( complexStructMember.type_id() );
+            }
+            mComplexTypeMap[complexType.type_id()] = ComplexDataElement( newStruct );
+            FWE_LOG_TRACE( "Adding struct with complex type id: " + std::to_string( complexType.type_id() ) + " with " +
+                           std::to_string( newStruct.mOrderedTypeIds.size() ) + " members" );
+        }
+        else if ( complexType.variant_case() == Schemas::DecoderManifestMsg::ComplexType::kArray )
+        {
+            auto &complexArray = complexType.array();
+            mComplexTypeMap[complexType.type_id()] =
+                ComplexDataElement( ComplexArray{ complexArray.size(), complexArray.type_id() } );
+            FWE_LOG_TRACE( "Adding array with complex type id: " + std::to_string( complexType.type_id() ) + " with " +
+                           std::to_string( complexArray.size() ) +
+                           " members of type: " + std::to_string( complexArray.type_id() ) );
+        }
+        else if ( complexType.variant_case() == Schemas::DecoderManifestMsg::ComplexType::kStringData )
+        {
+            auto &complexStringData = complexType.string_data();
+            if ( ( complexStringData.encoding() != Schemas::DecoderManifestMsg::StringEncoding::UTF_16 ) &&
+                 ( complexStringData.encoding() != Schemas::DecoderManifestMsg::StringEncoding::UTF_8 ) )
+            {
+                FWE_LOG_WARN( "String data with type id " + std::to_string( complexType.type_id() ) +
+                              " has invalid encoding: " +
+                              std::to_string( static_cast<uint32_t>( complexStringData.encoding() ) ) );
+                continue;
+            }
+            ComplexDataTypeId characterType =
+                complexStringData.encoding() == Schemas::DecoderManifestMsg::StringEncoding::UTF_16
+                    ? RESERVED_UTF16_UINT32_TYPE_ID
+                    : RESERVED_UTF8_UINT8_TYPE_ID;
+            if ( mComplexTypeMap.find( characterType ) == mComplexTypeMap.end() )
+            {
+                SignalType signalType =
+                    complexStringData.encoding() == Schemas::DecoderManifestMsg::StringEncoding::UTF_16
+                        ? SignalType::UINT32 // ROS2 implementation uses uint32 for utf-16 (wstring) code units
+                        : SignalType::UINT8;
+                mComplexTypeMap[characterType] = PrimitiveData{ signalType, 1.0, 0.0 };
+            }
+            mComplexTypeMap[complexType.type_id()] =
+                ComplexDataElement( ComplexArray{ complexStringData.size(), characterType } );
+            FWE_LOG_TRACE( "Adding string as array with complex type id: " + std::to_string( complexType.type_id() ) +
+                           " with " + std::to_string( complexStringData.size() ) +
+                           " members of type: " + std::to_string( characterType ) );
+        }
+    }
+
+    for ( int i = 0; i < mProtoDecoderManifest.complex_signals_size(); i++ )
+    {
+        const Schemas::DecoderManifestMsg::ComplexSignal &complexSignal = mProtoDecoderManifest.complex_signals( i );
+        mSignalToVehicleDataSourceProtocol[complexSignal.signal_id()] = VehicleDataSourceProtocol::COMPLEX_DATA;
+        if ( complexSignal.interface_id() == INVALID_COMPLEX_DATA_INTERFACE )
+        {
+            FWE_LOG_WARN( "Complex Signal with empty interface_id and signal id:" +
+                          std::to_string( complexSignal.signal_id() ) );
+        }
+        else
+        {
+            mSignalToComplexDecoderFormat[complexSignal.signal_id()] = ComplexSignalDecoderFormat{
+                complexSignal.interface_id(), complexSignal.message_id(), complexSignal.root_type_id() };
+
+            mSignalIDToTypeMap[complexSignal.signal_id()] =
+                SignalType::RAW_DATA_BUFFER_HANDLE; // handle top level signals always as raw data handles
+            FWE_LOG_TRACE( "Adding complex signal with id: " + std::to_string( complexSignal.signal_id() ) +
+                           " with interface ID: '" + complexSignal.interface_id() + "' message  ID: '" +
+                           complexSignal.message_id() +
+                           "' and root complex type id: " + std::to_string( complexSignal.root_type_id() ) );
+        }
+    }
+#endif
+
     FWE_LOG_TRACE( "Decoder Manifest build succeeded" );
     // Set our ready flag to true
     mReady = true;
     return true;
 }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+SignalType
+DecoderManifestIngestion::convertPrimitiveTypeToSignalType( Schemas::DecoderManifestMsg::PrimitiveType primitiveType )
+{
+    switch ( primitiveType )
+    {
+    case Schemas::DecoderManifestMsg::PrimitiveType::BOOL:
+        return SignalType::BOOLEAN;
+    case Schemas::DecoderManifestMsg::PrimitiveType::UINT8:
+        return SignalType::UINT8;
+    case Schemas::DecoderManifestMsg::PrimitiveType::UINT16:
+        return SignalType::UINT16;
+    case Schemas::DecoderManifestMsg::PrimitiveType::UINT32:
+        return SignalType::UINT32;
+    case Schemas::DecoderManifestMsg::PrimitiveType::UINT64:
+        return SignalType::UINT64;
+    case Schemas::DecoderManifestMsg::PrimitiveType::INT8:
+        return SignalType::INT8;
+    case Schemas::DecoderManifestMsg::PrimitiveType::INT16:
+        return SignalType::INT16;
+    case Schemas::DecoderManifestMsg::PrimitiveType::INT32:
+        return SignalType::INT32;
+    case Schemas::DecoderManifestMsg::PrimitiveType::INT64:
+        return SignalType::INT64;
+    case Schemas::DecoderManifestMsg::PrimitiveType::FLOAT32:
+        return SignalType::FLOAT;
+    case Schemas::DecoderManifestMsg::PrimitiveType::FLOAT64:
+        return SignalType::DOUBLE;
+    default:
+        FWE_LOG_WARN( "Currently PrimitiveType " + std::to_string( primitiveType ) + " is not supported" );
+        break;
+    }
+    return SignalType::UINT8; // default to uint8
+}
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

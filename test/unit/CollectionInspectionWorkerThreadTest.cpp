@@ -12,8 +12,6 @@
 #include "TimeTypes.h"
 #include "WaitUntil.h"
 #include <array>
-#include <boost/lockfree/queue.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 #include <chrono>
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -34,8 +32,6 @@ protected:
     std::shared_ptr<const InspectionMatrix> consCollectionSchemes;
     std::vector<std::shared_ptr<ExpressionNode>> expressionNodes;
     SignalBufferPtr signalBufferPtr;
-    CANBufferPtr canRawBufferPtr;
-    ActiveDTCBufferPtr activeDTCBufferPtr;
     std::shared_ptr<const Clock> fClock = ClockHandler::getClock();
     std::shared_ptr<CollectedDataReadyToPublish> outputCollectedData;
 
@@ -92,10 +88,6 @@ protected:
         collectionSchemes->conditions[1].probabilityToSend = 1.0;
 
         signalBufferPtr.reset( new SignalBuffer( 1000 ) );
-        // CAN Buffer are a lock-free multi-producer single consumer buffer
-        canRawBufferPtr.reset( new CANBuffer( 1000 ) );
-        // DTC Buffer are a single producer single consumer buffer
-        activeDTCBufferPtr.reset( new ActiveDTCBuffer( 1000 ) );
         // Init the output buffer
         outputCollectedData = std::make_shared<CollectedDataReadyToPublish>( 3 );
     }
@@ -109,7 +101,7 @@ protected:
 TEST_F( CollectionInspectionWorkerThreadTest, CollectBurstWithoutSubsampling )
 {
     CollectionInspectionWorkerThread worker;
-    ASSERT_TRUE( worker.init( signalBufferPtr, canRawBufferPtr, activeDTCBufferPtr, outputCollectedData, 1000 ) );
+    ASSERT_TRUE( worker.init( signalBufferPtr, outputCollectedData, 1000 ) );
     ASSERT_TRUE( worker.start() );
     // minimumSampleIntervalMs=0 means no subsampling
     InspectionMatrixSignalCollectionInfo s1{};
@@ -146,21 +138,39 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectBurstWithoutSubsampling )
     collectionSchemes->conditions[0].condition = getSignalsBiggerCondition( s1.signalID, 1 ).get();
     worker.onChangeInspectionMatrix( consCollectionSchemes );
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
-    signalBufferPtr->push( CollectedSignal( s3.signalID, timestamp, 0, s3.signalType ) );
-    signalBufferPtr->push( CollectedSignal( s3.signalID, timestamp, 1, s3.signalType ) );
-    signalBufferPtr->push( CollectedSignal( s3.signalID, timestamp, 0, s3.signalType ) );
-    signalBufferPtr->push( CollectedSignal( s2.signalID, timestamp, 10, s2.signalType ) );
-    signalBufferPtr->push( CollectedSignal( s2.signalID, timestamp, 15, s2.signalType ) );
-    signalBufferPtr->push( CollectedSignal( s2.signalID, timestamp, 20, s2.signalType ) );
-    signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.1 ) );
-    signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.2 ) );
-    signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 1.5 ) );
+
+    CollectedSignalsGroup collectedSignalsGroup;
+    collectedSignalsGroup.push_back( CollectedSignal( s1.signalID, timestamp, 0.1 ) );
+    collectedSignalsGroup.push_back( CollectedSignal( s3.signalID, timestamp, 0, s3.signalType ) );
+    collectedSignalsGroup.push_back( CollectedSignal( s2.signalID, timestamp, 10, s2.signalType ) );
+
     std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf1 = { 0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0 };
-    canRawBufferPtr->push( CollectedCanRawFrame( c1.frameID, c1.channelID, timestamp, buf1, sizeof( buf1 ) ) );
+
+    signalBufferPtr->push( CollectedDataFrame(
+        collectedSignalsGroup,
+        std::make_shared<CollectedCanRawFrame>( c1.frameID, c1.channelID, timestamp, buf1, sizeof( buf1 ) ) ) );
+
+    collectedSignalsGroup.clear();
+
+    collectedSignalsGroup.push_back( CollectedSignal( s1.signalID, timestamp + 1, 0.2 ) );
+    collectedSignalsGroup.push_back( CollectedSignal( s3.signalID, timestamp + 1, 1, s3.signalType ) );
+    collectedSignalsGroup.push_back( CollectedSignal( s2.signalID, timestamp + 1, 15, s2.signalType ) );
+
     std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf2 = { 0xBA, 0xAD, 0xAF, 0xFE, 0x0, 0x0, 0x0, 0x0 };
-    canRawBufferPtr->push( CollectedCanRawFrame( c1.frameID, c1.channelID, timestamp, buf2, sizeof( buf2 ) ) );
+    signalBufferPtr->push( CollectedDataFrame(
+        collectedSignalsGroup,
+        std::make_shared<CollectedCanRawFrame>( c1.frameID, c1.channelID, timestamp, buf2, sizeof( buf2 ) ) ) );
+
+    collectedSignalsGroup.clear();
+
+    collectedSignalsGroup.push_back( CollectedSignal( s1.signalID, timestamp + 2, 1.5 ) );
+    collectedSignalsGroup.push_back( CollectedSignal( s2.signalID, timestamp + 2, 20, s2.signalType ) );
+    collectedSignalsGroup.push_back( CollectedSignal( s3.signalID, timestamp + 2, 0, s3.signalType ) );
+
     std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf3 = { 0xCA, 0xFE, 0xF0, 0x0D, 0x0, 0x0, 0x0, 0x0 };
-    canRawBufferPtr->push( CollectedCanRawFrame( c1.frameID, c1.channelID, timestamp, buf3, sizeof( buf3 ) ) );
+    signalBufferPtr->push( CollectedDataFrame(
+        collectedSignalsGroup,
+        std::make_shared<CollectedCanRawFrame>( c1.frameID, c1.channelID, timestamp, buf3, sizeof( buf3 ) ) ) );
 
     worker.onNewDataAvailable();
 
@@ -199,7 +209,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectBurstWithoutSubsampling )
 TEST_F( CollectionInspectionWorkerThreadTest, CollectionQueueFull )
 {
     CollectionInspectionWorkerThread worker;
-    ASSERT_TRUE( worker.init( signalBufferPtr, canRawBufferPtr, activeDTCBufferPtr, outputCollectedData, 1000 ) );
+    ASSERT_TRUE( worker.init( signalBufferPtr, outputCollectedData, 1000 ) );
     ASSERT_TRUE( worker.start() );
     // minimumSampleIntervalMs=0 means no subsampling
     InspectionMatrixSignalCollectionInfo s1{};
@@ -213,12 +223,16 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectionQueueFull )
     collectionSchemes->conditions[1].signals.push_back( s1 );
     collectionSchemes->conditions[1].condition = getAlwaysTrueCondition().get();
     collectionSchemes->conditions[2].signals.push_back( s1 );
+    collectionSchemes->conditions[2].probabilityToSend = 1.0;
     collectionSchemes->conditions[2].condition = getAlwaysTrueCondition().get();
     collectionSchemes->conditions[3].signals.push_back( s1 );
     collectionSchemes->conditions[3].condition = getAlwaysTrueCondition().get();
+    collectionSchemes->conditions[3].probabilityToSend = 1.0;
     worker.onChangeInspectionMatrix( consCollectionSchemes );
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
-    signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 1 ) );
+    CollectedSignalsGroup collectedSignalsGroup;
+    collectedSignalsGroup.push_back( CollectedSignal( s1.signalID, timestamp, 1 ) );
+    signalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) );
     worker.onNewDataAvailable();
 
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData;
@@ -233,7 +247,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectionQueueFull )
 TEST_F( CollectionInspectionWorkerThreadTest, ConsumeDataWithoutNotify )
 {
     CollectionInspectionWorkerThread worker;
-    ASSERT_TRUE( worker.init( signalBufferPtr, canRawBufferPtr, activeDTCBufferPtr, outputCollectedData, 1000 ) );
+    ASSERT_TRUE( worker.init( signalBufferPtr, outputCollectedData, 1000 ) );
     ASSERT_TRUE( worker.start() );
     // minimumSampleIntervalMs=0 means no subsampling
     InspectionMatrixSignalCollectionInfo s1{};
@@ -248,10 +262,18 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeDataWithoutNotify )
     worker.onChangeInspectionMatrix( consCollectionSchemes );
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
 
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.1 ) ) );
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 0.2 ) ) );
-    // // this fulfills condition >1 so should trigger
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( s1.signalID, timestamp, 1.5 ) ) );
+    CollectedSignalsGroup collectedSignalsGroup;
+    collectedSignalsGroup.push_back( CollectedSignal( s1.signalID, timestamp, 0.1 ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) );
+    collectedSignalsGroup.clear();
+
+    collectedSignalsGroup.push_back( CollectedSignal( s1.signalID, timestamp + 2, 0.2 ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) );
+    collectedSignalsGroup.clear();
+
+    collectedSignalsGroup.push_back( CollectedSignal( s1.signalID, timestamp + 3, 1.5 ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) );
+    collectedSignalsGroup.clear();
 
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData;
 
@@ -275,8 +297,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeDataWithoutNotify )
 TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeHasEnabledDTCs )
 {
     CollectionInspectionWorkerThread inspectionWorker;
-    ASSERT_TRUE(
-        inspectionWorker.init( signalBufferPtr, canRawBufferPtr, activeDTCBufferPtr, outputCollectedData, 1000 ) );
+    ASSERT_TRUE( inspectionWorker.init( signalBufferPtr, outputCollectedData, 1000 ) );
     ASSERT_TRUE( inspectionWorker.start() );
     // Test case 1 : Create a set of DTCs and make sure they are available in the collected data
     DTCInfo dtcInfo;
@@ -286,7 +307,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     dtcInfo.receiveTime = fClock->systemTimeSinceEpochMs();
     ASSERT_TRUE( dtcInfo.hasItems() );
     // Push the DTCs to the buffer
-    ASSERT_TRUE( activeDTCBufferPtr->push( dtcInfo ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedDataFrame( std::make_shared<DTCInfo>( dtcInfo ) ) ) );
     // Prepare a condition to evaluate and expect the DTCs to be collected.
     InspectionMatrixSignalCollectionInfo signal{};
     signal.signalID = 1234;
@@ -302,10 +323,12 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     inspectionWorker.onChangeInspectionMatrix( consCollectionSchemes );
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
 
+    CollectedSignalsGroup collectedSignalsGroup;
+    collectedSignalsGroup.push_back( CollectedSignal( signal.signalID, timestamp, 0.1 ) );
+    collectedSignalsGroup.push_back( CollectedSignal( signal.signalID, timestamp + 1, 0.2 ) );
+    collectedSignalsGroup.push_back( CollectedSignal( signal.signalID, timestamp + 2, 1.5 ) );
     // Push the signals so that the condition is met
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.1 ) ) );
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.2 ) ) );
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 1.5 ) ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) );
 
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData;
 
@@ -323,13 +346,22 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     dtcInfo.mSID = SID::STORED_DTC;
     dtcInfo.receiveTime = fClock->systemTimeSinceEpochMs();
     // Push the DTCs to the buffer
-    ASSERT_TRUE( activeDTCBufferPtr->push( dtcInfo ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedDataFrame( std::make_shared<DTCInfo>( dtcInfo ) ) ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedDataFrame( std::make_shared<DTCInfo>( dtcInfo ) ) ) );
     timestamp = fClock->systemTimeSinceEpochMs();
     // Push the signals so that the condition is met
 
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.1 ) ) );
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.2 ) ) );
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 1.5 ) ) );
+    CollectedSignalsGroup collectedSignalGroup;
+    collectedSignalGroup.push_back( CollectedSignal( signal.signalID, timestamp, 0.1 ) );
+    ASSERT_TRUE( signalBufferPtr->push( collectedSignalGroup ) );
+    collectedSignalGroup.clear();
+
+    collectedSignalGroup.push_back( CollectedSignal( signal.signalID, timestamp + 1, 0.2 ) );
+    ASSERT_TRUE( signalBufferPtr->push( collectedSignalGroup ) );
+    collectedSignalGroup.clear();
+
+    collectedSignalGroup.push_back( CollectedSignal( signal.signalID, timestamp + 2, 1.5 ) );
+    ASSERT_TRUE( signalBufferPtr->push( collectedSignalGroup ) );
 
     // Expect the data to be collected and has the DTCs
     WAIT_ASSERT_TRUE( outputCollectedData->pop( collectedData ) );
@@ -346,8 +378,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
 TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeHasDisabledDTCs )
 {
     CollectionInspectionWorkerThread inspectionWorker;
-    ASSERT_TRUE(
-        inspectionWorker.init( signalBufferPtr, canRawBufferPtr, activeDTCBufferPtr, outputCollectedData, 1000 ) );
+    ASSERT_TRUE( inspectionWorker.init( signalBufferPtr, outputCollectedData, 1000 ) );
     ASSERT_TRUE( inspectionWorker.start() );
     // Create a set of DTCs and make sure they are NOT available in the collected data
     DTCInfo dtcInfo;
@@ -357,7 +388,7 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     dtcInfo.receiveTime = fClock->systemTimeSinceEpochMs();
     ASSERT_TRUE( dtcInfo.hasItems() );
     // Push the DTCs to the buffer
-    ASSERT_TRUE( activeDTCBufferPtr->push( dtcInfo ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedDataFrame( std::make_shared<DTCInfo>( dtcInfo ) ) ) );
     // Prepare a condition to evaluate and expect the DTCs to be NOT collected.
     InspectionMatrixSignalCollectionInfo signal{};
     signal.signalID = 1234;
@@ -373,9 +404,11 @@ TEST_F( CollectionInspectionWorkerThreadTest, ConsumeActiveDTCsCollectionSchemeH
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
 
     // Push the signals so that the condition is met
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.1 ) ) );
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 0.2 ) ) );
-    ASSERT_TRUE( signalBufferPtr->push( CollectedSignal( signal.signalID, timestamp, 1.5 ) ) );
+    CollectedSignalsGroup collectedSignalsGroup;
+    collectedSignalsGroup.push_back( CollectedSignal( signal.signalID, timestamp, 0.1 ) );
+    collectedSignalsGroup.push_back( CollectedSignal( signal.signalID, timestamp, 0.2 ) );
+    collectedSignalsGroup.push_back( CollectedSignal( signal.signalID, timestamp, 1.5 ) );
+    ASSERT_TRUE( signalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) );
 
     std::shared_ptr<const TriggeredCollectionSchemeData> collectedData;
 

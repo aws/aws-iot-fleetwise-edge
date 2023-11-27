@@ -10,6 +10,10 @@
 #include <gtest/gtest.h>
 #include <unordered_set>
 
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include <boost/variant.hpp>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -604,6 +608,198 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorFirstRawFrameThenSi
     ASSERT_EQ( decoderMethod->second.find( 0x100 )->second.collectType, CANMessageCollectType::RAW_AND_DECODE );
     ASSERT_EQ( decoderMethod->second.find( 0x100 )->second.format.mSignals[0].mOffset, 17 );
 }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+TEST( CollectionSchemeManagerTest, DecoderDictionaryComplexDataExtractor )
+{
+
+    CollectionSchemeManagerTest test( "DM1" );
+    CANInterfaceIDTranslator canIDTranslator;
+    test.init( 0, nullptr, canIDTranslator );
+
+    std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
+    /* mock currTime, and 3 collectionSchemes */
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startTime1 = currTime.systemTimeMs;
+    Timestamp stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
+
+    // Map to be used by Decoder Manifest Mock to return getCANFrameAndNodeID( SignalID signalId )
+    std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;
+
+    ICollectionScheme::Signals_t signalInfo1;
+    ICollectionScheme::RawCanFrames_t canFrameInfo1;                                                   // empty
+    std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap; // empty
+    std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat;                   // empty
+
+    ICollectionScheme::PartialSignalIDLookup partialSignalIDLookup;
+    std::unordered_map<SignalID, ComplexSignalDecoderFormat> complexSignalMap;
+    std::unordered_map<ComplexDataTypeId, ComplexDataElement> complexDataTypeMap;
+
+    SignalCollectionInfo signal1;
+    signal1.signalID = 0xFFFF0000;
+    signalInfo1.push_back( signal1 );
+    partialSignalIDLookup[signal1.signalID] = std::pair<SignalID, SignalPath>( 0x2000000, SignalPath{ 1, 2, 5 } );
+    complexSignalMap[0x2000000] = ComplexSignalDecoderFormat{ "interface1", "messageID1", 30 };
+
+    SignalCollectionInfo signal2;
+    signal2.signalID = 0xFFF30000;
+    signalInfo1.push_back( signal2 );
+    partialSignalIDLookup[signal2.signalID] = std::pair<SignalID, SignalPath>( 0x2000000, SignalPath{ 1, 1, 7 } );
+
+    SignalCollectionInfo signal6;
+    signal6.signalID = 0xFFF60000;
+    signalInfo1.push_back( signal6 );
+    partialSignalIDLookup[signal6.signalID] = std::pair<SignalID, SignalPath>( 0x2000000, SignalPath{ 2, 2 } );
+
+    SignalCollectionInfo signal4;
+    signal4.signalID = 0xFFF40000;
+    signalInfo1.push_back( signal4 );
+    partialSignalIDLookup[signal4.signalID] = std::pair<SignalID, SignalPath>( 0x2000000, SignalPath{ 2 } );
+
+    SignalCollectionInfo signal3;
+    signal3.signalID = 0x01000000;
+    signalInfo1.push_back( signal3 );
+    complexSignalMap[0x01000000] = ComplexSignalDecoderFormat{ "interface1", "messageID3", 20 };
+
+    SignalCollectionInfo signal5;
+    signal5.signalID = 0xFFF50000;
+    signalInfo1.push_back( signal5 );
+    partialSignalIDLookup[signal5.signalID] = std::pair<SignalID, SignalPath>( signal3.signalID, SignalPath{ 0 } );
+
+    complexDataTypeMap[30] = ComplexDataElement( ComplexStruct{ { 20, 10, 20 } } );
+    complexDataTypeMap[20] = ComplexDataElement( ComplexArray{ 50000, 10 } );
+    complexDataTypeMap[10] = ComplexDataElement( PrimitiveData{ SignalType::UINT64, 1.0, 0.0 } );
+
+    ICollectionSchemePtr collectionScheme1 = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEMECOMPLEXDATA1",
+                                                                                      "DM1",
+                                                                                      startTime1,
+                                                                                      stopTime1,
+                                                                                      signalInfo1,
+                                                                                      canFrameInfo1,
+                                                                                      partialSignalIDLookup );
+
+    std::vector<ICollectionSchemePtr> list1;
+    list1.emplace_back( collectionScheme1 );
+
+    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>(
+        "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, complexSignalMap, complexDataTypeMap );
+
+    // Set input as DM1, list1
+    test.setDecoderManifest( DM1 );
+    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    test.setCollectionSchemeList( PL1 );
+    // Both collectionScheme1 and collectionScheme2 are expected to be enabled
+    ASSERT_TRUE( test.updateMapsandTimeLine( currTime ) );
+    // Invoke Decoder Dictionary Extractor function
+    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
+    test.decoderDictionaryExtractor( decoderDictionaryMap );
+
+    auto dict = decoderDictionaryMap.find( VehicleDataSourceProtocol::COMPLEX_DATA );
+    ASSERT_NE( dict, decoderDictionaryMap.end() );
+    auto complexDict = std::dynamic_pointer_cast<ComplexDataDecoderDictionary>( dict->second );
+    ASSERT_TRUE( complexDict );
+    auto decoder = complexDict->complexMessageDecoderMethod["interface1"]["messageID1"];
+    ASSERT_EQ( decoder.mSignalId, 0x2000000 );
+    ASSERT_EQ( decoder.mCollectRaw, false );
+    ASSERT_EQ( decoder.mSignalPaths.size(), 4 );
+    // Check order correct
+    ASSERT_EQ( decoder.mSignalPaths[0].mSignalPath, ( std::vector<uint32_t>{ 1, 1, 7 } ) );
+    ASSERT_EQ( decoder.mSignalPaths[1].mSignalPath, ( std::vector<uint32_t>{ 1, 2, 5 } ) );
+    ASSERT_EQ( decoder.mSignalPaths[2].mSignalPath, ( std::vector<uint32_t>{ 2 } ) );
+    ASSERT_EQ( decoder.mSignalPaths[3].mSignalPath, ( std::vector<uint32_t>{ 2, 2 } ) );
+
+    auto decoder2 = complexDict->complexMessageDecoderMethod["interface1"]["messageID3"];
+    ASSERT_EQ( decoder2.mSignalId, 0x01000000 );
+    ASSERT_EQ( decoder2.mCollectRaw, true );
+    ASSERT_EQ( decoder2.mSignalPaths.size(), 1 );
+
+    ASSERT_EQ( decoder.mRootTypeId, 30 );
+    auto decodedStruct = boost::get<ComplexStruct>( decoder.mComplexTypeMap[30] );
+    ASSERT_EQ( decodedStruct.mOrderedTypeIds[0], 20 );
+    ASSERT_EQ( decodedStruct.mOrderedTypeIds[1], 10 );
+    ASSERT_EQ( decodedStruct.mOrderedTypeIds[2], 20 );
+
+    auto decodedArray = boost::get<ComplexArray>( decoder.mComplexTypeMap[20] );
+    ASSERT_EQ( decodedArray.mSize, 50000 );
+    ASSERT_EQ( decodedArray.mRepeatedTypeId, 10 );
+
+    auto decodedPrimitive = boost::get<PrimitiveData>( decoder.mComplexTypeMap[10] );
+    ASSERT_EQ( decodedPrimitive.mPrimitiveType, SignalType::UINT64 );
+    ASSERT_EQ( decodedPrimitive.mScaling, 1.0 );
+    ASSERT_EQ( decodedPrimitive.mOffset, 0.0 );
+}
+
+TEST( CollectionSchemeManagerTest, DecoderDictionaryInvalidPartialSignalIDAndInvalidComplexType )
+{
+
+    CollectionSchemeManagerTest test( "DM1" );
+    CANInterfaceIDTranslator canIDTranslator;
+    test.init( 0, nullptr, canIDTranslator );
+
+    std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
+    /* mock currTime, and 3 collectionSchemes */
+    TimePoint currTime = testClock->timeSinceEpoch();
+    Timestamp startTime1 = currTime.systemTimeMs;
+    Timestamp stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
+
+    // Map to be used by Decoder Manifest Mock to return getCANFrameAndNodeID( SignalID signalId )
+    std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;
+
+    ICollectionScheme::Signals_t signalInfo1;
+    ICollectionScheme::RawCanFrames_t canFrameInfo1;                                                   // empty
+    std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap; // empty
+    std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat;                   // empty
+
+    ICollectionScheme::PartialSignalIDLookup partialSignalIDLookup;
+    std::unordered_map<SignalID, ComplexSignalDecoderFormat> complexSignalMap;
+    std::unordered_map<ComplexDataTypeId, ComplexDataElement> complexDataTypeMap;
+
+    SignalCollectionInfo signal1;
+    signal1.signalID = 0xFF000000;
+    signalInfo1.push_back( signal1 );
+    // Set different signalId
+    partialSignalIDLookup[signal1.signalID + 1] = std::pair<SignalID, SignalPath>( 0x2000000, SignalPath{ 1, 2, 5 } );
+    complexSignalMap[0x2000000] = ComplexSignalDecoderFormat{ "interface1", "messageID1", 30 };
+
+    SignalCollectionInfo signal2;
+    signal2.signalID = 0xFF100000;
+    signalInfo1.push_back( signal2 );
+    partialSignalIDLookup[signal2.signalID] = std::pair<SignalID, SignalPath>( 0x2000001, SignalPath{ 1, 2, 5 } );
+    complexSignalMap[0x2000001] = ComplexSignalDecoderFormat{ "interface1", "messageID2", 40 };
+
+    // Wrong type id lookup for 40 will fail ads only 41 in map
+    complexDataTypeMap[41] = ComplexDataElement( ComplexStruct{ { 20, 10, 20 } } );
+
+    ICollectionSchemePtr collectionScheme1 = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEMECOMPLEXDATA1",
+                                                                                      "DM1",
+                                                                                      startTime1,
+                                                                                      stopTime1,
+                                                                                      signalInfo1,
+                                                                                      canFrameInfo1,
+                                                                                      partialSignalIDLookup );
+
+    std::vector<ICollectionSchemePtr> list1;
+    list1.emplace_back( collectionScheme1 );
+
+    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>(
+        "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, complexSignalMap, complexDataTypeMap );
+
+    test.setDecoderManifest( DM1 );
+    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    test.setCollectionSchemeList( PL1 );
+
+    ASSERT_TRUE( test.updateMapsandTimeLine( currTime ) );
+    // Invoke Decoder Dictionary Extractor function
+    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
+    test.decoderDictionaryExtractor( decoderDictionaryMap );
+
+    auto dict = decoderDictionaryMap.find( VehicleDataSourceProtocol::COMPLEX_DATA );
+    ASSERT_NE( dict, decoderDictionaryMap.end() );
+    auto complexDict = std::dynamic_pointer_cast<ComplexDataDecoderDictionary>( dict->second );
+    ASSERT_TRUE( complexDict );
+    ASSERT_EQ( complexDict->complexMessageDecoderMethod.size(), 1 ); // only second signal is in map and ERROR in log
+}
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

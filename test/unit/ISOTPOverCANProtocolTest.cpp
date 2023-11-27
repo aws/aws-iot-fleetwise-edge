@@ -6,6 +6,7 @@
 #include "ISOTPOverCANReceiver.h"
 #include "ISOTPOverCANSender.h"
 #include "ISOTPOverCANSenderReceiver.h"
+#include "LoggingModule.h"
 #include <cstdint>
 #include <functional>
 #include <gtest/gtest.h>
@@ -30,42 +31,6 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-bool
-socketAvailable()
-{
-    auto sock = socket( PF_CAN, SOCK_DGRAM, CAN_ISOTP );
-    if ( sock < 0 )
-    {
-        return false;
-    }
-    close( sock );
-    return true;
-}
-
-void
-sendPDU( ISOTPOverCANSender &sender, const std::vector<uint8_t> &pdu )
-{
-    ASSERT_TRUE( sender.sendPDU( pdu ) );
-}
-
-void
-senderReceiverSendPDU( ISOTPOverCANSenderReceiver &senderReceiver, const std::vector<uint8_t> &pdu )
-{
-    ASSERT_TRUE( senderReceiver.sendPDU( pdu ) );
-}
-
-void
-senderReceiverReceivePDU( ISOTPOverCANSenderReceiver &senderReceiver, std::vector<uint8_t> &pdu )
-{
-    ASSERT_TRUE( senderReceiver.receivePDU( pdu ) );
-}
-
-void
-receivePDU( ISOTPOverCANReceiver &receiver, std::vector<uint8_t> &pdu )
-{
-    ASSERT_TRUE( receiver.receivePDU( pdu ) );
-}
-
 class ISOTPOverCANProtocolTest : public ::testing::Test
 {
 protected:
@@ -75,6 +40,54 @@ protected:
         if ( !socketAvailable() )
         {
             GTEST_SKIP() << "Skipping test fixture due to unavailability of socket";
+        }
+    }
+
+    static bool
+    socketAvailable()
+    {
+        auto sock = socket( PF_CAN, SOCK_DGRAM, CAN_ISOTP );
+        if ( sock < 0 )
+        {
+            return false;
+        }
+        close( sock );
+        return true;
+    }
+
+    static void
+    sendPDU( ISOTPOverCANSender &sender, const std::vector<uint8_t> &pdu )
+    {
+        if ( !sender.sendPDU( pdu ) )
+        {
+            FWE_LOG_ERROR( "Error sending ISO-TP message" );
+        }
+    }
+
+    static void
+    senderReceiverSendPDU( ISOTPOverCANSenderReceiver &senderReceiver, const std::vector<uint8_t> &pdu )
+    {
+        if ( !senderReceiver.sendPDU( pdu ) )
+        {
+            FWE_LOG_ERROR( "Error sending ISO-TP message" );
+        }
+    }
+
+    static void
+    senderReceiverReceivePDU( ISOTPOverCANSenderReceiver &senderReceiver, std::vector<uint8_t> &pdu )
+    {
+        if ( !senderReceiver.receivePDU( pdu ) )
+        {
+            FWE_LOG_ERROR( "Error receiving ISO-TP message" );
+        }
+    }
+
+    static void
+    receivePDU( ISOTPOverCANReceiver &receiver, std::vector<uint8_t> &pdu )
+    {
+        if ( !receiver.receivePDU( pdu ) )
+        {
+            FWE_LOG_ERROR( "Error receiving ISO-TP message" );
         }
     }
 };

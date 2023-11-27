@@ -135,7 +135,7 @@ collect data from it.
    && sudo -H ./install-deps.sh
    ```
 
-   The above command installs the following PIP packages: `wrapt plotly pandas cantools fastparquet`
+   The above command installs the following PIP packages: `wrapt plotly pandas cantools pyarrow`
 
 1. If you are using the AWS CLI with a version lower than v2.11.24, update the CLI by running:
 
@@ -342,8 +342,8 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
    The commands above will:
 
    1. Install the following Ubuntu packages:
-      `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libcurl4-openssl-dev libsnappy-dev default-jre libasio-dev`.
-      Additionally it installs the following: `jsoncpp protobuf aws-sdk-cpp`
+      `libssl-dev libboost-system-dev libboost-log-dev libboost-thread-dev build-essential cmake unzip git wget curl zlib1g-dev libsnappy-dev`.
+      Additionally, it installs the following: `jsoncpp protobuf curl aws-sdk-cpp`
    1. Install the following Ubuntu packages:
       `build-essential dkms can-utils git linux-modules-extra-aws`. Additionally it installs the
       following: `can-isotp`. It also installs a systemd service called `setup-socketcan` that
@@ -414,7 +414,7 @@ collect data from it.
    ```
 
    The above command installs the following Ubuntu packages: `python3 python3-pip`. It then installs
-   the following PIP packages: `wrapt plotly pandas cantools fastparquet`
+   the following PIP packages: `wrapt plotly pandas cantools pyarrow`
 
 1. If you are using the AWS CLI with a version lower than v2.11.24, update the CLI by running:
 
@@ -610,6 +610,14 @@ devices to interconnect.
 
 **On Board Diagnostics (OBD):** A protocol used to retrieve vehicle diagnostics information.
 
+**Vision System Data:** A group of sensors, perception stacks, etc that feed into what a vehicle
+'sees' on the road
+
+**ROS2:** The Robot Operating System (ROS) is a set of software libraries and tools for building
+robot applications
+
+**CDR:** An OMG specification that is used by ROS2
+
 **Message Queuing Telemetry Transport (MQTT)**
 
 **Transport Layer Security (TLS)**
@@ -620,7 +628,8 @@ devices to interconnect.
 
 This document is intended for System and Software Engineers at OEMs and System Integrators who are
 developing or integrating in-vehicle software. Knowledge of C/C++, POSIX APIs, in-vehicle Networking
-protocols (such as CAN) and external connectivity protocols (such as MQTT) are pre-requisites.
+protocols (such as CAN), middleware (such as ROS2) and external connectivity protocols (such as
+MQTT, HTTPS) are pre-requisites.
 
 ## Architecture Overview
 
@@ -640,7 +649,7 @@ AWS IoT FleetWise enables you to create campaigns that can be deployed to a flee
 a campaign is active, it is deployed from the cloud to the target vehicles via a push mechanism. FWE
 uses the underlying collection schemes to acquire sensor data from the vehicle network. It applies
 the inspection rules and uploads the data back to AWS IoT FleetWise data plane. The data plane
-persists collected data in the OEM's AWS Account; the account can then be used to analyse the data.
+persists collected data in the OEM's AWS Account; the account can then be used to analyze the data.
 
 ### Software Layers
 
@@ -729,7 +738,7 @@ These modules include a set of APIs and utility functions that the rest of the s
 
 These modules are used uniformly by all the other modules in the application.
 
-**Vehicle Network Management Modules**
+**Vehicle Network / Middleware Management Modules**
 
 ```
 ISOTPOverCANReceiver
@@ -737,8 +746,8 @@ ISOTPOverCANSender
 ISOTPOverCANSenderReceiver
 ```
 
-These modules implement a set of wrappers around the in vehicle network communication protocols, and
-realize the function of vehicle data acquisition. These modules include:
+These modules implement a set of wrappers around the in vehicle network / middleware communication
+protocols, and realize the function of vehicle data acquisition. These modules include:
 
 - An implementation of the Linux CAN APIs, to acquire standard CAN Traffic from the network using
   raw sockets.
@@ -767,6 +776,7 @@ DecoderManifestIngestion
 Geohash
 InspectionMatrixExtractor
 OBDDataDecoder
+RawDataManager
 Schema
 ```
 
@@ -778,8 +788,20 @@ These modules are used by the Data Inspection Modules to normalize and decode th
 and by the Execution Management Modules to initiate the Collection Scheme and decoder Manifest
 decoding.
 
+For Vision System Data, the ROS2 data will be serialized in CDR format and stored in
+`RawDataManager`. Based on inspection result, the data will later be published to Connectivity
+module for cloud upload. `RawDataManager` is managing memory allocation for collected ROS2 data
+snapshots and their usage by other threads. `RawDataManager` will ensure that ready for the upload
+ROS2 data is not deleted before upload is finished.
+
 These modules also implement a serialization module to serialize the data FWE wants to send to the
 data plane. The serialization schema is described below in the data model.
+
+If there is no connectivity, or during shutdown of the application, `DataSenderManagerWorkerThread`
+persists the data snapshots that are queued for sending to the cloud. Upon re-connection, this
+module will attempt to send the data to the cloud. The `CacheAndPersist` module ensures that the
+disk space is not exhausted, so this module just invokes the persistency module when it wants to
+read or write data to disk.
 
 **Data Inspection Modules**
 
@@ -792,6 +814,7 @@ ExternalCANDataSource
 GeohashFunctionNode
 OBDOverCANECU
 OBDOverCANModule
+ROS2DataSource
 ```
 
 These modules implement each of the following:
@@ -800,6 +823,7 @@ These modules implement each of the following:
   the system.
 - Consumer, decode and normalize of the ISO/TP CAN Frames (Diagnostic data) according to the Decoder
   Manifest available in the system.
+- Consume, decode ROS2 message from the ROS2 topic via ROS2 topic subscription.
 - Filter and inspect the signals values decoded from the network according to the inspection rules
   provided in the Inspection Matrix.
 - Cache of the needed signals in a signal history buffer.
@@ -817,22 +841,25 @@ AwsGGConnectivityModule
 AwsIotChannel
 AwsIotConnectivityModule
 AwsSDKMemoryManager
+Credentials
 PayloadManager
 RetryThread
 RemoteProfiler
+S3Sender
 ```
 
 These modules implement the communication routines between FWE and the cloud Control Plane and Data
 Plane.
 
-Since all the communication between the device and the cloud occurs over a secure MQTT connection,
-these modules uses the AWS SDK for C++ as an MQTT client. It creates exactly one connection to the
-MQTT broker.
+Since the communication between the device and the cloud occurs over a secure MQTT or HTTPS
+connection, these modules uses the AWS SDK for C++ as an MQTT client and S3 client. The MQTT client
+creates exactly one connection to the MQTT broker.
 
-These modules then publish the data snapshot through that connection (through a dedicated MQTT
-topic) and subscribes to the Scheme and decoder manifest topic (dedicated MQTT topic) for eventual
-updates. On the subscribe side, these modules notifies the rest of the system on the arrival of an
-update of either the Scheme or the decoder manifests, which are enacted accordant in near real time.
+These modules then publish the data snapshot through that connection (through a dedicated MQTT topic
+or S3 put) and subscribes to the Scheme and decoder manifest topic (dedicated MQTT topic) for
+eventual updates. On the subscribe side, these modules notifies the rest of the system on the
+arrival of an update of either the Scheme or the decoder manifests, which are enacted accordant in
+near real time.
 
 **Execution Management Module**
 
@@ -845,40 +872,50 @@ ensures that are the other modules are provided with their corresponding setting
 it ensures that all the modules and corresponding system resources (threads, loggers, and sockets)
 are stopped/closed properly.
 
-If there is no connectivity, or during shutdown of the application, this module persists the data
-snapshots that are queued for sending to the cloud. Upon re-connection, this module will attempt to
-send the data to the cloud. The `CacheAndPersist` module ensures that the disk space is not
-exhausted, so this module just invokes the persistency module when it wants to read or write data to
-disk.
-
 ## Programming and Execution model
 
 FWE implements a concurrent and event-based multithreading system.
 
-- **In the Vehicle Network Management Modules,** each CAN Network Interface spawns one thread to
-  take care of opening a Socket to the network device. E.g. if the device has 4 CAN Networks
-  configured, there will be one thread per network mainly doing message reception from the network
-  and insertion into the corresponding circular buffer in a lock free fashion. Each of the threads
-  raises a notification via a listener interface in case the underlying socket communication is
-  interrupted. These threads operate in a polling mode i.e. wait on socket read in non blocking
-  mode.
+- **In the Vehicle Network / Middleware Management Modules**
+  - **_CAN Interface_** each CAN Network Interface spawns one thread to take care of opening a
+    Socket to the network device. E.g. if the device has 4 CAN Networks configured, there will be
+    one thread per network mainly doing message reception from the network and insertion into the
+    corresponding circular buffer in a lock free fashion. Each of the threads raises a notification
+    via a listener interface in case the underlying socket communication is interrupted. These
+    threads operate in a polling mode i.e. wait on socket read in non blocking mode.
+  - **_ROS2 Interface_** each ROS2 interface will create one ROS2 multithread executor. An Executor
+    uses one or more threads of the underlying operating system to invoke the callbacks of
+    subscriptions such as on receiving an ROS2 message. Upon receiving the ROS2 decoder manifest,
+    the ROS2 interface will subscribe to the ROS2 topic with the ROS2 type name and callback. The
+    callback will be invoked when new messages arrive on the subscribed topic. The received message
+    will then be serialized and published to Raw Buffer Manager. If the event based collection
+    scheme use a specific primitive data field from the ROS2 message as trigger condition, the ROS2
+    interface will decode the ROS2 message to extract the required primitive data field and publish
+    to a circular buffer for further inspection.
 - **In the Data Management Modules**, one thread is created that manages the life cycle of the
   collection Scheme and decode manifest. This thread is busy waiting and wakes up only during an
   arrival of new collection schemes/manifest from the cloud, or during the expiry of any of the
   collection schemes in the system.
 - **In the Data Inspection Modules**, each of the following modules spawn threads:
   - The inspection rule engine that does active inspection of the signals having one thread.
-  - One thread for each CAN Network consuming the data and decoding/normalizing, working in polling
-    mode, and using a lock free container to read and write CAN Messages.
-    [A boost spsc](https://theboostcpplibraries.com/boost.lockfree) queue is used for this purpose.
+  - One thread for each Network consuming the data and decoding/normalizing, working in polling
+    mode, and using a thread-safe queue to read and write CAN Messages. This queue is used across
+    all data sources for pushing the data and is consumed by one Data Inspection Module.
   - One thread taking care of controlling the health of the Network Interfaces (event based) and
     shutting down the sockets if a CAN IF is interrupted.
   - One thread that does run a Diagnostic session at a given time frequency (running J1979 PID and
     DTC request)
-- **In the Connectivity Modules**, most of the execution runs in the context of the main application
-  thread. Callbacks and notifications from the MQTT stack happen in the context of the AWS IoT
-  Device SDK thread. This module intercepts the notifications and switches the thread context to one
-  of FWE threads so that no real data processing happens in the MQTT connection thread.
+- **In the Connectivity Modules**,
+  - **_MQTT_** The execution runs in the DataSenderManagerWorkerThread. Callbacks and notifications
+    from the MQTT stack happen in the context of the AWS IoT Device SDK thread. This module
+    intercepts the notifications and switches the thread context to one of FWE threads so that no
+    real data processing happens in the MQTT connection thread.
+  - **_HTTPS_** Large data such as Vision System data will be transmitted to AWS S3 via HTTPS. The
+    Edge uses IoT certificate to acquire AWS credential via AWS IoT Credential Provider and use it
+    for S3 upload. The upload is executed in 5Mb parts with
+    [Transfer Manager](https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/examples-s3-transfermanager.html).
+    The default part size can be changed in static configuration under
+    ["staticConfig"]["s3upload"]["multipartSize"]. If upload fails, retry is only executed once.
 - **In the Execution Management Modules**, there are two threads
   - One thread which is managing all the bootstrap sequence and intercepting SystemD signals i.e.
     application main thread
@@ -906,10 +943,14 @@ a configurable frequency to the cloud services. Refer to
 
 **Data Snapshot Information**
 
-This message is send conditionally to the cloud data plane services once one or more inspection rule
-is met. Depending on the configuration of FWE, (e.g. send decoded and raw data), FWE sends one or
-more instance of this message in an MQTT packet to the cloud. Refer to
+**_Telemetry Data_** This message is sent conditionally to the cloud data plane services once one or
+more inspection rule is met. For telemetry data such as CAN data, FWE sends it in an MQTT packet to
+the cloud. Refer to
 [vehicle_data.proto](../../interfaces/protobuf/schemas/edgeToCloud/vehicle_data.proto).
+
+**_Vision System Data_** In Vision System data use case, FWE serializes each ROS2 message into CDR
+format and packed them in Amazon ION file format and directly upload to S3. Refer to
+[vision_system_data.isl](../../interfaces/protobuf/schemas/edgeToCloud/vision_system_data.isl).
 
 ### Cloud to Device communication
 
@@ -934,6 +975,8 @@ with the cloud services. The persistency operates on three types of documents:
   startup.
 - Decoder Manifest Data: This data set is persisted during shutdown of FWE, and re-loaded upon
   startup.
+- Metadata for Data Snapshots: Additional information for persisted data snapshots. Refer to
+  [persistencyMetadataFormat.json](../../interfaces/persistency/schemas/persistencyMetadataFormat.json).
 - Data Snapshots: This data set is persisted when there is no connectivity in the system. Upon the
   next startup of the application, the data is reloaded and send if there is connectivity.
 
@@ -943,6 +986,8 @@ left, the module does not persist the data.
 Persisted data is uploaded once on the bootup. Upload will be repeated after interval that is set in
 the static configuration under ["staticConfig"]["persistency"]["persistencyUploadRetryIntervalMs"].
 If this value is not set, upload will be retried only on the next bootup.
+
+Note Data Persistency is not supported for Vision System Data currently.
 
 ## Logging
 
@@ -996,9 +1041,14 @@ described below in the configuration section. Each log entry includes the follow
 |                             | dtcRequestIntervalSeconds                   | Interval used to schedule DTC requests (in seconds)                                                                                                                                                                                                                                                                                                                             | integer  |
 |                             | interfaceId                                 | Every OBD signal decoder is associated with a OBD network interface using a unique Id                                                                                                                                                                                                                                                                                           | string   |
 |                             | type                                        | Specifies if the interface carries CAN or OBD signals over this channel, this will be OBD for a OBD network interface                                                                                                                                                                                                                                                           | string   |
-| bufferSizes                 | dtcBufferSize                               | Max size of the buffer shared between data collection module (Collection Engine) and Vehicle Data Consumer. This is a single producer single consumer buffer.                                                                                                                                                                                                                   | integer  |
+| ros2Interface               | subscribeQueueLength                        | Define how many ROS2 messages to be queued before invoking callback                                                                                                                                                                                                                                                                                                             | integer  |
+|                             | executorThreads                             | number of threads to have in the thread pool for ROS2 executor                                                                                                                                                                                                                                                                                                                  | string   |
+|                             | introspectionLibraryCompare                 | Error handling when local ROS2 introspection library mismatches with Cloud decoder manifest: "ErrorAndFail", "Warn","Ignore".                                                                                                                                                                                                                                                   | string   |
+|                             | interfaceId                                 | A unique network interface ID used by AWS IoT FleetWise service                                                                                                                                                                                                                                                                                                                 | string   |
+|                             | type                                        | Specifies if the interface carries ROS2 signals over this channel.                                                                                                                                                                                                                                                                                                              | string   |
+| bufferSizes                 | dtcBufferSize                               | Deprecated: decodedSignalsBufferSize is used for all signals. This option will be ignored.                                                                                                                                                                                                                                                                                      | integer  |
 |                             | decodedSignalsBufferSize                    | Max size of the buffer shared between data collection module (Collection Engine) and Vehicle Data Consumer for OBD and CAN signals. This buffer receives the raw packets from the Vehicle Data e.g. CAN bus and stores the decoded/filtered data according to the signal decoding information provided in decoder manifest. This is a multiple producer single consumer buffer. | integer  |
-|                             | rawCANFrameBufferSize                       | Max size of the buffer shared between Vehicle Data Consumer and data collection module (Collection Engine). This buffer stores raw CAN frames coming in from the CAN Bus. This is a lock-free multi-producer single consumer buffer.                                                                                                                                            | integer  |
+|                             | rawCANFrameBufferSize                       | Deprecated: decodedSignalsBufferSize is used for all signals. This option will be ignored.                                                                                                                                                                                                                                                                                      | integer  |
 | threadIdleTimes             | inspectionThreadIdleTimeMs                  | Sleep time for inspection engine thread if no new data is available (in milliseconds)                                                                                                                                                                                                                                                                                           | integer  |
 |                             | socketCANThreadIdleTimeMs                   | Sleep time for CAN interface if no new data is available (in milliseconds)                                                                                                                                                                                                                                                                                                      | integer  |
 |                             | canDecoderThreadIdleTimeMs                  | Sleep time for CAN decoder thread if no new data is available (in milliseconds)                                                                                                                                                                                                                                                                                                 | integer  |
@@ -1032,6 +1082,24 @@ described below in the configuration section. Each log entry includes the follow
 |                             | metricsUploadIntervalMs                     | The interval in milliseconds to wait for uploading new values of all metrics                                                                                                                                                                                                                                                                                                    | integer  |
 |                             | loggingUploadMaxWaitBeforeUploadMs          | The maximum time in milliseconds to cache log messages before uploading them                                                                                                                                                                                                                                                                                                    | string   |
 |                             | profilerPrefix                              | The prefix used to categorize the metrics and logs. Can be set unique per vehicle such as `clientId` or the same for all vehicles if metrics should be aggregated                                                                                                                                                                                                               | string   |
+| credentialsProvider         | endpointUrl                                 | AWS account's IoT Credentials Provider endpoint. Required when `FWE_FEATURE_VISION_SYSTEM_DATA` is enabled.                                                                                                                                                                                                                                                                     | string   |
+|                             | roleAlias                                   | The IoT Role Alias to use with IoT Credentials Provider. Required when `FWE_FEATURE_VISION_SYSTEM_DATA` is enabled.                                                                                                                                                                                                                                                             | string   |
+| s3Upload                    | maxEnvelopeSize                             | The size in bytes at which to split the collected data between multiple Amazon Ion files. Required when `FWE_FEATURE_VISION_SYSTEM_DATA` is enabled.                                                                                                                                                                                                                            | integer  |
+|                             | multipartSize                               | The size in bytes to use when performing an S3 multipart upload. Required when `FWE_FEATURE_VISION_SYSTEM_DATA` is enabled.                                                                                                                                                                                                                                                     | integer  |
+|                             | maxConnections                              | Specifies the maximum number of HTTP connections to a single S3 server. enabled.                                                                                                                                                                                                                                                                                                | integer  |
+| visionSystemDataCollection  | rawDataBuffer                               | Configuration parameters for raw data buffer used to store samples of complex signals                                                                                                                                                                                                                                                                                           | object   |
+| rawDataBuffer               | maxSize                                     | Size (bytes) of memory allocated for raw data buffer manager                                                                                                                                                                                                                                                                                                                    | integer  |
+|                             | reservedSizePerSignal                       | Size (bytes) of memory that will be reserved for each signal. This won't be available to other signals, even if it is unused.                                                                                                                                                                                                                                                   | integer  |
+|                             | maxSamplesPerSignal                         | Max number of samples that will be stored in the raw data buffer for each signal                                                                                                                                                                                                                                                                                                | integer  |
+|                             | maxSizePerSample                            | Max size (bytes) of memory that can be used by a single sample. Larger samples will be discarded.                                                                                                                                                                                                                                                                               | integer  |
+|                             | maxSizePerSignal                            | Max size (bytes) of memory that can be used for each signal                                                                                                                                                                                                                                                                                                                     | integer  |
+|                             | overridesPerSignal                          | List of config overrides for specific signals                                                                                                                                                                                                                                                                                                                                   | array    |
+| overridesPerSignal          | interfaceId                                 | This is the interfaceId that is associated to the signal. Together with messageId, it uniquely identifies this signal.                                                                                                                                                                                                                                                          | string   |
+|                             | messageId                                   | This is the messageId passed in the decoder manifest. Together with interfaceId, it uniquely identifies this signal.                                                                                                                                                                                                                                                            | string   |
+|                             | reservedSize                                | Size (bytes) of memory that will be reserved for this signal. This won't be available to other signals, even if it is unused.                                                                                                                                                                                                                                                   | integer  |
+|                             | maxSamples                                  | Max number of samples that will be stored in the raw data buffer for this signal                                                                                                                                                                                                                                                                                                | integer  |
+|                             | maxSizePerSample                            | Max size (bytes) of memory that can be used by a single sample of this signal. Larger samples will be discarded.                                                                                                                                                                                                                                                                | integer  |
+|                             | maxSize                                     | Max size (bytes) of memory that can be used for this signal                                                                                                                                                                                                                                                                                                                     | integer  |
 
 ## Security
 

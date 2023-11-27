@@ -1,0 +1,10 @@
+{
+  "topics": [
+    {
+      "name": "ImageTopic",
+      "module": "sensor_msgs.msg",
+      "type": "Image",
+      "period_sec": 1
+    }
+  ]
+}

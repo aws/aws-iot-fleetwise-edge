@@ -19,8 +19,6 @@
 #include "WaitUntil.h"
 #include <array>
 #include <atomic>
-#include <boost/lockfree/queue.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <linux/can.h>
@@ -38,199 +36,6 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-using SignalDoubleValue = double;
-
-// ECU ID mocked for unit test
-enum class ECU_ID_MOCK
-{
-    ENGINE_ECU_TX = 0x7E0,
-    ENGINE_ECU_RX = 0x7E8,
-    ENGINE_ECU_TX_EXTENDED = 0x18DA58F1,
-    ENGINE_ECU_RX_EXTENDED = 0x18DAF158,
-    TRANSMISSION_ECU_TX = 0x7E1,
-    TRANSMISSION_ECU_TX_EXTENDED = 0x18DA59F1,
-    TRANSMISSION_ECU_RX = 0x7E9,
-    TRANSMISSION_ECU_RX_EXTENDED = 0x18DAF159
-};
-
-bool
-socketAvailable()
-{
-    auto sock = socket( PF_CAN, SOCK_DGRAM, CAN_ISOTP );
-    if ( sock < 0 )
-    {
-        return false;
-    }
-    close( sock );
-    return true;
-}
-
-// Initialize the decoder dictionary for this test.
-// Note In actual product, decoder dictionary comes from decoder manifest. For this unit test,
-// The decoder dictionary is initialized based on a local table mode1PIDs in OBDDataDecoder Module.
-void
-initInspectionMatrix( OBDOverCANModule &module )
-{
-    // Prepare the Inspection Engine and the inspection matrix
-
-    auto matrix = std::make_shared<InspectionMatrix>();
-    InspectionMatrixSignalCollectionInfo matrixCollectInfo;
-    ConditionWithCollectedData condition;
-    matrixCollectInfo.signalID = 1234;
-    matrixCollectInfo.sampleBufferSize = 50;
-    matrixCollectInfo.minimumSampleIntervalMs = 10;
-    matrixCollectInfo.fixedWindowPeriod = 77777;
-    matrixCollectInfo.isConditionOnlySignal = true;
-    condition.signals.push_back( matrixCollectInfo );
-    condition.afterDuration = 3;
-    condition.minimumPublishIntervalMs = 0;
-    condition.probabilityToSend = 1.0;
-    condition.includeActiveDtcs = true;
-    condition.triggerOnlyOnRisingEdge = false;
-    // Node
-    ExpressionNode node;
-    node.nodeType = ExpressionNodeType::BOOLEAN;
-    node.booleanValue = true;
-    condition.condition = &node;
-    // add the condition to the matrix
-    matrix->conditions.emplace_back( condition );
-    module.onChangeInspectionMatrix( matrix );
-}
-
-// Initialize the decoder dictionary for this test.
-// Note In actual product, decoder dictionary comes from decoder manifest. For this unit test,
-// The decoder dictionary is initialized based on a local table mode1PIDs in OBDDataDecoder Module.
-std::shared_ptr<CANDecoderDictionary>
-initDecoderDictionary( SignalType signalType = SignalType::DOUBLE )
-{
-    auto decoderDictPtr = std::make_shared<CANDecoderDictionary>();
-    decoderDictPtr->canMessageDecoderMethod.emplace( 0, std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>() );
-    for ( const auto &pidInfo : mode1PIDs )
-    {
-        CANMessageFormat format;
-        auto pid = pidInfo.pid;
-        format.mMessageID = pid;
-        format.mSizeInBytes = static_cast<uint8_t>( pidInfo.retLen );
-        format.mSignals = std::vector<CANSignalFormat>( pidInfo.formulas.size() );
-        for ( uint32_t idx = 0; idx < pidInfo.formulas.size(); ++idx )
-        {
-            // In final product, signal ID comes from Cloud, edge doesn't generate signal ID
-            // Below signal ID initialization got implemented only for Edge testing.
-            // In this test, signal ID are defined as PID | (signal order) << 8
-            format.mSignals[idx].mSignalID = pid | ( idx << 8 );
-            format.mSignals[idx].mFirstBitPosition =
-                static_cast<uint16_t>( pidInfo.formulas[idx].byteOffset * BYTE_SIZE + pidInfo.formulas[idx].bitShift );
-            format.mSignals[idx].mSizeInBits = static_cast<uint16_t>(
-                ( pidInfo.formulas[idx].numOfBytes - 1 ) * BYTE_SIZE + pidInfo.formulas[idx].bitMaskLen );
-            format.mSignals[idx].mFactor = pidInfo.formulas[idx].scaling;
-            format.mSignals[idx].mOffset = pidInfo.formulas[idx].offset;
-            format.mSignals[idx].mSignalType = signalType;
-            decoderDictPtr->signalIDsToCollect.insert( pid | ( idx << 8 ) );
-        }
-        decoderDictPtr->canMessageDecoderMethod[0].emplace( pid, CANMessageDecoderMethod() );
-        decoderDictPtr->canMessageDecoderMethod[0][pid].format = format;
-    }
-    return decoderDictPtr;
-}
-
-struct ECUMock
-{
-    void
-    init( ECUID broadcastRxId, ECU_ID_MOCK physicalRxId, ECU_ID_MOCK physicalTxId )
-    {
-        ISOTPOverCANReceiverOptions broadcastOptions;
-        // Broadcast
-        broadcastOptions.mSocketCanIFName = "vcan0";
-        broadcastOptions.mSourceCANId = (unsigned)physicalTxId;
-        broadcastOptions.mIsExtendedId = (unsigned)broadcastRxId > CAN_SFF_MASK;
-        broadcastOptions.mDestinationCANId = (unsigned)broadcastRxId;
-        broadcastOptions.mP2TimeoutMs = P2_TIMEOUT_DEFAULT_MS;
-        ASSERT_TRUE( mBroadcastReceiver.init( broadcastOptions ) );
-        ASSERT_TRUE( mBroadcastReceiver.connect() );
-
-        ISOTPOverCANSenderReceiverOptions ecuOptions;
-        ecuOptions.mSocketCanIFName = "vcan0";
-        ecuOptions.mIsExtendedId = (unsigned)physicalRxId > CAN_SFF_MASK;
-        ecuOptions.mP2TimeoutMs = P2_TIMEOUT_DEFAULT_MS;
-        ecuOptions.mSourceCANId = (unsigned)physicalTxId;
-        ecuOptions.mDestinationCANId = (unsigned)physicalRxId;
-        ASSERT_TRUE( mPhysicalSenderReceiver.init( ecuOptions ) );
-        ASSERT_TRUE( mPhysicalSenderReceiver.connect() );
-    }
-    ISOTPOverCANReceiver mBroadcastReceiver;
-    ISOTPOverCANSenderReceiver mPhysicalSenderReceiver;
-    std::vector<uint8_t> mSupportedPIDResponse1;
-    std::vector<uint8_t> mSupportedPIDResponse2;
-    std::vector<uint8_t> mRequestPID1;
-    std::vector<uint8_t> mPIDResponse1;
-    std::vector<uint8_t> mRequestPID2;
-    std::vector<uint8_t> mPIDResponse2;
-    std::vector<uint8_t> mDTCResponse;
-    std::atomic<bool> mShouldStop{ false };
-    Thread mThread;
-};
-
-// This function will be run in a separate thread to mock ECU response to FWE OBD requests
-void
-ecuResponse( void *ecuMock )
-{
-    auto ecuMockPtr = static_cast<ECUMock *>( ecuMock );
-    while ( !ecuMockPtr->mShouldStop )
-    {
-        struct pollfd pfds[] = { { ecuMockPtr->mBroadcastReceiver.getSocket(), POLLIN, 0 },
-                                 { ecuMockPtr->mPhysicalSenderReceiver.getSocket(), POLLIN, 0 } };
-        int res = poll( pfds, 2U, 100 ); // 100 ms poll time
-        if ( res <= 0 )
-        {
-            continue;
-        }
-        std::vector<uint8_t> rxPDUData;
-        if ( pfds[0].revents != 0 )
-        {
-            ecuMockPtr->mBroadcastReceiver.receivePDU( rxPDUData );
-        }
-        else if ( pfds[1].revents != 0 )
-        {
-            ecuMockPtr->mPhysicalSenderReceiver.receivePDU( rxPDUData );
-        }
-        else
-        {
-            continue;
-        }
-
-        if ( rxPDUData == std::vector<uint8_t>{ 0x01, 0x00 } )
-        {
-            ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mSupportedPIDResponse1 );
-        }
-        else if ( rxPDUData == std::vector<uint8_t>{ 0x01, 0x00, 0x20, 0x40, 0x60, 0x80, 0xA0 } )
-        {
-            // FWE is querying supported PIDs
-            ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mSupportedPIDResponse1 );
-        }
-        else if ( rxPDUData == std::vector<uint8_t>{ 0x01, 0xC0, 0xE0 } )
-        {
-            // FWE is querying supported PIDs
-            ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mSupportedPIDResponse2 );
-        }
-        else if ( rxPDUData == ecuMockPtr->mRequestPID1 )
-        {
-            ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mPIDResponse1 );
-        }
-        else if ( rxPDUData == ecuMockPtr->mRequestPID2 )
-        {
-            ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mPIDResponse2 );
-        }
-        else if ( rxPDUData == std::vector<uint8_t>{ 0x03 } )
-        {
-            ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mDTCResponse );
-        }
-        else
-        {
-            // Do Nothing, this message is not recognized by ECU
-        }
-    }
-}
-
 class OBDOverCANModuleTest : public ::testing::Test
 {
 protected:
@@ -242,7 +47,6 @@ protected:
             GTEST_SKIP() << "Skipping test fixture due to unavailability of socket";
         }
         signalBufferPtr = std::make_shared<SignalBuffer>( 256 );
-        activeDTCBufferPtr = std::make_shared<ActiveDTCBuffer>( 256 );
     }
     void
     TearDown() override
@@ -256,10 +60,203 @@ protected:
         }
         ASSERT_TRUE( obdModule.disconnect() );
     }
-    // ISOTPOverCANSenderReceiver engineECU;
+
+    static bool
+    socketAvailable()
+    {
+        auto sock = socket( PF_CAN, SOCK_DGRAM, CAN_ISOTP );
+        if ( sock < 0 )
+        {
+            return false;
+        }
+        close( sock );
+        return true;
+    }
+
+    using SignalDoubleValue = double;
+
+    // ECU ID mocked for unit test
+    enum class ECU_ID_MOCK
+    {
+        ENGINE_ECU_TX = 0x7E0,
+        ENGINE_ECU_RX = 0x7E8,
+        ENGINE_ECU_TX_EXTENDED = 0x18DA58F1,
+        ENGINE_ECU_RX_EXTENDED = 0x18DAF158,
+        TRANSMISSION_ECU_TX = 0x7E1,
+        TRANSMISSION_ECU_TX_EXTENDED = 0x18DA59F1,
+        TRANSMISSION_ECU_RX = 0x7E9,
+        TRANSMISSION_ECU_RX_EXTENDED = 0x18DAF159
+    };
+
+    // Initialize the decoder dictionary for this test.
+    // Note In actual product, decoder dictionary comes from decoder manifest. For this unit test,
+    // The decoder dictionary is initialized based on a local table mode1PIDs in OBDDataDecoder Module.
+    static void
+    initInspectionMatrix( OBDOverCANModule &module )
+    {
+        // Prepare the Inspection Engine and the inspection matrix
+
+        auto matrix = std::make_shared<InspectionMatrix>();
+        InspectionMatrixSignalCollectionInfo matrixCollectInfo;
+        ConditionWithCollectedData condition;
+        matrixCollectInfo.signalID = 1234;
+        matrixCollectInfo.sampleBufferSize = 50;
+        matrixCollectInfo.minimumSampleIntervalMs = 10;
+        matrixCollectInfo.fixedWindowPeriod = 77777;
+        matrixCollectInfo.isConditionOnlySignal = true;
+        condition.signals.push_back( matrixCollectInfo );
+        condition.afterDuration = 3;
+        condition.minimumPublishIntervalMs = 0;
+        condition.probabilityToSend = 1.0;
+        condition.includeActiveDtcs = true;
+        condition.triggerOnlyOnRisingEdge = false;
+        // Node
+        ExpressionNode node;
+        node.nodeType = ExpressionNodeType::BOOLEAN;
+        node.booleanValue = true;
+        condition.condition = &node;
+        // add the condition to the matrix
+        matrix->conditions.emplace_back( condition );
+        module.onChangeInspectionMatrix( matrix );
+    }
+
+    // Initialize the decoder dictionary for this test.
+    // Note In actual product, decoder dictionary comes from decoder manifest. For this unit test,
+    // The decoder dictionary is initialized based on a local table mode1PIDs in OBDDataDecoder Module.
+    static std::shared_ptr<CANDecoderDictionary>
+    initDecoderDictionary( SignalType signalType = SignalType::DOUBLE )
+    {
+        auto decoderDictPtr = std::make_shared<CANDecoderDictionary>();
+        decoderDictPtr->canMessageDecoderMethod.emplace( 0,
+                                                         std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>() );
+        for ( const auto &pidInfo : mode1PIDs )
+        {
+            CANMessageFormat format;
+            auto pid = pidInfo.pid;
+            format.mMessageID = pid;
+            format.mSizeInBytes = static_cast<uint8_t>( pidInfo.retLen );
+            format.mSignals = std::vector<CANSignalFormat>( pidInfo.formulas.size() );
+            for ( uint32_t idx = 0; idx < pidInfo.formulas.size(); ++idx )
+            {
+                // In final product, signal ID comes from Cloud, edge doesn't generate signal ID
+                // Below signal ID initialization got implemented only for Edge testing.
+                // In this test, signal ID are defined as PID | (signal order) << 8
+                format.mSignals[idx].mSignalID = pid | ( idx << 8 );
+                format.mSignals[idx].mFirstBitPosition = static_cast<uint16_t>(
+                    pidInfo.formulas[idx].byteOffset * BYTE_SIZE + pidInfo.formulas[idx].bitShift );
+                format.mSignals[idx].mSizeInBits = static_cast<uint16_t>(
+                    ( pidInfo.formulas[idx].numOfBytes - 1 ) * BYTE_SIZE + pidInfo.formulas[idx].bitMaskLen );
+                format.mSignals[idx].mFactor = pidInfo.formulas[idx].scaling;
+                format.mSignals[idx].mOffset = pidInfo.formulas[idx].offset;
+                format.mSignals[idx].mSignalType = signalType;
+                decoderDictPtr->signalIDsToCollect.insert( pid | ( idx << 8 ) );
+            }
+            decoderDictPtr->canMessageDecoderMethod[0].emplace( pid, CANMessageDecoderMethod() );
+            decoderDictPtr->canMessageDecoderMethod[0][pid].format = format;
+        }
+        return decoderDictPtr;
+    }
+
+    struct ECUMock
+    {
+        void
+        init( ECUID broadcastRxId, ECU_ID_MOCK physicalRxId, ECU_ID_MOCK physicalTxId )
+        {
+            ISOTPOverCANReceiverOptions broadcastOptions;
+            // Broadcast
+            broadcastOptions.mSocketCanIFName = "vcan0";
+            broadcastOptions.mSourceCANId = (unsigned)physicalTxId;
+            broadcastOptions.mIsExtendedId = (unsigned)broadcastRxId > CAN_SFF_MASK;
+            broadcastOptions.mDestinationCANId = (unsigned)broadcastRxId;
+            broadcastOptions.mP2TimeoutMs = P2_TIMEOUT_DEFAULT_MS;
+            ASSERT_TRUE( mBroadcastReceiver.init( broadcastOptions ) );
+            ASSERT_TRUE( mBroadcastReceiver.connect() );
+
+            ISOTPOverCANSenderReceiverOptions ecuOptions;
+            ecuOptions.mSocketCanIFName = "vcan0";
+            ecuOptions.mIsExtendedId = (unsigned)physicalRxId > CAN_SFF_MASK;
+            ecuOptions.mP2TimeoutMs = P2_TIMEOUT_DEFAULT_MS;
+            ecuOptions.mSourceCANId = (unsigned)physicalTxId;
+            ecuOptions.mDestinationCANId = (unsigned)physicalRxId;
+            ASSERT_TRUE( mPhysicalSenderReceiver.init( ecuOptions ) );
+            ASSERT_TRUE( mPhysicalSenderReceiver.connect() );
+        }
+        ISOTPOverCANReceiver mBroadcastReceiver;
+        ISOTPOverCANSenderReceiver mPhysicalSenderReceiver;
+        std::vector<uint8_t> mSupportedPIDResponse1;
+        std::vector<uint8_t> mSupportedPIDResponse2;
+        std::vector<uint8_t> mRequestPID1;
+        std::vector<uint8_t> mPIDResponse1;
+        std::vector<uint8_t> mRequestPID2;
+        std::vector<uint8_t> mPIDResponse2;
+        std::vector<uint8_t> mDTCResponse;
+        std::atomic<bool> mShouldStop{ false };
+        Thread mThread;
+    };
+
+    // This function will be run in a separate thread to mock ECU response to FWE OBD requests
+    static void
+    ecuResponse( void *ecuMock )
+    {
+        auto ecuMockPtr = static_cast<ECUMock *>( ecuMock );
+        while ( !ecuMockPtr->mShouldStop )
+        {
+            struct pollfd pfds[] = { { ecuMockPtr->mBroadcastReceiver.getSocket(), POLLIN, 0 },
+                                     { ecuMockPtr->mPhysicalSenderReceiver.getSocket(), POLLIN, 0 } };
+            int res = poll( pfds, 2U, 100 ); // 100 ms poll time
+            if ( res <= 0 )
+            {
+                continue;
+            }
+            std::vector<uint8_t> rxPDUData;
+            if ( pfds[0].revents != 0 )
+            {
+                ecuMockPtr->mBroadcastReceiver.receivePDU( rxPDUData );
+            }
+            else if ( pfds[1].revents != 0 )
+            {
+                ecuMockPtr->mPhysicalSenderReceiver.receivePDU( rxPDUData );
+            }
+            else
+            {
+                continue;
+            }
+
+            if ( rxPDUData == std::vector<uint8_t>{ 0x01, 0x00 } )
+            {
+                ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mSupportedPIDResponse1 );
+            }
+            else if ( rxPDUData == std::vector<uint8_t>{ 0x01, 0x00, 0x20, 0x40, 0x60, 0x80, 0xA0 } )
+            {
+                // FWE is querying supported PIDs
+                ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mSupportedPIDResponse1 );
+            }
+            else if ( rxPDUData == std::vector<uint8_t>{ 0x01, 0xC0, 0xE0 } )
+            {
+                // FWE is querying supported PIDs
+                ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mSupportedPIDResponse2 );
+            }
+            else if ( rxPDUData == ecuMockPtr->mRequestPID1 )
+            {
+                ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mPIDResponse1 );
+            }
+            else if ( rxPDUData == ecuMockPtr->mRequestPID2 )
+            {
+                ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mPIDResponse2 );
+            }
+            else if ( rxPDUData == std::vector<uint8_t>{ 0x03 } )
+            {
+                ecuMockPtr->mPhysicalSenderReceiver.sendPDU( ecuMockPtr->mDTCResponse );
+            }
+            else
+            {
+                // Do Nothing, this message is not recognized by ECU
+            }
+        }
+    }
+
     OBDOverCANModule obdModule;
     std::shared_ptr<SignalBuffer> signalBufferPtr;
-    std::shared_ptr<ActiveDTCBuffer> activeDTCBufferPtr;
     std::vector<ECUMock> ecus;
 };
 
@@ -267,15 +264,14 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleInitFailure )
 {
     constexpr uint32_t obdPIDRequestInterval = 2; // seconds
     constexpr uint32_t obdDTCRequestInterval = 2; // seconds
-    ASSERT_FALSE( obdModule.init( nullptr, nullptr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
+    ASSERT_FALSE( obdModule.init( nullptr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
 }
 
 TEST_F( OBDOverCANModuleTest, OBDOverCANModuleInitTestSuccess )
 {
     constexpr uint32_t obdPIDRequestInterval = 2; // seconds
     constexpr uint32_t obdDTCRequestInterval = 2; // seconds
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
     ASSERT_TRUE( obdModule.disconnect() );
 }
@@ -301,8 +297,7 @@ TEST_F( OBDOverCANModuleTest, OBDOverCANModuleAndDecoderManifestLifecycle )
     engineECUOptions.mDestinationCANId = toUType( ECU_ID_MOCK::ENGINE_ECU_TX );
     ASSERT_TRUE( engineECU.init( engineECUOptions ) );
     ASSERT_TRUE( engineECU.connect() );
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
     // No Requests should be seen on the bus as it hasn't received a valid decoder dictionary yet.
     DELAY_ASSERT_FALSE( engineECU.receivePDU( ecmRxPDUData ) );
@@ -344,8 +339,7 @@ TEST_P( OBDOverCANModuleTestWithAllSignalTypes, RequestPIDFromNotExtendedIDECUTe
     // Request PIDs every 2 seconds and no DTC request
     constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
     // Create decoder dictionary
     auto decoderDictPtr = initDecoderDictionary( signalType );
@@ -358,13 +352,13 @@ TEST_P( OBDOverCANModuleTestWithAllSignalTypes, RequestPIDFromNotExtendedIDECUTe
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 } };
     // Verify all PID Signals are correctly decoded
-    CollectedSignal signal;
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_NO_FATAL_FAILURE( assertSignalValue( signal.value, expectedPIDSignalValue[signal.signalID], signalType ) );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_NO_FATAL_FAILURE( assertSignalValue( signal.value, expectedPIDSignalValue[signal.signalID], signalType ) );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_NO_FATAL_FAILURE( assertSignalValue( signal.value, expectedPIDSignalValue[signal.signalID], signalType ) );
+    CollectedDataFrame collectedDataFrame;
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_NO_FATAL_FAILURE(
+            assertSignalValue( signal.value, expectedPIDSignalValue[signal.signalID], signalType ) );
+    }
 }
 
 // This test is to validate that OBDOverCANModule will only request PID that are specified in Decoder Dictionary
@@ -397,8 +391,7 @@ TEST_F( OBDOverCANModuleTest, RequestPartialPIDFromNotExtendedIDECUTest )
     // Request PIDs every 2 seconds and no DTC request
     constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
     // Create decoder dictionary
     auto decoderDictPtr = initDecoderDictionary();
@@ -423,13 +416,19 @@ TEST_F( OBDOverCANModuleTest, RequestPartialPIDFromNotExtendedIDECUTest )
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 },
         { 0xC1, 0xAA } };
     // Verify all PID Signals are correctly decoded
-    CollectedSignal signal;
-    for ( size_t idx = 0; idx < expectedPIDSignalValue.size(); ++idx )
+    CollectedDataFrame collectedDataFrame;
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto &signal : collectedDataFrame.mCollectedSignals )
     {
-        WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
         ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
     }
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->empty() );
+    // Check last two PID signals
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto &signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    }
+    ASSERT_FALSE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
 }
 
 // This test is to validate that OBDOverCANModule can update the PID request list when receiving new decoder manifest
@@ -466,8 +465,7 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
     // Request PIDs every 2 seconds and no DTC request
     constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
     // Create decoder dictionary
     auto decoderDictPtr = initDecoderDictionary();
@@ -492,14 +490,20 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 },
         { 0xC1, 0xAA } };
     // Verify all PID Signals are correctly decoded
+    CollectedDataFrame collectedDataFrame;
     CollectedSignal signal;
-    for ( size_t idx = 0; idx < expectedPIDSignalValue.size(); ++idx )
+    // Check first three PID signals
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto &signal : collectedDataFrame.mCollectedSignals )
     {
-        WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
         ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
     }
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->empty() );
-
+    // Check last two PID signals
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto &signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    }
     // Update Decoder Dictionary to collect PID 0x05
     decoderDictPtr->signalIDsToCollect.erase( 0x04 );
     decoderDictPtr->signalIDsToCollect.insert( 0x05 );
@@ -515,18 +519,25 @@ TEST_F( OBDOverCANModuleTest, DecoderDictionaryUpdatePIDsToCollectTest )
                                { toUType( EmissionPIDs::ENGINE_SPEED ), 1000 },
                                { 0xC1, 0xAA } };
     // Verify all PID Signals are correctly decoded
-    for ( size_t idx = 0; idx < expectedPIDSignalValue.size(); ++idx )
+    // Check first three PID signals
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto &signal : collectedDataFrame.mCollectedSignals )
     {
-        WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
         ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
     }
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->empty() );
+    // Check last two PID signals
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto &signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    }
+    ASSERT_FALSE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
 
     // Update Decoder Dictionary to collect no signals.
     // publish the new decoder dictionary to OBD module
     obdModule.onChangeOfActiveDictionary( nullptr, VehicleDataSourceProtocol::OBD );
     // We shall not receive any PIDs as decoder dictionary is empty
-    DELAY_ASSERT_FALSE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    DELAY_ASSERT_FALSE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
 }
 
 TEST_F( OBDOverCANModuleTest, RequestEmissionPIDAndDTCFromExtendedIDECUTest )
@@ -557,8 +568,7 @@ TEST_F( OBDOverCANModuleTest, RequestEmissionPIDAndDTCFromExtendedIDECUTest )
     constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 1; // Request DTC every 1 seconds
 
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
     // Create decoder dictionary
     auto decoderDictPtr = initDecoderDictionary();
@@ -573,25 +583,30 @@ TEST_F( OBDOverCANModuleTest, RequestEmissionPIDAndDTCFromExtendedIDECUTest )
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 },
         { 0xC1, 0xAA } };
     // Verify produced PID signals are correctly decoded
-    CollectedSignal signal;
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    CollectedDataFrame collectedDataFrame;
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+
+    for ( auto signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    }
+
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    }
 
     // Verify produced DTC Buffer is correct. 4 codes for ECM , 0 codes for TCM
-    DTCInfo dtcInfo;
-    WAIT_ASSERT_TRUE( obdModule.getActiveDTCBufferPtr()->pop( dtcInfo ) );
-    ASSERT_EQ( dtcInfo.mDTCCodes.size(), 4 );
-    ASSERT_EQ( dtcInfo.mSID, SID::STORED_DTC );
-    ASSERT_EQ( dtcInfo.mDTCCodes[0], "P0143" );
-    ASSERT_EQ( dtcInfo.mDTCCodes[1], "C0196" );
-    ASSERT_EQ( dtcInfo.mDTCCodes[2], "B0148" );
-    ASSERT_EQ( dtcInfo.mDTCCodes[3], "U0148" );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    auto dtcInfo = collectedDataFrame.mActiveDTCs;
+    ASSERT_NE( dtcInfo, nullptr );
+    ASSERT_EQ( dtcInfo->mDTCCodes.size(), 4 );
+    ASSERT_EQ( dtcInfo->mSID, SID::STORED_DTC );
+    ASSERT_EQ( dtcInfo->mDTCCodes[0], "P0143" );
+    ASSERT_EQ( dtcInfo->mDTCCodes[1], "C0196" );
+    ASSERT_EQ( dtcInfo->mDTCCodes[2], "B0148" );
+    ASSERT_EQ( dtcInfo->mDTCCodes[3], "U0148" );
 }
 
 TEST_F( OBDOverCANModuleTest, RequestPIDAndDTCFromNonExtendedIDECUTest )
@@ -621,8 +636,7 @@ TEST_F( OBDOverCANModuleTest, RequestPIDAndDTCFromNonExtendedIDECUTest )
     constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 1; // Request DTC every 1 seconds
 
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
     auto decoderDictPtr = initDecoderDictionary();
     // publish decoder dictionary to OBD module
@@ -635,26 +649,33 @@ TEST_F( OBDOverCANModuleTest, RequestPIDAndDTCFromNonExtendedIDECUTest )
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 },
         { 0xC1, 0xAA } };
+
+    CollectedDataFrame collectedDataFrame;
+
     // Verify produced PID signals are correctly decoded
-    CollectedSignal signal;
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    }
+
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    }
 
     // Verify produced DTC Buffer is correct. 4 codes for ECM , 0 codes for TCM
-    DTCInfo dtcInfo;
-    WAIT_ASSERT_TRUE( obdModule.getActiveDTCBufferPtr()->pop( dtcInfo ) );
-    ASSERT_EQ( dtcInfo.mDTCCodes.size(), 4 );
-    ASSERT_EQ( dtcInfo.mSID, SID::STORED_DTC );
-    ASSERT_EQ( dtcInfo.mDTCCodes[0], "P0143" );
-    ASSERT_EQ( dtcInfo.mDTCCodes[1], "C0196" );
-    ASSERT_EQ( dtcInfo.mDTCCodes[2], "B0148" );
-    ASSERT_EQ( dtcInfo.mDTCCodes[3], "U0148" );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+
+    auto dtcInfo = collectedDataFrame.mActiveDTCs;
+    ASSERT_NE( dtcInfo, nullptr );
+    ASSERT_EQ( dtcInfo->mDTCCodes.size(), 4 );
+    ASSERT_EQ( dtcInfo->mSID, SID::STORED_DTC );
+    ASSERT_EQ( dtcInfo->mDTCCodes[0], "P0143" );
+    ASSERT_EQ( dtcInfo->mDTCCodes[1], "C0196" );
+    ASSERT_EQ( dtcInfo->mDTCCodes[2], "B0148" );
+    ASSERT_EQ( dtcInfo->mDTCCodes[3], "U0148" );
 }
 
 TEST_F( OBDOverCANModuleTest, BroadcastRequestsStandardIDs )
@@ -683,8 +704,7 @@ TEST_F( OBDOverCANModuleTest, BroadcastRequestsStandardIDs )
     // Request PIDs every 2 seconds and no DTC request
     constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, true ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, true ) );
     ASSERT_TRUE( obdModule.connect() );
     // Create decoder dictionary
     auto decoderDictPtr = initDecoderDictionary();
@@ -697,13 +717,13 @@ TEST_F( OBDOverCANModuleTest, BroadcastRequestsStandardIDs )
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 } };
     // Verify all PID Signals are correctly decoded
-    CollectedSignal signal;
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    CollectedDataFrame collectedDataFrame;
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+
+    for ( auto signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    }
 }
 
 TEST_F( OBDOverCANModuleTest, BroadcastRequestsExtendedIDs )
@@ -733,8 +753,7 @@ TEST_F( OBDOverCANModuleTest, BroadcastRequestsExtendedIDs )
     // Request PIDs every 2 seconds and no DTC request
     constexpr uint32_t obdPIDRequestInterval = 1; // 1 second
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, true ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, true ) );
     ASSERT_TRUE( obdModule.connect() );
     // Create decoder dictionary
     auto decoderDictPtr = initDecoderDictionary();
@@ -747,13 +766,12 @@ TEST_F( OBDOverCANModuleTest, BroadcastRequestsExtendedIDs )
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 } };
     // Verify all PID Signals are correctly decoded
-    CollectedSignal signal;
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    CollectedDataFrame collectedDataFrame;
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    }
 }
 
 TEST_F( OBDOverCANModuleTest, getExternalPIDsToRequest )
@@ -761,8 +779,7 @@ TEST_F( OBDOverCANModuleTest, getExternalPIDsToRequest )
     // Request PIDs every 2 seconds and no DTC request
     constexpr uint32_t obdPIDRequestInterval = 0; // no PID request
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
     ASSERT_EQ( obdModule.getExternalPIDsToRequest(), std::vector<PID>() );
     // Create decoder dictionary
@@ -793,8 +810,7 @@ TEST_F( OBDOverCANModuleTest, setExternalPIDResponse )
     // Request PIDs every 2 seconds and no DTC request
     constexpr uint32_t obdPIDRequestInterval = 0; // no PID request
     constexpr uint32_t obdDTCRequestInterval = 0; // no DTC request
-    ASSERT_TRUE( obdModule.init(
-        signalBufferPtr, activeDTCBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
+    ASSERT_TRUE( obdModule.init( signalBufferPtr, "vcan0", obdPIDRequestInterval, obdDTCRequestInterval, false ) );
     ASSERT_TRUE( obdModule.connect() );
     // Check before decoder manifest arrives:
     obdModule.setExternalPIDResponse( static_cast<PID>( EmissionPIDs::ENGINE_LOAD ),
@@ -803,8 +819,8 @@ TEST_F( OBDOverCANModuleTest, setExternalPIDResponse )
     auto decoderDictPtr = initDecoderDictionary();
     // publish decoder dictionary to OBD module
     obdModule.onChangeOfActiveDictionary( decoderDictPtr, VehicleDataSourceProtocol::OBD );
-    CollectedSignal signal;
-    DELAY_ASSERT_FALSE( obdModule.getSignalBufferPtr()->pop( signal ) );
+    CollectedDataFrame collectedDataFrame;
+    DELAY_ASSERT_FALSE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
     // Check unknown PID:
     obdModule.setExternalPIDResponse( 0xCF, { 0x41, 0xCF, 0x00, 0x00, 0x00, 0x00, 0x00 } );
     // Check incorrect length:
@@ -825,12 +841,11 @@ TEST_F( OBDOverCANModuleTest, setExternalPIDResponse )
         { toUType( EmissionPIDs::ENGINE_COOLANT_TEMPERATURE ), 70 },
         { toUType( EmissionPIDs::VEHICLE_SPEED ), 35 } };
     // Verify all PID Signals are correctly decoded
-    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
-    ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( signal ) );
-    ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    WAIT_ASSERT_TRUE( obdModule.getSignalBufferPtr()->pop( collectedDataFrame ) );
+    for ( auto signal : collectedDataFrame.mCollectedSignals )
+    {
+        ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, expectedPIDSignalValue[signal.signalID] );
+    }
 }
 
 } // namespace IoTFleetWise

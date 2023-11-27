@@ -4,7 +4,6 @@
 #include "ExternalGpsSource.h"
 #include "LoggingModule.h"
 #include "TraceModule.h"
-#include <boost/lockfree/queue.hpp>
 #include <string>
 #include <utility>
 
@@ -64,16 +63,17 @@ ExternalGpsSource::setLocation( double latitude, double longitude )
         return;
     }
     auto timestamp = mClock->systemTimeSinceEpochMs();
-    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-    if ( !mSignalBufferPtr->push( CollectedSignal( latitudeSignalId, timestamp, latitude ) ) )
+    CollectedSignalsGroup collectedSignalsGroup;
+    collectedSignalsGroup.push_back( CollectedSignal( latitudeSignalId, timestamp, latitude ) );
+    collectedSignalsGroup.push_back( CollectedSignal( longitudeSignalId, timestamp, longitude ) );
+
+    TraceModule::get().addToAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS, 2 );
+    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
+
+    if ( !mSignalBufferPtr->push( CollectedDataFrame( std::move( collectedSignalsGroup ) ) ) )
     {
-        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-        FWE_LOG_WARN( "Signal buffer full" );
-    }
-    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-    if ( !mSignalBufferPtr->push( CollectedSignal( longitudeSignalId, timestamp, longitude ) ) )
-    {
-        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
+        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
+        TraceModule::get().subtractFromAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS, 2 );
         FWE_LOG_WARN( "Signal buffer full" );
     }
 }

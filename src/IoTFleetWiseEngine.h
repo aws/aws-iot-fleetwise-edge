@@ -44,6 +44,14 @@
 #ifdef FWE_FEATURE_IWAVE_GPS
 #include "IWaveGpsSource.h"
 #endif
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "S3Sender.h"
+#include <aws/core/auth/AWSCredentialsProvider.h>
+#include <aws/core/utils/threading/Executor.h>
+#endif
+#ifdef FWE_FEATURE_ROS2
+#include "ROS2DataSource.h"
+#endif
 
 namespace Aws
 {
@@ -183,7 +191,11 @@ private:
     std::unique_ptr<RemoteProfiler> mRemoteProfiler;
     std::shared_ptr<IConnectivityChannel> mConnectivityChannelMetricsUpload;
     std::shared_ptr<IConnectivityChannel> mConnectivityChannelLogsUpload;
-
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    std::shared_ptr<Aws::Auth::AWSCredentialsProvider> mAwsCredentialsProvider;
+    std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor> mTransferManagerExecutor;
+    std::shared_ptr<S3Sender> mS3Sender;
+#endif
 #ifdef FWE_FEATURE_IWAVE_GPS
     std::shared_ptr<IWaveGpsSource> mIWaveGpsSource;
 #endif
@@ -192,6 +204,9 @@ private:
 #endif
 #ifdef FWE_FEATURE_AAOS_VHAL
     std::shared_ptr<AaosVhalSource> mAaosVhalSource;
+#endif
+#ifdef FWE_FEATURE_ROS2
+    std::shared_ptr<ROS2DataSource> mROS2DataSource;
 #endif
 };
 

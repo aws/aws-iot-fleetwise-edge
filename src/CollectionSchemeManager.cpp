@@ -227,6 +227,26 @@ CollectionSchemeManager::doWork( void *data )
             // Publish decoder dictionaries update to all listeners
             collectionSchemeManager->decoderDictionaryUpdater( decoderDictionaryMap );
             // coverity[check_return : SUPPRESS]
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            // Update the Raw Buffer Config
+            if ( collectionSchemeManager->mRawDataBufferManager != nullptr )
+            {
+                std::shared_ptr<ComplexDataDecoderDictionary> complexDataDictionary;
+                auto decoderDictionary = decoderDictionaryMap.find( VehicleDataSourceProtocol::COMPLEX_DATA );
+                if ( decoderDictionary != decoderDictionaryMap.end() && decoderDictionary->second != nullptr )
+                {
+                    complexDataDictionary =
+                        std::dynamic_pointer_cast<ComplexDataDecoderDictionary>( decoderDictionary->second );
+                    if ( complexDataDictionary == nullptr )
+                    {
+                        FWE_LOG_WARN( "Could not cast dictionary to ComplexDataDecoderDictionary" );
+                    }
+                }
+                collectionSchemeManager->updateRawDataBufferConfig( complexDataDictionary );
+            }
+#endif
+
             auto canDecoderDictionaryPtr = std::dynamic_pointer_cast<CANDecoderDictionary>(
                 decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] );
             std::string decoderCanChannels = std::to_string(
@@ -339,9 +359,17 @@ CollectionSchemeManager::updateAvailable()
 bool
 CollectionSchemeManager::init( uint32_t checkinIntervalMsec,
                                const std::shared_ptr<CacheAndPersist> &schemaPersistencyPtr,
-                               CANInterfaceIDTranslator &canIDTranslator )
+                               CANInterfaceIDTranslator &canIDTranslator
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                               ,
+                               std::shared_ptr<RawData::BufferManager> rawDataBufferManager
+#endif
+)
 {
     mCANIDTranslator = canIDTranslator;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    mRawDataBufferManager = rawDataBufferManager;
+#endif
     FWE_LOG_TRACE( "CollectionSchemeManager initialised with a checkin interval of: " +
                    std::to_string( checkinIntervalMsec ) + " ms" );
     if ( checkinIntervalMsec > 0 )
@@ -487,9 +515,6 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
     {
         return false;
     }
-    // Create vector of active collection schemes to notify interested components about new schemes
-    std::shared_ptr<ActiveCollectionSchemes> activeCollectionSchemesOutput =
-        std::make_shared<ActiveCollectionSchemes>();
 
     collectionSchemeList = mCollectionSchemeList->getCollectionSchemes();
     /* Separate collectionSchemes into Enabled and Idle bucket */
@@ -524,13 +549,10 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
             mEnabledCollectionSchemeMap[id] = collectionScheme;
             mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
             ret = true;
-
-            activeCollectionSchemesOutput->activeCollectionSchemes.emplace_back( collectionScheme );
         }
     }
-
-    notifyListeners<const std::shared_ptr<const ActiveCollectionSchemes> &>(
-        &IActiveCollectionSchemesListener::onChangeCollectionSchemeList, activeCollectionSchemesOutput );
+    // Notify consumers of active collection schemes about new list
+    updateActiveSchemesListeners();
 
     std::string enableStr;
     std::string idleStr;
@@ -575,6 +597,7 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
     {
         return false;
     }
+
     collectionSchemeList = mCollectionSchemeList->getCollectionSchemes();
     for ( auto const &collectionScheme : collectionSchemeList )
     {
@@ -715,6 +738,9 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
     {
         FWE_LOG_TRACE( "Removing collectionSchemes missing from PI updates: " + removeStr );
     }
+    // Notify consumers of active collection schemes about new list
+    updateActiveSchemesListeners();
+
     std::string enableStr;
     std::string idleStr;
     printExistingCollectionSchemes( enableStr, idleStr );
@@ -901,6 +927,21 @@ CollectionSchemeManager::checkTimeLine( const TimePoint &currTime )
                        mTimeLine.top().id + " currTime: " + std::to_string( currTime.monotonicTimeMs ) );
     }
     return ret;
+}
+
+void
+CollectionSchemeManager::updateActiveSchemesListeners()
+{
+    // Create vector of active collection schemes to notify interested components about new schemes
+    auto activeCollectionSchemesOutput = std::make_shared<ActiveCollectionSchemes>();
+
+    for ( const auto &enabledCollectionScheme : mEnabledCollectionSchemeMap )
+    {
+        activeCollectionSchemesOutput->activeCollectionSchemes.push_back( enabledCollectionScheme.second );
+    }
+
+    notifyListeners<const std::shared_ptr<const ActiveCollectionSchemes> &>(
+        &IActiveCollectionSchemesListener::onChangeCollectionSchemeList, activeCollectionSchemesOutput );
 }
 
 } // namespace IoTFleetWise
