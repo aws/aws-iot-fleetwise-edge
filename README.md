@@ -1,5 +1,8 @@
 # Reference Implementation for AWS IoT FleetWise
 
+:new: AWS IoT FleetWise now supports [ROS2](https://docs.ros.org), jump to the
+[Vision system data developer guide](./docs/dev-guide/vision-system-data/vision-system-data-demo.ipynb).
+
 :information_source: To quickly get started, jump to the
 [Edge Agent Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md), the
 [Android Guide](./tools/android-app/README.md), or the

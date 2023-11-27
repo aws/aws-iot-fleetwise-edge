@@ -1,0 +1,486 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Notebook Instance Configuration
+        Parameters:
+          - Ec2KeyPair
+          - Ec2InstanceType
+          - Ec2VolumeSize
+          - CloudWatchLogsGroup
+Parameters:
+  SourceUrl:
+    Type: String
+    Default: https://github.com/aws/aws-iot-fleetwise-edge.git
+    Description: Source URL (leave as default)
+  Ec2InstanceType:
+    Description: Type of EC2 instance
+    Type: String
+    Default: m6g.8xlarge
+    AllowedValues:
+      - m6g.medium
+      - m6g.large
+      - m6g.xlarge
+      - m6g.2xlarge
+      - m6g.4xlarge
+      - m6g.8xlarge
+      - m6g.12xlarge
+      - m6g.16xlarge
+  Ec2KeyPair:
+    Description: Name of SSH key pair (required)
+    Type: String
+    ConstraintDescription:
+      "Must be the 'Name' of an SSH key pair from here
+      https://console.aws.amazon.com/ec2/v2/home#KeyPairs:"
+    AllowedPattern: ".+"
+  Ec2VolumeSize:
+    Description: Size of storage space in GB
+    Type: String
+    Default: 500
+  CloudWatchLogsGroup:
+    Default: "/var/log/jupyterlab.log"
+    Description: Group name of CloudWatch Logs to deliver Jupyter Lab server log.
+    Type: String
+Resources:
+  WaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+    Metadata:
+      aws:cdk:path: FwDemoStack/EC2/WaitHandle
+
+  WaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: NotebookEc2Instance
+    Properties:
+      Handle: !Ref WaitHandle
+      Timeout: "900"
+    Metadata:
+      aws:cdk:path: FwDemoStack/EC2/WaitCondition
+  Ec2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Instance security group
+    Metadata:
+      aws:cdk:path: FwDemoStack/EC2/EC2SecurityGroup
+  Ec2SecurityGroupSshIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow inbound SSH access
+      GroupId: !GetAtt Ec2SecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: "0.0.0.0/0"
+  Ec2SecurityGroupSelfIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow access in same security group
+      GroupId: !GetAtt Ec2SecurityGroup.GroupId
+      IpProtocol: -1
+      SourceSecurityGroupId: !GetAtt Ec2SecurityGroup.GroupId
+
+  Ec2ServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-EC2-ServicePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: "*"
+                Resource: "*"
+    Metadata:
+      aws:cdk:path: FwDemoStack/EC2/Ec2ServiceRole/Resource
+
+  Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref Ec2ServiceRole
+    Metadata:
+      aws:cdk:path: FwDemoStack/EC2/Ec2InstanceProfile/Resource
+
+  NotebookEc2Instance:
+    Type: AWS::EC2::Instance
+    Metadata:
+      aws:cdk:path: FwDemoStack/EC2/NotebookEc2Instance/Resource
+      AWS::CloudFormation::Init:
+        configSets:
+          OnCreate:
+            [
+              account,
+              setup,
+              cfg,
+              cfg_amazonlinux,
+              repo,
+              svc,
+              svc_amazonlinux,
+              jupyter_publish_token,
+            ]
+        account:
+          users:
+            fwuser:
+              homeDir: /opt/fwuser
+        setup:
+          files:
+            /opt/local/bin/default-awsconfig.sh:
+              content: |
+                #!/bin/sh -v
+                whoami
+                echo home directory is "$HOME"
+                [ -d ~/.aws ] || mkdir ~/.aws
+                chmod 700 ~/.aws
+                cp /opt/local/etc/default-awsconfig ~/.aws/config
+                git config --global --add safe.directory '*'
+                chmod 600 ~/.aws/config
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            /opt/local/etc/default-awsconfig:
+              content: !Sub |
+                [default]
+                region = ${AWS::Region}
+              mode: "000644"
+              owner: "root"
+              group: "root"
+            /opt/fwuser/server/Pipfile:
+              content: |
+                [[source]]
+                url = "https://pypi.python.org/simple"
+                verify_ssl = true
+                name = "pypi"
+                [packages]
+                aquirdturtle_collapsible_headings = "==3.1.0"
+                bash_kernel = "==0.9.1"
+                bokeh = "==3.1.1"
+                boto3 = "==1.29.6"
+                cantools = "==39.4.0"
+                catkin_pkg = "==1.0.0"
+                jupyter = "==1.0.0"
+                jupyter_contrib_nbextensions = "==0.7.0"
+                jupyterlab = "==3.6.6"
+                matplotlib = "==3.7.4"
+                notebook = "==6.5.6"
+                numpy = "==1.24.4"
+                pandas = "==2.0.3"
+                plotly = "==5.18.0"
+                pyarrow = "==14.0.1"
+                pyyaml = "==6.0.1"
+                requests = "==2.31.0"
+                scikit-learn = "==1.3.2"
+                scipy = "==1.10.1"
+                seaborn = "==0.13.0"
+                statsmodels = "==0.14.0"
+                urllib3 = "==1.26.18"
+                wrapt = "==1.16.0"
+                xlrd = "==2.0.1"
+              mode: "000644"
+              owner: "fwuser"
+              group: "fwuser"
+            /opt/fwuser/dataset/README:
+              content: |
+                Place local dataset here.
+              mode: "000644"
+              owner: "fwuser"
+              group: "fwuser"
+            /etc/systemd/system/jupyterlab.service:
+              content: |
+                [Unit]
+                Description=description: Jupyter Lab server
+                Requires=network.target
+                After=network.target
+
+                [Service]
+                WorkingDirectory=/opt/fwuser/server
+                ExecStart=/bin/bash -c 'pipenv run jupyter lab --ip=0.0.0.0 --port=8888 --no-browser \
+                  --notebook-dir=/opt/fwuser/aws-iot-fleetwise-edge/docs/dev-guide/vision-system-data \
+                  --NotebookApp.iopub_data_rate_limit=1e10 --NotebookApp.max_buffer_size=10737418240 \
+                  >> /var/log/jupyterlab.log 2>&1'
+                KillMode=control-group
+                User=fwuser
+                Group=fwuser
+                Restart=always
+                RestartSec=10
+                RuntimeDirectoryMode=0755
+
+                [Install]
+                WantedBy=multi-user.target
+              mode: "000755"
+        cfg:
+          files:
+            /var/log/jupyterlab.log:
+              content: |
+                Generated by AWS::CloudFormation::Init
+              mode: "000644"
+              owner: "fwuser"
+              group: "fwuser"
+        cfg_amazonlinux:
+          files:
+            /opt/aws/amazon-cloudwatch-agent/bin/config.json:
+              content: !Sub |
+                {
+                    "agent": {
+                        "run_as_user": "root"
+                    },
+                    "logs": {
+                        "force_flush_interval": 5,
+                        "logs_collected": {
+                            "files": {
+                                "collect_list": [
+                                    {
+                                        "file_path": "/var/log/jupyterlab.log",
+                                        "log_group_name": ${CloudWatchLogsGroup},
+                                        "log_stream_name": "{instance_id}",
+                                        "retention_in_days": -1,
+                                        "timestamp_format": "%b %d %H:%M:%S"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+              mode: "000644"
+              owner: "root"
+              group: "root"
+          commands:
+            pip:
+              command: |
+                python3 -m pip install pipenv
+                /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json -s
+        repo:
+          files:
+            /opt/local/bin/clone-repo.sh:
+              content: !Sub |
+                #!/bin/sh -v
+                whoami
+                echo home directory is "$HOME"
+                repo_dir="/opt/fwuser/aws-iot-fleetwise-edge"
+                if echo "${SourceUrl}" | grep -q 's3://'; then
+                  aws s3 cp "${SourceUrl}" $HOME/aws-iot-fleetwise-edge.zip
+                  mkdir -p $repo_dir
+                  unzip -q -d $repo_dir $HOME/aws-iot-fleetwise-edge.zip
+                else
+                  git clone "${SourceUrl}" $repo_dir
+                fi
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            /opt/local/etc/default-awsconfig:
+              content: !Sub |
+                [default]
+                region = ${AWS::Region}
+              mode: "000644"
+              owner: "root"
+              group: "root"
+          commands:
+            git-clone:
+              command: |
+                chown -R fwuser:fwuser /opt/fwuser
+                sudo -u fwuser /opt/local/bin/default-awsconfig.sh
+                sudo -u fwuser /opt/local/bin/clone-repo.sh
+        svc:
+          commands:
+            jupyter:
+              command: |
+                chown -R fwuser:fwuser /opt/fwuser
+                echo 'fwuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+                # skip lock mechanism because of html5lib dependency resolution error
+                cd /opt/fwuser/server && sudo -u fwuser /usr/local/bin/pipenv install --skip-lock
+                cd /opt/fwuser/server && sudo -u fwuser /usr/local/bin/pipenv run python -m bash_kernel.install
+        svc_amazonlinux:
+          services:
+            systemd:
+              amazon-cloudwatch-agent:
+                enabled: "true"
+                ensureRunning: "true"
+              jupyterlab:
+                enabled: "true"
+                ensureRunning: "true"
+        jupyter_publish_token:
+          commands:
+            jupyter:
+              command: !Sub |
+                # keep trying until the token is found, or the WaitCondition times out
+                while true; do
+                  token=$(grep "token=" /var/log/jupyterlab.log | tail -1 | awk -F= '{ print $2 }')
+                  if [[ -z "$token" ]]; then
+                    sleep 5
+                  else
+                    echo "Token retrieved: $token"
+                    /opt/aws/bin/cfn-signal -e 0 -r "Notebook setup complete" -d "$token" "${WaitHandle}"
+                  fi
+                  sleep 1
+                done
+    Properties:
+      KeyName: !Ref Ec2KeyPair
+      IamInstanceProfile: !Ref Ec2InstanceProfile
+      ImageId: !FindInMap [AMIRegionMap, !Ref "AWS::Region", AMIID]
+      SecurityGroupIds: !Split [",", !GetAtt Ec2SecurityGroup.GroupId]
+      InstanceType: !Ref Ec2InstanceType
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref Ec2VolumeSize
+            DeleteOnTermination: true
+            Encrypted: true
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            set -euovx pipefail
+            # Wait for any existing package install to finish
+            i=0
+            while true; do
+              if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
+                i=0
+              else
+                i=`expr $i + 1`
+                if expr $i \>= 10 > /dev/null; then
+                  break
+                fi
+              fi
+              sleep 1
+            done
+            # Upgrade system and reboot if required
+            apt update
+            apt upgrade -y
+            if [ -f /var/run/reboot-required ]; then
+              # Delete the UserData info file so that we run again after reboot
+              rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
+              reboot
+              exit
+            fi
+            # Install helper scripts:
+            configsets=OnCreate
+            apt update
+            apt install -y python3-setuptools python3-pip git markdown
+            mkdir -p /opt/aws/bin
+            wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+            python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
+            rm aws-cfn-bootstrap-py3-latest.tar.gz
+            #install awslogs
+            wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
+            dpkg -i -E ./amazon-cloudwatch-agent.deb
+            rm amazon-cloudwatch-agent.deb
+            # On error, signal back to cfn:
+            error_handler() {
+              /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource ${Resource} --region ${AWS::Region}
+            }
+            function error_exit {
+              /opt/aws/bin/cfn-signal -e 1 -r "$1" "${WaitHandle}"
+              exit 1
+            }
+            trap error_handler ERR
+            # Install packages
+            apt update
+            apt install -y ec2-instance-connect htop jq unzip zip
+            # Install AWS CLI:
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            ./aws/install
+            rm awscliv2.zip
+
+            /opt/aws/bin/cfn-init --stack ${AWS::StackId} --resource ${Resource} --configsets $configsets --region ${AWS::Region} || error_exit 'Failed to run cfn-init'
+          - Resource: NotebookEc2Instance
+      Tags:
+        - Key: Name
+          Value: FleetWise JupyterLab EC2 Instance
+
+  NotebookEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref NotebookEc2Instance
+    Metadata:
+      aws:cdk:path: FwDemoStack/EC2/NotebookEIP/Resource
+
+Outputs:
+  Ec2InstanceId:
+    Description: "EC2 instance ID"
+    Value: !Ref NotebookEc2Instance
+  NotebookEIP:
+    Description: Public IP address of notebook
+    Value: !Ref NotebookEIP
+  SSHPortForwarding:
+    Description: SSH port forwarding command
+    Value:
+      !Join [
+        "",
+        [
+          "ssh -i ",
+          !Ref Ec2KeyPair,
+          ".pem -N -L 8888:localhost:8888 ",
+          !Join ["@", ["ubuntu", !Ref NotebookEIP]],
+        ],
+      ]
+  WebAccessWithPortForwarding:
+    Description: Web access URL using SSH port forwarding
+    Value: !Sub
+      - "http://127.0.0.1:8888/lab?token=${token}"
+      - token:
+          !Join [
+            "",
+            !Split [
+              '"',
+              !Select [0, !Split ["}", !Select [1, !Split [":", !GetAtt WaitCondition.Data]]]],
+            ],
+          ]
+  JupyterAccessToken:
+    Description: Jupyter access token
+    Value:
+      !Join [
+        "",
+        !Split [
+          '"',
+          !Select [0, !Split ["}", !Select [1, !Split [":", !GetAtt WaitCondition.Data]]]],
+        ],
+      ]
+Mappings:
+  # Ubuntu 20.04 arm64 AMIs
+  AMIRegionMap:
+    ap-northeast-1:
+      AMIID: ami-08c2b40b757d7a436
+    ap-northeast-2:
+      AMIID: ami-0ae4f84503ebf3d18
+    ap-northeast-3:
+      AMIID: ami-06d46b97c052d058f
+    ap-south-1:
+      AMIID: ami-0aedb44d8d5454af4
+    ap-southeast-1:
+      AMIID: ami-0281c2b7875eaa573
+    ap-southeast-2:
+      AMIID: ami-0b1c7f9ffaf189009
+    ca-central-1:
+      AMIID: ami-077fd3ca91fd436e8
+    eu-central-1:
+      AMIID: ami-0eb0fc432507c6ceb
+    eu-north-1:
+      AMIID: ami-0fc9d4f1e282548cb
+    eu-west-1:
+      AMIID: ami-0a7fc9991623e938a
+    eu-west-2:
+      AMIID: ami-00da71119c33fd647
+    eu-west-3:
+      AMIID: ami-00f72fc3d31abc995
+    sa-east-1:
+      AMIID: ami-0418ffcf915b2ec2b
+    us-east-1:
+      AMIID: ami-06978f2d3e435039f
+    us-east-2:
+      AMIID: ami-09919781fa752ad93
+    us-west-1:
+      AMIID: ami-06de4e4d34dc642c8
+    us-west-2:
+      AMIID: ami-0eaba58686a7d034a

@@ -1,6 +1,6 @@
 # Edge Agent Developer Guide
 
-**Note:** AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe (Frankfurt).
+**Note:** AWS IoT FleetWise is currently available in `us-east-1` and `eu-central-1`.
 
 **Topics**
 
@@ -82,6 +82,9 @@ This guide showcases AWS IoT FleetWise at a high level. If you are interested in
 FleetWise at a more detailed technical level, see the
 [Getting started guide](#getting-started-guide).
 
+If you are interested in exploring AWS IoT FleetWise with ROS2 support, see the
+[Vision System Data Developer Guide](./vision-system-data/vision-system-data-demo.ipynb).
+
 **Topics:**
 
 - [Prerequisites for quick start demo](#prerequisites-for-quick-start-demo)
@@ -94,8 +97,7 @@ FleetWise at a more detailed technical level, see the
 - Access to an AWS Account with administrator privileges.
 - Logged in to the AWS Console in your desired region using the account with administrator
   privileges.
-  - **Note:** AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe
-    (Frankfurt).
+  - **Note:** AWS IoT FleetWise is currently available in `us-east-1` and `eu-central-1`.
 
 ## Deploy Edge Agent
 
@@ -253,6 +255,9 @@ machine to build and run the executable. If you would prefer to learn about AWS 
 higher level that does not require use of a development machine, see the
 [Quick start demo](#quick-start-demo).
 
+If you are interested in exploring AWS IoT FleetWise with ROS2 support, see the
+[Vision System Data Developer Guide](./vision-system-data/vision-system-data-demo.ipynb).
+
 #### Topics:
 
 - [Getting started on a development machine](#getting-started-on-a-development-machine)
@@ -290,8 +295,7 @@ This section describes how to get started on a development machine.
 - Access to an AWS Account with administrator privileges.
 - Logged in to the AWS Console in your desired region using the account with administrator
   privileges.
-  - **Note:** AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe
-    (Frankfurt).
+  - **Note:** AWS IoT FleetWise is currently available in`us-east-1` and `eu-central-1`.
 - A local Linux or MacOS machine.
 
 ### Launch your development machine

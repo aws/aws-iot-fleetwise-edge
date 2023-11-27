@@ -86,8 +86,7 @@ to take action based on your use of AWS IoT FleetWise._**
   [2-Channel Isolated CAN Bus Expansion HAT](https://rarecomponents.com/store/2-ch-can-hat-waveshare).
 - Access to an AWS account with administrator permissions
 - To be signed in to the AWS Management Console with an account in your chosen Region
-  - **Note:** AWS IoT FleetWise is currently available in US East (N. Virginia) and Europe
-    (Frankfurt).
+  - **Note:** AWS IoT FleetWise is currently available in `us-east-1` and `eu-central-1`.
 - A local Windows, Mac, or Linux machine
 
 ## Step 1: Setup the Raspberry Pi
