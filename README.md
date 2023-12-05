@@ -1,9 +1,11 @@
 # Reference Implementation for AWS IoT FleetWise
 
-:new: AWS IoT FleetWise now supports [ROS2](https://docs.ros.org), jump to the
-[Vision system data developer guide](./docs/dev-guide/vision-system-data/vision-system-data-demo.ipynb).
+:robot: AWS IoT FleetWise now supports [ROS2](https://docs.ros.org) for collecting vision system
+data.<br> :information_source: To quickly get started, jump to the
+**[Jupyter Notebook demo](./docs/dev-guide/vision-system-data/vision-system-data-demo.ipynb)** and
+collect camera data from a [CARLA](https://carla.org) vehicle simulation.
 
-:information_source: To quickly get started, jump to the
+:information_source: To quickly get started with telematics data collection, jump to the
 [Edge Agent Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md), the
 [Android Guide](./tools/android-app/README.md), or the
 [Raspberry Pi Tutorial](./docs/rpi-tutorial/raspberry-pi-tutorial.md).
