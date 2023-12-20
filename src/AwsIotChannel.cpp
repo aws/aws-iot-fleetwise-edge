@@ -96,7 +96,7 @@ AwsIotChannel::subscribe()
                 {
                     TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
                     // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
-                    auto reasonString = std::string( subAckPacket->getReasonString()->c_str() != nullptr
+                    auto reasonString = std::string( subAckPacket->getReasonString().has_value()
                                                          ? subAckPacket->getReasonString()->c_str()
                                                          : "Unknown reason" );
                     FWE_LOG_ERROR( "Server rejected subscription to topic " + mTopicName + ". Reason code " +
