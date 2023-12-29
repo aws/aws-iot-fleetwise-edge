@@ -1,16 +1,7 @@
 # IWave GPS setup
 
-Setup the iWave device like described in the [iwave-g26-tutorial](iwave-g26-tutorial.md) To enable
-the GPS output, open the file `/etc/ppp/chat/gprs` and add the following (for example above the
-AT+CPIN line):
-
-```
-# Enable GPS
-AT+QGPS=1
-```
-
-To apply the changes you can use `systemctl restart lte`. After that you should see NMEA formatted
-ASCII data if you do `cat < /dev/ttyUSB1`
+Setup the iWave device as described in the [iwave-g26-tutorial](iwave-g26-tutorial.md), then check
+that you can see NMEA formatted ASCII data when you run `cat < /dev/ttyUSB1`.
 
 The required decoder manifest changes are explained in
 [custom-data-source](../custom-data-source.md). If you are using the console to create the decoder

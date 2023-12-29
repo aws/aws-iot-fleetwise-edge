@@ -242,17 +242,17 @@ Setting up the 4G LTE modem inside the G26 TCU is dependent on your SIM card ser
    ```bash
    #!/bin/sh
    echo 1 > /proc/sys/net/ipv4/ip_forward
-   #12v register
+   # 12v register
    echo 137 > /sys/class/gpio/export
-   #Battery Status
+   # Battery Status
    echo 118 > /sys/class/gpio/export
    #Battery Charge Enable
    echo 120 > /sys/class/gpio/export
-   #LED
+   # LED
    echo 73 > /sys/class/gpio/export
-   #Battery Power Good
+   # Battery Power Good
    echo 64 > /sys/class/gpio/export
-   #Modem
+   # Modem
    echo 90 > /sys/class/gpio/export
    echo 78 > /sys/class/gpio/export
    echo 88 > /sys/class/gpio/export
@@ -282,6 +282,9 @@ Setting up the 4G LTE modem inside the G26 TCU is dependent on your SIM card ser
    insmod /iwtest/kernel-module/ci_hdrc_imx.ko
    insmod /iwtest/kernel-module/u_serial.ko
    sleep 20
+   # Enable the GPS:
+   echo "AT+QGPS=1" > /dev/ttyUSB2
+   # Connect to LTE:
    /usr/sbin/pppd call gprs_4g nodetach
    ```
 
