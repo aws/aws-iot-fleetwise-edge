@@ -297,7 +297,7 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         vcs import --input https://raw.githubusercontent.com/ros2/ros2/release-galactic-20221209/ros2.repos src
         rosdep init
         rosdep update
-        git apply ${SCRIPT_DIR}/ros2_fix_cross_compile.patch
+        git apply ${SCRIPT_DIR}/patches/ros2_fix_cross_compile.patch
         # Without setting PythonExtra_EXTENSION_SUFFIX the .so file are armhf but have x86_64 in the name
         colcon build \
             --merge-install \
