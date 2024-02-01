@@ -4,8 +4,8 @@
 
 import json
 import sys
-
 import cantools
+
 
 FQN_KEY = "fullyQualifiedName"
 
@@ -13,16 +13,23 @@ if len(sys.argv) < 2:
     print("Usage: python3 " + sys.argv[0] + " <INPUT_DBC_FILE> [<OUTPUT_JSON_FILE>]")
     exit(-1)
 
-db = cantools.database.load_file(sys.argv[1])
+dbc_file = sys.argv[1]
+db = cantools.database.load_file(dbc_file, strict=False)
 
 vehicle_branch = {FQN_KEY: "Vehicle"}
 nodes = []
 
+visit = set()
 signals = {}
 for message in db.messages:
     message_text = message.name if message.name else message.frame_id
-    message_branch = {FQN_KEY: f"{vehicle_branch[FQN_KEY]}.{message_text}"}
-    nodes.append({"branch": message_branch})
+    message_branch_path = f"{vehicle_branch[FQN_KEY]}.{message_text}"
+    message_branch_node = {"branch": {FQN_KEY: message_branch_path}}
+
+    if not message_branch_path in visit:
+        nodes.append(message_branch_node)
+        visit.add(message_branch_path)
+
     for signal in message.signals:
         if message_text not in signals:
             signals[message_text] = set()
@@ -55,7 +62,7 @@ for message in db.messages:
         node = {
             "sensor": {
                 "dataType": datatype,
-                FQN_KEY: f"{message_branch[FQN_KEY]}.{signal.name}",
+                FQN_KEY: f"{message_branch_path}.{signal.name}",
             }
         }
         if signal.comment:
@@ -67,6 +74,7 @@ for message in db.messages:
         if signal.maximum is not None and datatype != "BOOLEAN":
             node["sensor"]["max"] = signal.maximum
         nodes.append(node)
+
 
 out = json.dumps(nodes, indent=4, sort_keys=True)
 
