@@ -28,6 +28,11 @@ for message in db.messages:
     if not message_branch_path in processed_node:
         nodes.append(message_branch_node)
         processed_node.add(message_branch_path)
+    else:
+        print(
+            f"Branch {message_text} occurs multiple times in the message, only"
+            " the first occurrence will be used"
+        )
 
     for signal in message.signals:
         signal_path = f"{message_branch_path}.{signal.name}"
