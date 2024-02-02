@@ -4,13 +4,17 @@
 
 import json
 import sys
+import logging
+
 import cantools
 
 
 FQN_KEY = "fullyQualifiedName"
 
+logging.basicConfig(filename='./dbc-to-nodes.log', level=logging.DEBUG)
+
 if len(sys.argv) < 2:
-    print("Usage: python3 " + sys.argv[0] + " <INPUT_DBC_FILE> [<OUTPUT_JSON_FILE>]")
+    logging.error("Usage: python3 " + sys.argv[0] + " <INPUT_DBC_FILE> [<OUTPUT_JSON_FILE>]")
     exit(-1)
 
 dbc_file = sys.argv[1]
@@ -29,7 +33,7 @@ for message in db.messages:
         nodes.append(message_branch_node)
         processed_node.add(message_branch_path)
     else:
-        print(
+        logging.warning(
             f"Branch {message_text} occurs multiple times in the message, only"
             " the first occurrence will be used"
         )
@@ -77,7 +81,7 @@ for message in db.messages:
             processed_node.add(signal_path)
             
         else:
-            print(
+            logging.warning(
                 f"Signal {signal.name} occurs multiple times in the message {message_text}, only"
                 " the first occurrence will be used"
             )

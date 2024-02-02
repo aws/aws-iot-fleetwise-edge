@@ -4,11 +4,15 @@
 
 import json
 import sys
+import logging
 
 import cantools
 
+
+logging.basicConfig(filename='./dbc-to-decoders.log', level=logging.DEBUG)
+
 if len(sys.argv) < 2:
-    print("Usage: python3 " + sys.argv[0] + " <INPUT_DBC_FILE> [<OUTPUT_JSON_FILE>]")
+    logging.error("Usage: python3 " + sys.argv[0] + " <INPUT_DBC_FILE> [<OUTPUT_JSON_FILE>]")
     exit(-1)
 
 db = cantools.database.load_file(sys.argv[1], strict=False)
