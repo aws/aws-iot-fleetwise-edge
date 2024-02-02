@@ -17,63 +17,65 @@ dbc_file = sys.argv[1]
 db = cantools.database.load_file(dbc_file, strict=False)
 
 vehicle_branch = {FQN_KEY: "Vehicle"}
-nodes = []
+processed_node = set() # deduplicate branch and siganl node
 
-visit = set()
-signals = {}
+nodes = []
 for message in db.messages:
     message_text = message.name if message.name else message.frame_id
     message_branch_path = f"{vehicle_branch[FQN_KEY]}.{message_text}"
     message_branch_node = {"branch": {FQN_KEY: message_branch_path}}
 
-    if not message_branch_path in visit:
+    if not message_branch_path in processed_node:
         nodes.append(message_branch_node)
-        visit.add(message_branch_path)
+        processed_node.add(message_branch_path)
 
     for signal in message.signals:
-        if message_text not in signals:
-            signals[message_text] = set()
-        if signal.name in signals[message_text]:
+        signal_path = f"{message_branch_path}.{signal.name}"
+        if not signal_path in processed_node:
+            if (
+                signal.choices
+                and len(signal.choices) <= 2
+                and (
+                    (0 in signal.choices and str(signal.choices[0]).lower() == "false")
+                    or (1 in signal.choices and str(signal.choices[1]).lower() == "true")
+                )
+            ):
+                datatype = "BOOLEAN"
+            elif signal.scale != 1 or signal.offset != 0 or signal.length > 64 or signal.is_float:
+                datatype = "DOUBLE"
+            elif signal.length <= 8:
+                datatype = "INT8" if signal.is_signed else "UINT8"
+            elif signal.length <= 16:
+                datatype = "INT16" if signal.is_signed else "UINT16"
+            elif signal.length <= 32:
+                datatype = "INT32" if signal.is_signed else "UINT32"
+            else:
+                datatype = "INT64" if signal.is_signed else "UINT64"
+            
+            node = {
+                "sensor": {
+                    "dataType": datatype,
+                    FQN_KEY: signal_path,
+                }
+            }
+
+            if signal.comment:
+                node["sensor"]["description"] = signal.comment
+            if signal.unit:
+                node["sensor"]["unit"] = signal.unit
+            if signal.minimum is not None and datatype != "BOOLEAN":
+                node["sensor"]["min"] = signal.minimum
+            if signal.maximum is not None and datatype != "BOOLEAN":
+                node["sensor"]["max"] = signal.maximum
+            
+            nodes.append(node)
+            processed_node.add(signal_path)
+            
+        else:
             print(
                 f"Signal {signal.name} occurs multiple times in the message {message_text}, only"
                 " the first occurrence will be used"
             )
-            continue
-        signals[message_text].add(signal.name)
-        if (
-            signal.choices
-            and len(signal.choices) <= 2
-            and (
-                (0 in signal.choices and str(signal.choices[0]).lower() == "false")
-                or (1 in signal.choices and str(signal.choices[1]).lower() == "true")
-            )
-        ):
-            datatype = "BOOLEAN"
-        elif signal.scale != 1 or signal.offset != 0 or signal.length > 64 or signal.is_float:
-            datatype = "DOUBLE"
-        elif signal.length <= 8:
-            datatype = "INT8" if signal.is_signed else "UINT8"
-        elif signal.length <= 16:
-            datatype = "INT16" if signal.is_signed else "UINT16"
-        elif signal.length <= 32:
-            datatype = "INT32" if signal.is_signed else "UINT32"
-        else:
-            datatype = "INT64" if signal.is_signed else "UINT64"
-        node = {
-            "sensor": {
-                "dataType": datatype,
-                FQN_KEY: f"{message_branch_path}.{signal.name}",
-            }
-        }
-        if signal.comment:
-            node["sensor"]["description"] = signal.comment
-        if signal.unit:
-            node["sensor"]["unit"] = signal.unit
-        if signal.minimum is not None and datatype != "BOOLEAN":
-            node["sensor"]["min"] = signal.minimum
-        if signal.maximum is not None and datatype != "BOOLEAN":
-            node["sensor"]["max"] = signal.maximum
-        nodes.append(node)
 
 
 out = json.dumps(nodes, indent=4, sort_keys=True)
