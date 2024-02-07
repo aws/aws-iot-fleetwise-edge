@@ -59,7 +59,9 @@ for message in db.messages:
 out = json.dumps(signal_decoders_to_add, indent=4, sort_keys=True)
 
 if len(sys.argv) < 3:
-    print(out)
+    # print(out)
+    # When you run a demo.sh, the script automatically shuts down when the output appears.
+    pass
 else:
     with open(sys.argv[2], "w") as fp:
         fp.write(out)
