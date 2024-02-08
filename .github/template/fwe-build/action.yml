@@ -22,7 +22,7 @@ runs:
   steps:
     - name: cache-deps
       id: cache-deps
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: cache
         # prettier-ignore
@@ -65,7 +65,7 @@ runs:
         ./tools/test-fwe.sh ${{ inputs.extra-options }}
 
     - name: upload-artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.dist-name }}-${{ inputs.upload-arch }}
         path: |

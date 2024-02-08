@@ -21,8 +21,8 @@ jobs:
   linting:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.8"
       - run: sudo apt-get install expect
@@ -32,7 +32,7 @@ jobs:
   build-amd64:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
         with:
           build-arch: "native"
@@ -44,7 +44,7 @@ jobs:
   build-arm64:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
         with:
           build-arch: "cross-arm64"
@@ -56,7 +56,7 @@ jobs:
   build-armhf:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
         with:
           build-arch: "cross-armhf"
@@ -69,7 +69,7 @@ jobs:
   build-ros2-amd64:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
         with:
           build-arch: "native"
@@ -82,7 +82,7 @@ jobs:
   build-ros2-arm64:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
         with:
           build-arch: "cross-arm64"
@@ -95,7 +95,7 @@ jobs:
   build-ros2-armhf:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
         with:
           build-arch: "cross-armhf"
@@ -108,7 +108,7 @@ jobs:
   build-android:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
         with:
           build-arch: "cross-android"
@@ -131,7 +131,7 @@ jobs:
           cd tools/android-app
           unset ANDROID_SDK_ROOT
           ANDROID_HOME=/usr/local/android_sdk ./gradlew assembleRelease
-      - uses: aws-actions/configure-aws-credentials@v2
+      - uses: aws-actions/configure-aws-credentials@v4
         if: github.repository == 'aws/aws-iot-fleetwise-edge' && github.event_name == 'push'
         with:
           role-to-assume: ${{ secrets.ANDROID_SIGNING_ROLE }}
@@ -155,7 +155,7 @@ jobs:
           shred -u ~/android-signing.jks
       - name: upload-artifacts
         if: github.repository == 'aws/aws-iot-fleetwise-edge' && github.event_name == 'push'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-android-app
           path: |
@@ -173,8 +173,8 @@ jobs:
       - build-arm64
       - build-armhf
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
       - name: Move artifacts to match buildx TARGETPLATFORM structure
         run: |
           mkdir -p linux/amd64
@@ -198,8 +198,8 @@ jobs:
       - build-ros2-arm64
       - build-ros2-armhf
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
       - name: Move artifacts to match buildx TARGETPLATFORM structure
         run: |
           mkdir -p linux/amd64
@@ -222,8 +222,8 @@ jobs:
       github.repository == 'aws/aws-iot-fleetwise-edge' && (github.ref_type == 'tag' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     steps:
-      - uses: actions/checkout@v3
-      - uses: aws-actions/configure-aws-credentials@v2
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.CFN_TEMPLATES_COPY_ROLE }}
           aws-region: us-east-1
