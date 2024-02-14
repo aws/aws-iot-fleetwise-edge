@@ -2,6 +2,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import argparse
 import json
 import sys
 
@@ -9,30 +10,64 @@ import cantools
 
 FQN_KEY = "fullyQualifiedName"
 
-if len(sys.argv) < 2:
-    print("Usage: python3 " + sys.argv[0] + " <INPUT_DBC_FILE> [<OUTPUT_JSON_FILE>]")
-    exit(-1)
+parser = argparse.ArgumentParser(
+    description=(
+        "Converts a DBC file to AWS IoT FleetWise 'nodes' format for use with "
+        "CreateSignalCatalog"
+    )
+)
+parser.add_argument(
+    "-p",
+    "--permissive",
+    action="store_true",
+    help="Apply the cantools strict=False option when loading the DBC file",
+)
+parser.add_argument(
+    "infile",
+    nargs="?",
+    type=argparse.FileType("r"),
+    default=sys.stdin,
+    help="Input DBC file, default stdin",
+)
+parser.add_argument(
+    "outfile",
+    nargs="?",
+    type=argparse.FileType("w"),
+    default=sys.stdout,
+    help="Output filename, default stdout",
+)
+args = parser.parse_args()
 
-db = cantools.database.load_file(sys.argv[1])
+db = cantools.database.load(args.infile, strict=not args.permissive)
 
 vehicle_branch = {FQN_KEY: "Vehicle"}
 nodes = []
 
-signals = {}
+processed_messages = set()
 for message in db.messages:
     message_text = message.name if message.name else message.frame_id
-    message_branch = {FQN_KEY: f"{vehicle_branch[FQN_KEY]}.{message_text}"}
-    nodes.append({"branch": message_branch})
-    for signal in message.signals:
-        if message_text not in signals:
-            signals[message_text] = set()
-        if signal.name in signals[message_text]:
+    if message_text in processed_messages:
+        message_text = f"{message_text}_{message.frame_id}"
+        if message_text in processed_messages:
             print(
-                f"Signal {signal.name} occurs multiple times in the message {message_text}, only"
-                " the first occurrence will be used"
+                f"Message {message.frame_id} occurs multiple times, only the first occurrence "
+                "will be used",
+                file=sys.stderr,
             )
             continue
-        signals[message_text].add(signal.name)
+    processed_messages.add(message_text)
+    message_branch = {FQN_KEY: f"{vehicle_branch[FQN_KEY]}.{message_text}"}
+    nodes.append({"branch": message_branch})
+    processed_signals = set()
+    for signal in message.signals:
+        if signal.name in processed_signals:
+            print(
+                f"Signal {signal.name} occurs multiple times in the message {message_text}, only"
+                " the first occurrence will be used",
+                file=sys.stderr,
+            )
+            continue
+        processed_signals.add(signal.name)
         if (
             signal.choices
             and len(signal.choices) <= 2
@@ -70,8 +105,4 @@ for message in db.messages:
 
 out = json.dumps(nodes, indent=4, sort_keys=True)
 
-if len(sys.argv) < 3:
-    print(out)
-else:
-    with open(sys.argv[2], "w") as fp:
-        fp.write(out)
+args.outfile.write(out)
