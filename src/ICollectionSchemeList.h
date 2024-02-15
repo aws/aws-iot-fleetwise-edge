@@ -76,5 +76,18 @@ public:
     virtual ~ICollectionSchemeList() = default;
 };
 
+using ICollectionSchemeListPtr = std::shared_ptr<ICollectionSchemeList>;
+
+/**
+ * @brief Interface for components interested in the currently active collection schemes. Used to prepare senders based
+ * on campaign data before the data is collected and selected for the upload.
+ *
+ */
+
+struct ActiveCollectionSchemes
+{
+    std::vector<ICollectionSchemePtr> activeCollectionSchemes;
+};
+
 } // namespace IoTFleetWise
 } // namespace Aws

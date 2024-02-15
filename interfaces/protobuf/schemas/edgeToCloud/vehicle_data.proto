@@ -48,9 +48,10 @@ message VehicleData {
     repeated CanFrame can_frames = 7;
 
     /*
-     * Captured Geohash which reflect which geohash tile the vehicle is currently located.
+     * This field was never supported, so it should not be used any more.
      */
-    Geohash geohash = 8;
+    reserved 8;
+    reserved "geohash";
 
     /*
      * Files that were uploaded to S3.
@@ -145,20 +146,6 @@ message DtcData {
     * Strings of active DTC codes
     */
    repeated string active_dtc_codes = 2;
-}
-
-message Geohash {
-
-    /*
-     * Geohash in string format. It's encoded in base 32 format. The maximum resolution of geohash is used and the string is always 9 characters long.
-     */
-    string geohash_string = 1;
-
-    /*
-     * Previous Geohash in string format encoded in base 32 format. The maximum resolution of geohash is used and the
-     * string is always 9 characters long.
-     */
-    string prev_reported_geohash_string = 2;
 }
 
 message S3Object {

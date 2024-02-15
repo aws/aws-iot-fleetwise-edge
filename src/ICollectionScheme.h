@@ -63,7 +63,7 @@ struct CanFrameCollectionInfo
      * @brief The Interface Id specified by the Decoder Manifest. This will contain the physical channel
      * id of the hardware CAN Bus the frame is present on.
      */
-    CANInterfaceID interfaceID{ INVALID_CAN_INTERFACE_ID };
+    InterfaceID interfaceID{ INVALID_INTERFACE_ID };
 
     /**
      * @brief Ring buffer size used to store these sampled CAN frames. One CAN Frame is a sample.
@@ -81,9 +81,8 @@ struct CanFrameCollectionInfo
 enum class ExpressionNodeType
 {
     FLOAT = 0,
-    SIGNAL,          // Node_Signal_ID
-    WINDOWFUNCTION,  // NodeFunction
-    GEOHASHFUNCTION, // GEOHASH
+    SIGNAL,         // Node_Signal_ID
+    WINDOWFUNCTION, // NodeFunction
     BOOLEAN,
     OPERATOR_SMALLER, // NodeOperator
     OPERATOR_BIGGER,
@@ -111,25 +110,8 @@ enum class WindowFunction
     NONE
 };
 
-struct GeohashFunction
-{
-    enum class GPSUnitType
-    {
-        DECIMAL_DEGREE = 0,
-        MICROARCSECOND,
-        MILLIARCSECOND,
-        ARCSECOND,
-        MAX
-    };
-    SignalID latitudeSignalID{ 0 };
-    SignalID longitudeSignalID{ 0 };
-    uint8_t precision{ 0 };
-    GPSUnitType gpsUnitType{ GPSUnitType::DECIMAL_DEGREE };
-};
-
 struct ExpressionFunction
 {
-    GeohashFunction geohashFunction;
     WindowFunction windowFunction{ WindowFunction::NONE };
 };
 
@@ -273,11 +255,8 @@ public:
     const uint32_t INVALID_MINIMUM_PUBLISH_TIME = std::numeric_limits<uint32_t>::max();
     const uint32_t INVALID_AFTER_TRIGGER_DURATION = std::numeric_limits<uint32_t>::max();
     const uint32_t INVALID_PRIORITY_LEVEL = std::numeric_limits<uint32_t>::max();
-    const double INVALID_PROBABILITY_TO_SEND = 0.0;
     const std::string INVALID_COLLECTION_SCHEME_ID = std::string();
     const std::string INVALID_DECODER_MANIFEST_ID = std::string();
-
-    const double DEFAULT_PROBABILITY_TO_SEND = 1.0;
 
     /**
      * @brief indicates if the decoder manifest is prepared to be used for example by calling getters
@@ -353,13 +332,6 @@ public:
      * @return true: trigger on change from false to true, false: trigger as long condition is true
      */
     virtual bool isTriggerOnlyOnRisingEdge() const = 0;
-
-    /**
-     * @brief At which probability should the triggered and collected data be sent out
-     *
-     * @return double 0: send never, send always
-     */
-    virtual double getProbabilityToSend() const = 0;
 
     /**
      * @brief get priority which is used by the offboard offboardconnectivity module

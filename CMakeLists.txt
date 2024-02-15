@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.10.2)
 
-project(iotfleetwise VERSION 1.1.0)
+project(iotfleetwise VERSION 1.1.1)
 
 # FWE uses C++14 for compatibility reasons with Automotive middlewares (Adaptive AUTOSAR, ROS2)
 # Note: When built with FWE_FEATURE_ROS2, colcon will override these settings
@@ -25,10 +25,10 @@ option(FWE_SECURITY_COMPILE_FLAGS "Add security related compile options" OFF)
 option(FWE_AWS_SDK_SHARED_LIBS "Use AWS SDK shared libs. Needs to be set to the same value of BUILD_SHARED_LIBS that the SDK was compiled with." OFF)
 option(FWE_AWS_SDK_EXTRA_LIBS "Extra libs required to link with the AWS SDK. When FWE_STATIC_LINK is ON, setting this to ON will automatically find the standard libs. Can be a space-separated list of libs." ON)
 option(FWE_FEATURE_GREENGRASSV2 "Enable Greengrass connection module" OFF)
-option(FWE_FEATURE_CUSTOM_DATA_SOURCE "Include the custom data source interface" OFF)
-option(FWE_FEATURE_IWAVE_GPS "Include the IWave GPS example for a custom data source" OFF)
-option(FWE_FEATURE_EXTERNAL_GPS "Include the external GPS example for a custom data source" OFF)
-option(FWE_FEATURE_AAOS_VHAL "Include the Android Automotive VHAL example for a custom data source" OFF)
+option(FWE_FEATURE_CUSTOM_DATA_SOURCE "Include the custom data source interface, which uses CAN signals to model arbitary signal sources" OFF)
+option(FWE_FEATURE_IWAVE_GPS "Include the IWave GPS example for a custom data source (implies FWE_FEATURE_CUSTOM_DATA_SOURCE)" OFF)
+option(FWE_FEATURE_EXTERNAL_GPS "Include the external GPS example for a custom data source (implies FWE_FEATURE_CUSTOM_DATA_SOURCE)" OFF)
+option(FWE_FEATURE_AAOS_VHAL "Include the Android Automotive VHAL example for a custom data source (implies FWE_FEATURE_CUSTOM_DATA_SOURCE)" OFF)
 option(FWE_FEATURE_VISION_SYSTEM_DATA "Include support for vision-system-data sources" OFF)
 option(FWE_FEATURE_ROS2 "Include support for ROS2 as a vision-system-data source. Implies FWE_FEATURE_VISION_SYSTEM_DATA." OFF)
 option(FWE_BUILD_EXECUTABLE "Build the executable, otherwise build a library" ON)
@@ -95,13 +95,14 @@ configure_file(src/IoTFleetWiseVersion.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/IoTFle
 
 # Protobuf
 find_package(Protobuf REQUIRED)
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS
+set(PROTO_FILES
   interfaces/protobuf/schemas/cloudToEdge/common_types.proto
   interfaces/protobuf/schemas/cloudToEdge/collection_schemes.proto
   interfaces/protobuf/schemas/cloudToEdge/decoder_manifest.proto
   interfaces/protobuf/schemas/edgeToCloud/checkin.proto
   interfaces/protobuf/schemas/edgeToCloud/vehicle_data.proto
 )
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILES})
 add_library(fwe-proto OBJECT
   ${PROTO_SRCS}
   ${PROTO_HDRS}
@@ -131,11 +132,9 @@ set(HEADER_FILES
   src/CollectionInspectionWorkerThread.h
   src/CollectionSchemeIngestion.h
   src/CollectionSchemeIngestionList.h
-  src/CollectionSchemeManagementListener.h
   src/CollectionSchemeManager.h
   src/ConsoleLogger.h
   src/CPUUsageInfo.h
-  src/DataReduction.h
   src/DataSenderManager.h
   src/DataSenderManagerWorkerThread.h
   src/DataSenderProtoWriter.h
@@ -143,23 +142,15 @@ set(HEADER_FILES
   src/EnumUtility.h
   src/EventTypes.h
   src/ExternalCANDataSource.h
-  src/GeohashFunctionNode.h
-  src/Geohash.h
-  src/GeohashInfo.h
-  src/IActiveCollectionSchemesListener.h
-  src/IActiveConditionProcessor.h
-  src/IActiveDecoderDictionaryListener.h
   src/ICollectionScheme.h
   src/ICollectionSchemeList.h
   src/ICollectionSchemeManager.h
   src/IConnectionTypes.h
   src/IConnectivityChannel.h
   src/IConnectivityModule.h
-  src/IDataReadyToPublishListener.h
   src/IDecoderDictionary.h
   src/IDecoderManifest.h
   src/ILogger.h
-  src/InspectionEventListener.h
   src/IoTFleetWiseConfig.h
   src/IoTFleetWiseEngine.h
   src/IoTFleetWiseVersion.h
@@ -219,8 +210,6 @@ set(SRC_FILES
   src/DecoderDictionaryExtractor.cpp
   src/DecoderManifestIngestion.cpp
   src/ExternalCANDataSource.cpp
-  src/Geohash.cpp
-  src/GeohashFunctionNode.cpp
   src/InspectionMatrixExtractor.cpp
   src/IoTFleetWiseConfig.cpp
   src/IoTFleetWiseEngine.cpp
@@ -260,8 +249,6 @@ set(TEST_FILES
   test/unit/DataSenderProtoWriterTest.cpp
   test/unit/DecoderDictionaryExtractorTest.cpp
   test/unit/ExternalCANDataSourceTest.cpp
-  test/unit/GeohashFunctionNodeTest.cpp
-  test/unit/GeohashTest.cpp
   test/unit/InspectionMatrixExtractorTest.cpp
   test/unit/IoTFleetWiseConfigTest.cpp
   test/unit/IoTFleetWiseEngineTest.cpp
@@ -564,6 +551,7 @@ if(${BUILD_TESTING})
       src/ClockHandler.cpp
       src/RawDataManager.cpp
       src/ConsoleLogger.cpp
+      src/IoTFleetWiseConfig.cpp
       test/unit/support/main.cpp
     )
     target_include_directories(ROS2DataSourceTest PUBLIC

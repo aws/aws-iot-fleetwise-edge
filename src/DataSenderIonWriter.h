@@ -4,7 +4,6 @@
 #pragma once
 
 #include "CollectionInspectionAPITypes.h"
-#include "IActiveDecoderDictionaryListener.h"
 #include "IDecoderDictionary.h"
 #include "RawDataManager.h"
 #include "SignalTypes.h"
@@ -39,7 +38,7 @@ struct FrameInfoForIon
 // coverity[cert_dcl60_cpp_violation] false positive - class only defined once
 // coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
 // coverity[misra_cpp_2008_rule_3_2_2_violation] false positive - class only defined once
-class DataSenderIonWriter : public IActiveDecoderDictionaryListener
+class DataSenderIonWriter
 {
 public:
     /**
@@ -50,7 +49,7 @@ public:
     /**
      * @brief Destructor.
      */
-    ~DataSenderIonWriter() override;
+    virtual ~DataSenderIonWriter();
 
     DataSenderIonWriter( const DataSenderIonWriter & ) = delete;
     DataSenderIonWriter &operator=( const DataSenderIonWriter & ) = delete;
@@ -97,12 +96,12 @@ public:
     };
 
     /**
-     * @brief From IActiveDecoderDictionaryListener get called on dictionary updates
+     * @brief To be called on dictionary updates
      * @param dictionary new dictionary with the topics to subscribe to and information how to decode
      * @param networkProtocol only COMPLEX_DATA will be accepted
      */
     void onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
-                                     VehicleDataSourceProtocol networkProtocol ) override;
+                                     VehicleDataSourceProtocol networkProtocol );
 
 private:
     bool fillFrameInfo( FrameInfoForIon &frame );

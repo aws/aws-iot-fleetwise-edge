@@ -141,7 +141,7 @@ CANDataSource::extractTimestamp( struct msghdr *msgHeader )
     }
     if ( timestamp == 0 ) // either other timestamp are invalid(=0) or mTimestampTypeToUse == POLLING_TIME
     {
-        TraceModule::get().incrementVariable( TraceVariable::CAN_POLLING_TIMESTAMP_COUNTER );
+        TraceModule::get().incrementVariable( TraceVariable::POLLING_TIMESTAMP_COUNTER );
         timestamp = mClock->systemTimeSinceEpochMs();
     }
     return timestamp;

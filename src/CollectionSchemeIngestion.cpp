@@ -3,7 +3,6 @@
 
 #include "CollectionSchemeIngestion.h"
 #include "CollectionInspectionAPITypes.h"
-#include "EnumUtility.h"
 #include "LoggingModule.h"
 #include <google/protobuf/message.h>
 
@@ -435,37 +434,6 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
             FWE_LOG_TRACE( "Creating Window FUNCTION node for Signal ID:" + std::to_string( currentNode->signalID ) );
             return currentNode;
         }
-        else if ( node.node_function().functionType_case() ==
-                  Schemas::CommonTypesMsg::ConditionNode_NodeFunction::kGeohashFunction )
-        {
-            if ( ( node.node_function().geohash_function().geohash_precision() > UINT8_MAX ) ||
-                 ( node.node_function().geohash_function().gps_unit() >=
-                   toUType( GeohashFunction::GPSUnitType::MAX ) ) )
-            {
-                FWE_LOG_WARN( "Invalid Geohash function arguments" );
-            }
-            else
-            {
-                currentNode->nodeType = ExpressionNodeType::GEOHASHFUNCTION; // geohash
-                currentNode->function.geohashFunction.latitudeSignalID =
-                    node.node_function().geohash_function().latitude_signal_id();
-                currentNode->function.geohashFunction.longitudeSignalID =
-                    node.node_function().geohash_function().longitude_signal_id();
-                currentNode->function.geohashFunction.precision =
-                    static_cast<uint8_t>( node.node_function().geohash_function().geohash_precision() );
-                // coverity[autosar_cpp14_a7_2_1_violation] Range is checked by the if-statement above
-                currentNode->function.geohashFunction.gpsUnitType =
-                    static_cast<GeohashFunction::GPSUnitType>( node.node_function().geohash_function().gps_unit() );
-                FWE_LOG_TRACE(
-                    "Creating Geohash FUNCTION node: Lat SignalID: " +
-                    std::to_string( currentNode->function.geohashFunction.latitudeSignalID ) +
-                    "; Lon SignalID: " + std::to_string( currentNode->function.geohashFunction.longitudeSignalID ) +
-                    "; precision: " + std::to_string( currentNode->function.geohashFunction.precision ) +
-                    "; GPS Unit Type: " +
-                    std::to_string( static_cast<uint8_t>( currentNode->function.geohashFunction.gpsUnitType ) ) );
-                return currentNode;
-            }
-        }
         else
         {
             FWE_LOG_WARN( "Unsupported Function Node Type" );
@@ -709,20 +677,6 @@ CollectionSchemeIngestion::isTriggerOnlyOnRisingEdge() const
     }
 
     return false;
-}
-
-double
-CollectionSchemeIngestion::getProbabilityToSend() const
-{
-    if ( !mReady )
-    {
-        return INVALID_PROBABILITY_TO_SEND;
-    }
-    if ( !mProtoCollectionSchemeMessagePtr->has_probabilities() )
-    {
-        return DEFAULT_PROBABILITY_TO_SEND;
-    }
-    return mProtoCollectionSchemeMessagePtr->probabilities().probability_to_send();
 }
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA

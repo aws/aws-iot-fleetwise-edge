@@ -107,7 +107,6 @@ protected:
         condition.signals.push_back( matrixCollectInfo );
         condition.afterDuration = 3;
         condition.minimumPublishIntervalMs = 0;
-        condition.probabilityToSend = 1.0;
         condition.includeActiveDtcs = true;
         condition.triggerOnlyOnRisingEdge = false;
         // Node

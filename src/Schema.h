@@ -6,16 +6,17 @@
 #include "Clock.h"
 #include "ClockHandler.h"
 #include "CollectionSchemeIngestionList.h"
-#include "CollectionSchemeManagementListener.h"
 #include "DecoderManifestIngestion.h"
+#include "ICollectionSchemeList.h"
+#include "IDecoderManifest.h"
 #include "IReceiver.h"
 #include "ISender.h"
 #include "Listener.h"
-#include "LoggingModule.h"
 #include "SchemaListener.h"
 #include "checkin.pb.h"
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -32,9 +33,26 @@ using DecoderManifestPtr = std::shared_ptr<DecoderManifestIngestion>;
 /**
  * @brief This class handles the receipt of Decoder Manifests and CollectionScheme Lists from the Cloud.
  */
-class Schema : public ThreadListeners<CollectionSchemeManagementListener>, public SchemaListener
+class Schema : public SchemaListener
 {
 public:
+    /**
+     * @brief Callback function that Schema uses to notify CollectionSchemeManagement when a new CollectionScheme List
+     * arrives from the Cloud.
+     *
+     * @param collectionSchemeList ICollectionSchemeList from CollectionScheme Ingestion
+     */
+    using OnCollectionSchemeUpdateCallback =
+        std::function<void( const ICollectionSchemeListPtr &collectionSchemeList )>;
+
+    /**
+     * @brief Callback function that Schema uses to notify CollectionSchemeManagement when a new Decoder
+     * Manifest arrives from the Cloud.
+     *
+     * @param decoderManifest IDecoderManifest from CollectionScheme Ingestion
+     */
+    using OnDecoderManifestUpdateCallback = std::function<void( const IDecoderManifestPtr &decoderManifest )>;
+
     /**
      * @brief Constructor for the Schema class that handles receiving CollectionSchemes and DecoderManifest protobuffers
      * from Cloud and sending them to CollectionSchemeManagement.
@@ -54,21 +72,17 @@ public:
     Schema( Schema && ) = delete;
     Schema &operator=( Schema && ) = delete;
 
-    /**
-     * @brief Sends CollectionScheme List to CollectionScheme Management
-     *
-     * @param collectionSchemeListPtr A shared pointer of a collectionScheme list object received from Cloud containing
-     * the binary data packed inside it.
-     */
-    void setCollectionSchemeList( const CollectionSchemeListPtr collectionSchemeListPtr );
+    void
+    subscribeToCollectionSchemeUpdate( OnCollectionSchemeUpdateCallback callback )
+    {
+        mCollectionSchemeListeners.subscribe( callback );
+    }
 
-    /**
-     * @brief Sends DecoderManifest to CollectionScheme Management
-     *
-     * @param decoderManifestPtr A shared pointer of a Decoder Manifest object received from Cloud containing the binary
-     * data packed inside it.
-     */
-    void setDecoderManifest( const DecoderManifestPtr decoderManifestPtr );
+    void
+    subscribeToDecoderManifestUpdate( OnDecoderManifestUpdateCallback callback )
+    {
+        mDecoderManifestListeners.subscribe( callback );
+    }
 
     /**
      * @brief Send a Checkin message to the cloud that includes the active decoder manifest and schemes currently in the
@@ -81,96 +95,18 @@ public:
 
 private:
     /**
-     * @brief This struct is used to receive the callback from MQTT IoT Core on receipt of data on the DecoderManifest
-     * topic
+     * @brief Callback that should be called whenever a new message with DecoderManifest is received from the Cloud.
+     * @param buf Pointer to the data. It will be valid only until the callback returns.
+     * @param size Size of the data
      */
-    struct DecoderManifestCb : IReceiverCallback
-    {
-        Schema &mSchema; //< Member variable to the Schema object which will receive the data
-
-        /**
-         * @brief Constructor that will initialize the member variables
-         *
-         * @param collectionSchemeIngestion Reference to a Schema object which allow this struct to pass data to
-         */
-        DecoderManifestCb( Schema &collectionSchemeIngestion )
-            : mSchema( collectionSchemeIngestion )
-        {
-        }
-
-        void
-        onDataReceived( const uint8_t *buf, size_t size ) override
-        {
-            // Check for a empty input data
-            if ( ( buf == nullptr ) || ( size == 0 ) )
-            {
-                FWE_LOG_ERROR( "Received empty CollectionScheme List data from Cloud" );
-                return;
-            }
-
-            // Create an empty shared pointer which we'll copy the data to
-            DecoderManifestPtr decoderManifestPtr = std::make_shared<DecoderManifestIngestion>();
-
-            // Try to copy the binary data into the decoderManifest object
-            if ( !decoderManifestPtr->copyData( buf, size ) )
-            {
-                FWE_LOG_ERROR( "DecoderManifest copyData from IoT core failed" );
-                return;
-            }
-
-            // Successful copy, so we cache the decoderManifest in the Schema object
-            mSchema.setDecoderManifest( decoderManifestPtr );
-            FWE_LOG_TRACE( "Received Decoder Manifest in PI DecoderManifestCb" );
-        }
-    };
-
-    DecoderManifestCb mDecoderManifestCb;
+    void onDecoderManifestReceived( const uint8_t *buf, size_t size );
 
     /**
-     * @brief This struct is used to receive the callback from MQTT IoT Core on receipt of data on the
-     * CollectionSchemeList topic
+     * @brief Callback that should be called whenever a new message with CollectionScheme is received from the Cloud.
+     * @param buf Pointer to the data. It will be valid only until the callback returns.
+     * @param size Size of the data
      */
-    struct CollectionSchemeListCb : IReceiverCallback
-    {
-        Schema &mSchema; //< Member variable to the Schema object which will receive the data
-
-        /**
-         * @brief Constructor that will initialize the member variables
-         *
-         * @param collectionSchemeIngestion Reference to a Schema object which allow this struct to pass data to
-         */
-        CollectionSchemeListCb( Schema &collectionSchemeIngestion )
-            : mSchema( collectionSchemeIngestion )
-        {
-        }
-
-        void
-        onDataReceived( const uint8_t *buf, size_t size ) override
-        {
-            // Check for a empty input data
-            if ( ( buf == nullptr ) || ( size == 0 ) )
-            {
-                FWE_LOG_ERROR( "Received empty CollectionScheme List data from Cloud" );
-                return;
-            }
-
-            // Create an empty shared pointer which we'll copy the data to
-            CollectionSchemeListPtr collectionSchemeListPtr = std::make_shared<CollectionSchemeIngestionList>();
-
-            // Try to copy the binary data into the collectionSchemeList object
-            if ( !collectionSchemeListPtr->copyData( buf, size ) )
-            {
-                FWE_LOG_ERROR( "CollectionSchemeList copyData from IoT core failed" );
-                return;
-            }
-
-            // Successful copy, so we cache the collectionSchemeList in the Schema object
-            mSchema.setCollectionSchemeList( collectionSchemeListPtr );
-            FWE_LOG_TRACE( "Received CollectionSchemeList" );
-        }
-    };
-
-    CollectionSchemeListCb mCollectionSchemeListCb;
+    void onCollectionSchemeReceived( const uint8_t *buf, size_t size );
 
     /**
      * @brief ISender object used to interface with cloud to send Checkins
@@ -191,6 +127,9 @@ private:
      * @brief Clock member variable used to generate the time a checkin was sent
      */
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
+
+    ThreadSafeListeners<OnCollectionSchemeUpdateCallback> mCollectionSchemeListeners;
+    ThreadSafeListeners<OnDecoderManifestUpdateCallback> mDecoderManifestListeners;
 
     /**
      * @brief Sends an mProtoCheckinMsgOutput string on the checkin topic

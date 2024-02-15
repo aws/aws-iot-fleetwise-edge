@@ -19,14 +19,14 @@ class CANInterfaceIDTranslator
 
 public:
     void
-    add( CANInterfaceID iid )
+    add( InterfaceID iid )
     {
         mLookup.emplace_back( mCounter, iid );
         mCounter++;
     }
 
     CANChannelNumericID
-    getChannelNumericID( const CANInterfaceID &iid )
+    getChannelNumericID( const InterfaceID &iid )
     {
         for ( auto l : mLookup )
         {
@@ -38,7 +38,7 @@ public:
         return INVALID_CAN_SOURCE_NUMERIC_ID;
     };
 
-    CANInterfaceID
+    InterfaceID
     getInterfaceID( CANChannelNumericID cid )
     {
         for ( auto l : mLookup )
@@ -48,11 +48,11 @@ public:
                 return l.second;
             }
         }
-        return INVALID_CAN_INTERFACE_ID;
+        return INVALID_INTERFACE_ID;
     };
 
 private:
-    std::vector<std::pair<CANChannelNumericID, CANInterfaceID>> mLookup;
+    std::vector<std::pair<CANChannelNumericID, InterfaceID>> mLookup;
     CANChannelNumericID mCounter{ 0 };
 };
 

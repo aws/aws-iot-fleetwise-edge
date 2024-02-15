@@ -228,18 +228,16 @@ collect data from it.
 
 ## Clean up resources
 
-Copy and paste the following commands to AWS CloudShell to clean up resources created by the
-`provision.sh` and `demo.sh` scripts. **Note:** The Amazon Timestream and S3 resources are not
-deleted.
+1. Copy and paste the following commands to AWS CloudShell to clean up resources created by the
+   `demo.sh` script. **Note:** The Amazon Timestream and S3 resources are not deleted.
 
-```bash
-cd ~/aws-iot-fleetwise-edge/tools/cloud \
-&& clean-up.sh \
-&& ../provision.sh \
-   --vehicle-name fwdemo \
-   --region us-east-1 \
-   --only-clean-up
-```
+   ```bash
+   cd ~/aws-iot-fleetwise-edge/tools/cloud \
+   && ./clean-up.sh
+   ```
+
+1. Delete the CloudFormation stack created earlier, which by default is called `fwdemo`:
+   https://us-east-1.console.aws.amazon.com/cloudformation/home
 
 # Getting started guide
 
@@ -541,17 +539,21 @@ collect data from it.
 
 ### Clean up
 
-Run the following _on the development machine_ to clean up resources created by the `provision.sh`
-and `demo.sh` scripts. **Note:** The Amazon Timestream and S3 resources are not deleted.
+1. Run the following _on the development machine_ to clean up resources created by the
+   `provision.sh` and `demo.sh` scripts. **Note:** The Amazon Timestream and S3 resources are not
+   deleted.
 
-```bash
-cd ~/aws-iot-fleetwise-edge/tools/cloud \
-&& clean-up.sh \
-&& ../provision.sh \
-   --vehicle-name fwdemo-ec2 \
-   --region us-east-1 \
-   --only-clean-up
-```
+   ```bash
+   cd ~/aws-iot-fleetwise-edge/tools/cloud \
+   && ./clean-up.sh \
+   && ../provision.sh \
+      --vehicle-name fwdemo-ec2 \
+      --region us-east-1 \
+      --only-clean-up
+   ```
+
+1. Delete the CloudFormation stack for your development machine, which by default is called `fwdev`:
+   https://us-east-1.console.aws.amazon.com/cloudformation/home
 
 ## Getting started on a NXP S32G board
 
@@ -777,7 +779,6 @@ DataSenderManagerWorkerThread
 DataSenderProtoWriter
 DecoderDictionaryExtractor
 DecoderManifestIngestion
-Geohash
 InspectionMatrixExtractor
 OBDDataDecoder
 RawDataManager
@@ -815,7 +816,6 @@ CANDataSource
 CollectionInspectionEngine
 CollectionInspectionWorkerThread
 ExternalCANDataSource
-GeohashFunctionNode
 OBDOverCANECU
 OBDOverCANModule
 ROS2DataSource
@@ -929,46 +929,43 @@ FWE implements a concurrent and event-based multithreading system.
 
 ## Data Models
 
-FWE defines four schemas that describe the communication with the Cloud Control and Data Plane
-services.
+FWE defines schemas that describe the communication with the Cloud Control and Data Plane services.
 
-All the payloads exchanged between FWE and the cloud services are serialized in a Protobuff format.
+All the payloads exchanged between FWE and the cloud services are serialized in a Protobuf format.
 
 ### Device to Cloud communication
 
-FWE sends two artifacts with the Cloud services:
+FWE sends the following artifacts to the Cloud services:
 
-**Check-in Information**
+- **Check-in Information:** This check-in information consists of data collection schemes and
+  decoder manifest Amazon Resource Name (ARN) that are active in FWE at a given time point. This
+  check-in message is send regularly at a configurable frequency to the cloud services. Refer to
+  [checkin.proto](../../interfaces/protobuf/schemas/edgeToCloud/checkin.proto).
 
-This check-in information consists of data collection schemes and decoder manifest Amazon Resource
-Name (ARN) that are active in FWE at a given time point. This check-in message is send regularly at
-a configurable frequency to the cloud services. Refer to
-[checkin.proto](../../interfaces/protobuf/schemas/edgeToCloud/checkin.proto).
+- **Data Snapshot Information**
 
-**Data Snapshot Information**
+  - **Telemetry Data:** This message is sent conditionally to the cloud data plane services once one
+    or more inspection rule is met. For telemetry data such as CAN data, FWE sends it in an MQTT
+    packet to the cloud. Refer to
+    [vehicle_data.proto](../../interfaces/protobuf/schemas/edgeToCloud/vehicle_data.proto).
 
-**_Telemetry Data_** This message is sent conditionally to the cloud data plane services once one or
-more inspection rule is met. For telemetry data such as CAN data, FWE sends it in an MQTT packet to
-the cloud. Refer to
-[vehicle_data.proto](../../interfaces/protobuf/schemas/edgeToCloud/vehicle_data.proto).
-
-**_Vision System Data_** In Vision System data use case, FWE serializes each ROS2 message into CDR
-format and packed them in Amazon ION file format and directly upload to S3. Refer to
-[vision_system_data.isl](../../interfaces/protobuf/schemas/edgeToCloud/vision_system_data.isl).
+  - **Vision System Data:** In Vision System data use case, FWE serializes each ROS2 message into
+    CDR format and packed them in Amazon ION file format and directly upload to S3. Refer to
+    [vision_system_data.isl](../../interfaces/protobuf/schemas/edgeToCloud/vision_system_data.isl).
 
 ### Cloud to Device communication
 
-The Cloud Control plane services publish to FWE dedicated MQTT Topic the following two artifacts:
+The Cloud Control plane services publish to FWE dedicated MQTT Topic the following artifacts:
 
-**Decoder Manifest:** This artifact describes the Vehicle Network Interfaces that the user defined.
-The description includes the semantics of each of the Network interface traffic to be inspected
-including the signal decoding rules. Refer to
-[decoder_manifest.proto](../../interfaces/protobuf/schemas/cloudToEdge/decoder_manifest.proto).
+- **Decoder Manifest:** This artifact describes the Vehicle Network Interfaces that the user
+  defined. The description includes the semantics of each of the Network interface traffic to be
+  inspected including the signal decoding rules. Refer to
+  [decoder_manifest.proto](../../interfaces/protobuf/schemas/cloudToEdge/decoder_manifest.proto).
 
-**Collection Scheme:** This artifact describes effectively the inspection rules, that FWE will apply
-on the network traffic it receives. Using the decoder manifest, the Inspection module will apply the
-rules defined in the collection schemes to generate data snapshots. Refer to
-[collection_schemes.proto](../../interfaces/protobuf/schemas/cloudToEdge/collection_schemes.proto).
+- **Collection Scheme:** This artifact describes effectively the inspection rules, that FWE will
+  apply on the network traffic it receives. Using the decoder manifest, the Inspection module will
+  apply the rules defined in the collection schemes to generate data snapshots. Refer to
+  [collection_schemes.proto](../../interfaces/protobuf/schemas/cloudToEdge/collection_schemes.proto).
 
 ## Data Persistency
 
@@ -1063,7 +1060,6 @@ described below in the configuration section. Each log entry includes the follow
 |                             | systemWideLogLevel                          | Sets logging level severity: `Trace`, `Info`, `Warning`, `Error`                                                                                                                                                                                                                                                                                                                | string   |
 |                             | logColor                                    | Whether logs should be colored: `Auto`, `Yes`, `No`. Default to `Auto`, meaning FWE will try to detect whether colored output is supported (for example when connected to a tty)                                                                                                                                                                                                | string   |
 |                             | maximumAwsSdkHeapMemoryBytes                | The maximum size of AWS SDK heap memory                                                                                                                                                                                                                                                                                                                                         | integer  |
-|                             | dataReductionProbabilityDisabled            | Disables probability-based DDC (only for debug purpose)                                                                                                                                                                                                                                                                                                                         | boolean  |
 |                             | metricsCyclicPrintIntervalMs                | Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never                                                                                                                                                                                                                                                          | string   |
 | publishToCloudParameters    | maxPublishMessageCount                      | Maximum messages that can be published to the cloud in one payload                                                                                                                                                                                                                                                                                                              | integer  |
 |                             | collectionSchemeManagementCheckinIntervalMs | Time interval between collection schemes checkins(in milliseconds)                                                                                                                                                                                                                                                                                                              | integer  |

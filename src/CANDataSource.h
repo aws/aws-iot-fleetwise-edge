@@ -6,7 +6,6 @@
 #include "CANDataConsumer.h"
 #include "Clock.h"
 #include "ClockHandler.h"
-#include "IActiveDecoderDictionaryListener.h"
 #include "IDecoderDictionary.h"
 #include "Signal.h"
 #include "SignalTypes.h"
@@ -62,7 +61,7 @@ stringToCanTimestampType( std::string const &timestampType, CanTimestampType &ou
  * @brief Linux CAN Bus implementation. Uses Raw Sockets to listen to CAN
  * data on 1 single CAN IF.
  */
-class CANDataSource : public IActiveDecoderDictionaryListener
+class CANDataSource
 {
 public:
     static constexpr int PARALLEL_RECEIVED_FRAMES_FROM_KERNEL = 10;
@@ -85,7 +84,7 @@ public:
                    bool forceCanFD,
                    uint32_t threadIdleTimeMs,
                    CANDataConsumer &consumer );
-    ~CANDataSource() override;
+    ~CANDataSource();
 
     CANDataSource( const CANDataSource & ) = delete;
     CANDataSource &operator=( const CANDataSource & ) = delete;
@@ -100,7 +99,7 @@ public:
     bool isAlive();
 
     void onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
-                                     VehicleDataSourceProtocol networkProtocol ) override;
+                                     VehicleDataSourceProtocol networkProtocol );
 
 private:
     // Start the bus thread

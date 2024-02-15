@@ -287,7 +287,7 @@ Java_com_aws_iotfleetwise_Fwe_ingestCanMessage(
         return;
     }
     auto interfaceIdCString = env->GetStringUTFChars( interfaceIdJString, 0 );
-    std::string interfaceId( interfaceIdCString );
+    Aws::IoTFleetWise::InterfaceID interfaceId( interfaceIdCString );
     env->ReleaseStringUTFChars( interfaceIdJString, interfaceIdCString );
     auto len = env->GetArrayLength( dataJArray );
     std::vector<uint8_t> data( static_cast<size_t>( len ) );

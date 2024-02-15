@@ -940,8 +940,7 @@ CollectionSchemeManager::updateActiveSchemesListeners()
         activeCollectionSchemesOutput->activeCollectionSchemes.push_back( enabledCollectionScheme.second );
     }
 
-    notifyListeners<const std::shared_ptr<const ActiveCollectionSchemes> &>(
-        &IActiveCollectionSchemesListener::onChangeCollectionSchemeList, activeCollectionSchemesOutput );
+    mCollectionSchemeListChangeListeners.notify( activeCollectionSchemesOutput );
 }
 
 } // namespace IoTFleetWise

@@ -58,8 +58,9 @@ detectQuectelDevice()
           it != boost::filesystem::directory_iterator();
           ++it )
     {
-        if ( !boost::filesystem::is_directory( *it ) || !boost::filesystem::exists( it->path().string() + "/uevent" ) ||
-             !boost::filesystem::exists( it->path().string() + "/" + DEFAULT_NMEA_SOURCE ) )
+        if ( ( !boost::filesystem::is_directory( *it ) ) ||
+             ( !boost::filesystem::exists( it->path().string() + "/uevent" ) ) ||
+             ( !boost::filesystem::exists( it->path().string() + "/" + DEFAULT_NMEA_SOURCE ) ) )
         {
             continue;
         }

@@ -3,6 +3,7 @@
 
 #include "Schema.h"
 #include "IConnectionTypes.h"
+#include "LoggingModule.h"
 #include <utility>
 
 namespace Aws
@@ -13,27 +14,65 @@ namespace IoTFleetWise
 Schema::Schema( std::shared_ptr<IReceiver> receiverDecoderManifest,
                 std::shared_ptr<IReceiver> receiverCollectionSchemeList,
                 std::shared_ptr<ISender> sender )
-    : mDecoderManifestCb( *this )
-    , mCollectionSchemeListCb( *this )
-    , mSender( std::move( sender ) )
+    : mSender( std::move( sender ) )
 {
     // Register the listeners
-    receiverCollectionSchemeList->subscribeListener( &mCollectionSchemeListCb );
-    receiverDecoderManifest->subscribeListener( &mDecoderManifestCb );
+    receiverDecoderManifest->subscribeToDataReceived( [this]( const ReceivedChannelMessage &receivedChannelMessage ) {
+        onDecoderManifestReceived( receivedChannelMessage.buf, receivedChannelMessage.size );
+    } );
+    receiverCollectionSchemeList->subscribeToDataReceived(
+        [this]( const ReceivedChannelMessage &receivedChannelMessage ) {
+            onCollectionSchemeReceived( receivedChannelMessage.buf, receivedChannelMessage.size );
+        } );
 }
 
 void
-Schema::setCollectionSchemeList( const CollectionSchemeListPtr collectionSchemeListPtr )
+Schema::onDecoderManifestReceived( const uint8_t *buf, size_t size )
 {
-    notifyListeners<const ICollectionSchemeListPtr &>( &CollectionSchemeManagementListener::onCollectionSchemeUpdate,
-                                                       collectionSchemeListPtr );
+    // Check for a empty input data
+    if ( ( buf == nullptr ) || ( size == 0 ) )
+    {
+        FWE_LOG_ERROR( "Received empty CollectionScheme List data from Cloud" );
+        return;
+    }
+
+    // Create an empty shared pointer which we'll copy the data to
+    DecoderManifestPtr decoderManifestPtr = std::make_shared<DecoderManifestIngestion>();
+
+    // Try to copy the binary data into the decoderManifest object
+    if ( !decoderManifestPtr->copyData( buf, size ) )
+    {
+        FWE_LOG_ERROR( "DecoderManifest copyData from IoT core failed" );
+        return;
+    }
+
+    // Successful copy, so we cache the decoderManifest in the Schema object
+    mDecoderManifestListeners.notify( decoderManifestPtr );
+    FWE_LOG_TRACE( "Received Decoder Manifest in PI DecoderManifestCb" );
 }
 
 void
-Schema::setDecoderManifest( const DecoderManifestPtr decoderManifestPtr )
+Schema::onCollectionSchemeReceived( const uint8_t *buf, size_t size )
 {
-    notifyListeners<const IDecoderManifestPtr &>( &CollectionSchemeManagementListener::onDecoderManifestUpdate,
-                                                  decoderManifestPtr );
+    // Check for a empty input data
+    if ( ( buf == nullptr ) || ( size == 0 ) )
+    {
+        FWE_LOG_ERROR( "Received empty CollectionScheme List data from Cloud" );
+        return;
+    }
+
+    // Create an empty shared pointer which we'll copy the data to
+    CollectionSchemeListPtr collectionSchemeListPtr = std::make_shared<CollectionSchemeIngestionList>();
+
+    // Try to copy the binary data into the collectionSchemeList object
+    if ( !collectionSchemeListPtr->copyData( buf, size ) )
+    {
+        FWE_LOG_ERROR( "CollectionSchemeList copyData from IoT core failed" );
+        return;
+    }
+
+    mCollectionSchemeListeners.notify( collectionSchemeListPtr );
+    FWE_LOG_TRACE( "Received CollectionSchemeList" );
 }
 
 bool

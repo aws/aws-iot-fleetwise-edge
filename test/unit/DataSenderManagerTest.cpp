@@ -6,7 +6,6 @@
 #include "CANInterfaceIDTranslator.h"
 #include "CacheAndPersist.h"
 #include "CollectionInspectionAPITypes.h"
-#include "GeohashInfo.h"
 #include "IConnectionTypes.h"
 #include "ISender.h"
 #include "OBDDataTypes.h"
@@ -28,7 +27,6 @@
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include "CollectionSchemeManagerTest.h"
 #include "DataSenderIonWriterMock.h"
-#include "IActiveCollectionSchemesListener.h"
 #include "ICollectionScheme.h"
 #include "ICollectionSchemeList.h"
 #include "S3SenderMock.h"
@@ -162,7 +160,6 @@ TEST_F( DataSenderManagerTest, ProcessSingleSignal )
     ASSERT_EQ( vehicleData.captured_signals_size(), 1 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 
     ASSERT_EQ( vehicleData.captured_signals()[0].signal_id(), signal1.signalID );
     ASSERT_EQ( vehicleData.captured_signals()[0].double_value(), signal1.value.value.doubleVal );
@@ -196,7 +193,6 @@ TEST_F( DataSenderManagerTest, ProcessMultipleSignals )
     ASSERT_EQ( vehicleData.captured_signals_size(), 3 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 
     ASSERT_EQ( vehicleData.captured_signals()[0].signal_id(), signal1.signalID );
     ASSERT_EQ( vehicleData.captured_signals()[0].double_value(), signal1.value.value.doubleVal );
@@ -246,14 +242,12 @@ TEST_F( DataSenderManagerTest, ProcessMultipleSignalsBeyondTransmitThreshold )
     ASSERT_EQ( vehicleData.captured_signals_size(), 5 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[1].data ) );
 
     ASSERT_EQ( vehicleData.captured_signals_size(), 4 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 }
 
 TEST_F( DataSenderManagerTest, ProcessSingleCanFrame )
@@ -281,7 +275,6 @@ TEST_F( DataSenderManagerTest, ProcessSingleCanFrame )
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 1 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 
     ASSERT_EQ( vehicleData.can_frames()[0].message_id(), canFrame1.frameID );
     ASSERT_EQ( vehicleData.can_frames()[0].interface_id(), "can123" );
@@ -320,7 +313,6 @@ TEST_F( DataSenderManagerTest, ProcessMultipleCanFrames )
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 3 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 
     ASSERT_EQ( vehicleData.can_frames()[0].message_id(), canFrame1.frameID );
     ASSERT_EQ( vehicleData.can_frames()[0].interface_id(), "can123" );
@@ -375,14 +367,12 @@ TEST_F( DataSenderManagerTest, ProcessMultipleCanFramesBeyondTransmitThreshold )
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 5 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[1].data ) );
 
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 4 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 }
 
 TEST_F( DataSenderManagerTest, ProcessSingleDtcCode )
@@ -412,7 +402,6 @@ TEST_F( DataSenderManagerTest, ProcessSingleDtcCode )
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_TRUE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 
     ASSERT_EQ( vehicleData.dtc_data().active_dtc_codes_size(), 1 );
     ASSERT_EQ( vehicleData.dtc_data().active_dtc_codes()[0], "P0143" );
@@ -446,7 +435,6 @@ TEST_F( DataSenderManagerTest, ProcessMultipleDtcCodes )
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_TRUE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 
     ASSERT_EQ( vehicleData.dtc_data().active_dtc_codes_size(), 2 );
     ASSERT_EQ( vehicleData.dtc_data().active_dtc_codes()[0], "P0143" );
@@ -485,7 +473,6 @@ TEST_F( DataSenderManagerTest, ProcessMultipleDtcCodesBeyondTransmitThreshold )
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_TRUE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
     ASSERT_EQ( vehicleData.dtc_data().active_dtc_codes_size(), 5 );
 
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[1].data ) );
@@ -493,39 +480,7 @@ TEST_F( DataSenderManagerTest, ProcessMultipleDtcCodesBeyondTransmitThreshold )
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_TRUE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
     ASSERT_EQ( vehicleData.dtc_data().active_dtc_codes_size(), 4 );
-}
-
-TEST_F( DataSenderManagerTest, ProcessGeohash )
-{
-    GeohashInfo geohashInfo;
-    geohashInfo.mGeohashString = "9q9hwg28j";
-    mTriggeredCollectionSchemeData->mGeohashInfo = geohashInfo;
-
-    // TODO: verify data and collectionSchemeParams (3rd parameter)
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).WillOnce( Return( ConnectivityError::Success ) );
-
-    processCollectedData( mTriggeredCollectionSchemeData );
-
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
-
-    auto collectionSchemeParams = sentBufferData[0].collectionSchemeParams;
-    ASSERT_EQ( collectionSchemeParams.eventID, mTriggeredCollectionSchemeData->eventID );
-    ASSERT_EQ( collectionSchemeParams.triggerTime, mTriggeredCollectionSchemeData->triggerTime );
-    ASSERT_EQ( collectionSchemeParams.compression, mTriggeredCollectionSchemeData->metadata.compress );
-    ASSERT_EQ( collectionSchemeParams.persist, mTriggeredCollectionSchemeData->metadata.persist );
-
-    Schemas::VehicleDataMsg::VehicleData vehicleData;
-    ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
-
-    ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
-    ASSERT_EQ( vehicleData.can_frames_size(), 0 );
-    ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_TRUE( vehicleData.has_geohash() );
-
-    ASSERT_EQ( vehicleData.geohash().geohash_string(), "9q9hwg28j" );
 }
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -553,7 +508,6 @@ TEST_F( DataSenderManagerTest, ProcessSingleUploadedS3Object )
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
     ASSERT_EQ( vehicleData.s3_objects_size(), 1 );
 
     ASSERT_EQ( vehicleData.s3_objects()[0].key(), "uploaded/object/key1" );
@@ -588,7 +542,6 @@ TEST_F( DataSenderManagerTest, ProcessMultipleUploadedS3Objects )
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
     ASSERT_EQ( vehicleData.s3_objects_size(), 3 );
 
     ASSERT_EQ( vehicleData.s3_objects()[0].key(), "uploaded/object/key1" );
@@ -641,7 +594,6 @@ TEST_F( DataSenderManagerTest, ProcessMultipleUploadedS3ObjectsBeyondTransmitThr
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
     ASSERT_EQ( vehicleData.s3_objects_size(), 5 );
 
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[1].data ) );
@@ -649,7 +601,6 @@ TEST_F( DataSenderManagerTest, ProcessMultipleUploadedS3ObjectsBeyondTransmitThr
     ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
     ASSERT_EQ( vehicleData.s3_objects_size(), 4 );
 }
 
@@ -719,7 +670,6 @@ TEST_F( DataSenderManagerTest, ProcessSingleRawDataSignal )
     ASSERT_EQ( reportedCollectionSchemeData->metadata.decoderID, mTriggeredCollectionSchemeData->metadata.decoderID );
 
     ASSERT_FALSE( reportedCollectionSchemeData->mDTCInfo.hasItems() );
-    ASSERT_FALSE( reportedCollectionSchemeData->mGeohashInfo.hasItems() );
     ASSERT_EQ( reportedCollectionSchemeData->signals.size(), 0 );
     ASSERT_EQ( reportedCollectionSchemeData->canFrames.size(), 0 );
     ASSERT_EQ( reportedCollectionSchemeData->uploadedS3Objects.size(), 1 );
@@ -784,7 +734,6 @@ TEST_F( DataSenderManagerTest, ProcessMultipleRawDataSignals )
     ASSERT_EQ( reportedCollectionSchemeData->metadata.decoderID, mTriggeredCollectionSchemeData->metadata.decoderID );
 
     ASSERT_FALSE( reportedCollectionSchemeData->mDTCInfo.hasItems() );
-    ASSERT_FALSE( reportedCollectionSchemeData->mGeohashInfo.hasItems() );
     ASSERT_EQ( reportedCollectionSchemeData->signals.size(), 0 );
     ASSERT_EQ( reportedCollectionSchemeData->canFrames.size(), 0 );
     ASSERT_EQ( reportedCollectionSchemeData->uploadedS3Objects.size(), 1 );
@@ -904,7 +853,6 @@ TEST_F( DataSenderManagerTest, ProcessSingleSignalWithCompression )
     ASSERT_EQ( vehicleData.captured_signals_size(), 1 );
     ASSERT_EQ( vehicleData.can_frames_size(), 0 );
     ASSERT_FALSE( vehicleData.has_dtc_data() );
-    ASSERT_FALSE( vehicleData.has_geohash() );
 
     ASSERT_EQ( vehicleData.captured_signals()[0].signal_id(), signal1.signalID );
     ASSERT_EQ( vehicleData.captured_signals()[0].double_value(), signal1.value.value.doubleVal );

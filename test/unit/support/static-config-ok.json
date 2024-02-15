@@ -19,6 +19,19 @@
       },
       "interfaceId": "2",
       "type": "obdInterface"
+    },
+    {
+      "interfaceId": "4",
+      "type": "externalCanInterface"
+    },
+    {
+      "ros2Interface": {
+        "executorThreads": 1,
+        "subscribeQueueLength": 1000,
+        "introspectionLibraryCompare": "ErrorAndFail"
+      },
+      "interfaceId": "10",
+      "type": "ros2Interface"
     }
   ],
   "staticConfig": {
@@ -40,7 +53,6 @@
     "internalParameters": {
       "readyToPublishDataBufferSize": 10000,
       "systemWideLogLevel": "Trace",
-      "dataReductionProbabilityDisabled": false,
       "persistencyUploadRetryIntervalMs": 5000
     },
     "publishToCloudParameters": {
@@ -56,9 +68,9 @@
       "loggingUploadTopic": "aws-iot-fleetwise-logging-upload",
       "canDataTopic": "can-data",
       "checkinTopic": "checkin",
-      "certificateFilename": "path/to/my-certificate.pem.crt",
-      "privateKeyFilename": "path/to/my-private.pem.key",
-      "rootCAFilename": "path/to/my-root-ca.pem.crt"
+      "certificateFilename": "/tmp/dummyCertificate.pem",
+      "privateKeyFilename": "/tmp/dummyPrivateKey.key",
+      "rootCAFilename": "/tmp/dummyCertificate.pem"
     },
     "iWaveGpsExample": {
       "nmeaFilePath": "/tmp/engineTestIWaveGPSfile.txt",

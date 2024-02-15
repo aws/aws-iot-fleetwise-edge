@@ -54,9 +54,9 @@ public:
 
     std::string getID() const override;
 
-    const CANMessageFormat &getCANMessageFormat( CANRawFrameID canID, CANInterfaceID interfaceID ) const override;
+    const CANMessageFormat &getCANMessageFormat( CANRawFrameID canID, InterfaceID interfaceID ) const override;
 
-    std::pair<CANRawFrameID, CANInterfaceID> getCANFrameAndInterfaceID( SignalID signalID ) const override;
+    std::pair<CANRawFrameID, InterfaceID> getCANFrameAndInterfaceID( SignalID signalID ) const override;
 
     VehicleDataSourceProtocol getNetworkProtocol( SignalID signalID ) const override;
 
@@ -108,14 +108,13 @@ private:
      * @brief A dictionary used internally that allows the retrieval of a CANMessageFormat per CanChannelId and
      * CANRawFrameID Key: CANRawFrameID Value: CANMessageFormat
      */
-    std::unordered_map<CANInterfaceID, CANFrameToMessageMap> mCANMessageFormatDictionary;
+    std::unordered_map<InterfaceID, CANFrameToMessageMap> mCANMessageFormatDictionary;
 
     /**
      * @brief A dictionary used internally that allows lookup of what CANRawFrameID and NodeID a Signal is found on
      * Key: Signal ID Value:pair of CANRawFrameID and NodeID
      */
-    std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>>
-        mSignalToCANRawFrameIDAndInterfaceIDDictionary;
+    std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> mSignalToCANRawFrameIDAndInterfaceIDDictionary;
 
     /**
      * @brief A dictionary used internally that allows lookup of what type of network protocol is this signal

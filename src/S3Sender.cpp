@@ -117,7 +117,7 @@ S3Sender::submitQueuedUploads()
 {
     std::lock_guard<std::mutex> lock( mQueuedAndOngoingUploadsLookupMutex );
 
-    while ( mOngoingUploads.size() < MAX_SIMULTANEOUS_FILES && !mQueuedUploads.empty() )
+    while ( ( mOngoingUploads.size() < MAX_SIMULTANEOUS_FILES ) && ( !mQueuedUploads.empty() ) )
     {
         QueuedUploadMetadata &queuedUploadMetadata = mQueuedUploads.front();
         auto streambuf = queuedUploadMetadata.streambufBuilder->build();
@@ -208,16 +208,16 @@ S3Sender::transferStatusUpdatedCallback( const std::shared_ptr<const Aws::Transf
                    "; QueuedParts: " + std::to_string( transferHandle->GetQueuedParts().size() ) +
                    "; FailedParts: " + std::to_string( transferHandle->GetFailedParts().size() ) );
 
-    if ( transferStatus == Aws::Transfer::TransferStatus::NOT_STARTED ||
-         transferStatus == Aws::Transfer::TransferStatus::IN_PROGRESS )
+    if ( ( transferStatus == Aws::Transfer::TransferStatus::NOT_STARTED ) ||
+         ( transferStatus == Aws::Transfer::TransferStatus::IN_PROGRESS ) )
     {
         return;
     }
 
-    if ( transferStatus != Aws::Transfer::TransferStatus::CANCELED &&
-         transferStatus != Aws::Transfer::TransferStatus::FAILED &&
-         transferStatus != Aws::Transfer::TransferStatus::COMPLETED &&
-         transferStatus != Aws::Transfer::TransferStatus::ABORTED )
+    if ( ( transferStatus != Aws::Transfer::TransferStatus::CANCELED ) &&
+         ( transferStatus != Aws::Transfer::TransferStatus::FAILED ) &&
+         ( transferStatus != Aws::Transfer::TransferStatus::COMPLETED ) &&
+         ( transferStatus != Aws::Transfer::TransferStatus::ABORTED ) )
     {
         FWE_LOG_ERROR( "Unexpected transfer status '" + transferStatusToString( transferStatus ) + "' for object " +
                        transferHandle->GetKey() );
@@ -252,7 +252,7 @@ S3Sender::transferStatusUpdatedCallback( const std::shared_ptr<const Aws::Transf
                         metadata.transferManagerWrapper->RetryUpload( data, metadata.transferHandle );
                     return;
                 }
-            };
+            }
         }
     }
 

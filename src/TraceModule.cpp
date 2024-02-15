@@ -54,7 +54,9 @@ TraceModule::getVariableName( TraceVariable variable )
     switch ( variable )
     {
     // The _idX suffix is to match the legacy naming, which should not be changed as they are used
-    // in dashbaords.
+    // in dashboards.
+    case TraceVariable::TRACE_VARIABLE_SIZE:
+        return nullptr;
     case TraceVariable::READ_SOCKET_FRAMES_0:
         return "RFrames0_id0";
     case TraceVariable::READ_SOCKET_FRAMES_1:
@@ -127,7 +129,7 @@ TraceModule::getVariableName( TraceVariable variable )
         return "ObdE3_id54";
     case TraceVariable::DISCARDED_FRAMES:
         return "FrmE0_id55";
-    case TraceVariable::CAN_POLLING_TIMESTAMP_COUNTER:
+    case TraceVariable::POLLING_TIMESTAMP_COUNTER:
         return "CanPollTCnt_id56";
     case TraceVariable::CE_PROCESSED_SIGNALS:
         return "CeSCnt_id57";
@@ -155,9 +157,9 @@ TraceModule::getVariableName( TraceVariable variable )
         return "CEProcessedDataFrames";
     case TraceVariable::CE_PROCESSED_DTCS:
         return "CEProcessedDTCs";
-    default:
-        return nullptr;
+        // Intentionally omit default so that we can use compiler warnings to remind us about missing values
     }
+    return nullptr;
 }
 
 const char *
@@ -166,7 +168,9 @@ TraceModule::getAtomicVariableName( TraceAtomicVariable variable )
     switch ( variable )
     {
     // The _idX suffix is to match the legacy naming, which should not be changed as they are used
-    // in dashbaords.
+    // in dashboards.
+    case TraceAtomicVariable::TRACE_ATOMIC_VARIABLE_SIZE:
+        return nullptr;
     case TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS:
         return "QUEUE_CONSUMER_TO_INSPECTION_SIGNALS_id0";
     case TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN:
@@ -174,7 +178,7 @@ TraceModule::getAtomicVariableName( TraceAtomicVariable variable )
     case TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES:
         return "QueueConsumerToInspectionDataFrames";
     case TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS:
-        return "QueueConsumerToInspectionDataFrames";
+        return "QueueConsumerToInspectionDtcs";
     case TraceAtomicVariable::NOT_TIME_MONOTONIC_FRAMES:
         return "nTime_id2";
     case TraceAtomicVariable::SUBSCRIBE_ERROR:
@@ -191,9 +195,9 @@ TraceModule::getAtomicVariableName( TraceAtomicVariable variable )
         return "ConRes_id8";
     case TraceAtomicVariable::COLLECTION_SCHEME_ERROR:
         return "CampaignFailures";
-    default:
-        return nullptr;
+        // Intentionally omit default so that we can use compiler warnings to remind us about missing values
     }
+    return nullptr;
 }
 
 const char *
@@ -202,7 +206,9 @@ TraceModule::getSectionName( TraceSection section )
     switch ( section )
     {
     // The _idX suffix is to match the legacy naming, which should not be changed as they are used
-    // in dashbaords.
+    // in dashboards.
+    case TraceSection::TRACE_SECTION_SIZE:
+        return nullptr;
     case TraceSection::BUILD_MQTT:
         return "BUILD_MQTT_id0";
     case TraceSection::FWE_STARTUP:
@@ -257,9 +263,9 @@ TraceModule::getSectionName( TraceSection section )
         return "CD_19_id25";
     case TraceSection::COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA:
         return "CampaignRxToDataTx";
-    default:
-        return nullptr;
+        // Intentionally omit default so that we can use compiler warnings to remind us about missing values
     }
+    return nullptr;
 }
 
 void

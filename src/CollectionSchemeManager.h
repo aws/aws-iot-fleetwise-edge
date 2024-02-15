@@ -8,10 +8,6 @@
 #include "Clock.h"
 #include "ClockHandler.h"
 #include "CollectionInspectionAPITypes.h"
-#include "CollectionSchemeManagementListener.h"
-#include "IActiveCollectionSchemesListener.h"
-#include "IActiveConditionProcessor.h"
-#include "IActiveDecoderDictionaryListener.h"
 #include "ICollectionSchemeList.h"
 #include "ICollectionSchemeManager.h"
 #include "IDecoderDictionary.h"
@@ -72,16 +68,36 @@ struct TimeData
  * 7. Notify other components about currently Enabled CollectionSchemes.
  */
 
-class CollectionSchemeManager : public ICollectionSchemeManager,
-                                public CollectionSchemeManagementListener,
-                                public ThreadListeners<IActiveDecoderDictionaryListener>,
-                                public ThreadListeners<IActiveConditionProcessor>,
-                                public ThreadListeners<IActiveCollectionSchemesListener>
+class CollectionSchemeManager : public ICollectionSchemeManager
 {
 public:
-    using ThreadListeners<IActiveDecoderDictionaryListener>::subscribeListener;
-    using ThreadListeners<IActiveConditionProcessor>::subscribeListener;
-    using ThreadListeners<IActiveCollectionSchemesListener>::subscribeListener;
+    /**
+     * @brief The callback function used to notify any listeners on change of Decoder Dictionary
+     *
+     * @param dictionary const shared pointer pointing to a constant decoder dictionary
+     * @param networkProtocol network protocol type indicating which type of decoder dictionary it's updating
+     */
+    using OnActiveDecoderDictionaryChangeCallback =
+        std::function<void( ConstDecoderDictionaryConstPtr &dictionary, VehicleDataSourceProtocol networkProtocol )>;
+
+    /**
+     * @brief Callback to notify the change of active conditions for example by rebuilding buffers
+     *
+     * This function should be called as rarely as possible.
+     * All condition should fulfill the restriction like max signal id or equation depth.
+     * After this call all cached signal values that were not published are deleted
+     * @param inspectionMatrix all currently active Conditions
+     * @return true if valid conditions were handed over
+     * */
+    using OnInspectionMatrixChangeCallback =
+        std::function<void( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )>;
+
+    /**
+     * @brief Callback to notify the change of active collection schemes
+     *
+     * */
+    using OnCollectionSchemeListChangeCallback =
+        std::function<void( const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes )>;
 
     CollectionSchemeManager() = default;
 
@@ -174,11 +190,37 @@ public:
      */
     std::vector<std::string> getCollectionSchemeArns();
 
-private:
-    using ThreadListeners<IActiveDecoderDictionaryListener>::notifyListeners;
-    using ThreadListeners<IActiveConditionProcessor>::notifyListeners;
-    using ThreadListeners<IActiveCollectionSchemesListener>::notifyListeners;
+    /**
+     * @brief Subscribe to changes in the active decoder dictionary
+     * @param callback A function that will be called when the active dictionary changes
+     */
+    void
+    subscribeToActiveDecoderDictionaryChange( OnActiveDecoderDictionaryChangeCallback callback )
+    {
+        mActiveDecoderDictionaryChangeListeners.subscribe( callback );
+    }
 
+    /**
+     * @brief Subscribe to changes in the inspection matrix
+     * @param callback A function that will be called when the inspection matrix changes
+     */
+    void
+    subscribeToInspectionMatrixChange( OnInspectionMatrixChangeCallback callback )
+    {
+        mInspectionMatrixChangeListeners.subscribe( callback );
+    }
+
+    /**
+     * @brief Subscribe to changes in the collection scheme list
+     * @param callback A function that will be called when the collection scheme list changes
+     */
+    void
+    subscribeToCollectionSchemeListChange( OnCollectionSchemeListChangeCallback callback )
+    {
+        mCollectionSchemeListChangeListeners.subscribe( callback );
+    }
+
+private:
     /**
      * @brief Starts main thread
      * @return True if successful. False otherwise.
@@ -388,6 +430,10 @@ protected:
     std::priority_queue<TimeData, std::vector<TimeData>, std::greater<TimeData>> mTimeLine;
     /* lock used in callback functions onCollectionSchemeAvailable and onDecoderManifest */
     std::mutex mSchemaUpdateMutex;
+
+    ThreadSafeListeners<OnActiveDecoderDictionaryChangeCallback> mActiveDecoderDictionaryChangeListeners;
+    ThreadSafeListeners<OnInspectionMatrixChangeCallback> mInspectionMatrixChangeListeners;
+    ThreadSafeListeners<OnCollectionSchemeListChangeCallback> mCollectionSchemeListChangeListeners;
 
     /*
      * parameters used in  onCollectionSchemeAvailable()

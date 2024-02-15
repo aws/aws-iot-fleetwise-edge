@@ -298,11 +298,12 @@ private:
     ionWriteFieldStr( hWRITER writer, const char *str, size_t len )
     {
         ION_STRING fieldNameString;
-        // coverity[cert_exp55_cpp_violation] ion-c needs non-const input
+        // clang-format off
         // coverity[autosar_cpp14_a5_2_3_violation] ion-c needs non-const input
         // coverity[misra_cpp_2008_rule_5_2_5_violation] ion-c needs non-const input
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
-        ion_string_assign_cstr( &fieldNameString, const_cast<char *>( str ), static_cast<SIZE>( len ) );
+        // coverity[cert_exp55_cpp_violation] ion-c needs non-const input
+        ion_string_assign_cstr( &fieldNameString, const_cast<char *>( str ), static_cast<SIZE>( len ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
+        // clang-format on
         return ion_writer_write_field_name( ( writer ), &fieldNameString );
     }
 
@@ -310,11 +311,12 @@ private:
     ionWriteValueStr( hWRITER writer, const char *str, size_t len )
     {
         ION_STRING valueString;
-        // coverity[cert_exp55_cpp_violation] ion-c needs non-const input
+        // clang-format off
         // coverity[autosar_cpp14_a5_2_3_violation] ion-c needs non-const input
         // coverity[misra_cpp_2008_rule_5_2_5_violation] ion-c needs non-const input
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
-        ion_string_assign_cstr( &valueString, const_cast<char *>( str ), static_cast<SIZE>( len ) );
+        // coverity[cert_exp55_cpp_violation] ion-c needs non-const input
+        ion_string_assign_cstr( &valueString, const_cast<char *>( str ), static_cast<SIZE>( len ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
+        // clang-format on
         return ion_writer_write_string( ( writer ), &valueString );
     }
 
@@ -342,34 +344,24 @@ private:
         // The callbacks will come only directly form inside a ion_ call and not from a different thread
         mIonWriteCallback = [this]( _ion_user_stream *stream ) -> iERR {
             // Check limit to skip first call where stream->limit is not initialized
-
-            // coverity[autosar_cpp14_m5_0_18_violation] stream-> limit is assigned to mIonWriteBuffer.end()
-            // coverity[cert_ctr54_cpp_violation] stream-> limit is assigned to mIonWriteBuffer.end()
-            // coverity[misra_cpp_2008_rule_5_0_18_violation] stream-> limit is assigned to mIonWriteBuffer.end()
             if ( stream->limit == static_cast<BYTE *>( mIonWriteBuffer.data() + mIonWriteBuffer.size() ) )
             {
-                // coverity[cert_ctr54_cpp_violation] this explicitly checks if stream->curr is inside the array
-                // coverity[autosar_cpp14_m5_0_18_violation] this explicitly checks if stream->curr is inside the array
-                // coverity[misra_cpp_2008_rule_5_0_18_violation] this explicitly checks if stream->curr is inside the
-                // array
+                // coverity[misra_cpp_2008_rule_5_0_18_violation] it was checked that stream->curr is inside the array
+                // coverity[autosar_cpp14_m5_0_18_violation] same
+                // coverity[cert_ctr54_cpp_violation] same
                 if ( ( stream->curr >= static_cast<BYTE *>( &( *mIonWriteBuffer.begin() ) ) ) &&
-                     // coverity[autosar_cpp14_m5_0_18_violation] this explicitly checks if stream->curr is inside the
-                     // array
-                     // coverity[cert_ctr54_cpp_violation] this explicitly checks if stream->curr is inside the array
-                     // coverity[misra_cpp_2008_rule_5_0_18_violation] this explicitly checks if stream->curr is inside
-                     // the array
+                     // clang-format off
+                    // coverity[misra_cpp_2008_rule_5_0_18_violation] it was checked that stream->curr is inside the array
+                    // coverity[autosar_cpp14_m5_0_18_violation] same
                      ( stream->curr <= static_cast<BYTE *>( mIonWriteBuffer.data() + mIonWriteBuffer.size() ) ) )
+                // clang-format on
                 {
-                    // coverity[autosar_cpp14_m5_0_18_violation] it was checked that stream->curr is inside the array
-                    // coverity[autosar_cpp14_m5_0_17_violation] same
-                    // coverity[cert_ctr54_cpp_violation] same
-                    // coverity[misra_cpp_2008_rule_5_0_18_violation] same
+                    // coverity[autosar_cpp14_m5_0_17_violation] it was checked that stream->curr is inside the array
+                    // coverity[autosar_cpp14_m5_0_9_violation] same
                     // coverity[misra_cpp_2008_rule_5_0_17_violation] same
+                    // coverity[misra_cpp_2008_rule_5_0_9_violation] same
+                    // coverity[cert_ctr54_cpp_violation] same
                     mWrittenBytesInIonWriteBuffer =
-                        // coverity[autosar_cpp14_m5_0_9_violation] it is checked that stream->curr >=
-                        // mIonWriteBuffer.begin() so not negative
-                        // coverity[misra_cpp_2008_rule_5_0_9_violation] it is checked that stream->curr >=
-                        // mIonWriteBuffer.begin() so not negative
                         static_cast<uint64_t>( stream->curr - static_cast<BYTE *>( &( *mIonWriteBuffer.begin() ) ) );
                 }
                 if ( stream->curr == stream->limit )
@@ -415,12 +407,12 @@ private:
             FWE_LOG_ERROR( "Abort serializeMetadata as Ion Writer could not be created" );
             return;
         }
+        // clang-format off
         // coverity[autosar_cpp14_m5_2_9_violation] tid_STRUCT comes from library so cast is done in library header
-        // coverity[cert_exp57_cpp_violation] tid_STRUCT comes from library so cast is done in library header
         // coverity[misra_cpp_2008_rule_5_2_9_violation] tid_STRUCT comes from library so cast is done in library header
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast) cast is for tid_STRUCT in Ion header
-        ION_CHECK( ion_writer_start_container( mIonWriter, tid_STRUCT ) );
+        // coverity[cert_exp57_cpp_violation] tid_STRUCT comes from library so cast is done in library header
+        ION_CHECK( ion_writer_start_container( mIonWriter, tid_STRUCT ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast, cppcoreguidelines-pro-type-cstyle-cast)
+        // clang-format on
 
         ION_CHECK( ionWriteFieldStr(
             mIonWriter, &FIELD_NAME_SCHEMA[0], static_cast<size_t>( sizeof( FIELD_NAME_SCHEMA ) - 1 ) ) );
@@ -463,12 +455,12 @@ private:
             FWE_LOG_ERROR( "Abort serializeMetadata as Ion Writer could not be created" );
             return;
         }
-        // coverity[cert_exp57_cpp_violation] tid_STRUCT comes from library so cast is done in library header
+        // clang-format off
         // coverity[autosar_cpp14_m5_2_9_violation] tid_STRUCT comes from library so cast is done in library header
         // coverity[misra_cpp_2008_rule_5_2_9_violation] tid_STRUCT comes from library so cast is done in library header
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast) cast is for tid_STRUCT in Ion header
-        ION_CHECK( ion_writer_start_container( mIonWriter, tid_STRUCT ) );
+        // coverity[cert_exp57_cpp_violation] tid_STRUCT comes from library so cast is done in library header
+        ION_CHECK( ion_writer_start_container( mIonWriter, tid_STRUCT ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast, cppcoreguidelines-pro-type-cstyle-cast)
+        // clang-format on
         ION_CHECK( ionWriteFieldStr(
             mIonWriter, &FIELD_NAME_SIGNAL_ID[0], static_cast<size_t>( sizeof( FIELD_NAME_SIGNAL_ID ) - 1 ) ) );
         ION_CHECK( ion_writer_write_int32( mIonWriter, static_cast<int32_t>( frameInfo.mId ) ) );
@@ -503,12 +495,13 @@ private:
         {
             ION_CHECK( ionWriteFieldStr(
                 mIonWriter, &FIELD_NAME_SIGNAL_BLOB[0], static_cast<size_t>( sizeof( FIELD_NAME_SIGNAL_BLOB ) - 1 ) ) );
+            // clang-format off
             // coverity[autosar_cpp14_a5_2_3_violation] ion-c needs non-const input
-            // coverity[cert_exp55_cpp_violation] ion-c needs non-const input
             // coverity[misra_cpp_2008_rule_5_2_5_violation] ion-c needs non-const input
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
+            // coverity[cert_exp55_cpp_violation] ion-c needs non-const input
             ION_CHECK( ion_writer_write_blob(
-                mIonWriter, reinterpret_cast<BYTE *>( const_cast<char *>( buffer ) ), static_cast<SIZE>( size ) ) );
+                mIonWriter, reinterpret_cast<BYTE *>( const_cast<char *>( buffer ) ), static_cast<SIZE>( size ) ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
+            // clang-format on
         }
         ION_CHECK( ion_writer_finish_container( mIonWriter ) );
 

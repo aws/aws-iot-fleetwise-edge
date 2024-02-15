@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "AwsIotConnectivityModule.h"
-#include "IReceiver.h"
 #include "LoggingModule.h"
 #include "Thread.h"
 #include "TraceModule.h"
@@ -13,7 +12,7 @@
 #include <aws/crt/mqtt/Mqtt5Client.h>
 #include <aws/crt/mqtt/Mqtt5Packets.h>
 #include <aws/crt/mqtt/Mqtt5Types.h>
-#include <cstddef>
+#include <chrono>
 #include <sstream>
 #include <utility>
 
@@ -36,6 +35,9 @@ constexpr uint16_t MQTT_CONNECT_KEEP_ALIVE_SECONDS = 60;
 // If the PING request does not return within this interval, the stack will create a new one.
 constexpr uint32_t MQTT_PING_TIMEOUT_MS = 3000;
 constexpr uint32_t MQTT_SESSION_EXPIRY_INTERVAL_SEC = 3600;
+
+// How much time to wait for a response to an unsubscribe operation when shutting the module down.
+constexpr uint32_t MQTT_UNSUBSCRIBE_TIMEOUT_ON_SHUTDOWN_SEC = 5;
 
 AwsIotConnectivityModule::AwsIotConnectivityModule( std::string rootCA,
                                                     std::string clientId,
@@ -108,12 +110,32 @@ AwsIotConnectivityModule::resetConnection()
 bool
 AwsIotConnectivityModule::disconnect()
 {
+    // In case there is no connection or the connection is bad, we don't want to be waiting here for
+    // a long time. So we tell all channels to unsubscribe asynchronously, and then wait for them
+    // in a separate step.
+    std::vector<std::pair<std::string, std::future<bool>>> unsubscribeResults;
+    {
+        std::lock_guard<std::mutex> lock( mTopicToChannelMutex );
+        for ( auto &topicAndChannel : mTopicToChannel )
+        {
+            unsubscribeResults.emplace_back( topicAndChannel.first, topicAndChannel.second->unsubscribeAsync() );
+        }
+    }
+
+    auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds( MQTT_UNSUBSCRIBE_TIMEOUT_ON_SHUTDOWN_SEC );
+    for ( auto &topicAndResult : unsubscribeResults )
+    {
+        if ( topicAndResult.second.wait_until( timeout ) == std::future_status::timeout )
+        {
+            FWE_LOG_WARN( "Unsubscribe operation timed out for topic " + topicAndResult.first );
+        }
+    }
+
+    mRetryThread.stop();
     for ( auto channel : mChannels )
     {
-        channel->unsubscribe();
         channel->invalidateConnection();
     }
-    mRetryThread.stop();
     return resetConnection();
 }
 
@@ -258,7 +280,11 @@ AwsIotConnectivityModule::createMqttConnection()
         std::shared_ptr<AwsIotChannel> channel;
         {
             std::lock_guard<std::mutex> lock( mTopicToChannelMutex );
-            channel = mTopicToChannel[topic];
+            auto it = mTopicToChannel.find( topic );
+            if ( it != mTopicToChannel.end() )
+            {
+                channel = it->second;
+            }
         }
 
         if ( channel == nullptr )
@@ -267,14 +293,20 @@ AwsIotConnectivityModule::createMqttConnection()
             return;
         }
 
-        channel->notifyListeners<const std::uint8_t *, size_t>( &IReceiverCallback::onDataReceived,
-                                                                eventData.publishPacket->getPayload().ptr,
-                                                                eventData.publishPacket->getPayload().len );
+        channel->onDataReceived( eventData );
     } );
 
     TraceModule::get().sectionBegin( TraceSection::BUILD_MQTT );
     mMqttClient = mMqttClientBuilder->Build();
     TraceModule::get().sectionEnd( TraceSection::BUILD_MQTT );
+    if ( !mMqttClient )
+    {
+        int lastError = mMqttClientBuilder->LastError();
+        auto errorString = Aws::Crt::ErrorDebugString( lastError );
+        FWE_LOG_ERROR( "MQTT Client building failed with error code " + std::to_string( lastError ) + ": " +
+                       std::string( errorString != nullptr ? errorString : "Unknown error" ) );
+        return false;
+    }
     if ( !*mMqttClient )
     {
         int lastError = mMqttClient->LastError();

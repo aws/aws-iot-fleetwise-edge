@@ -31,11 +31,6 @@ CollectionInspectionEngine::isSignalPartOfEval( const ExpressionNode *expression
     {
         return expression->signalID == signalID;
     }
-    else if ( expression->nodeType == ExpressionNodeType::GEOHASHFUNCTION )
-    {
-        return ( expression->function.geohashFunction.latitudeSignalID == signalID ) ||
-               ( expression->function.geohashFunction.longitudeSignalID == signalID );
-    }
     // Recursion limited depth through last parameter
     bool leftRet = isSignalPartOfEval( expression->left, signalID, remainingStackDepth - 1 );
     bool rightRet = isSignalPartOfEval( expression->right, signalID, remainingStackDepth - 1 );
@@ -109,7 +104,7 @@ CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<cons
         {
             if ( s.signalID == INVALID_SIGNAL_ID )
             {
-                FWE_LOG_ERROR( "A SignalID with value" + std::to_string( INVALID_SIGNAL_ID ) + " is not allowed" );
+                FWE_LOG_ERROR( "A SignalID with value " + std::to_string( INVALID_SIGNAL_ID ) + " is not allowed" );
                 TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::COLLECTION_SCHEME_ERROR );
                 return;
             }
@@ -842,12 +837,6 @@ CollectionInspectionEngine::collectData( ActiveCondition &condition,
         collectedData->mDTCInfo = mActiveDTCs;
         setActiveDTCsConsumed( conditionId, true );
     }
-    // Pack geohash into data sender buffer if there's new geohash.
-    // A new geohash is generated during geohash function node evaluation
-    if ( mGeohashFunctionNode.hasNewGeohash() )
-    {
-        mGeohashFunctionNode.consumeGeohash( collectedData->mGeohashInfo );
-    }
     // Propagate the event ID
     collectedData->eventID = condition.mEventID;
     return std::const_pointer_cast<const TriggeredCollectionSchemeData>( collectedData );
@@ -877,23 +866,17 @@ CollectionInspectionEngine::collectNextDataToSend( const TimePoint &currentTime,
                    condition.mLastTrigger.monotonicTimeMs + condition.mCondition.afterDuration ) )
             {
                 mConditionsNotTriggeredWaitingPublished.set( mNextConditionToCollectedIndex );
-                // Send message out only with a certain probability. If probabilityToSend==0
-                // no data is sent out
-                if ( mDataReduction.shallSendData( condition.mCondition.probabilityToSend ) )
-                {
-                    // Generate the Event ID and pack  it into the active Condition
-                    condition.mEventID = generateEventID( currentTime.systemTimeMs );
-                    // Return the collected data
-                    InspectionTimestamp newestSignalTimeStamp = 0;
-                    auto cd = collectData( condition, mNextConditionToCollectedIndex, newestSignalTimeStamp );
-                    // After collecting the data set the newest timestamp from any data that was
-                    // collected
-                    condition.mLastDataTimestampPublished =
-                        std::min( newestSignalTimeStamp, currentTime.monotonicTimeMs );
-                    // Increase index before returning from the function
-                    mNextConditionToCollectedIndex++;
-                    return cd;
-                }
+                // Generate the Event ID and pack  it into the active Condition
+                condition.mEventID = generateEventID( currentTime.systemTimeMs );
+                // Return the collected data
+                InspectionTimestamp newestSignalTimeStamp = 0;
+                auto cd = collectData( condition, mNextConditionToCollectedIndex, newestSignalTimeStamp );
+                // After collecting the data set the newest timestamp from any data that was
+                // collected
+                condition.mLastDataTimestampPublished = std::min( newestSignalTimeStamp, currentTime.monotonicTimeMs );
+                // Increase index before returning from the function
+                mNextConditionToCollectedIndex++;
+                return cd;
             }
             else
             {
@@ -1127,34 +1110,6 @@ CollectionInspectionEngine::getSampleWindowFunction( WindowFunction function,
 }
 
 CollectionInspectionEngine::ExpressionErrorCode
-CollectionInspectionEngine::getGeohashFunctionNode( const ExpressionNode *expression,
-                                                    ActiveCondition &condition,
-                                                    bool &resultValueBool )
-{
-    resultValueBool = false;
-    // First we need to grab Latitude / longitude signal from collected signal buffer
-    InspectionValue latitude = 0;
-    auto status = getLatestSignalValue( expression->function.geohashFunction.latitudeSignalID, condition, latitude );
-    if ( status != ExpressionErrorCode::SUCCESSFUL )
-    {
-        FWE_LOG_WARN( "Unable to evaluate Geohash due to missing latitude signal" );
-        return status;
-    }
-    InspectionValue longitude = 0;
-    status = getLatestSignalValue( expression->function.geohashFunction.longitudeSignalID, condition, longitude );
-    if ( status != ExpressionErrorCode::SUCCESSFUL )
-    {
-        FWE_LOG_WARN( "Unable to evaluate Geohash due to missing longitude signal" );
-        return status;
-    }
-    resultValueBool = mGeohashFunctionNode.evaluateGeohash( latitude,
-                                                            longitude,
-                                                            expression->function.geohashFunction.precision,
-                                                            expression->function.geohashFunction.gpsUnitType );
-    return ExpressionErrorCode::SUCCESSFUL;
-}
-
-CollectionInspectionEngine::ExpressionErrorCode
 CollectionInspectionEngine::eval( const ExpressionNode *expression,
                                   ActiveCondition &condition,
                                   InspectionValue &resultValueDouble,
@@ -1184,10 +1139,6 @@ CollectionInspectionEngine::eval( const ExpressionNode *expression,
     {
         return getSampleWindowFunction(
             expression->function.windowFunction, expression->signalID, condition, resultValueDouble );
-    }
-    if ( expression->nodeType == ExpressionNodeType::GEOHASHFUNCTION )
-    {
-        return getGeohashFunctionNode( expression, condition, resultValueBool );
     }
 
     InspectionValue leftDouble = 0;

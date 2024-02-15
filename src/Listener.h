@@ -14,75 +14,37 @@ namespace IoTFleetWise
 
 /**
  * @brief Template utility implementing a thread safe Subject/Observer design pattern.
+ *
+ * It is intended to be used with callbacks defined as std::function.
  */
-template <typename ThreadListener>
-class ThreadListeners
+template <typename T>
+class ThreadSafeListeners
 {
 
-private:
-    template <typename... Args>
-    using CallBackFunction = void ( ThreadListener::* )( Args... );
-
 public:
-    ThreadListeners() = default;
-    virtual ~ThreadListeners()
+    ThreadSafeListeners() = default;
+    virtual ~ThreadSafeListeners()
     {
         MutexLock lock( mMutex );
         mContainer.clear();
     }
-    ThreadListeners( const ThreadListeners & ) = delete;
-    ThreadListeners &operator=( const ThreadListeners & ) = delete;
-    ThreadListeners( ThreadListeners && ) = delete;
-    ThreadListeners &operator=( ThreadListeners && ) = delete;
+    ThreadSafeListeners( const ThreadSafeListeners & ) = delete;
+    ThreadSafeListeners &operator=( const ThreadSafeListeners & ) = delete;
+    ThreadSafeListeners( ThreadSafeListeners && ) = delete;
+    ThreadSafeListeners &operator=( ThreadSafeListeners && ) = delete;
 
     /**
      * @brief Subscribe the listener instance to notifications from this thread.
-     * @param listener Listener instance that will invoked when notifyListeners is called.
-     * @return True if the listener instance has been subscribed, False if
-     * it's already subscribed.
+     * @param callback Callback that will invoked when notify is called.
      */
-    bool
-    subscribeListener( ThreadListener *listener )
+    void
+    subscribe( T callback )
     {
         MutexLock lock( mMutex );
 
-        ListenerContainer &container = getContainer();
-        const auto &containerIterator = std::find( container.begin(), container.end(), listener );
-        if ( containerIterator == container.end() )
-        {
-            container.emplace_back( listener );
-            mModified = mCopied;
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    /**
-     * @brief unSubscribe a Listener  the listener instance from notifications to this thread.
-     * @param listener Listener instance that will stop receiving notifications.
-     * @return True if the listener instance has been removed, False if
-     * it was not subscribed in the first place.
-     */
-    bool
-    unSubscribeListener( ThreadListener *listener )
-    {
-        MutexLock lock( mMutex );
-
-        ListenerContainer &container = getContainer();
-        const auto &containerIterator = std::find( container.begin(), container.end(), listener );
-        if ( containerIterator != container.end() )
-        {
-            container.erase( containerIterator );
-            mModified = mCopied;
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        CallbackContainer &container = getContainer();
+        container.emplace_back( callback );
+        mModified = mCopied;
     }
 
     /**
@@ -90,27 +52,27 @@ public:
      */
     template <typename... Args>
     void
-    notifyListeners( CallBackFunction<Args...> callBackFunction, Args... args ) const
+    notify( Args... args ) const
     {
         MutexLock lock( mMutex );
 
         ContainerInvocationState state( this );
 
-        for ( const auto &listener : mContainer )
+        for ( const auto &callback : mContainer )
         {
-            ( ( listener )->*callBackFunction )( args... );
+            callback( args... );
         }
     }
 
 private:
     // Container to store the list of listeners to this thread
-    using ListenerContainer = std::vector<ThreadListener *>;
+    using CallbackContainer = std::vector<T>;
     // Mutex to protect the storage from concurrent reads and writes
     using MutexLock = std::lock_guard<std::mutex>;
     // Container for all listeners registered.
-    mutable ListenerContainer mContainer;
+    mutable CallbackContainer mContainer;
     // Temporary container used during modification via subscribe/unsubscribe
-    mutable ListenerContainer mTemporaryContainer;
+    mutable CallbackContainer mTemporaryContainer;
     // Container state coordinating local swaps of the listener container
     // Active flag is set when Listener callbacks are being executed
     mutable bool mActive{ false };
@@ -121,11 +83,11 @@ private:
     mutable bool mModified{ false };
     mutable typename std::mutex mMutex;
 
-    // Manages the container storing the listeners in a way that
+    // Manages the container storing the callbacks in a way that
     // callback invocations is eventually consistent.
     struct ContainerInvocationState
     {
-        ContainerInvocationState( ThreadListeners const *currentState )
+        ContainerInvocationState( ThreadSafeListeners const *currentState )
             : mPreviousState( currentState->mActive )
             , mOriginalContainer( currentState )
         {
@@ -149,10 +111,10 @@ private:
 
     private:
         bool mPreviousState;
-        ThreadListeners const *mOriginalContainer;
+        ThreadSafeListeners const *mOriginalContainer;
     };
 
-    ListenerContainer &
+    CallbackContainer &
     getContainer()
     {
         if ( mModified )

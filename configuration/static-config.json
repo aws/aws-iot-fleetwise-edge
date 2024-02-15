@@ -41,7 +41,6 @@
     "internalParameters": {
       "readyToPublishDataBufferSize": 10000,
       "systemWideLogLevel": "Trace",
-      "dataReductionProbabilityDisabled": false,
       "maximumAwsSdkHeapMemoryBytes": 10000000
     },
     "publishToCloudParameters": {

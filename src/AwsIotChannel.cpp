@@ -6,6 +6,7 @@
 #include "CacheAndPersist.h"
 #include "IConnectivityModule.h"
 #include "LoggingModule.h"
+#include "TimeTypes.h"
 #include "TraceModule.h"
 #include <aws/crt/Api.h>
 #include <aws/crt/Optional.h>
@@ -13,6 +14,7 @@
 #include <aws/crt/mqtt/Mqtt5Packets.h>
 #include <aws/crt/mqtt/Mqtt5Types.h>
 #include <future>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -275,6 +277,51 @@ AwsIotChannel::sendFile( const std::string &filePath, size_t size, CollectionSch
 }
 
 void
+AwsIotChannel::subscribeToDataReceived( OnDataReceivedCallback callback )
+{
+    mListeners.subscribe( callback );
+}
+
+void
+AwsIotChannel::onDataReceived( const Aws::Crt::Mqtt5::PublishReceivedEventData &eventData )
+{
+    Timestamp currentTime = mClock->monotonicTimeSinceEpochMs();
+
+    std::unordered_map<std::string, std::string> properties;
+
+    auto correlationData = eventData.publishPacket->getCorrelationData();
+    if ( correlationData.has_value() )
+    {
+        // coverity[cert_str51_cpp_violation] correlationData->ptr is not null, checked before
+        properties[PROPERTY_NAME_CORRELATION_DATA] =
+            std::string( correlationData->ptr, correlationData->ptr + correlationData->len );
+    }
+
+    auto messageExpiryIntervalSec = eventData.publishPacket->getMessageExpiryIntervalSec();
+    Timestamp messageExpiryMonotonicTimeSinceEpochMs = 0;
+    if ( messageExpiryIntervalSec.has_value() )
+    {
+        // convert seconds to milliseconds and calculate absolute message expiry time
+        messageExpiryMonotonicTimeSinceEpochMs = currentTime + messageExpiryIntervalSec.value() * 1000;
+    }
+
+    for ( auto property : eventData.publishPacket->getUserProperties() )
+    {
+        auto name = std::string( property.getName().begin(), property.getName().end() );
+        auto value = std::string( property.getValue().begin(), property.getValue().end() );
+        if ( !properties.emplace( name, value ).second )
+        {
+            FWE_LOG_WARN( "Duplicate property name '" + name + "', first value will be kept" );
+        }
+        properties[name] = value;
+    }
+    mListeners.notify( ReceivedChannelMessage{ eventData.publishPacket->getPayload().ptr,
+                                               eventData.publishPacket->getPayload().len,
+                                               properties,
+                                               messageExpiryMonotonicTimeSinceEpochMs } );
+}
+
+void
 AwsIotChannel::publishMessage( const uint8_t *buf, size_t size )
 {
     auto payload = Aws::Crt::ByteBufFromArray( buf, size );
@@ -308,22 +355,49 @@ AwsIotChannel::publishMessage( const uint8_t *buf, size_t size )
 bool
 AwsIotChannel::unsubscribe()
 {
+    auto result = unsubscribeAsync();
+    result.wait();
+    return result.get();
+}
+
+std::future<bool>
+AwsIotChannel::unsubscribeAsync()
+{
     std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
-    if ( isAliveNotThreadSafe() )
+
+    // We can't move the promise into the lambda, because the lambda needs to be copyable. So we
+    // don't have much choice but use a shared pointer.
+    auto unsubscribeFinishedPromise = std::make_shared<std::promise<bool>>();
+    auto unsubscribeFuture = unsubscribeFinishedPromise->get_future();
+
+    if ( !isAliveNotThreadSafe() )
     {
-        std::promise<bool> unsubscribeFinishedPromise;
-        FWE_LOG_TRACE( "Unsubscribing..." );
-        auto unsubPacket = std::make_shared<Aws::Crt::Mqtt5::UnsubscribePacket>();
-        // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
-        unsubPacket->WithTopicFilter( mTopicName.c_str() );
-        mMqttClient->Unsubscribe( unsubPacket, [&]( int errorCode, std::shared_ptr<UnSubAckPacket> unsubAckPacket ) {
+        unsubscribeFinishedPromise->set_value( false );
+        return unsubscribeFuture;
+    }
+
+    FWE_LOG_TRACE( "Unsubscribing..." );
+    auto unsubPacket = std::make_shared<Aws::Crt::Mqtt5::UnsubscribePacket>();
+    // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
+    unsubPacket->WithTopicFilter( mTopicName.c_str() );
+    mMqttClient->Unsubscribe(
+        unsubPacket,
+        [this, unsubscribeFinishedPromise]( int errorCode, std::shared_ptr<UnSubAckPacket> unsubAckPacket ) {
             if ( errorCode != 0 )
             {
-                TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
                 auto errorString = Aws::Crt::ErrorDebugString( errorCode );
-                FWE_LOG_ERROR( "Unsubscribe failed with error code " + std::to_string( errorCode ) + ": " +
-                               std::string( errorString != nullptr ? errorString : "Unknown error" ) );
-                unsubscribeFinishedPromise.set_value( false );
+                std::string logMessage = "Unsubscribe failed with error code " + std::to_string( errorCode ) + ": " +
+                                         std::string( errorString != nullptr ? errorString : "Unknown error" );
+                if ( errorCode == AWS_ERROR_MQTT5_USER_REQUESTED_STOP )
+                {
+                    FWE_LOG_TRACE( logMessage );
+                }
+                else
+                {
+                    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
+                    FWE_LOG_ERROR( logMessage );
+                }
+                unsubscribeFinishedPromise->set_value( false );
                 return;
             }
 
@@ -340,23 +414,19 @@ AwsIotChannel::unsubscribe()
                         TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
                         FWE_LOG_ERROR( "Server rejected unsubscribe from topic " + mTopicName + ". Reason code " +
                                        std::to_string( reasonCode ) + ": " + reasonString );
-                        unsubscribeFinishedPromise.set_value( false );
-                        // Just return on the first error found. There could be multiple reason codes if we unsubscribe
-                        // from multiple subscriptions at once, but we always request a single one.
+                        unsubscribeFinishedPromise->set_value( false );
+                        // Just return on the first error found. There could be multiple reason codes if we
+                        // unsubscribe from multiple subscriptions at once, but we always request a single one.
                         return;
                     }
                 }
             }
             FWE_LOG_TRACE( "Unsubscribed from topic " + mTopicName );
             mSubscribed = false;
-            unsubscribeFinishedPromise.set_value( true );
+            unsubscribeFinishedPromise->set_value( true );
         } );
-        // Blocked call until subscribe finished this call should quickly either fail or succeed but
-        // depends on the network quality the Bootstrap needs to retry subscribing if failed.
-        unsubscribeFinishedPromise.get_future().wait();
-        return true;
-    }
-    return false;
+
+    return unsubscribeFuture;
 }
 
 AwsIotChannel::~AwsIotChannel()

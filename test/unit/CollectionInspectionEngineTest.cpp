@@ -4,7 +4,6 @@
 #include "CollectionInspectionEngine.h"
 #include "CANDataTypes.h"
 #include "CollectionInspectionAPITypes.h"
-#include "GeohashInfo.h"
 #include "ICollectionScheme.h"
 #include "OBDDataTypes.h"
 #include "SignalTypes.h"
@@ -168,18 +167,6 @@ protected:
         value2->floatingValue = threshold2;
 
         return boolAnd;
-    }
-
-    std::shared_ptr<ExpressionNode>
-    getGeohashFunctionCondition( SignalID latID, SignalID lonID, uint8_t precision )
-    {
-        expressionNodes.push_back( std::make_shared<ExpressionNode>() );
-        auto function = expressionNodes.back();
-        function->nodeType = ExpressionNodeType::GEOHASHFUNCTION;
-        function->function.geohashFunction.latitudeSignalID = latID;
-        function->function.geohashFunction.longitudeSignalID = lonID;
-        function->function.geohashFunction.precision = precision;
-        return function;
     }
 
     std::shared_ptr<ExpressionNode>
@@ -395,9 +382,7 @@ protected:
         collectionSchemes->conditions.resize( 2 );
 
         collectionSchemes->conditions[0].condition = getAlwaysFalseCondition().get();
-        collectionSchemes->conditions[0].probabilityToSend = 1.0;
         collectionSchemes->conditions[1].condition = getAlwaysFalseCondition().get();
-        collectionSchemes->conditions[1].probabilityToSend = 1.0;
     }
 
     void
@@ -1364,7 +1349,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, MoreCollectionSchemesThanSupported
     for ( uint32_t i = 0; i < MAX_NUMBER_OF_ACTIVE_CONDITION; i++ )
     {
         collectionSchemes->conditions[i].condition = getAlwaysTrueCondition().get();
-        collectionSchemes->conditions[i].probabilityToSend = 1.0;
         addSignalToCollect( collectionSchemes->conditions[i], s1 );
     }
 
@@ -1381,95 +1365,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, MoreCollectionSchemesThanSupported
     timestamp += 10000;
     engine.evaluateConditions( timestamp );
     engine.collectNextDataToSend( timestamp, waitTimeMs );
-}
-
-/**
- * @brief This test aims to test Inspection Engine to evaluate Geohash Function Node.
- * Here's the test procedure:
- * 1. Generate AST Tree with Root setting to Geohash Function Node
- * 2. Before Signal become ready, we ask Inspection Engine to evaluate Geohash. This Step verify
- *    Inspection Engine's ability to handle corner case if GPS signal is not there
- * 3. Then we add valid lat/lon signal and expect inspection engine to evaluate true
- * 4. Next we change GPS signal slightly. Since Geohash didn't change at given precision.
- *  Evaluation return false.
- * 5. We change GPS signal more so that Geohash changed at given precision. Evaluation return true.
- * 6. As final step, we supply invalid lat/lon to test Inspection Engine can gracefully handle
- *  invalid signal
- */
-TEST_F( CollectionInspectionEngineDoubleTest, GeohashFunctionNodeTrigger )
-{
-    CollectionInspectionEngine engine;
-    InspectionMatrixSignalCollectionInfo lat{};
-    lat.signalID = 1;
-    lat.sampleBufferSize = 50;
-    lat.minimumSampleIntervalMs = 0;
-    lat.fixedWindowPeriod = 77777;
-    lat.isConditionOnlySignal = true;
-    InspectionMatrixSignalCollectionInfo lon{};
-    lon.signalID = 2;
-    lon.sampleBufferSize = 50;
-    lon.minimumSampleIntervalMs = 0;
-    lon.fixedWindowPeriod = 77777;
-    lon.isConditionOnlySignal = true;
-    addSignalToCollect( collectionSchemes->conditions[0], lat );
-    addSignalToCollect( collectionSchemes->conditions[0], lon );
-
-    collectionSchemes->conditions[0].condition = getGeohashFunctionCondition( lat.signalID, lon.signalID, 5 ).get();
-
-    TimePoint timestamp = { 160000000, 100 };
-    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
-
-    // Before GPS signal is ready, we ask Inspection Engine to evaluate Geohash
-    ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
-    uint32_t waitTimeMs = 0;
-    auto collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs );
-    ASSERT_EQ( collectedData, nullptr );
-
-    timestamp += 1000;
-    engine.addNewSignal<double>( lat.signalID, timestamp, 37.371392 );
-    engine.addNewSignal<double>( lon.signalID, timestamp, -122.046208 );
-
-    ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
-    collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs );
-    ASSERT_NE( collectedData, nullptr );
-    ASSERT_TRUE( collectedData->mGeohashInfo.hasItems() );
-    ASSERT_EQ( collectedData->mGeohashInfo.mGeohashString, "9q9hwg28j" );
-    ASSERT_EQ( collectedData->mGeohashInfo.mPrevReportedGeohashString.length(), 0 );
-
-    // 37.361392, -122.056208 -> 9q9hw93mu. still within the same geohash tile at precision 5.
-    timestamp += 1000;
-    engine.addNewSignal<double>( lat.signalID, timestamp, 37.361392 );
-    engine.addNewSignal<double>( lon.signalID, timestamp, -122.056208 );
-    ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
-    collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs );
-    ASSERT_EQ( collectedData, nullptr );
-
-    // 37.351392, -122.066208 -> 9q9hqkpbp. Geohash changed at precision 5.
-    timestamp += 1000;
-    engine.addNewSignal<double>( lat.signalID, timestamp, 37.351392 );
-    engine.addNewSignal<double>( lon.signalID, timestamp, -122.066208 );
-    ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
-    collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs );
-    ASSERT_NE( collectedData, nullptr );
-    ASSERT_TRUE( collectedData->mGeohashInfo.hasItems() );
-    ASSERT_EQ( collectedData->mGeohashInfo.mGeohashString, "9q9hqrd5e" );
-    ASSERT_EQ( collectedData->mGeohashInfo.mPrevReportedGeohashString, "9q9hwg28j" );
-
-    // We supply an invalid latitude
-    timestamp += 1000;
-    engine.addNewSignal<double>( lat.signalID, timestamp, 137.351392 );
-    engine.addNewSignal<double>( lon.signalID, timestamp, -122.066208 );
-    ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
-    collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs );
-    ASSERT_EQ( collectedData, nullptr );
-
-    // We supply an invalid longitude
-    timestamp += 1000;
-    engine.addNewSignal<double>( lat.signalID, timestamp, 37.351392 );
-    engine.addNewSignal<double>( lon.signalID, timestamp, -222.066208 );
-    ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
-    collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs );
-    ASSERT_EQ( collectedData, nullptr );
 }
 
 TYPED_TEST( CollectionInspectionEngineTest, CollectWithAfterTime )
@@ -1570,54 +1465,6 @@ TYPED_TEST( CollectionInspectionEngineTest, CollectWithAfterTime )
     ASSERT_TRUE( this->compareSignalValue( collectedData->signals[2].getValue(), val3 ) );
     ASSERT_EQ( collectedData->signals[2].receiveTime, timestamp1.systemTimeMs );
     ASSERT_EQ( collectedData->triggerTime, timestamp0.systemTimeMs );
-}
-
-TEST_F( CollectionInspectionEngineDoubleTest, ProbabilityToSendTest )
-{
-
-    CollectionInspectionEngine engine;
-    InspectionMatrixSignalCollectionInfo s1{};
-    s1.signalID = 1234;
-    s1.sampleBufferSize = 50;
-    s1.minimumSampleIntervalMs = 10;
-    s1.fixedWindowPeriod = 77777;
-    addSignalToCollect( collectionSchemes->conditions[0], s1 );
-
-    // Every 10 seconds send data out
-    collectionSchemes->conditions[0].minimumPublishIntervalMs = 10000;
-    collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-
-    // Set probability to send to 50%
-    collectionSchemes->conditions[0].probabilityToSend = 0.5;
-
-    TimePoint timestamp = { 160000000, 100 };
-    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
-
-    uint32_t waitTimeMs = 0;
-    const uint32_t NR_OF_HEARTBEAT_INTERVALS = 1000;
-
-    uint64_t numberOfDataToSend = 0;
-
-    for ( uint32_t i = 0; i < NR_OF_HEARTBEAT_INTERVALS; i++ )
-    {
-        engine.addNewSignal<double>( s1.signalID, timestamp, 0.1 );
-        engine.evaluateConditions( timestamp );
-        if ( engine.collectNextDataToSend( timestamp, waitTimeMs ) != nullptr )
-        {
-            numberOfDataToSend++;
-        }
-        // Increase time stamp by heartbeat interval to trigger new message
-        timestamp += collectionSchemes->conditions[0].minimumPublishIntervalMs;
-    }
-
-    // Probability to get less than 50 or more than NR_OF_HEARTBEAT_INTERVALS-50 is small if
-    // NR_OF_HEARTBEAT_INTERVALS is >> 100. But there is a small chance of this failing even if
-    // everything works correctly
-    EXPECT_GE( numberOfDataToSend, 50 );
-    EXPECT_LE( numberOfDataToSend, NR_OF_HEARTBEAT_INTERVALS - 50 );
-
-    std::cout << NR_OF_HEARTBEAT_INTERVALS << " data to send with a probability of 50%: " << numberOfDataToSend
-              << " were actually sent" << std::endl;
 }
 
 TEST_F( CollectionInspectionEngineDoubleTest, AvgWindowCondition )
@@ -1899,7 +1746,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, RandomDataTest )
         ConditionWithCollectedData collectionScheme;
         collectionSchemes->conditions.resize( NUMBER_OF_COLLECTION_SCHEMES );
         collectionSchemes->conditions[i].condition = getAlwaysTrueCondition().get();
-        collectionSchemes->conditions[i].probabilityToSend = 1.0;
     }
 
     CollectionInspectionEngine engine;

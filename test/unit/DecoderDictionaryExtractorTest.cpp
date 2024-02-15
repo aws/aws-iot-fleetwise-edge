@@ -72,13 +72,13 @@ namespace IoTFleetWise
  *
  * PID 0x70 Boost Pressure Control
  *     Signal: Boost Pressure A Control Status
- *          signalID: 0x7005
+ *          signalID: 0x1005
  *          start byte: 9
  *          num of byte: 1
  *          bit right shift: 0
  *          bit mask length: 2
  *     Signal: Boost Pressure B Control Status
- *          signalID: 0x7006
+ *          signalID: 0x1006
  *          start byte: 9
  *          num of byte: 1
  *          bit right shift: 2
@@ -109,7 +109,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     Timestamp stopTime3 = startTime3 + SECOND_TO_MILLISECOND( 5 );
 
     // Map to be used by Decoder Manifest Mock to return getCANFrameAndNodeID( SignalID signalId )
-    std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;
+    std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID;
 
     // This is CAN Frame 0x100 at Node 10 decoding format. It's part of decoder manifest
     struct CANMessageFormat canMessageFormat0x100;
@@ -231,15 +231,15 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     // format Map used by Decoder Manifest Mock to response for getCANMessageFormat( CANRawFrameID canId,
     // CANInternalChannelID channelId
     // )
-    std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap = {
+    std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap = {
         { "10", formatMapNode10 }, { "20", formatMapNode20 } };
 
     // Here's input to decoder manifest for OBD PID Signal decoder information
     std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat = {
         { 0x1000, PIDSignalDecoderFormat( 4, SID::CURRENT_STATS, 0x14, 0.0125, -40.0, 0, 2, 0, 8 ) },
         { 0x1001, PIDSignalDecoderFormat( 4, SID::CURRENT_STATS, 0x14, 0.0125, -40.0, 2, 2, 0, 8 ) },
-        { 0x7005, PIDSignalDecoderFormat( 10, SID::CURRENT_STATS, 0x70, 1.0, 0.0, 9, 1, 0, 2 ) },
-        { 0x7006, PIDSignalDecoderFormat( 10, SID::CURRENT_STATS, 0x70, 1.0, 0.0, 9, 1, 2, 2 ) } };
+        { 0x1005, PIDSignalDecoderFormat( 10, SID::CURRENT_STATS, 0x70, 1.0, 0.0, 9, 1, 0, 2 ) },
+        { 0x1006, PIDSignalDecoderFormat( 10, SID::CURRENT_STATS, 0x70, 1.0, 0.0, 9, 1, 2, 2 ) } };
 
     // Add OBD-II PID signals to CollectionScheme 1
     SignalCollectionInfo obdPidSignal;
@@ -247,9 +247,9 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     signalInfo2.emplace_back( obdPidSignal );
     obdPidSignal.signalID = 0x1001;
     signalInfo2.emplace_back( obdPidSignal );
-    obdPidSignal.signalID = 0x7005;
+    obdPidSignal.signalID = 0x1005;
     signalInfo2.emplace_back( obdPidSignal );
-    obdPidSignal.signalID = 0x7006;
+    obdPidSignal.signalID = 0x1006;
     signalInfo2.emplace_back( obdPidSignal );
     // Add an invalid network protocol signal. PM shall not add it to decoder dictionary
     SignalCollectionInfo inValidSignal;
@@ -368,13 +368,13 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     ASSERT_EQ( obdPidDecoderDictionary.at( 0 ).at( 0x70 ).format.mSizeInBytes, 10 );
     ASSERT_EQ( obdPidDecoderDictionary.at( 0 ).at( 0x70 ).format.mSignals.size(), 2 );
     formula = obdPidDecoderDictionary.at( 0 ).at( 0x70 ).format.mSignals[0];
-    ASSERT_EQ( formula.mSignalID, 0x7005 );
+    ASSERT_EQ( formula.mSignalID, 0x1005 );
     ASSERT_DOUBLE_EQ( formula.mFactor, 1.0 );
     ASSERT_DOUBLE_EQ( formula.mOffset, 0.0 );
     ASSERT_EQ( formula.mFirstBitPosition, 72 );
     ASSERT_EQ( formula.mSizeInBits, 2 );
     formula = obdPidDecoderDictionary.at( 0 ).at( 0x70 ).format.mSignals[1];
-    ASSERT_EQ( formula.mSignalID, 0x7006 );
+    ASSERT_EQ( formula.mSignalID, 0x1006 );
     ASSERT_DOUBLE_EQ( formula.mFactor, 1.0 );
     ASSERT_DOUBLE_EQ( formula.mOffset, 0.0 );
     ASSERT_EQ( formula.mFirstBitPosition, 74 );
@@ -472,7 +472,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorNoSignalsTest )
     Timestamp stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
 
     // Map to be used by Decoder Manifest Mock to return getCANFrameAndNodeID( SignalID signalId )
-    std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;
+    std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID;
 
     // This signalInfo vector define a list of signals to collect. It's part of the collectionScheme1.
     ICollectionScheme::Signals_t signalInfo1 = ICollectionScheme::Signals_t();
@@ -487,7 +487,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorNoSignalsTest )
     // decoder Method for all CAN Frames at node 10
     std::unordered_map<CANRawFrameID, CANMessageFormat> formatMapNode10 = { { 0x100, CANMessageFormat() } };
 
-    std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap = {
+    std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap = {
         { "10", formatMapNode10 } };
 
     // Two collectionSchemes.
@@ -531,7 +531,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorFirstRawFrameThenSi
     Timestamp stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
 
     // Map to be used by Decoder Manifest Mock to return getCANFrameAndNodeID( SignalID signalId )
-    std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;
+    std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID;
 
     // This signalInfo vector define a list of signals to collect. It's part of the collectionScheme1.
     ICollectionScheme::Signals_t signalInfo1 = ICollectionScheme::Signals_t();
@@ -572,7 +572,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorFirstRawFrameThenSi
     // decoder Method for all CAN Frames at node 10
     std::unordered_map<CANRawFrameID, CANMessageFormat> formatMapNode10 = { { 0x100, canMessageFormat0x100 } };
 
-    std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap = {
+    std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap = {
         { "10", formatMapNode10 } };
 
     // Two collectionSchemes.
@@ -624,12 +624,12 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryComplexDataExtractor )
     Timestamp stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
 
     // Map to be used by Decoder Manifest Mock to return getCANFrameAndNodeID( SignalID signalId )
-    std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;
+    std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID;
 
     ICollectionScheme::Signals_t signalInfo1;
-    ICollectionScheme::RawCanFrames_t canFrameInfo1;                                                   // empty
-    std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap; // empty
-    std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat;                   // empty
+    ICollectionScheme::RawCanFrames_t canFrameInfo1;                                                // empty
+    std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap; // empty
+    std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat;                // empty
 
     ICollectionScheme::PartialSignalIDLookup partialSignalIDLookup;
     std::unordered_map<SignalID, ComplexSignalDecoderFormat> complexSignalMap;
@@ -743,12 +743,12 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryInvalidPartialSignalIDAndInv
     Timestamp stopTime1 = startTime1 + SECOND_TO_MILLISECOND( 5 );
 
     // Map to be used by Decoder Manifest Mock to return getCANFrameAndNodeID( SignalID signalId )
-    std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;
+    std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID;
 
     ICollectionScheme::Signals_t signalInfo1;
-    ICollectionScheme::RawCanFrames_t canFrameInfo1;                                                   // empty
-    std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap; // empty
-    std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat;                   // empty
+    ICollectionScheme::RawCanFrames_t canFrameInfo1;                                                // empty
+    std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap; // empty
+    std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat;                // empty
 
     ICollectionScheme::PartialSignalIDLookup partialSignalIDLookup;
     std::unordered_map<SignalID, ComplexSignalDecoderFormat> complexSignalMap;

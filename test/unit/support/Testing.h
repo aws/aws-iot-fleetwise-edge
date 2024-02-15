@@ -7,6 +7,21 @@
 #include "SignalTypes.h"
 #include "TimeTypes.h"
 #include <gtest/gtest.h>
+#include <stdexcept>
+#include <string>
+
+#define EXPECT_THROW_MESSAGE( x, message )                                                                             \
+    try                                                                                                                \
+    {                                                                                                                  \
+        x;                                                                                                             \
+        ADD_FAILURE() << "No exception was thrown";                                                                    \
+    }                                                                                                                  \
+    catch ( const std::exception &e )                                                                                  \
+    {                                                                                                                  \
+        std::string actualMessage( e.what() );                                                                         \
+        std::string expectedMessage( message );                                                                        \
+        EXPECT_EQ( actualMessage, expectedMessage ) << "Unexpected exception message";                                 \
+    }
 
 namespace Aws
 {

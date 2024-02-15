@@ -31,7 +31,7 @@ compile using `make` as usual.
 Like CAN if data is sent to cloud you should see this:
 
 ```
-[INFO ] [IoTFleetWiseEngine.cpp:914] [doWork()]: [FWE data ready to send with eventID 1644139266 from arn:aws:iotfleetwise:us-east-1:xxxxxxxxxxxx:campaign/IWaveGpsCampaign Signals:70 [2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196, ...] first signal timestamp: 1666881551998 raw CAN frames:0 DTCs:0 Geohash:]
+[INFO ] [IoTFleetWiseEngine.cpp:914] [doWork()]: [FWE data ready to send with eventID 1644139266 from arn:aws:iotfleetwise:us-east-1:xxxxxxxxxxxx:campaign/IWaveGpsCampaign Signals:70 [2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196,2514:13.393196, ...] first signal timestamp: 1666881551998 raw CAN frames:0 DTCs:0]
 ```
 
 If the GPS NMEA output it working but gps fix is available you should move to an area with a open

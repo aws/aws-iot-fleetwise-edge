@@ -42,7 +42,7 @@ DecoderManifestIngestion::isReady() const
 }
 
 const CANMessageFormat &
-DecoderManifestIngestion::getCANMessageFormat( CANRawFrameID canID, CANInterfaceID interfaceID ) const
+DecoderManifestIngestion::getCANMessageFormat( CANRawFrameID canID, InterfaceID interfaceID ) const
 {
     if ( !mReady )
     {
@@ -61,12 +61,12 @@ DecoderManifestIngestion::getCANMessageFormat( CANRawFrameID canID, CANInterface
     return INVALID_CAN_MESSAGE_FORMAT;
 }
 
-std::pair<CANRawFrameID, CANInterfaceID>
+std::pair<CANRawFrameID, InterfaceID>
 DecoderManifestIngestion::getCANFrameAndInterfaceID( SignalID signalID ) const
 {
     if ( !mReady )
     {
-        return std::make_pair( INVALID_CAN_FRAME_ID, INVALID_CAN_INTERFACE_ID );
+        return std::make_pair( INVALID_CAN_FRAME_ID, INVALID_INTERFACE_ID );
     }
 
     // Check to see if entry exists
@@ -77,7 +77,7 @@ DecoderManifestIngestion::getCANFrameAndInterfaceID( SignalID signalID ) const
     }
 
     // Information for signal does not exist.
-    return std::make_pair( INVALID_CAN_FRAME_ID, INVALID_CAN_INTERFACE_ID );
+    return std::make_pair( INVALID_CAN_FRAME_ID, INVALID_INTERFACE_ID );
 }
 
 VehicleDataSourceProtocol
@@ -407,7 +407,7 @@ DecoderManifestIngestion::build()
     {
         const Schemas::DecoderManifestMsg::ComplexSignal &complexSignal = mProtoDecoderManifest.complex_signals( i );
         mSignalToVehicleDataSourceProtocol[complexSignal.signal_id()] = VehicleDataSourceProtocol::COMPLEX_DATA;
-        if ( complexSignal.interface_id() == INVALID_COMPLEX_DATA_INTERFACE )
+        if ( complexSignal.interface_id() == INVALID_INTERFACE_ID )
         {
             FWE_LOG_WARN( "Complex Signal with empty interface_id and signal id:" +
                           std::to_string( complexSignal.signal_id() ) );

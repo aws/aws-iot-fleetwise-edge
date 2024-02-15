@@ -40,8 +40,14 @@ TEST( CollectionSchemeManagerTest, InspectionMatrixUpdaterTest )
     InspectionEnginePtr.reset( new CollectionInspectionWorkerThreadMock() );
     InspectionEnginePtr2.reset( new CollectionInspectionWorkerThreadMock() );
 
-    testPtr->subscribeListener( InspectionEnginePtr.get() );
-    testPtr->subscribeListener( InspectionEnginePtr2.get() );
+    testPtr->subscribeToInspectionMatrixChange(
+        std::bind( &CollectionInspectionWorkerThreadMock::onChangeInspectionMatrix,
+                   InspectionEnginePtr.get(),
+                   std::placeholders::_1 ) );
+    testPtr->subscribeToInspectionMatrixChange(
+        std::bind( &CollectionInspectionWorkerThreadMock::onChangeInspectionMatrix,
+                   InspectionEnginePtr2.get(),
+                   std::placeholders::_1 ) );
 
     // Clear updater flag. Note this flag only exist in mock class for testing purpose
     InspectionEnginePtr->setUpdateFlag( false );
@@ -376,8 +382,8 @@ TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterWithCom
     CANInterfaceIDTranslator canIDTranslator;
     test.init( 0, nullptr, canIDTranslator, rawDataBufferManager );
 
-    std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap;
-    std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID;
+    std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap;
+    std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID;
     std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat;
     std::unordered_map<ComplexDataTypeId, ComplexDataElement> complexDataTypeMap;
     std::unordered_map<SignalID, ComplexSignalDecoderFormat> complexSignalMap = {

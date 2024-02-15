@@ -152,6 +152,7 @@ private:
     // owns the actual data and it needs to track what is in use to ensure the data is kept valid.
     LoanedFrame() = default;
 
+    // coverity[autosar_cpp14_a0_1_3_violation] false-positive, this constructor is used
     LoanedFrame(
         BufferManager *rawBufferManager, BufferTypeId typeId, BufferHandle handle, const uint8_t *data, size_t size )
         : mRawBufferManager( rawBufferManager )
@@ -241,7 +242,7 @@ static const TypeStatistics INVALID_TYPE_STATISTICS = TypeStatistics{ 0, 0, 0 };
 
 struct SignalBufferOverrides
 {
-    std::string interfaceId;
+    InterfaceID interfaceId;
     std::string messageId;
     boost::optional<size_t> reservedBytes;
     boost::optional<size_t> maxNumOfSamples;
@@ -249,6 +250,7 @@ struct SignalBufferOverrides
     boost::optional<size_t> maxBytes;
 };
 
+// coverity[cert_dcl60_cpp_violation] false positive - class only defined once
 class BufferManagerConfig
 {
 public:
@@ -297,7 +299,7 @@ public:
      * @return the config for the signal buffer with any overrides already resolved
      */
     SignalConfig getSignalConfig( BufferTypeId typeId,
-                                  const std::string &interfaceId,
+                                  const InterfaceID &interfaceId,
                                   const std::string &messageId ) const;
 
     size_t
@@ -325,7 +327,7 @@ private:
 struct SignalUpdateConfig
 {
     BufferTypeId typeId;
-    std::string interfaceId;
+    InterfaceID interfaceId;
     std::string messageId;
 };
 
@@ -523,6 +525,7 @@ private:
      * @brief Get an raw message counter since the last reset of the software.
      * @return The incremented counter value
      */
+    // coverity[autosar_cpp14_a0_1_3_violation] false-positive, this function is used
     static uint8_t
     generateRawMsgCounter()
     {
@@ -538,6 +541,7 @@ private:
      */
     bool checkMemoryLimit( size_t memoryReq ) const;
 
+    // coverity[autosar_cpp14_a0_1_3_violation] false-positive, this function is used
     static bool
     isValidStageIndex( uint32_t stageIndex )
     {

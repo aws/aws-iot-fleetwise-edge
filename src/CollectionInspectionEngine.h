@@ -5,12 +5,8 @@
 
 #include "CANDataTypes.h"
 #include "CollectionInspectionAPITypes.h"
-#include "DataReduction.h"
 #include "EventTypes.h"
-#include "GeohashFunctionNode.h"
 #include "ICollectionScheme.h"
-#include "InspectionEventListener.h"
-#include "Listener.h"
 #include "LoggingModule.h"
 #include "MessageTypes.h"
 #include "OBDDataTypes.h"
@@ -116,7 +112,7 @@ public:
  * are called only from one thread. This class will be instantiated and used from the Collection
  * Inspection Engine thread
  */
-class CollectionInspectionEngine : public ThreadListeners<InspectionEventListener>
+class CollectionInspectionEngine
 {
 
 public:
@@ -198,18 +194,6 @@ public:
                             const TimePoint &receiveTime,
                             std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> &buffer,
                             uint8_t size );
-
-    /**
-     * @brief Copies the data reduction object over and applies it before handing out data
-     *
-     * After setting this depending on the parameters the number of data packages collected over
-     * collectNextDataToSend will go or down
-     */
-    void
-    setDataReductionParameters( bool disableProbability )
-    {
-        mDataReduction.setDisableProbability( disableProbability );
-    };
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     void
@@ -584,9 +568,6 @@ private:
                                                      ActiveCondition &condition,
                                                      InspectionValue &result );
 
-    ExpressionErrorCode getGeohashFunctionNode( const ExpressionNode *expression,
-                                                ActiveCondition &condition,
-                                                bool &resultValueBool );
     template <typename T>
     void collectLastSignals( InspectionSignalID id,
                              uint32_t minimumSamplingInterval,
@@ -716,7 +697,6 @@ private:
         mActiveDTCsConsumed.setAlreadyConsumed( conditionId, value );
     }
 
-    GeohashFunctionNode mGeohashFunctionNode;
     // index in this bitset also the index in conditions vector.
     std::bitset<MAX_NUMBER_OF_ACTIVE_CONDITION>
         mConditionsWithInputSignalChanged; // bit is set if any signal or fixed window that this condition uses in its
@@ -736,7 +716,6 @@ private:
     uint32_t mNextConditionToCollectedIndex{ 0 };
 
     InspectionTimestamp mNextWindowFunctionTimesOut{ 0 };
-    DataReduction mDataReduction;
     bool mSendDataOnlyOncePerCondition{ false };
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     std::shared_ptr<RawData::BufferManager> mRawBufferManager{ nullptr };

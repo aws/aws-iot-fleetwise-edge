@@ -62,9 +62,6 @@ if ${INSTALL_BUILD_TIME_DEPS}; then
         faketime \
         git \
         graphviz \
-        libboost-log-dev \
-        libboost-system-dev \
-        libboost-thread-dev \
         libsnappy-dev \
         libssl-dev \
         unzip \
@@ -106,7 +103,31 @@ fi
 
 if ${INSTALL_BUILD_TIME_DEPS} && ( ! ${USE_CACHE} || [ ! -d ${PREFIX} ] ); then
     mkdir -p ${PREFIX}
-    mkdir deps-native && cd deps-native
+    mkdir deps-native
+    cd deps-native
+
+    wget -q https://archives.boost.io/release/${VERSION_BOOST}/source/boost_${VERSION_BOOST//./_}.tar.bz2
+    tar -jxf boost_${VERSION_BOOST//./_}.tar.bz2
+    cd boost_${VERSION_BOOST//./_}
+    ./bootstrap.sh
+    # Build static libraries with -fPIC enabled, so they can later be linked into shared libraries
+    # (The Ubuntu static libraries are not built with -fPIC)
+    if [ "${SHARED_LIBS}" == "OFF" ]; then
+        BOOST_OPTIONS="cxxflags=-fPIC cflags=-fPIC link=static"
+    else
+        BOOST_OPTIONS=""
+    fi
+    ./b2 \
+        --with-atomic \
+        --with-system \
+        --with-thread \
+        --with-filesystem \
+        --with-program_options \
+        --prefix=${PREFIX} \
+        ${BOOST_OPTIONS} \
+        -j`nproc` \
+        install
+    cd ..
 
     git clone -b ${VERSION_JSON_CPP} https://github.com/open-source-parsers/jsoncpp.git
     cd jsoncpp

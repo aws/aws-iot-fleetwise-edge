@@ -45,7 +45,7 @@
               },
               "interfaceId": {
                 "type": "string",
-                "description": "Every CAN/OBD signal decoder is associated with a signal/OBD network interface using a unique Id"
+                "description": "Every network interface is associated with a unique ID that must match the interface ID sent by the cloud in the decoder manifest"
               },
               "type": {
                 "type": "string",
@@ -93,7 +93,7 @@
               },
               "interfaceId": {
                 "type": "string",
-                "description": "Every CAN/OBD signal decoder is associated with a signal/OBD network interface using a unique Id"
+                "description": "Every network interface is associated with a unique ID that must match the interface ID sent by the cloud in the decoder manifest"
               },
               "type": {
                 "type": "string",
@@ -132,7 +132,7 @@
               },
               "interfaceId": {
                 "type": "string",
-                "description": "Every CAN/OBD/ROS signal decoder is associated with a network interface using a unique Id. This must match the interface Id configured in the cloud"
+                "description": "Every network interface is associated with a unique ID that must match the interface ID sent by the cloud in the decoder manifest"
               },
               "type": {
                 "type": "string",
@@ -227,10 +227,6 @@
               "enum": ["Auto", "Yes", "No"],
               "description": "Whether the logs should be colored. Default to auto."
             },
-            "dataReductionProbabilityDisabled": {
-              "type": "boolean",
-              "description": "Disables the whole probability-based DDC,can be used for debugging"
-            },
             "metricsCyclicPrintIntervalMs": {
               "type": "string",
               "description": "Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never"
@@ -240,11 +236,7 @@
               "description": "Set the maximum AWS SDK heap memory bytes. Default to 10000000"
             }
           },
-          "required": [
-            "readyToPublishDataBufferSize",
-            "systemWideLogLevel",
-            "dataReductionProbabilityDisabled"
-          ]
+          "required": ["readyToPublishDataBufferSize", "systemWideLogLevel"]
         },
         "publishToCloudParameters": {
           "type": "object",

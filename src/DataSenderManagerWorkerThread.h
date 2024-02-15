@@ -6,7 +6,6 @@
 #include "CollectionInspectionAPITypes.h"
 #include "DataSenderManager.h"
 #include "IConnectivityModule.h"
-#include "IDataReadyToPublishListener.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "Timer.h"
@@ -16,7 +15,7 @@
 #include <mutex>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-#include "IActiveCollectionSchemesListener.h"
+#include "ICollectionSchemeList.h"
 #endif
 
 namespace Aws
@@ -24,18 +23,14 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-class DataSenderManagerWorkerThread : public IDataReadyToPublishListener
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-    ,
-                                      public IActiveCollectionSchemesListener
-#endif
+class DataSenderManagerWorkerThread
 {
 public:
     DataSenderManagerWorkerThread( std::shared_ptr<IConnectivityModule> connectivityModule,
                                    std::shared_ptr<DataSenderManager> dataSenderManager,
                                    uint64_t persistencyUploadRetryIntervalMs,
                                    std::shared_ptr<CollectedDataReadyToPublish> &collectedDataQueue );
-    ~DataSenderManagerWorkerThread() override;
+    ~DataSenderManagerWorkerThread();
 
     DataSenderManagerWorkerThread( const DataSenderManagerWorkerThread & ) = delete;
     DataSenderManagerWorkerThread &operator=( const DataSenderManagerWorkerThread & ) = delete;
@@ -48,11 +43,10 @@ public:
      * @brief Callback from the Inspection Engine to wake up this thread and
      * publish the data to the cloud.
      */
-    void onDataReadyToPublish() override;
+    void onDataReadyToPublish();
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-    void onChangeCollectionSchemeList(
-        const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes ) override;
+    void onChangeCollectionSchemeList( const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes );
 #endif
 
     /**

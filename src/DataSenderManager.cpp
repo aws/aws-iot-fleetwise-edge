@@ -3,7 +3,6 @@
 
 #include "DataSenderManager.h"
 #include "CacheAndPersist.h"
-#include "GeohashInfo.h"
 #include "LoggingModule.h"
 #include "OBDDataTypes.h"
 #include "TraceModule.h"
@@ -125,12 +124,6 @@ DataSenderManager::transformTelemetryDataToProto(
         {
             appendMessageToProto( triggeredCollectionSchemeDataPtr, dtc );
         }
-    }
-
-    // Add Geohash to the payload
-    if ( triggeredCollectionSchemeDataPtr->mGeohashInfo.hasItems() )
-    {
-        appendMessageToProto( triggeredCollectionSchemeDataPtr, triggeredCollectionSchemeDataPtr->mGeohashInfo );
     }
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA

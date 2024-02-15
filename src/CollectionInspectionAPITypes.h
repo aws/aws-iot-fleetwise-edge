@@ -5,7 +5,6 @@
 
 #include "CANDataTypes.h"
 #include "EventTypes.h"
-#include "GeohashInfo.h"
 #include "MessageTypes.h"
 #include "OBDDataTypes.h"
 #include "SignalTypes.h"
@@ -27,8 +26,6 @@ static constexpr uint32_t MAX_EQUATION_DEPTH =
 static constexpr uint32_t MAX_DIFFERENT_SIGNAL_IDS =
     50000; /**< Signal IDs can be distributed over the whole range but never more than 50.000 signals in parallel */
 
-static constexpr double MIN_PROBABILITY = 0.0;
-static constexpr double MAX_PROBABILITY = 1.0;
 // INPUT to collection and inspection engine:
 
 // This values will be provided by CollectionSchemeManagement:
@@ -76,7 +73,6 @@ struct ConditionWithCollectedData
     std::vector<InspectionMatrixCanFrameCollectionInfo> canFrames;
     bool includeActiveDtcs;
     bool triggerOnlyOnRisingEdge;
-    double probabilityToSend;
     PassThroughMetadata metadata;
 };
 
@@ -399,6 +395,7 @@ public:
         }
         return consumed;
     }
+    // coverity[misra_cpp_2008_rule_14_7_1_violation] Required in unit tests
     bool
     isEmpty()
     {
@@ -428,8 +425,6 @@ struct TriggeredCollectionSchemeData
     std::vector<UploadedS3Object> uploadedS3Objects;
 #endif
     DTCInfo mDTCInfo;
-    GeohashInfo mGeohashInfo; // Because Geohash is not a physical signal from VSS, we decided to not using SignalID for
-    // geohash. In future we might introduce virtual signal concept which will include geohash.
     EventID eventID;
 };
 

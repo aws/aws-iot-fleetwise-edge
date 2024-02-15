@@ -140,7 +140,7 @@ public:
 struct ComplexSignalDecoderFormat
 {
 
-    ComplexDataInterfaceId mInterfaceId;
+    InterfaceID mInterfaceId;
 
     /*
      * Interface-specific message information. The pair interface_id and message_id should be unique across all
@@ -203,7 +203,7 @@ public:
      * @return if can frame id can't be found a CANMessageFormat equal to INVALID_CAN_MESSAGE_FORMAT
      * is returned
      */
-    virtual const CANMessageFormat &getCANMessageFormat( CANRawFrameID canID, CANInterfaceID interfaceID ) const = 0;
+    virtual const CANMessageFormat &getCANMessageFormat( CANRawFrameID canID, InterfaceID interfaceID ) const = 0;
 
     /**
      * @brief get the can frame that contains the signal
@@ -211,7 +211,7 @@ public:
      *
      * @return if no can and can interface ids can be found invalid ids are returned
      */
-    virtual std::pair<CANRawFrameID, CANInterfaceID> getCANFrameAndInterfaceID( SignalID signalID ) const = 0;
+    virtual std::pair<CANRawFrameID, InterfaceID> getCANFrameAndInterfaceID( SignalID signalID ) const = 0;
 
     /**
      * @brief Get the Vehicle Data Source Protocol for this Signal
@@ -275,6 +275,8 @@ public:
      */
     virtual ~IDecoderManifest() = default;
 };
+
+using IDecoderManifestPtr = std::shared_ptr<IDecoderManifest>;
 
 } // namespace IoTFleetWise
 } // namespace Aws

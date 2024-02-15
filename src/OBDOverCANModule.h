@@ -6,8 +6,6 @@
 #include "Clock.h"
 #include "ClockHandler.h"
 #include "CollectionInspectionAPITypes.h"
-#include "IActiveConditionProcessor.h"
-#include "IActiveDecoderDictionaryListener.h"
 #include "IDecoderDictionary.h"
 #include "OBDDataDecoder.h"
 #include "OBDDataTypes.h"
@@ -47,11 +45,11 @@ enum class ECUID
  * @brief This class is responsible for coordinating OBD requests on all ECUs
  */
 
-class OBDOverCANModule : public IActiveDecoderDictionaryListener, public IActiveConditionProcessor
+class OBDOverCANModule
 {
 public:
     OBDOverCANModule() = default;
-    ~OBDOverCANModule() override;
+    ~OBDOverCANModule();
 
     OBDOverCANModule( const OBDOverCANModule & ) = delete;
     OBDOverCANModule &operator=( const OBDOverCANModule & ) = delete;
@@ -94,14 +92,12 @@ public:
      */
     bool isAlive();
 
-    // From IActiveDecoderDictionaryListener
     // We need this to know whether PIDs should be requested or not
     void onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
-                                     VehicleDataSourceProtocol networkProtocol ) override;
+                                     VehicleDataSourceProtocol networkProtocol );
 
-    // From IActiveConditionProcessor
     // We need this to know whether DTCs should be requested or not
-    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) override;
+    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix );
 
     /**
      * @brief Handle of the Signal Output Buffer. This buffer shared between Collection Engine

@@ -430,11 +430,11 @@ BufferManager::deleteBufferFromStats( Buffer &buffer )
 {
     auto bytesInUseAndReserved = std::max( buffer.mBytesInUse, buffer.mReservedBytes );
 
-    FWE_FATAL_ASSERT( mBytesInUse <= mMaxOverallMemory, "" );
-    FWE_FATAL_ASSERT( mBytesInUseAndReserved <= mMaxOverallMemory, "" );
-    FWE_FATAL_ASSERT( mBytesReserved <= mMaxOverallMemory, "" );
-    FWE_FATAL_ASSERT( mBytesInUse <= mBytesInUseAndReserved, "" );
-    FWE_FATAL_ASSERT( mBytesReserved <= mBytesInUseAndReserved, "" );
+    FWE_FATAL_ASSERT( ( mBytesInUse <= mMaxOverallMemory ), "" );
+    FWE_FATAL_ASSERT( ( mBytesInUseAndReserved <= mMaxOverallMemory ), "" );
+    FWE_FATAL_ASSERT( ( mBytesReserved <= mMaxOverallMemory ), "" );
+    FWE_FATAL_ASSERT( ( mBytesInUse <= mBytesInUseAndReserved ), "" );
+    FWE_FATAL_ASSERT( ( mBytesReserved <= mBytesInUseAndReserved ), "" );
 
     FWE_FATAL_ASSERT( mBytesInUse >= buffer.mBytesInUse, "" );
     FWE_FATAL_ASSERT( mBytesInUseAndReserved >= bytesInUseAndReserved, "" );
@@ -651,8 +651,8 @@ BufferManager::Buffer::deleteUnusedData()
         // to release unused data whose handle is in use. This will cause the user to get
         // a null when calling borrowFrame() to request the data.
         unusedDataFrame = std::find_if( mBuffer.cbegin(), mBuffer.cend(), [&]( const Frame &rawDataFrame ) -> bool {
-            return rawDataFrame.mDataInUseCounter == 0 &&
-                   rawDataFrame.getUsageHint( BufferHandleUsageStage::UPLOADING ) == 0;
+            return ( rawDataFrame.mDataInUseCounter == 0 ) &&
+                   ( rawDataFrame.getUsageHint( BufferHandleUsageStage::UPLOADING ) == 0 );
         } );
         if ( unusedDataFrame == mBuffer.cend() )
         {
@@ -816,22 +816,22 @@ BufferManagerConfig::create( boost::optional<size_t> maxBytes,
             return {};
         }
 
-        auto maxBytes = config.mMaxBytes;
+        auto maxBytesCur = config.mMaxBytes;
         if ( signalOverride.maxBytes.has_value() )
         {
-            maxBytes = signalOverride.maxBytes.get();
-            if ( maxBytes > config.mMaxBytes )
+            maxBytesCur = signalOverride.maxBytes.get();
+            if ( maxBytesCur > config.mMaxBytes )
             {
                 FWE_LOG_ERROR( "Invalid buffer config override for interfaceId '" + signalOverride.interfaceId +
                                "' and messageId '" + signalOverride.messageId + "'. Max bytes for this signal " +
-                               std::to_string( maxBytes ) + " can't be larger than max overall buffer size " +
+                               std::to_string( maxBytesCur ) + " can't be larger than max overall buffer size " +
                                std::to_string( config.mMaxBytes ) );
                 return {};
             }
             // In case the size per sample is not set, it should be capped to the max size allowed for this signal.
             if ( !signalOverride.maxBytesPerSample.has_value() )
             {
-                signalOverride.maxBytesPerSample = maxBytes;
+                signalOverride.maxBytesPerSample = maxBytesCur;
             }
         }
 
@@ -843,30 +843,30 @@ BufferManagerConfig::create( boost::optional<size_t> maxBytes,
             return {};
         }
 
-        auto maxBytesPerSample = signalOverride.maxBytesPerSample.get_value_or( config.mMaxBytesPerSample );
-        if ( maxBytesPerSample == 0 )
+        auto maxBytesPerSampleCur = signalOverride.maxBytesPerSample.get_value_or( config.mMaxBytesPerSample );
+        if ( maxBytesPerSampleCur == 0 )
         {
             FWE_LOG_ERROR( "Invalid buffer config override for interfaceId '" + signalOverride.interfaceId +
                            "' and messageId '" + signalOverride.messageId +
                            "'. Max bytes per sample for this signal can't be zero" );
             return {};
         }
-        if ( maxBytesPerSample > maxBytes )
+        if ( maxBytesPerSampleCur > maxBytesCur )
         {
             FWE_LOG_ERROR( "Invalid buffer config override for interfaceId '" + signalOverride.interfaceId +
                            "' and messageId '" + signalOverride.messageId + "'. Max bytes per sample for this signal " +
-                           std::to_string( maxBytesPerSample ) + " can't be larger than max bytes for this signal " +
-                           std::to_string( maxBytes ) );
+                           std::to_string( maxBytesPerSampleCur ) + " can't be larger than max bytes for this signal " +
+                           std::to_string( maxBytesCur ) );
             return {};
         }
 
         auto reservedBytes = signalOverride.reservedBytes.get_value_or( config.mReservedBytesPerSignal );
-        if ( reservedBytes > maxBytes )
+        if ( reservedBytes > maxBytesCur )
         {
             FWE_LOG_ERROR( "Invalid buffer config override for interfaceId '" + signalOverride.interfaceId +
                            "' and messageId '" + signalOverride.messageId + "'. Reserved bytes for this signal " +
                            std::to_string( reservedBytes ) + " can't be larger than max bytes for this signal " +
-                           std::to_string( maxBytes ) );
+                           std::to_string( maxBytesCur ) );
             return {};
         }
 
@@ -881,7 +881,7 @@ BufferManagerConfig::create( boost::optional<size_t> maxBytes,
 
 SignalConfig
 BufferManagerConfig::getSignalConfig( BufferTypeId typeId,
-                                      const std::string &interfaceId,
+                                      const InterfaceID &interfaceId,
                                       const std::string &messageId ) const
 {
     SignalConfig signalConfig;
