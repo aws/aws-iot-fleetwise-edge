@@ -84,12 +84,11 @@ if(mIWaveGpsSource->init(
     mIWaveGpsSource->connect()
     )
 {
-    if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                        static_cast<IActiveDecoderDictionaryListener *>( mIWaveGpsSource.get() ) ) )
-    {
-        FWE_LOG_ERROR(" Failed to register the IWaveGps to the CollectionScheme Manager");
-        return false;
-    }
+    mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+        std::bind( &IWaveGpsSource::onChangeOfActiveDictionary,
+                   mIWaveGpsSource.get(),
+                   std::placeholders::_1,
+                   std::placeholders::_2 ) );
     mIWaveGpsSource->start();
 }
 ```

@@ -1,4 +1,5 @@
 #!/bin/bash
+export VERSION_BOOST="1.78.0"
 export VERSION_JSON_CPP="1.9.5"
 export VERSION_PROTOBUF="3.21.12"
 export VERSION_PROTOBUF_RELEASE="v21.12"
@@ -19,5 +20,4 @@ export VERSION_ANDROID_BUILD_TOOLS="30.0.3"
 export VERSION_CMAKE="3.22.1" # Provided by Ubuntu 20.04, version here used for Android build
 export VERSION_SNAPPY="1.1.8" # Provided by Ubuntu 20.04, version here used for Android build
 export VERSION_OPENSSL="1.1.1w" # Provided by Ubuntu 20.04, version here used for Android build
-export VERSION_BOOST="1.78.0" # Provided by Ubuntu 20.04, version here used for Android build
 export VERSION_ION_C="v1.1.2"

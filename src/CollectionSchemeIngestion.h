@@ -5,6 +5,7 @@
 
 #include "ICollectionScheme.h"
 #include "collection_schemes.pb.h"
+#include "common_types.pb.h"
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -54,8 +55,6 @@ public:
     bool isActiveDTCsIncluded() const override;
 
     bool isTriggerOnlyOnRisingEdge() const override;
-
-    double getProbabilityToSend() const override;
 
     const Signals_t &getCollectSignals() const override;
 

@@ -16,8 +16,8 @@
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include "DataSenderIonWriter.h"
-#include "IActiveCollectionSchemesListener.h"
 #include "ICollectionScheme.h"
+#include "ICollectionSchemeList.h"
 #include "S3Sender.h"
 #include <functional>
 #endif

@@ -6,6 +6,8 @@
 #include "AwsIotChannel.h"
 #include "AwsSDKMemoryManager.h"
 #include "CacheAndPersist.h"
+#include "Clock.h"
+#include "ClockHandler.h"
 #include "IConnectionTypes.h"
 #include "IConnectivityChannel.h"
 #include "IReceiver.h"
@@ -13,7 +15,6 @@
 #include "MqttClientWrapper.h"
 #include "MqttClientWrapperMock.h"
 #include "PayloadManager.h"
-#include "ReceiverListenerFake.h"
 #include "WaitUntil.h"
 #include <algorithm>
 #include <array>
@@ -351,13 +352,18 @@ TEST_F( AwsIotConnectivityModuleTest, subscribeWithoutBeingConnected )
 
 TEST_F( AwsIotConnectivityModuleTest, receiveMessage )
 {
-    Testing::ReceiverListenerFake listener1;
-    Testing::ReceiverListenerFake listener2;
+    std::vector<std::pair<std::string, ReceivedChannelMessage>> receivedDataChannel1;
+    std::vector<std::pair<std::string, ReceivedChannelMessage>> receivedDataChannel2;
+
     auto channel1 = mConnectivityModule->createNewChannel( nullptr, "topic1", true );
     auto channel2 = mConnectivityModule->createNewChannel( nullptr, "topic2", true );
 
-    channel1->subscribeListener( &listener1 );
-    channel2->subscribeListener( &listener2 );
+    channel1->subscribeToDataReceived( [&]( const ReceivedChannelMessage &message ) {
+        receivedDataChannel1.emplace_back( std::string( message.buf, message.buf + message.size ), message );
+    } );
+    channel2->subscribeToDataReceived( [&]( const ReceivedChannelMessage &message ) {
+        receivedDataChannel2.emplace_back( std::string( message.buf, message.buf + message.size ), message );
+    } );
 
     EXPECT_CALL( *mMqttClientBuilderWrapperMock, WithClientExtendedValidationAndFlowControl( _ ) ).Times( 1 );
     EXPECT_CALL( *mMqttClientBuilderWrapperMock, WithConnectOptions( _ ) ).Times( 1 );
@@ -382,13 +388,19 @@ TEST_F( AwsIotConnectivityModuleTest, receiveMessage )
 
     // Simulate messages coming from MQTT client
     std::string data1 = "data1";
+    uint64_t expectedMessageExpiryMonotonicTimeSinceEpochMs = UINT64_MAX;
     {
         Aws::Crt::Mqtt5::PublishReceivedEventData eventData;
+
         auto publishPacket =
             std::make_shared<Aws::Crt::Mqtt5::PublishPacket>( "topic1",
                                                               Aws::Crt::ByteCursorFromCString( data1.c_str() ),
                                                               Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE );
+        auto messageExpiryIntervalSec = 5;
+        publishPacket->WithMessageExpiryIntervalSec( messageExpiryIntervalSec );
         eventData.publishPacket = publishPacket;
+        expectedMessageExpiryMonotonicTimeSinceEpochMs =
+            ClockHandler::getClock()->monotonicTimeSinceEpochMs() + ( messageExpiryIntervalSec * 1000 );
         mMqttClientBuilderWrapperMock->mOnPublishReceivedHandlerCallback( eventData );
     }
     std::string data2 = "data2";
@@ -402,10 +414,18 @@ TEST_F( AwsIotConnectivityModuleTest, receiveMessage )
         mMqttClientBuilderWrapperMock->mOnPublishReceivedHandlerCallback( eventData );
     }
 
-    ASSERT_EQ( listener1.mReceivedData.size(), 1 );
-    ASSERT_EQ( listener1.mReceivedData[0], "data1" );
-    ASSERT_EQ( listener2.mReceivedData.size(), 1 );
-    ASSERT_EQ( listener2.mReceivedData[0], "data2" );
+    ASSERT_EQ( receivedDataChannel1.size(), 1 );
+    ASSERT_EQ( receivedDataChannel1[0].first, "data1" );
+    ASSERT_GE( receivedDataChannel1[0].second.messageExpiryMonotonicTimeSinceEpochMs,
+               expectedMessageExpiryMonotonicTimeSinceEpochMs );
+    // Give some margin for error due to test being slow, but make sure that timeout is not much more
+    // than expected.
+    ASSERT_LE( receivedDataChannel1[0].second.messageExpiryMonotonicTimeSinceEpochMs,
+               expectedMessageExpiryMonotonicTimeSinceEpochMs + 500 );
+
+    ASSERT_EQ( receivedDataChannel2.size(), 1 );
+    ASSERT_EQ( receivedDataChannel2[0].first, "data2" );
+    ASSERT_EQ( receivedDataChannel2[0].second.messageExpiryMonotonicTimeSinceEpochMs, 0 );
 
     // Should be called on destruction
     EXPECT_CALL( *mMqttClientWrapperMock, Unsubscribe( _, _ ) )

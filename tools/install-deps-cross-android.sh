@@ -82,12 +82,16 @@ install_deps() {
 
     mkdir -p ${INSTALL_PREFIX}
     mkdir -p ${NATIVE_PREFIX}
-    mkdir deps-cross-android && cd deps-cross-android
+    mkdir -p deps-cross-android && cd deps-cross-android
 
     # Boost
-    git clone https://github.com/moritz-wundke/Boost-for-Android.git
+    if [ ! -d "Boost-for-Android" ]; then
+        git clone https://github.com/moritz-wundke/Boost-for-Android.git
+        wget -q https://archives.boost.io/release/${VERSION_BOOST}/source/boost_${VERSION_BOOST//./_}.tar.bz2 -O Boost-for-Android/boost_${VERSION_BOOST//./_}.tar.bz2
+    fi
     cd Boost-for-Android
     git checkout 53e6c16ea80c7dcb2683fd548e0c7a09ddffbfc1
+    rm -rf build
     ./build-android.sh \
         ${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \
         --boost=${VERSION_BOOST} \
@@ -100,8 +104,11 @@ install_deps() {
     cd ..
 
     # Snappy
-    git clone -b ${VERSION_SNAPPY} https://github.com/google/snappy.git
+    if [ ! -d "snappy" ]; then
+        git clone -b ${VERSION_SNAPPY} https://github.com/google/snappy.git
+    fi
     cd snappy
+    rm -rf build
     mkdir build && cd build
     cmake \
         -DSNAPPY_BUILD_TESTS=OFF \
@@ -120,10 +127,13 @@ install_deps() {
 
     if ${WITH_VISION_SYSTEM_DATA}; then
         # Amazon Ion C
-        git clone https://github.com/amazon-ion/ion-c.git
+        if [ ! -d "ion-c" ]; then
+            git clone https://github.com/amazon-ion/ion-c.git
+        fi
         cd ion-c
         git checkout ${VERSION_ION_C}
         git submodule update --init
+        rm -rf build
         mkdir build && cd build
         cmake \
             -DCMAKE_BUILD_TYPE=Release \
@@ -140,10 +150,13 @@ install_deps() {
     fi
 
     # Protobuf
-    wget -q https://github.com/protocolbuffers/protobuf/releases/download/${VERSION_PROTOBUF_RELEASE}/protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
-    tar -zxf protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
+    if [ ! -d "protobuf-${VERSION_PROTOBUF}" ]; then
+        wget -q https://github.com/protocolbuffers/protobuf/releases/download/${VERSION_PROTOBUF_RELEASE}/protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
+        tar -zxf protobuf-cpp-${VERSION_PROTOBUF}.tar.gz
+    fi
     cd protobuf-${VERSION_PROTOBUF}
     if [ ! -f ${NATIVE_PREFIX}/bin/protoc ]; then
+        rm -rf build_native
         mkdir build_native && cd build_native
         cmake \
             -DCMAKE_BUILD_TYPE=Release \
@@ -155,6 +168,7 @@ install_deps() {
         make install -j`nproc`
         cd ..
     fi
+    rm -rf build_target
     mkdir build_target && cd build_target
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
@@ -173,8 +187,11 @@ install_deps() {
     cd ../..
 
     # JsonCpp
-    git clone -b ${VERSION_JSON_CPP} https://github.com/open-source-parsers/jsoncpp.git
+    if [ ! -d "jsoncpp" ]; then
+        git clone -b ${VERSION_JSON_CPP} https://github.com/open-source-parsers/jsoncpp.git
+    fi
     cd jsoncpp
+    rm -rf build
     mkdir build && cd build
     cmake \
         -DBUILD_SHARED_LIBS=OFF \
@@ -192,7 +209,10 @@ install_deps() {
     cd ../..
 
     # OpenSSL
-    wget -q https://www.openssl.org/source/openssl-${VERSION_OPENSSL}.tar.gz
+    if [ ! -f "openssl-${VERSION_OPENSSL}.tar.gz" ]; then
+        wget -q https://www.openssl.org/source/openssl-${VERSION_OPENSSL}.tar.gz
+    fi
+    rm -rf openssl-${VERSION_OPENSSL}
     tar -zxf openssl-${VERSION_OPENSSL}.tar.gz
     cd openssl-${VERSION_OPENSSL}
     ANDROID_NDK_HOME=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \
@@ -204,7 +224,10 @@ install_deps() {
     cd ..
 
     # curl
-    wget -q https://github.com/curl/curl/releases/download/${VERSION_CURL_RELEASE}/curl-${VERSION_CURL}.tar.gz
+    if [ ! -f "curl-${VERSION_CURL}.tar.gz" ]; then
+        wget -q https://github.com/curl/curl/releases/download/${VERSION_CURL_RELEASE}/curl-${VERSION_CURL}.tar.gz
+    fi
+    rm -rf curl-${VERSION_CURL}
     tar -zxf curl-${VERSION_CURL}.tar.gz
     cd curl-${VERSION_CURL}
     NDK=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \
@@ -234,8 +257,11 @@ install_deps() {
     cd ..
 
     # AWS C++ SDK
-    git clone -b ${VERSION_AWS_SDK_CPP} --recursive https://github.com/aws/aws-sdk-cpp.git
+    if [ ! -d "aws-sdk-cpp" ]; then
+        git clone -b ${VERSION_AWS_SDK_CPP} --recursive https://github.com/aws/aws-sdk-cpp.git
+    fi
     cd aws-sdk-cpp
+    rm -rf build
     mkdir build && cd build
     CFLAGS=-I${INSTALL_PREFIX}/include cmake \
         -DENABLE_TESTING=OFF \
@@ -258,7 +284,6 @@ install_deps() {
     ar -rc ${INSTALL_PREFIX}/lib/libpthread.a
 
     cd ..
-    rm -rf deps-cross-android
 }
 
 for ARCH in ${ARCHS}; do
@@ -282,3 +307,4 @@ for ARCH in ${ARCHS}; do
         install_deps ${TARGET_ARCH} ${HOST_PLATFORM} ${SSL_TARGET}
     fi
 done
+rm -rf deps-cross-android

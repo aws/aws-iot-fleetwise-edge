@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include "IActiveDecoderDictionaryListener.h"
 #include "IDecoderDictionary.h"
 #include "MessageTypes.h"
 #include "Signal.h"
@@ -24,13 +23,13 @@ namespace IoTFleetWise
  * To implement a custom data source create a new class and inherit from CustomDataSource
  * then call setFilter() then start() and provide an implementation for pollData
  */
-class CustomDataSource : public IActiveDecoderDictionaryListener
+class CustomDataSource
 {
 public:
     CustomDataSource() = default;
-    // from IActiveDecoderDictionaryListener
+
     void onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
-                                     VehicleDataSourceProtocol networkProtocol ) override;
+                                     VehicleDataSourceProtocol networkProtocol );
 
     bool start();
     bool stop();
@@ -61,7 +60,7 @@ public:
      */
     std::vector<CANSignalFormat> getSignalInfo();
 
-    ~CustomDataSource() override;
+    virtual ~CustomDataSource();
     CustomDataSource( const CustomDataSource & ) = delete;
     CustomDataSource &operator=( const CustomDataSource & ) = delete;
     CustomDataSource( CustomDataSource && ) = delete;

@@ -46,10 +46,13 @@ if ${WITH_ROS2_SUPPORT}; then
 fi
 
 if ${WITH_ROS2_SUPPORT}; then
+    BUILD_DIR=build/iotfleetwise
     source /opt/ros/galactic/setup.bash
     colcon build --cmake-args ${CMAKE_OPTIONS}
 else
+    BUILD_DIR=build
     mkdir -p build && cd build
     cmake ${CMAKE_OPTIONS} ..
     make -j`nproc`
+    cd ..
 fi

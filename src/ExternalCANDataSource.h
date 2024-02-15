@@ -6,7 +6,6 @@
 #include "CANDataConsumer.h"
 #include "Clock.h"
 #include "ClockHandler.h"
-#include "IActiveDecoderDictionaryListener.h"
 #include "IDecoderDictionary.h"
 #include "SignalTypes.h"
 #include "TimeTypes.h"
@@ -27,7 +26,7 @@ namespace IoTFleetWise
  */
 // coverity[cert_dcl60_cpp_violation] false positive - class only defined once
 // coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
-class ExternalCANDataSource : public IActiveDecoderDictionaryListener
+class ExternalCANDataSource
 {
 public:
     /**
@@ -35,7 +34,7 @@ public:
      * @param consumer CAN data consumer
      */
     ExternalCANDataSource( CANDataConsumer &consumer );
-    ~ExternalCANDataSource() override = default;
+    ~ExternalCANDataSource() = default;
 
     ExternalCANDataSource( const ExternalCANDataSource & ) = delete;
     ExternalCANDataSource &operator=( const ExternalCANDataSource & ) = delete;
@@ -53,7 +52,7 @@ public:
                         const std::vector<uint8_t> &data );
 
     void onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
-                                     VehicleDataSourceProtocol networkProtocol ) override;
+                                     VehicleDataSourceProtocol networkProtocol );
 
 private:
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();

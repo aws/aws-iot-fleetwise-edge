@@ -7,7 +7,7 @@ Parameters:
   Ec2InstanceType:
     Description: Type of EC2 instance
     Type: String
-    Default: m6g.8xlarge
+    Default: m6g.2xlarge
     AllowedValues:
       - m6g.medium
       - m6g.large
@@ -166,39 +166,39 @@ Mappings:
   # Ubuntu 20.04 arm64 AMIs
   AMIRegionMap:
     ap-northeast-1:
-      AMIID: ami-08c2b40b757d7a436
+      AMIID: ami-00a2b0a326e2d5aa6
     ap-northeast-2:
-      AMIID: ami-0ae4f84503ebf3d18
+      AMIID: ami-072ea936516f1028d
     ap-northeast-3:
-      AMIID: ami-06d46b97c052d058f
+      AMIID: ami-012359d9b70f2677f
     ap-south-1:
-      AMIID: ami-0aedb44d8d5454af4
+      AMIID: ami-01ee31dce69c952d6
     ap-southeast-1:
-      AMIID: ami-0281c2b7875eaa573
+      AMIID: ami-024c051b04436d40f
     ap-southeast-2:
-      AMIID: ami-0b1c7f9ffaf189009
+      AMIID: ami-09db86a20ff4364df
     ca-central-1:
-      AMIID: ami-077fd3ca91fd436e8
+      AMIID: ami-0aa71e61651e35060
     eu-central-1:
-      AMIID: ami-0eb0fc432507c6ceb
+      AMIID: ami-03fefcbe906e86531
     eu-north-1:
-      AMIID: ami-0fc9d4f1e282548cb
+      AMIID: ami-021eb0bed8ef688f8
     eu-west-1:
-      AMIID: ami-0a7fc9991623e938a
+      AMIID: ami-05e6fdf346fd69cc4
     eu-west-2:
-      AMIID: ami-00da71119c33fd647
+      AMIID: ami-008d5ee70e21f4d3b
     eu-west-3:
-      AMIID: ami-00f72fc3d31abc995
+      AMIID: ami-0d70b670c6ce568f6
     sa-east-1:
-      AMIID: ami-0418ffcf915b2ec2b
+      AMIID: ami-05fefec8c0e127811
     us-east-1:
-      AMIID: ami-06978f2d3e435039f
+      AMIID: ami-0f4581489e6809acf
     us-east-2:
-      AMIID: ami-09919781fa752ad93
+      AMIID: ami-03e62841910fc75df
     us-west-1:
-      AMIID: ami-06de4e4d34dc642c8
+      AMIID: ami-0c98a240ce51dda8a
     us-west-2:
-      AMIID: ami-0eaba58686a7d034a
+      AMIID: ami-01ac47a01fc9387bf
 Outputs:
   Ec2InstanceId:
     Description: "EC2 instance ID"

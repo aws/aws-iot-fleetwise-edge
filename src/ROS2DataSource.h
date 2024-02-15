@@ -6,8 +6,8 @@
 #include "Clock.h"
 #include "ClockHandler.h"
 #include "CollectionInspectionAPITypes.h"
-#include "IActiveDecoderDictionaryListener.h"
 #include "IDecoderDictionary.h"
+#include "IoTFleetWiseConfig.h"
 #include "MessageTypes.h"
 #include "RawDataManager.h"
 #include "Signal.h"
@@ -21,7 +21,6 @@
 #include <cstdint>
 #include <fastcdr/Cdr.h>
 #include <functional>
-#include <json/json.h>
 #include <memory>
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>
@@ -45,7 +44,7 @@ enum class CompareToIntrospection
 class ROS2DataSourceConfig
 {
 public:
-    std::string mInterfaceId;
+    InterfaceID mInterfaceId;
     uint8_t mExecutorThreads;
     CompareToIntrospection mIntrospectionLibraryCompare;
     size_t mSubscribeQueueLength;
@@ -56,7 +55,7 @@ public:
      * @param outputConfig ouput only valid when true is returned
      * @return true if successfully parsed, false otherwise
      */
-    static bool parseFromJson( const Json::Value &node, ROS2DataSourceConfig &outputConfig );
+    static bool parseFromJson( const IoTFleetWiseConfig &node, ROS2DataSourceConfig &outputConfig );
 };
 
 class ROS2DataSourceNode : public rclcpp::Node
@@ -97,13 +96,13 @@ private:
     rclcpp::CallbackGroup::SharedPtr mCallbackGroup;
 };
 
-class ROS2DataSource : public IActiveDecoderDictionaryListener
+class ROS2DataSource
 {
 public:
     ROS2DataSource( ROS2DataSourceConfig config,
                     SignalBufferPtr signalBufferPtr,
                     std::shared_ptr<RawData::BufferManager> rawDataBufferManager = nullptr );
-    ~ROS2DataSource() override;
+    ~ROS2DataSource();
 
     ROS2DataSource( const ROS2DataSource & ) = delete;
     ROS2DataSource &operator=( const ROS2DataSource & ) = delete;
@@ -133,12 +132,12 @@ public:
     }
 
     /**
-     * @brief From IActiveDecoderDictionaryListener get called on dictionary updates
+     * @brief To be called on dictionary updates
      * @param dictionary new dictionary with the topics to subscribe to and information how to decode
      * @param networkProtocol only COMPLEX_DATA will be accepted
      */
     void onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
-                                     VehicleDataSourceProtocol networkProtocol ) override;
+                                     VehicleDataSourceProtocol networkProtocol );
 
 private:
     /**

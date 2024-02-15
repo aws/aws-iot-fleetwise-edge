@@ -19,7 +19,7 @@
 #include <vector>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-#include "IActiveCollectionSchemesListener.h"
+#include "ICollectionSchemeList.h"
 #include <functional>
 #endif
 

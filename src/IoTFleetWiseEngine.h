@@ -23,6 +23,7 @@
 #include "RemoteProfiler.h"
 #include "Schema.h"
 #include "Signal.h"
+#include "SignalTypes.h"
 #include "Thread.h"
 #include "TimeTypes.h"
 #include "Timer.h"
@@ -77,7 +78,7 @@ public:
     IoTFleetWiseEngine( IoTFleetWiseEngine && ) = delete;
     IoTFleetWiseEngine &operator=( IoTFleetWiseEngine && ) = delete;
 
-    bool connect( const Json::Value &config );
+    bool connect( const Json::Value &jsonConfig );
     bool start();
     bool stop();
     bool disconnect();
@@ -100,7 +101,7 @@ public:
      * @param timestamp Timestamp of CAN message in milliseconds since epoch, or zero if unknown.
      * @param messageId CAN message ID in Linux SocketCAN format
      * @param data CAN message data */
-    void ingestExternalCANMessage( const std::string &interfaceId,
+    void ingestExternalCANMessage( const InterfaceID &interfaceId,
                                    Timestamp timestamp,
                                    uint32_t messageId,
                                    const std::vector<uint8_t> &data );
@@ -153,8 +154,6 @@ public:
     std::shared_ptr<CacheAndPersist> mPersistDecoderManifestCollectionSchemesAndData;
 
 private:
-    static constexpr uint64_t DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 10000;
-
     Thread mThread;
     std::atomic<bool> mShouldStop{ false };
     mutable std::mutex mThreadMutex;

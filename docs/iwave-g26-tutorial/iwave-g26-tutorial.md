@@ -547,14 +547,17 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 
 ## Step 8: Clean up
 
-Run the following to clean up resources created by the `provision.sh` and `demo.sh` scripts.
-**Note:** The Amazon Timestream resources are not deleted.
+1. Run the following _on the development machine_ to clean up resources created by the
+   `provision.sh` and `demo.sh` scripts. **Note:** The Amazon Timestream resources are not deleted.
 
-```bash
-cd ~/aws-iot-fleetwise-edge/tools/cloud \
-&& clean-up.sh \
-&& ../provision.sh \
-   --vehicle-name fwdemo-g26 \
-   --region us-east-1 \
-   --only-clean-up
-```
+   ```bash
+   cd ~/aws-iot-fleetwise-edge/tools/cloud \
+   && ./clean-up.sh \
+   && ../provision.sh \
+      --vehicle-name fwdemo-g26 \
+      --region us-east-1 \
+      --only-clean-up
+   ```
+
+1. Delete the CloudFormation stack for your development machine, which by default is called `fwdev`:
+   https://us-east-1.console.aws.amazon.com/cloudformation/home

@@ -381,8 +381,7 @@ CollectionSchemeManager::decoderDictionaryUpdater(
         // Down cast the CAN Decoder Dictionary to base Decoder Dictionary. We will support more
         // types of Decoder Dictionary in later releases
         auto dictPtr = std::static_pointer_cast<const DecoderDictionary>( dict.second );
-        notifyListeners<const std::shared_ptr<const DecoderDictionary> &>(
-            &IActiveDecoderDictionaryListener::onChangeOfActiveDictionary, dictPtr, dict.first );
+        mActiveDecoderDictionaryChangeListeners.notify( dictPtr, dict.first );
     }
 }
 

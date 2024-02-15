@@ -29,7 +29,7 @@ ExternalCANDataSource::ingestMessage( CANChannelNumericID channelId,
     }
     if ( timestamp == 0 )
     {
-        TraceModule::get().incrementVariable( TraceVariable::CAN_POLLING_TIMESTAMP_COUNTER );
+        TraceModule::get().incrementVariable( TraceVariable::POLLING_TIMESTAMP_COUNTER );
         timestamp = mClock->systemTimeSinceEpochMs();
     }
     if ( timestamp < mLastFrameTime )

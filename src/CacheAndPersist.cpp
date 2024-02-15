@@ -148,6 +148,8 @@ CacheAndPersist::write( const uint8_t *bufPtr, size_t size, std::string &path )
 }
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+/// @cond Ignore due to Doxygen bug. Even though ENABLE_PREPROCESSING is enabled, Doxygen warns
+//        about this overload not being declared when FWE_FEATURE_VISION_SYSTEM_DATA is disabled.
 ErrorCode
 CacheAndPersist::write( std::unique_ptr<std::streambuf> streambuf, DataType dataType, const std::string &filename )
 {
@@ -200,6 +202,7 @@ CacheAndPersist::write( std::unique_ptr<std::streambuf> streambuf, DataType data
 
     return ErrorCode::SUCCESS;
 }
+/// @endcond
 #endif
 
 void

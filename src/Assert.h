@@ -8,12 +8,6 @@
 #include <cstdlib>
 #include <string>
 
-namespace Aws
-{
-
-namespace IoTFleetWise
-{
-
 #define FWE_FATAL_ASSERT( cond, msg )                                                                                  \
     do                                                                                                                 \
     {                                                                                                                  \
@@ -38,6 +32,3 @@ namespace IoTFleetWise
             return returnValue;                                                                                        \
         }                                                                                                              \
     } while ( 0 )
-
-} // namespace IoTFleetWise
-} // namespace Aws

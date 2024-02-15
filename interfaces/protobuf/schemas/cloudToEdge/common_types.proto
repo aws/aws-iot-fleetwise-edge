@@ -134,6 +134,11 @@ message ConditionNode {
      * output based on specific logic
      */
     message NodeFunction{
+        /*
+         * This field was never supported, so it should not be used any more.
+         */
+        reserved 2;
+        reserved "geohash_function";
 
         /*
          * The function node could be one of the following function types.
@@ -145,54 +150,6 @@ message ConditionNode {
              * run an aggregation function over the samples and evaluate to a double.
              */
             WindowFunction window_function = 1;
-
-            /*
-             * Geohash function Node that evaluates whether Edge has changed Geohash. It returns true if the Geohash
-             * has changed at given precision and otherwise return false
-             */
-            GeohashFunction geohash_function = 2;
-        }
-
-        /*
-         * Geohash function evaluates whether Edge has changed Geohash at given precision
-         * It will firstly calculate Geohash with latitude and longitude
-         * It returns true if the Geohash has changed at given precision. Otherwise return false
-         */
-        message GeohashFunction{
-
-            /*
-             * signal id for latitude
-             */
-            uint32 latitude_signal_id = 1;
-
-            /*
-             * signal id for longitude
-             */
-            uint32 longitude_signal_id = 2;
-
-            /*
-             * The geohash precision for dynamic data collection Note geohash precision is defined as the length of hash
-             * characters (base 32 encoding).  Longer hash will have higher precision than shorter hash.
-             * see more details: https://en.wikipedia.org/wiki/Geohash
-             */
-            uint32 geohash_precision = 3;
-
-            /*
-             * The unit for decoded latitude / longitude signal. GPS Signal might be decoded into different unit
-             * according to the DBC file.
-             */
-            GPSUnitType gps_unit = 4;
-
-            /*
-             * The unit type for decoded latitude / longitude signal. This list might be extended in future to
-             * accommodate different vehicle models.
-             */
-            enum GPSUnitType {
-                DECIMAL_DEGREE = 0;
-                MICROARCSECOND = 1;
-                MILLIARCSECOND = 2;
-                ARCSECOND = 3;
-            }
         }
 
         /*

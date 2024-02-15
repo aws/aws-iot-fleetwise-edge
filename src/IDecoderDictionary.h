@@ -99,7 +99,7 @@ const uint32_t MAX_COMPLEX_TYPES = 5000;
 struct ComplexDataDecoderDictionary : DecoderDictionary
 {
     using ComplexDataDecoderMethodType =
-        std::unordered_map<ComplexDataInterfaceId, std::unordered_map<ComplexDataMessageId, ComplexDataMessageFormat>>;
+        std::unordered_map<InterfaceID, std::unordered_map<ComplexDataMessageId, ComplexDataMessageFormat>>;
 
     ComplexDataDecoderDictionary() = default;
     ComplexDataDecoderDictionary( ComplexDataDecoderMethodType complexMsgDecoderMethod,

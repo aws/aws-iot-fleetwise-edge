@@ -7,15 +7,13 @@
 #include "ClockHandler.h"
 #include "CollectionInspectionAPITypes.h"
 #include "CollectionInspectionEngine.h"
-#include "IActiveConditionProcessor.h"
-#include "IDataReadyToPublishListener.h"
-#include "InspectionEventListener.h"
 #include "Listener.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "TimeTypes.h"
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 
@@ -28,20 +26,29 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-class CollectionInspectionWorkerThread : public IActiveConditionProcessor,
-                                         public ThreadListeners<IDataReadyToPublishListener>
+class CollectionInspectionWorkerThread
 {
 public:
+    using OnDataReadyToPublishCallback = std::function<void()>;
+
     CollectionInspectionWorkerThread() = default;
-    ~CollectionInspectionWorkerThread() override;
+    ~CollectionInspectionWorkerThread();
 
     CollectionInspectionWorkerThread( const CollectionInspectionWorkerThread & ) = delete;
     CollectionInspectionWorkerThread &operator=( const CollectionInspectionWorkerThread & ) = delete;
     CollectionInspectionWorkerThread( CollectionInspectionWorkerThread && ) = delete;
     CollectionInspectionWorkerThread &operator=( CollectionInspectionWorkerThread && ) = delete;
 
-    // Inherited from IActiveConditionProcessor
-    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) override;
+    void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix );
+
+    /**
+     * @brief Register a callback to be called when data is ready to be published to the cloud
+     * */
+    void
+    subscribeToDataReadyToPublish( OnDataReadyToPublishCallback callback )
+    {
+        mDataReadyListeners.subscribe( callback );
+    }
 
     /**
      * @brief As soon as new data is available in any input queue call this to wakeup the thread
@@ -53,17 +60,17 @@ public:
      *
      * @return true if initialization was successful
      * */
-    bool init(
-        const std::shared_ptr<SignalBuffer> &inputSignalBuffer, /**< IVehicleDataSourceConsumer instances will
-                                                                   put relevant signals in this queue */
-        const std::shared_ptr<CollectedDataReadyToPublish>
-            &outputCollectedData, /**< this thread will put data that should be sent to cloud into this queue */
-        uint32_t idleTimeMs,      /**< if no new data is available sleep for this amount of milliseconds */
+    bool init( const std::shared_ptr<SignalBuffer> &inputSignalBuffer, /**< IVehicleDataSourceConsumer instances will
+                                                                          put relevant signals in this queue */
+               const std::shared_ptr<CollectedDataReadyToPublish>
+                   &outputCollectedData, /**< this thread will put data that should be sent to cloud into this queue */
+               uint32_t idleTimeMs       /**< if no new data is available sleep for this amount of milliseconds */
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-        std::shared_ptr<RawData::BufferManager> rawBufferManager =
-            nullptr, /**< the raw buffer manager which is informed what data is used */
+               ,
+               std::shared_ptr<RawData::BufferManager> rawBufferManager =
+                   nullptr /**< the raw buffer manager which is informed what data is used */
 #endif
-        bool dataReductionProbabilityDisabled = false /**< set to true to disable data reduction using probability*/ );
+    );
 
     /**
      * @brief stops the internal thread if started and wait until it finishes
@@ -83,30 +90,6 @@ public:
      * @brief Checks that the worker thread is healthy and consuming data.
      */
     bool isAlive();
-
-    /**
-     * @brief Register a thread as a listener to the Inspection Engine events.
-     * Thread safety is guaranteed by the underlying ThreadListener instance
-     * @param listener an InspectionEventListener instance
-     * @return the outcome of the Listener interface subscribeListener()
-     */
-    inline bool
-    subscribeToEvents( InspectionEventListener *listener )
-    {
-        return fCollectionInspectionEngine.subscribeListener( listener );
-    }
-
-    /**
-     * @brief unRegister a thread as a listener from the Inspection Engine events.
-     * Thread safety is guaranteed by the underlying ThreadListener instance
-     * @param listener an InspectionEventListener instance
-     * @return the outcome of the Listener interface unSubscribeListener()
-     */
-    inline bool
-    unSubscribeFromEvents( InspectionEventListener *listener )
-    {
-        return fCollectionInspectionEngine.unSubscribeListener( listener );
-    }
 
 private:
     static constexpr Timestamp EVALUATE_INTERVAL_MS = 1; // Evaluate every millisecond
@@ -139,6 +122,7 @@ private:
     Signal fWait;
     uint32_t fIdleTimeMs{ DEFAULT_THREAD_IDLE_TIME_MS };
     std::shared_ptr<const Clock> fClock = ClockHandler::getClock();
+    ThreadSafeListeners<OnDataReadyToPublishCallback> mDataReadyListeners;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     std::shared_ptr<RawData::BufferManager> mRawBufferManager{ nullptr };
 #endif

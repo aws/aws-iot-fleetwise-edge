@@ -5,7 +5,6 @@
 
 #include "CANInterfaceIDTranslator.h"
 #include "CollectionInspectionAPITypes.h"
-#include "GeohashInfo.h"
 #include "OBDDataTypes.h"
 #include "TimeTypes.h"
 #include "vehicle_data.pb.h"
@@ -69,13 +68,6 @@ public:
      * @param dtc  diagnostic trouble codes
      */
     void append( const std::string &dtc );
-
-    /**
-     * @brief Appends the Geohash String to the output protobuf
-     *
-     * @param geohashInfo  Geohash information
-     */
-    void append( const GeohashInfo &geohashInfo );
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     /**

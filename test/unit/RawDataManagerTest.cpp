@@ -5,7 +5,6 @@
 #include "SignalTypes.h"
 #include "Testing.h"
 #include "TimeTypes.h"
-#include <algorithm>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstdint>

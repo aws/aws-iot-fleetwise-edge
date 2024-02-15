@@ -84,9 +84,6 @@ apt install -y \
     crossbuild-essential-arm64 \
     curl \
     git \
-    libboost-log-dev:arm64 \
-    libboost-system-dev:arm64 \
-    libboost-thread-dev:arm64 \
     libsnappy-dev:arm64 \
     libssl-dev:arm64 \
     unzip \
@@ -125,7 +122,34 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/aarch64-linux-gnu ] || [ ! -d ${NATIVE_PR
     mkdir -p /usr/local/aarch64-linux-gnu/lib/cmake/
     mkdir -p ${NATIVE_PREFIX}
     cp ${SCRIPT_DIR}/arm64-toolchain.cmake /usr/local/aarch64-linux-gnu/lib/cmake/
-    mkdir deps-cross-arm64 && cd deps-cross-arm64
+    mkdir deps-cross-arm64
+    cd deps-cross-arm64
+
+    wget -q https://archives.boost.io/release/${VERSION_BOOST}/source/boost_${VERSION_BOOST//./_}.tar.bz2
+    tar -jxf boost_${VERSION_BOOST//./_}.tar.bz2
+    cd boost_${VERSION_BOOST//./_}
+    ./bootstrap.sh
+    # Build static libraries with -fPIC enabled, so they can later be linked into shared libraries
+    # (The Ubuntu static libraries are not built with -fPIC)
+    if [ "${SHARED_LIBS}" == "OFF" ]; then
+        BOOST_OPTIONS="cxxflags=-fPIC cflags=-fPIC link=static"
+    else
+        BOOST_OPTIONS=""
+    fi
+    echo "using gcc : arm64 : aarch64-linux-gnu-g++ ;" > user-config.jam
+    ./b2 \
+        --with-atomic \
+        --with-system \
+        --with-thread \
+        --with-filesystem \
+        --with-program_options \
+        --prefix=/usr/local/aarch64-linux-gnu \
+        ${BOOST_OPTIONS} \
+        --user-config=user-config.jam \
+        -j`nproc` \
+        toolset=gcc-arm64 \
+        install
+    cd ..
 
     git clone -b ${VERSION_JSON_CPP} https://github.com/open-source-parsers/jsoncpp.git
     cd jsoncpp

@@ -22,14 +22,18 @@ using CANRawFrameID = uint32_t;
 /**
  * @brief CAN Channel Numeric ID specifies which physical CAN channel a signal is found on. Its is only used internally
  * and not by any input or output artifact. Every vehicle has an array of available CAN channels, and the
- * CANChannelNumericID is the index to that array. CANChannelNumericID has a 1:1 mapping with CANInterfaceID. The array
+ * CANChannelNumericID is the index to that array. CANChannelNumericID has a 1:1 mapping with InterfaceID. The array
  * of available channels is constructed during the FWE Binary launch by a config file passed to the FWE Binary.
  */
 using CANChannelNumericID = uint32_t;
 static constexpr CANChannelNumericID INVALID_CAN_SOURCE_NUMERIC_ID = 0xFFFFFFFF;
 
-using CANInterfaceID = std::string;
-static const CANInterfaceID INVALID_CAN_INTERFACE_ID{};
+/**
+ * @brief Interface ID is a string identifier for a logical network interface that is defined in the static
+ * configuration file, and must match the value sent by cloud in the decoder manifest.
+ */
+using InterfaceID = std::string;
+static const InterfaceID INVALID_INTERFACE_ID{};
 
 /**
  * @brief Signal ID is either an ID provided by Cloud that is unique across all signals found in the vehicle regardless

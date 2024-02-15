@@ -1,5 +1,22 @@
 # Change Log
 
+## v1.1.1 (2024-02-12)
+
+Bug fixes:
+
+- Fixed possible segfaults at startup triggered by bad configuration.
+- Fixed periodic upload trigger for heartbeat campaigns, that previously was only triggered by
+  further data reception.
+
+Improvements:
+
+- Improve error output for bad configuration, to indicate where an option is missing or incorrect.
+- Upgraded GitHub actions to support Node v20, as Node v16 is now EOL.
+- Fixed some Coverity check regressions.
+- Removed unsupported 'Geohash' feature.
+- Corrected cleanup instructions in guides.
+- Build Boost from source with `-fPIC` to enable linkage in a shared library.
+
 ## v1.1.0 (2023-11-26)
 
 Features:

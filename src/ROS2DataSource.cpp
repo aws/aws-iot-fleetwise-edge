@@ -29,47 +29,44 @@ static constexpr int MAX_TYPE_TREE_DEPTH = 100;
 constexpr uint32_t DEFAULT_STARTING_OFFSET = 0;
 
 bool
-ROS2DataSourceConfig::parseFromJson( const Json::Value &node, ROS2DataSourceConfig &outputConfig )
+ROS2DataSourceConfig::parseFromJson( const IoTFleetWiseConfig &node, ROS2DataSourceConfig &outputConfig )
 {
-    outputConfig.mExecutorThreads = static_cast<uint8_t>( node["ros2Interface"]["executorThreads"].asUInt() );
-    if ( outputConfig.mExecutorThreads <= 0 )
+    try
     {
-        FWE_LOG_ERROR( "executorThreads must be set to a value > 0" );
-        outputConfig.mExecutorThreads = 0;
-        return false;
-    }
-    outputConfig.mSubscribeQueueLength = static_cast<size_t>( node["ros2Interface"]["subscribeQueueLength"].asUInt() );
-    if ( outputConfig.mSubscribeQueueLength <= 0 )
-    {
-        FWE_LOG_ERROR( "subscribeQueueLength must be set to a value > 0" );
-        outputConfig.mSubscribeQueueLength = 0;
-        return false;
-    }
+        outputConfig.mExecutorThreads =
+            static_cast<uint8_t>( node["ros2Interface"]["executorThreads"].asU32Required() );
+        outputConfig.mSubscribeQueueLength =
+            static_cast<size_t>( node["ros2Interface"]["subscribeQueueLength"].asU32Required() );
+        auto introspectionLibraryCompareString =
+            node["ros2Interface"]["introspectionLibraryCompare"].asStringRequired();
+        if ( introspectionLibraryCompareString == "ErrorAndFail" )
+        {
+            outputConfig.mIntrospectionLibraryCompare = CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE;
+        }
+        else if ( introspectionLibraryCompareString == "Warn" )
+        {
+            outputConfig.mIntrospectionLibraryCompare = CompareToIntrospection::WARN_ON_DIFFERENCE;
+        }
+        else if ( introspectionLibraryCompareString == "Ignore" )
+        {
+            outputConfig.mIntrospectionLibraryCompare = CompareToIntrospection::NO_CHECK;
+        }
+        else
+        {
+            FWE_LOG_ERROR( "introspectionLibraryCompare must be set to either ErrorAndFail, Warn or Ignore" );
+            return false;
+        }
 
-    auto introspectionLibraryCompareString = node["ros2Interface"]["introspectionLibraryCompare"].asString();
-    if ( introspectionLibraryCompareString == "ErrorAndFail" )
-    {
-        outputConfig.mIntrospectionLibraryCompare = CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE;
+        outputConfig.mInterfaceId = node["interfaceId"].asStringRequired();
+        if ( outputConfig.mInterfaceId.empty() )
+        {
+            FWE_LOG_ERROR( "interfaceId must be set" );
+            return false;
+        }
     }
-    else if ( introspectionLibraryCompareString == "Warn" )
+    catch ( const std::exception &e )
     {
-        outputConfig.mIntrospectionLibraryCompare = CompareToIntrospection::WARN_ON_DIFFERENCE;
-    }
-    else if ( introspectionLibraryCompareString == "Ignore" )
-    {
-        outputConfig.mIntrospectionLibraryCompare = CompareToIntrospection::NO_CHECK;
-    }
-    else
-    {
-        FWE_LOG_ERROR( "introspectionLibraryCompare must be set to either ErrorAndFail, Warn or Ignore" );
-        return false;
-    }
-
-    outputConfig.mInterfaceId = node["interfaceId"].asString();
-    if ( outputConfig.mInterfaceId.empty() )
-    {
-        FWE_LOG_ERROR( "interfaceId must be set" );
-        outputConfig.mInterfaceId = "";
+        FWE_LOG_ERROR( std::string( ( e.what() == nullptr ? "" : e.what() ) ) );
         return false;
     }
     return true;

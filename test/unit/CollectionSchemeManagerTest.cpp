@@ -22,7 +22,6 @@ TEST( CollectionSchemeManagerTest, StopMainTest )
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerTest test;
     test.init( 50, nullptr, canIDTranslator );
-    test.myRegisterListener();
     ASSERT_TRUE( test.connect() );
 
     /* stopping idling main thread */
@@ -62,7 +61,6 @@ TEST( CollectionSchemeManagerTest, CollectionSchemeUpdateCallBackTest )
     std::vector<ICollectionSchemePtr> emptyList;
     CANInterfaceIDTranslator canIDTranslator;
     test.init( 50, nullptr, canIDTranslator );
-    test.myRegisterListener();
     test.setmCollectionSchemeAvailable( false );
     test.setmProcessCollectionScheme( false );
     // pl is null
@@ -86,7 +84,6 @@ TEST( CollectionSchemeManagerTest, DecoderManifestUpdateCallBackTest )
     CollectionSchemeManagerTest test;
     CANInterfaceIDTranslator canIDTranslator;
     test.init( 50, nullptr, canIDTranslator );
-    test.myRegisterListener();
     test.setmDecoderManifestAvailable( false );
     test.setmProcessDecoderManifest( false );
     // dm is null
@@ -138,7 +135,6 @@ TEST( CollectionSchemeManagerTest, MockProducerTest )
     CollectionSchemeManagerTest test;
     CANInterfaceIDTranslator canIDTranslator;
     test.init( 50, nullptr, canIDTranslator );
-    test.myRegisterListener();
     ASSERT_TRUE( test.connect() );
 
     /* build DMs */
@@ -234,7 +230,6 @@ TEST( CollectionSchemeManagerTest, getCollectionSchemeArns )
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerTest test;
     test.init( 50, nullptr, canIDTranslator );
-    test.myRegisterListener();
     ASSERT_TRUE( test.connect() );
 
     ASSERT_EQ( test.getCollectionSchemeArns(), std::vector<std::string>() );

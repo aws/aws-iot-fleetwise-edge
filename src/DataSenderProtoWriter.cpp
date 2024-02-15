@@ -117,15 +117,6 @@ DataSenderProtoWriter::append( const std::string &dtc )
     dtcData->add_active_dtc_codes( dtc );
 }
 
-void
-DataSenderProtoWriter::append( const GeohashInfo &geohashInfo )
-{
-    auto geohashProto = mVehicleData.mutable_geohash();
-    mVehicleDataMsgCount++;
-    geohashProto->set_geohash_string( geohashInfo.mGeohashString );
-    geohashProto->set_prev_reported_geohash_string( geohashInfo.mPrevReportedGeohashString );
-}
-
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 void
 DataSenderProtoWriter::append( const UploadedS3Object &uploadedS3Object )

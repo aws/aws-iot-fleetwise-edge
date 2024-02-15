@@ -84,9 +84,6 @@ apt install -y \
     crossbuild-essential-armhf \
     curl \
     git \
-    libboost-log-dev:armhf \
-    libboost-system-dev:armhf \
-    libboost-thread-dev:armhf \
     libsnappy-dev:armhf \
     libssl-dev:armhf \
     unzip \
@@ -125,7 +122,34 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
     mkdir -p /usr/local/arm-linux-gnueabihf/lib/cmake/
     mkdir -p ${NATIVE_PREFIX}
     cp ${SCRIPT_DIR}/armhf-toolchain.cmake /usr/local/arm-linux-gnueabihf/lib/cmake/
-    mkdir deps-cross-armhf && cd deps-cross-armhf
+    mkdir deps-cross-armhf
+    cd deps-cross-armhf
+
+    wget -q https://archives.boost.io/release/${VERSION_BOOST}/source/boost_${VERSION_BOOST//./_}.tar.bz2
+    tar -jxf boost_${VERSION_BOOST//./_}.tar.bz2
+    cd boost_${VERSION_BOOST//./_}
+    ./bootstrap.sh
+    # Build static libraries with -fPIC enabled, so they can later be linked into shared libraries
+    # (The Ubuntu static libraries are not built with -fPIC)
+    if [ "${SHARED_LIBS}" == "OFF" ]; then
+        BOOST_OPTIONS="cxxflags=-fPIC cflags=-fPIC link=static"
+    else
+        BOOST_OPTIONS=""
+    fi
+    echo "using gcc : armhf : arm-linux-gnueabihf-g++ ;" > user-config.jam
+    ./b2 \
+        --with-atomic \
+        --with-system \
+        --with-thread \
+        --with-filesystem \
+        --with-program_options \
+        --prefix=/usr/local/arm-linux-gnueabihf \
+        ${BOOST_OPTIONS} \
+        --user-config=user-config.jam \
+        -j`nproc` \
+        toolset=gcc-armhf \
+        install
+    cd ..
 
     git clone -b ${VERSION_JSON_CPP} https://github.com/open-source-parsers/jsoncpp.git
     cd jsoncpp

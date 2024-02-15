@@ -7,13 +7,69 @@
 #include "IConnectivityModule.h"
 #include "IReceiver.h"
 #include "LoggingModule.h"
+#include "TimeTypes.h"
+#include <aws/crt/Optional.h>
+#include <aws/crt/Types.h>
 #include <chrono>
 #include <future>
+#include <unordered_map>
+#include <vector>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
+
+// coverity[autosar_cpp14_a0_1_3_violation] false positive - function overrides sdk's virtual function.
+void
+SubscribeStreamHandler::OnStreamEvent( Aws::Greengrass::IoTCoreMessage *response )
+{
+    auto message = response->GetMessage();
+
+    if ( message.has_value() && message.value().GetPayload().has_value() )
+    {
+        Timestamp currentTime = mClock->monotonicTimeSinceEpochMs();
+
+        auto payloadBytes = message.value().GetPayload().value();
+        std::string payloadString( payloadBytes.begin(), payloadBytes.end() );
+        std::unordered_map<std::string, std::string> properties;
+        auto messageUserProperties = message.value().GetUserProperties();
+        if ( messageUserProperties.has_value() )
+        {
+            for ( auto &property : messageUserProperties.value() )
+            {
+                std::string name;
+                std::string value;
+                if ( property.GetKey().has_value() )
+                {
+                    auto propertyKey = property.GetKey().value();
+                    name = std::string( propertyKey.begin(), propertyKey.end() );
+                }
+                if ( property.GetValue().has_value() )
+                {
+                    auto propertyValue = property.GetValue().value();
+                    value = std::string( propertyValue.begin(), propertyValue.end() );
+                }
+
+                if ( !properties.emplace( name, value ).second )
+                {
+                    FWE_LOG_WARN( "Duplicate property name '" + name + "', first value will be kept" );
+                }
+            }
+        }
+
+        auto messageExpiryIntervalSec = message.value().GetMessageExpiryIntervalSeconds();
+        Timestamp messageExpiryMonotonicTimeSinceEpochMs = 0;
+        if ( messageExpiryIntervalSec.has_value() )
+        {
+            // convert seconds to milliseconds and calculate absolute message expiry time
+            messageExpiryMonotonicTimeSinceEpochMs =
+                currentTime + static_cast<uint64_t>( messageExpiryIntervalSec.value() ) * 1000;
+        }
+        mCallback( ReceivedChannelMessage{
+            payloadBytes.data(), payloadBytes.size(), properties, messageExpiryMonotonicTimeSinceEpochMs } );
+    }
+}
 
 AwsGGChannel::AwsGGChannel( IConnectivityModule *connectivityModule,
                             std::shared_ptr<PayloadManager> payloadManager,
@@ -61,9 +117,10 @@ AwsGGChannel::subscribe()
         return ConnectivityError::NoConnection;
     }
 
-    mSubscribeStreamHandler = std::make_shared<SubscribeStreamHandler>( [&]( uint8_t *data, size_t size ) {
-        notifyListeners<const std::uint8_t *, size_t>( &IReceiverCallback::onDataReceived, data, size );
-    } );
+    mSubscribeStreamHandler =
+        std::make_shared<SubscribeStreamHandler>( [&]( const ReceivedChannelMessage &receivedChannelMessage ) {
+            mListeners.notify( receivedChannelMessage );
+        } );
 
     if ( mConnection == nullptr )
     {
@@ -381,6 +438,12 @@ AwsGGChannel::sendFile( const std::string &filePath, size_t size, CollectionSche
     }
 
     return ConnectivityError::Success;
+}
+
+void
+AwsGGChannel::subscribeToDataReceived( OnDataReceivedCallback callback )
+{
+    mListeners.subscribe( callback );
 }
 
 bool

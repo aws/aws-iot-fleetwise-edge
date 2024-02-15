@@ -3,14 +3,16 @@
 
 #pragma once
 
+#include "Clock.h"
+#include "ClockHandler.h"
 #include "IConnectionTypes.h"
 #include "IConnectivityChannel.h"
 #include "IConnectivityModule.h"
+#include "IReceiver.h"
 #include "ISender.h"
+#include "Listener.h"
 #include "PayloadManager.h"
 #include <atomic>
-#include <aws/crt/Optional.h>
-#include <aws/crt/Types.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <cstddef>
 #include <cstdint>
@@ -19,14 +21,13 @@
 #include <mutex>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-using SubscribeCallback = std::function<void( uint8_t *, size_t )>;
+using SubscribeCallback = std::function<void( const ReceivedChannelMessage &receivedChannelMessage )>;
 
 class SubscribeStreamHandler : public Aws::Greengrass::SubscribeToIoTCoreStreamHandler
 {
@@ -39,19 +40,14 @@ public:
 
 private:
     // coverity[autosar_cpp14_a0_1_3_violation] false positive - function overrides sdk's virtual function.
-    void
-    OnStreamEvent( Aws::Greengrass::IoTCoreMessage *response ) override
-    {
-        auto message = response->GetMessage();
+    void OnStreamEvent( Aws::Greengrass::IoTCoreMessage *response ) override;
 
-        if ( message.has_value() && message.value().GetPayload().has_value() )
-        {
-            auto payloadBytes = message.value().GetPayload().value();
-            std::string payloadString( payloadBytes.begin(), payloadBytes.end() );
-            mCallback( payloadBytes.data(), payloadBytes.size() );
-        }
-    };
     SubscribeCallback mCallback;
+
+    /**
+     * @brief Clock member variable used to generate the time an MQTT message was received
+     */
+    std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
 };
 
 /**
@@ -107,6 +103,8 @@ public:
                                 size_t size,
                                 CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) override;
 
+    void subscribeToDataReceived( OnDataReceivedCallback callback ) override;
+
     void
     invalidateConnection()
     {
@@ -144,6 +142,7 @@ private:
      */
     static const size_t AWS_IOT_MAX_MESSAGE_SIZE = 131072; // = 128 KiB
     IConnectivityModule *mConnectivityModule;
+    ThreadSafeListeners<OnDataReceivedCallback> mListeners;
 
     std::mutex mConnectivityMutex;
     std::mutex mConnectivityLambdaMutex;

@@ -20,11 +20,12 @@ namespace IoTFleetWise
 bool
 CollectionInspectionWorkerThread::init( const std::shared_ptr<SignalBuffer> &inputSignalBuffer,
                                         const std::shared_ptr<CollectedDataReadyToPublish> &outputCollectedData,
-                                        uint32_t idleTimeMs,
+                                        uint32_t idleTimeMs
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                                        std::shared_ptr<RawData::BufferManager> rawBufferManager,
+                                        ,
+                                        std::shared_ptr<RawData::BufferManager> rawBufferManager
 #endif
-                                        bool dataReductionProbabilityDisabled )
+)
 {
     fInputSignalBuffer = inputSignalBuffer;
     fOutputCollectedData = outputCollectedData;
@@ -32,7 +33,6 @@ CollectionInspectionWorkerThread::init( const std::shared_ptr<SignalBuffer> &inp
     {
         fIdleTimeMs = idleTimeMs;
     }
-    fCollectionInspectionEngine.setDataReductionParameters( dataReductionProbabilityDisabled );
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     fCollectionInspectionEngine.setRawDataBufferManager( rawBufferManager );
@@ -117,7 +117,6 @@ CollectionInspectionWorkerThread::doWork( void *data )
     CollectionInspectionWorkerThread *consumer = static_cast<CollectionInspectionWorkerThread *>( data );
     TimePoint lastTimeEvaluated = { 0, 0 };
     Timestamp lastTraceOutput = 0;
-    uint64_t inputCounterSinceLastEvaluate = 0;
     uint32_t statisticInputMessagesProcessed = 0;
     uint32_t statisticDataSentOut = 0;
     uint32_t activations = 0;
@@ -139,7 +138,6 @@ CollectionInspectionWorkerThread::doWork( void *data )
         // Otherwise, go to sleep.
         if ( consumer->fUpdatedInspectionMatrix )
         {
-            CollectedSignal inputSignal( 0, 0, 0.0 );
             std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = {};
             CollectedCanRawFrame inputCANFrame( 0, 0, 0, buf, 0 );
             TimePoint currentTime = consumer->fClock->timeSinceEpoch();
@@ -257,7 +255,6 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         calculateMonotonicTime( currentTime, dataFrame.mCollectedCanRawFrame->receiveTime ),
                         dataFrame.mCollectedCanRawFrame->data,
                         dataFrame.mCollectedCanRawFrame->size );
-                    inputCounterSinceLastEvaluate++;
                     statisticInputMessagesProcessed++;
                 }
 
@@ -283,32 +280,36 @@ CollectionInspectionWorkerThread::doWork( void *data )
                 // Initiate data collection and upload after every condition evaluation
                 statisticDataSentOut += consumer->collectDataAndUpload();
             };
-            consumer->fInputSignalBuffer->consumeAll( consumeSignalGroups );
+            auto consumed = consumer->fInputSignalBuffer->consumeAll( consumeSignalGroups );
 
-            // Repeat data collection and upload after queue was emptied
-            statisticDataSentOut += consumer->collectDataAndUpload();
-
-            if ( consumer->fInputSignalBuffer->isEmpty() )
+            // If nothing was consumed and at least the evaluate interval has elapsed, evaluate the
+            // conditions to check heartbeat campaigns:
+            if ( ( consumed == 0 ) && ( ( consumer->fClock->monotonicTimeSinceEpochMs() -
+                                          lastTimeEvaluated.monotonicTimeMs ) >= EVALUATE_INTERVAL_MS ) )
             {
-                // Nothing is in the ring buffer to consume. Go to idle mode for some time.
-                uint32_t timeToWait = std::min( waitTimeMs, consumer->fIdleTimeMs );
-                // Print only every THREAD_IDLE_TIME_MS to avoid console spam
-                if ( consumer->fClock->monotonicTimeSinceEpochMs() >
-                     ( lastTraceOutput + LoggingModule::LOG_AGGREGATION_TIME_MS ) )
-                {
-                    FWE_LOG_TRACE( "Activations: " + std::to_string( activations ) +
-                                   ". Waiting for some data to come. Idling for: " + std::to_string( timeToWait ) +
-                                   " ms or until notify. Since last idling processed " +
-                                   std::to_string( statisticInputMessagesProcessed ) +
-                                   " incoming data packages and sent out " + std::to_string( statisticDataSentOut ) +
-                                   " packages out" );
-                    activations = 0;
-                    statisticInputMessagesProcessed = 0;
-                    statisticDataSentOut = 0;
-                    lastTraceOutput = consumer->fClock->monotonicTimeSinceEpochMs();
-                }
-                consumer->fWait.wait( timeToWait );
+                lastTimeEvaluated = consumer->fClock->timeSinceEpoch();
+                consumer->fCollectionInspectionEngine.evaluateConditions( lastTimeEvaluated );
+                statisticDataSentOut += consumer->collectDataAndUpload();
             }
+
+            // Nothing is in the ring buffer to consume. Go to idle mode for some time.
+            uint32_t timeToWait = std::min( waitTimeMs, consumer->fIdleTimeMs );
+            // Print only every THREAD_IDLE_TIME_MS to avoid console spam
+            if ( consumer->fClock->monotonicTimeSinceEpochMs() >
+                 ( lastTraceOutput + LoggingModule::LOG_AGGREGATION_TIME_MS ) )
+            {
+                FWE_LOG_TRACE( "Activations: " + std::to_string( activations ) +
+                               ". Waiting for some data to come. Idling for: " + std::to_string( timeToWait ) +
+                               " ms or until notify. Since last idling processed " +
+                               std::to_string( statisticInputMessagesProcessed ) +
+                               " incoming data packages and sent out " + std::to_string( statisticDataSentOut ) +
+                               " packages out" );
+                activations = 0;
+                statisticInputMessagesProcessed = 0;
+                statisticDataSentOut = 0;
+                lastTraceOutput = consumer->fClock->monotonicTimeSinceEpochMs();
+            }
+            consumer->fWait.wait( timeToWait );
         }
         else
         {
@@ -339,7 +340,7 @@ CollectionInspectionWorkerThread::collectDataAndUpload()
         else
         {
             collectedDataPackages++;
-            this->notifyListeners<>( &IDataReadyToPublishListener::onDataReadyToPublish );
+            this->mDataReadyListeners.notify();
         }
         collectedData =
             this->fCollectionInspectionEngine.collectNextDataToSend( this->fClock->timeSinceEpoch(), waitTimeMs );

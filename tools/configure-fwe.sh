@@ -213,14 +213,25 @@ else
     echo "Error: Unknown connection type ${CONNECTION_TYPE}"
 fi
 
+# Clear all existing interfaces in the template file:
+OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".networkInterfaces=[]"`
+
 if [ "${CAN_BUS0}" != "" ]; then
-    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".networkInterfaces[0].canInterface.interfaceName=\"${CAN_BUS0}\"" \
-        | jq ".networkInterfaces[1].obdInterface.interfaceName=\"${CAN_BUS0}\"" \
-        | jq ".networkInterfaces[1].obdInterface.pidRequestIntervalSeconds=5" \
-        | jq ".networkInterfaces[1].obdInterface.dtcRequestIntervalSeconds=5" \
-        | jq ".networkInterfaces[1].interfaceId=\"0\""`
-else
-    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".networkInterfaces=[]"`
+    CAN_INTERFACE=`echo "{}" | jq ".interfaceId=\"1\"" \
+        | jq ".type=\"canInterface\"" \
+        | jq ".canInterface.interfaceName=\"${CAN_BUS0}\"" \
+        | jq ".canInterface.protocolName=\"CAN\"" \
+        | jq ".canInterface.protocolVersion=\"2.0A\""`
+    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".networkInterfaces+=[${CAN_INTERFACE}]"`
+
+    OBD_INTERFACE=`echo "{}" | jq ".interfaceId=\"0\"" \
+        | jq ".type=\"obdInterface\"" \
+        | jq ".obdInterface.interfaceName=\"${CAN_BUS0}\"" \
+        | jq ".obdInterface.pidRequestIntervalSeconds=5" \
+        | jq ".obdInterface.dtcRequestIntervalSeconds=5" \
+        | jq ".obdInterface.broadcastRequests=true" \
+        | jq ".obdInterface.obdStandard=\"J1979\""`
+    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".networkInterfaces+=[${OBD_INTERFACE}]"`
 fi
 
 if [ "${CREDS_ENDPOINT_URL}" != "" ] || [ "${CREDS_ROLE_ALIAS}" != "" ]; then

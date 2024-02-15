@@ -16,7 +16,9 @@ enum class VehicleDataSourceProtocol
     INVALID_PROTOCOL,
     OBD,
     RAW_SOCKET,
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     COMPLEX_DATA
+#endif
     // Add any new protocols to the list of supported protocols below
 };
 

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "DataSenderManagerWorkerThread.h"
-#include "GeohashInfo.h"
 #include "LoggingModule.h"
 #include "OBDDataTypes.h"
 #include "SignalTypes.h"
@@ -187,8 +186,7 @@ DataSenderManagerWorkerThread::doWork( void *data )
             // Avoid invoking Data Collection Sender if there is nothing to send.
             if ( triggeredCollectionSchemeDataPtr->signals.empty() &&
                  triggeredCollectionSchemeDataPtr->canFrames.empty() &&
-                 triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.empty() &&
-                 ( !triggeredCollectionSchemeDataPtr->mGeohashInfo.hasItems() )
+                 triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.empty()
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
                  && triggeredCollectionSchemeDataPtr->uploadedS3Objects.empty()
 #endif
@@ -209,8 +207,7 @@ DataSenderManagerWorkerThread::doWork( void *data )
                     firstSignalValues + firstSignalTimestamp +
                     " trigger timestamp: " + std::to_string( triggeredCollectionSchemeDataPtr->triggerTime ) +
                     " raw CAN frames:" + std::to_string( triggeredCollectionSchemeDataPtr->canFrames.size() ) +
-                    " DTCs:" + std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() ) +
-                    " Geohash:" + triggeredCollectionSchemeDataPtr->mGeohashInfo.mGeohashString
+                    " DTCs:" + std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() )
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
                     + " Uploaded S3 Objects: " +
                     std::to_string( triggeredCollectionSchemeDataPtr->uploadedS3Objects.size() )

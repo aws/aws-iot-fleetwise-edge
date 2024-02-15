@@ -83,9 +83,7 @@ protected:
         consCollectionSchemes = std::shared_ptr<const InspectionMatrix>( collectionSchemes );
         collectionSchemes->conditions.resize( 4 );
         collectionSchemes->conditions[0].condition = getAlwaysFalseCondition().get();
-        collectionSchemes->conditions[0].probabilityToSend = 1.0;
         collectionSchemes->conditions[1].condition = getAlwaysFalseCondition().get();
-        collectionSchemes->conditions[1].probabilityToSend = 1.0;
 
         signalBufferPtr.reset( new SignalBuffer( 1000 ) );
         // Init the output buffer
@@ -223,11 +221,9 @@ TEST_F( CollectionInspectionWorkerThreadTest, CollectionQueueFull )
     collectionSchemes->conditions[1].signals.push_back( s1 );
     collectionSchemes->conditions[1].condition = getAlwaysTrueCondition().get();
     collectionSchemes->conditions[2].signals.push_back( s1 );
-    collectionSchemes->conditions[2].probabilityToSend = 1.0;
     collectionSchemes->conditions[2].condition = getAlwaysTrueCondition().get();
     collectionSchemes->conditions[3].signals.push_back( s1 );
     collectionSchemes->conditions[3].condition = getAlwaysTrueCondition().get();
-    collectionSchemes->conditions[3].probabilityToSend = 1.0;
     worker.onChangeInspectionMatrix( consCollectionSchemes );
     Timestamp timestamp = fClock->systemTimeSinceEpochMs();
     CollectedSignalsGroup collectedSignalsGroup;

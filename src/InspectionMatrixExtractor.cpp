@@ -54,7 +54,7 @@ CollectionSchemeManager::updateRawDataBufferConfig(
                 if ( interface != complexDataDecoderDictionary->complexMessageDecoderMethod.end() )
                 {
                     auto complexDataMessage = std::find_if(
-                        interface->second.begin(), interface->second.end(), [signalId]( const auto &pair ) {
+                        interface->second.begin(), interface->second.end(), [signalId]( const auto &pair ) -> bool {
                             return pair.second.mSignalId == signalId;
                         } );
                     if ( complexDataMessage != interface->second.end() )
@@ -78,7 +78,6 @@ CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectio
     conditionData.afterDuration = collectionScheme->getAfterDurationMs();
     conditionData.includeActiveDtcs = collectionScheme->isActiveDTCsIncluded();
     conditionData.triggerOnlyOnRisingEdge = collectionScheme->isTriggerOnlyOnRisingEdge();
-    conditionData.probabilityToSend = collectionScheme->getProbabilityToSend();
 
     /*
      * use for loop to copy signalInfo and CANframe over to avoid error or memory issue
@@ -215,8 +214,7 @@ CollectionSchemeManager::inspectionMatrixExtractor( const std::shared_ptr<Inspec
 void
 CollectionSchemeManager::inspectionMatrixUpdater( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
 {
-    notifyListeners<const std::shared_ptr<const InspectionMatrix> &>(
-        &IActiveConditionProcessor::onChangeInspectionMatrix, inspectionMatrix );
+    mInspectionMatrixChangeListeners.notify( inspectionMatrix );
 }
 
 } // namespace IoTFleetWise

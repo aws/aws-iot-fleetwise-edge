@@ -5,8 +5,9 @@
 
 #include "CacheAndPersist.h"
 #include "CollectionInspectionAPITypes.h"
-#include "CollectionSchemeManagementListener.h"
 #include "ICollectionScheme.h"
+#include "IDecoderManifest.h"
+
 namespace Aws
 {
 namespace IoTFleetWise

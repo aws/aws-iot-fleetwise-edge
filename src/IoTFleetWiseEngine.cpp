@@ -6,11 +6,9 @@
 #include "AwsIotConnectivityModule.h"
 #include "AwsSDKMemoryManager.h"
 #include "CollectionInspectionAPITypes.h"
-#include "CollectionSchemeManagementListener.h"
 #include "DataSenderManager.h"
-#include "IActiveConditionProcessor.h"
-#include "IActiveDecoderDictionaryListener.h"
 #include "ILogger.h"
+#include "IoTFleetWiseConfig.h"
 #include "LogLevel.h"
 #include "LoggingModule.h"
 #include "MqttClientWrapper.h"
@@ -20,14 +18,13 @@
 #include <aws/crt/Api.h>
 #include <aws/crt/Types.h>
 #include <aws/iot/Mqtt5Client.h>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <exception>
 #include <fstream>
+#include <functional>
 #include <utility>
 
-#if defined( FWE_FEATURE_IWAVE_GPS ) || defined( FWE_FEATURE_EXTERNAL_GPS )
-#include <stdexcept>
-#endif
 #ifdef FWE_FEATURE_GREENGRASSV2
 #include "AwsGGConnectivityModule.h"
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -37,16 +34,12 @@
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include "Credentials.h"
 #include "DataSenderIonWriter.h"
-#include "IActiveCollectionSchemesListener.h"
 #include "RawDataManager.h"
 #include "TransferManagerWrapper.h"
 #include <aws/core/client/ClientConfiguration.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/S3ServiceClientModel.h>
 #include <aws/transfer/TransferManager.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 #endif
 
 namespace Aws
@@ -54,11 +47,21 @@ namespace Aws
 namespace IoTFleetWise
 {
 
+static constexpr uint64_t DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 10000;
 static const std::string CAN_INTERFACE_TYPE = "canInterface";
 static const std::string EXTERNAL_CAN_INTERFACE_TYPE = "externalCanInterface";
 static const std::string OBD_INTERFACE_TYPE = "obdInterface";
 #ifdef FWE_FEATURE_ROS2
 static const std::string ROS2_INTERFACE_TYPE = "ros2Interface";
+#endif
+#ifdef FWE_FEATURE_IWAVE_GPS
+static const std::string CONFIG_SECTION_IWAVE_GPS = "iWaveGpsExample";
+#endif
+#ifdef FWE_FEATURE_EXTERNAL_GPS
+static const std::string CONFIG_SECTION_EXTERNAL_GPS = "externalGpsExample";
+#endif
+#ifdef FWE_FEATURE_AAOS_VHAL
+static const std::string CONFIG_SECTION_AAOS_VHAL = "aaosVhalExample";
 #endif
 
 namespace
@@ -87,30 +90,6 @@ getFileContents( const std::string &p )
     return ret;
 }
 
-#if defined( FWE_FEATURE_IWAVE_GPS ) || defined( FWE_FEATURE_EXTERNAL_GPS )
-uint32_t
-stringToU32( const std::string &value )
-{
-    try
-    {
-        return static_cast<uint32_t>( std::stoul( value ) );
-    }
-    catch ( const std::exception &e )
-    {
-        throw std::runtime_error( "Could not cast " + value +
-                                  " to integer, invalid input: " + std::string( e.what() ) );
-    }
-}
-#endif
-
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-size_t
-getJsonValueAsSize( const Json::Value &jsonValue )
-{
-    return sizeof( size_t ) >= sizeof( uint64_t ) ? jsonValue.asUInt64() : jsonValue.asUInt();
-}
-#endif
-
 } // namespace
 
 IoTFleetWiseEngine::IoTFleetWiseEngine()
@@ -129,46 +108,45 @@ IoTFleetWiseEngine::~IoTFleetWiseEngine()
 }
 
 bool
-IoTFleetWiseEngine::connect( const Json::Value &config )
+IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
 {
     // Main bootstrap sequence.
     try
     {
-        const auto persistencyPath = config["staticConfig"]["persistency"]["persistencyPath"].asString();
+        IoTFleetWiseConfig config( jsonConfig );
+        const auto persistencyPath = config["staticConfig"]["persistency"]["persistencyPath"].asStringRequired();
         /*************************Payload Manager and Persistency library bootstrap begin*********/
-
         // Create an object for Persistency
         mPersistDecoderManifestCollectionSchemesAndData = std::make_shared<CacheAndPersist>(
-            persistencyPath, config["staticConfig"]["persistency"]["persistencyPartitionMaxSize"].asInt() );
+            persistencyPath, config["staticConfig"]["persistency"]["persistencyPartitionMaxSize"].asSizeRequired() );
         if ( !mPersistDecoderManifestCollectionSchemesAndData->init() )
         {
             FWE_LOG_ERROR( "Failed to init persistency library" );
         }
-        uint64_t persistencyUploadRetryIntervalMs = DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS;
-        if ( config["staticConfig"]["persistency"].isMember( "persistencyUploadRetryIntervalMs" ) )
-        {
-            persistencyUploadRetryIntervalMs = static_cast<uint64_t>(
-                config["staticConfig"]["persistency"]["persistencyUploadRetryIntervalMs"].asInt() );
-        }
+        uint64_t persistencyUploadRetryIntervalMs =
+            config["staticConfig"]["persistency"]["persistencyUploadRetryIntervalMs"].asU64Optional().get_value_or(
+                DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS );
         // Payload Manager for offline data management
         mPayloadManager = std::make_shared<PayloadManager>( mPersistDecoderManifestCollectionSchemesAndData );
 
         /*************************Payload Manager and Persistency library bootstrap end************/
 
         /*************************CAN InterfaceID to InternalID Translator begin*********/
-        for ( const auto &interfaceName : config["networkInterfaces"] )
+        for ( unsigned i = 0; i < config["networkInterfaces"].getArraySizeRequired(); i++ )
         {
-            if ( ( interfaceName["type"].asString() == CAN_INTERFACE_TYPE ) ||
-                 ( interfaceName["type"].asString() == EXTERNAL_CAN_INTERFACE_TYPE ) )
+            auto networkInterface = config["networkInterfaces"][i];
+            auto networkInterfaceType = networkInterface["type"].asStringRequired();
+            if ( ( networkInterfaceType == CAN_INTERFACE_TYPE ) ||
+                 ( networkInterfaceType == EXTERNAL_CAN_INTERFACE_TYPE ) )
             {
-                mCANIDTranslator.add( interfaceName["interfaceId"].asString() );
+                mCANIDTranslator.add( networkInterface["interfaceId"].asStringRequired() );
             }
         }
 #ifdef FWE_FEATURE_IWAVE_GPS
-        if ( config["staticConfig"].isMember( "iWaveGpsExample" ) )
+        if ( config["staticConfig"].isMember( CONFIG_SECTION_IWAVE_GPS ) )
         {
-            mCANIDTranslator.add(
-                config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::CAN_CHANNEL_NUMBER].asString() );
+            mCANIDTranslator.add( config["staticConfig"][CONFIG_SECTION_IWAVE_GPS][IWaveGpsSource::CAN_CHANNEL_NUMBER]
+                                      .asStringRequired() );
         }
         else
         {
@@ -176,10 +154,11 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         }
 #endif
 #ifdef FWE_FEATURE_EXTERNAL_GPS
-        if ( config["staticConfig"].isMember( "externalGpsExample" ) )
+        if ( config["staticConfig"].isMember( CONFIG_SECTION_EXTERNAL_GPS ) )
         {
             mCANIDTranslator.add(
-                config["staticConfig"]["externalGpsExample"][ExternalGpsSource::CAN_CHANNEL_NUMBER].asString() );
+                config["staticConfig"][CONFIG_SECTION_EXTERNAL_GPS][ExternalGpsSource::CAN_CHANNEL_NUMBER]
+                    .asStringRequired() );
         }
         else
         {
@@ -187,10 +166,10 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         }
 #endif
 #ifdef FWE_FEATURE_AAOS_VHAL
-        if ( config["staticConfig"].isMember( "aaosVhalExample" ) )
+        if ( config["staticConfig"].isMember( CONFIG_SECTION_AAOS_VHAL ) )
         {
-            mCANIDTranslator.add(
-                config["staticConfig"]["aaosVhalExample"][AaosVhalSource::CAN_CHANNEL_NUMBER].asString() );
+            mCANIDTranslator.add( config["staticConfig"][CONFIG_SECTION_AAOS_VHAL][AaosVhalSource::CAN_CHANNEL_NUMBER]
+                                      .asStringRequired() );
         }
         else
         {
@@ -206,7 +185,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         if ( config["staticConfig"]["internalParameters"].isMember( "maximumAwsSdkHeapMemoryBytes" ) )
         {
             maxAwsSdkHeapMemoryBytes =
-                config["staticConfig"]["internalParameters"]["maximumAwsSdkHeapMemoryBytes"].asUInt();
+                config["staticConfig"]["internalParameters"]["maximumAwsSdkHeapMemoryBytes"].asSizeRequired();
             if ( ( maxAwsSdkHeapMemoryBytes != 0U ) &&
                  AwsSDKMemoryManager::getInstance().setLimit( maxAwsSdkHeapMemoryBytes ) )
             {
@@ -223,54 +202,45 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             FWE_LOG_TRACE( "Maximum AWS SDK Heap Memory Bytes will use default value" );
         }
 
-#ifdef FWE_FEATURE_GREENGRASSV2
-        if ( config["staticConfig"]["mqttConnection"]["connectionType"].asString() == "iotGreengrassV2" )
-        {
-            FWE_LOG_INFO( "ConnectionType is iotGreengrassV2" )
-            mConnectivityModule = std::make_shared<AwsGGConnectivityModule>( bootstrapPtr );
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-            mAwsCredentialsProvider = std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>();
-#endif
-        }
-        else
-#endif
+        auto mqttConfig = config["staticConfig"]["mqttConnection"];
+        auto clientId = mqttConfig["clientId"].asStringRequired();
+        std::string connectionType = mqttConfig["connectionType"].asStringOptional().get_value_or( "iotCore" );
+
+        if ( connectionType == "iotCore" )
         {
             std::string privateKey;
             std::string certificate;
             std::string rootCA;
-            FWE_LOG_INFO( "ConnectionType is iotCore " +
-                          config["staticConfig"]["mqttConnection"]["connectionType"].asString() )
+            FWE_LOG_INFO( "ConnectionType is iotCore" );
             // fetch connection parameters from config
-            if ( config["staticConfig"]["mqttConnection"].isMember( "privateKey" ) )
+            if ( mqttConfig.isMember( "privateKey" ) )
             {
-                privateKey = config["staticConfig"]["mqttConnection"]["privateKey"].asString();
+                privateKey = mqttConfig["privateKey"].asStringRequired();
             }
-            else if ( config["staticConfig"]["mqttConnection"].isMember( "privateKeyFilename" ) )
+            else if ( mqttConfig.isMember( "privateKeyFilename" ) )
             {
-                privateKey =
-                    getFileContents( config["staticConfig"]["mqttConnection"]["privateKeyFilename"].asString() );
+                privateKey = getFileContents( mqttConfig["privateKeyFilename"].asStringRequired() );
             }
-            if ( config["staticConfig"]["mqttConnection"].isMember( "certificate" ) )
+            if ( mqttConfig.isMember( "certificate" ) )
             {
-                certificate = config["staticConfig"]["mqttConnection"]["certificate"].asString();
+                certificate = mqttConfig["certificate"].asStringRequired();
             }
-            else if ( config["staticConfig"]["mqttConnection"].isMember( "certificateFilename" ) )
+            else if ( mqttConfig.isMember( "certificateFilename" ) )
             {
-                certificate =
-                    getFileContents( config["staticConfig"]["mqttConnection"]["certificateFilename"].asString() );
+                certificate = getFileContents( mqttConfig["certificateFilename"].asStringRequired() );
             }
-            if ( config["staticConfig"]["mqttConnection"].isMember( "rootCA" ) )
+            if ( mqttConfig.isMember( "rootCA" ) )
             {
-                rootCA = config["staticConfig"]["mqttConnection"]["rootCA"].asString();
+                rootCA = mqttConfig["rootCA"].asStringRequired();
             }
-            else if ( config["staticConfig"]["mqttConnection"].isMember( "rootCAFilename" ) )
+            else if ( mqttConfig.isMember( "rootCAFilename" ) )
             {
-                rootCA = getFileContents( config["staticConfig"]["mqttConnection"]["rootCAFilename"].asString() );
+                rootCA = getFileContents( mqttConfig["rootCAFilename"].asStringRequired() );
             }
             // coverity[autosar_cpp14_a20_8_5_violation] - can't use make_unique as the constructor is private
             auto builder = std::unique_ptr<Aws::Iot::Mqtt5ClientBuilder>(
                 Aws::Iot::Mqtt5ClientBuilder::NewMqtt5ClientBuilderWithMtlsFromMemory(
-                    config["staticConfig"]["mqttConnection"]["endpointUrl"].asString().c_str(),
+                    mqttConfig["endpointUrl"].asStringRequired().c_str(),
                     Crt::ByteCursorFromCString( certificate.c_str() ),
                     Crt::ByteCursorFromCString( privateKey.c_str() ) ) );
 
@@ -280,6 +250,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 FWE_LOG_ERROR( "Failed to setup mqtt5 client builder with error code " +
                                std::to_string( Aws::Crt::LastError() ) + ": " +
                                Aws::Crt::ErrorDebugString( Aws::Crt::LastError() ) );
+                return false;
             }
             else
             {
@@ -287,112 +258,103 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 builderWrapper = std::make_unique<MqttClientBuilderWrapper>( std::move( builder ) );
             }
 
-            mConnectivityModule = std::make_shared<AwsIotConnectivityModule>(
-                rootCA, config["staticConfig"]["mqttConnection"]["clientId"].asString(), std::move( builderWrapper ) );
+            mConnectivityModule =
+                std::make_shared<AwsIotConnectivityModule>( rootCA, clientId, std::move( builderWrapper ) );
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
             if ( config["staticConfig"].isMember( "credentialsProvider" ) )
             {
                 auto crtCredentialsProvider = createX509CredentialsProvider(
                     bootstrapPtr,
-                    config["staticConfig"]["mqttConnection"]["clientId"].asString(),
+                    clientId,
                     privateKey,
                     certificate,
-                    config["staticConfig"]["credentialsProvider"]["endpointUrl"].asString(),
-                    config["staticConfig"]["credentialsProvider"]["roleAlias"].asString() );
+                    config["staticConfig"]["credentialsProvider"]["endpointUrl"].asStringRequired(),
+                    config["staticConfig"]["credentialsProvider"]["roleAlias"].asStringRequired() );
                 mAwsCredentialsProvider = std::make_shared<CrtCredentialsProviderAdapter>( crtCredentialsProvider );
             }
 #endif
         }
+#ifdef FWE_FEATURE_GREENGRASSV2
+        else if ( connectionType == "iotGreengrassV2" )
+        {
+            FWE_LOG_INFO( "ConnectionType is iotGreengrassV2" );
+            mConnectivityModule = std::make_shared<AwsGGConnectivityModule>( bootstrapPtr );
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            mAwsCredentialsProvider = std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>();
+#endif
+        }
+#endif
+        else
+        {
+            FWE_LOG_ERROR( "Unknown connection type: " + connectionType );
+            return false;
+        }
 
         // Only CAN data channel needs a payloadManager object for persistency and compression support,
         // for other components this will be nullptr
-        mConnectivityChannelSendVehicleData = mConnectivityModule->createNewChannel(
-            mPayloadManager, config["staticConfig"]["mqttConnection"]["canDataTopic"].asString() );
+        mConnectivityChannelSendVehicleData =
+            mConnectivityModule->createNewChannel( mPayloadManager, mqttConfig["canDataTopic"].asStringRequired() );
 
         mConnectivityChannelReceiveCollectionSchemeList = mConnectivityModule->createNewChannel(
-            nullptr, config["staticConfig"]["mqttConnection"]["collectionSchemeListTopic"].asString(), true );
+            nullptr, mqttConfig["collectionSchemeListTopic"].asStringRequired(), true );
 
         mConnectivityChannelReceiveDecoderManifest = mConnectivityModule->createNewChannel(
-            nullptr, config["staticConfig"]["mqttConnection"]["decoderManifestTopic"].asString(), true );
+            nullptr, mqttConfig["decoderManifestTopic"].asStringRequired(), true );
 
         /*
          * Over this channel metrics like performance (resident ram pages, cpu time spent in threads)
          * and tracing metrics like internal variables and time spent in specially instrumented functions
          * spent are uploaded in json format over mqtt.
          */
-        if ( config["staticConfig"]["mqttConnection"]["metricsUploadTopic"].asString().length() > 0 )
+        auto metricsUploadTopic = mqttConfig["metricsUploadTopic"].asStringOptional().get_value_or( "" );
+        if ( !metricsUploadTopic.empty() )
         {
-            mConnectivityChannelMetricsUpload = mConnectivityModule->createNewChannel(
-                nullptr, config["staticConfig"]["mqttConnection"]["metricsUploadTopic"].asString() );
+            mConnectivityChannelMetricsUpload = mConnectivityModule->createNewChannel( nullptr, metricsUploadTopic );
         }
         /*
          * Over this channel log messages that are currently logged to STDOUT are uploaded in json
          * format over MQTT.
          */
-        if ( config["staticConfig"]["mqttConnection"]["loggingUploadTopic"].asString().length() > 0 )
+        auto loggingUploadTopic = mqttConfig["loggingUploadTopic"].asStringOptional().get_value_or( "" );
+        if ( !loggingUploadTopic.empty() )
         {
-            mConnectivityChannelLogsUpload = mConnectivityModule->createNewChannel(
-                nullptr, config["staticConfig"]["mqttConnection"]["loggingUploadTopic"].asString() );
+            mConnectivityChannelLogsUpload = mConnectivityModule->createNewChannel( nullptr, loggingUploadTopic );
         }
 
         // Create an ISender for sending Checkins
-        mConnectivityChannelSendCheckin = mConnectivityModule->createNewChannel(
-            nullptr, config["staticConfig"]["mqttConnection"]["checkinTopic"].asString() );
+        mConnectivityChannelSendCheckin =
+            mConnectivityModule->createNewChannel( nullptr, mqttConfig["checkinTopic"].asStringRequired() );
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
         std::shared_ptr<RawData::BufferManager> rawDataBufferManager;
         boost::optional<RawData::BufferManagerConfig> rawDataBufferManagerConfig;
         auto rawDataBufferJsonConfig = config["staticConfig"]["visionSystemDataCollection"]["rawDataBuffer"];
-        auto rawBufferSize = rawDataBufferJsonConfig.isMember( "maxSize" )
-                                 ? boost::make_optional( getJsonValueAsSize( rawDataBufferJsonConfig["maxSize"] ) )
-                                 : boost::none;
+        auto rawBufferSize = rawDataBufferJsonConfig["maxSize"].asSizeOptional();
 
         if ( rawBufferSize.get_value_or( SIZE_MAX ) > 0 )
         {
             // Create a Raw Data Buffer Manager
             std::vector<RawData::SignalBufferOverrides> rawDataBufferOverridesPerSignal;
-            if ( rawDataBufferJsonConfig.isMember( "overridesPerSignal" ) )
+            for ( auto i = 0U; i < rawDataBufferJsonConfig["overridesPerSignal"].getArraySizeOptional(); i++ )
             {
-                for ( const auto &signalOverridesJson : rawDataBufferJsonConfig["overridesPerSignal"] )
-                {
-                    RawData::SignalBufferOverrides signalOverrides;
-                    signalOverrides.interfaceId = signalOverridesJson["interfaceId"].asString();
-                    signalOverrides.messageId = signalOverridesJson["messageId"].asString();
-                    signalOverrides.reservedBytes =
-                        signalOverridesJson.isMember( "reservedSize" )
-                            ? boost::make_optional( getJsonValueAsSize( signalOverridesJson["reservedSize"] ) )
-                            : boost::none;
-                    signalOverrides.maxNumOfSamples =
-                        signalOverridesJson.isMember( "maxSamples" )
-                            ? boost::make_optional( getJsonValueAsSize( signalOverridesJson["maxSamples"] ) )
-                            : boost::none;
-                    signalOverrides.maxBytesPerSample =
-                        signalOverridesJson.isMember( "maxSizePerSample" )
-                            ? boost::make_optional( getJsonValueAsSize( signalOverridesJson["maxSizePerSample"] ) )
-                            : boost::none;
-                    signalOverrides.maxBytes =
-                        signalOverridesJson.isMember( "maxSize" )
-                            ? boost::make_optional( getJsonValueAsSize( signalOverridesJson["maxSize"] ) )
-                            : boost::none;
-                    rawDataBufferOverridesPerSignal.emplace_back( signalOverrides );
-                }
+                auto signalOverridesJson = rawDataBufferJsonConfig["overridesPerSignal"][i];
+                RawData::SignalBufferOverrides signalOverrides;
+                signalOverrides.interfaceId = signalOverridesJson["interfaceId"].asStringRequired();
+                signalOverrides.messageId = signalOverridesJson["messageId"].asStringRequired();
+                signalOverrides.reservedBytes = signalOverridesJson["reservedSize"].asSizeOptional();
+                signalOverrides.maxNumOfSamples = signalOverridesJson["maxSamples"].asSizeOptional();
+                signalOverrides.maxBytesPerSample = signalOverridesJson["maxSizePerSample"].asSizeOptional();
+                signalOverrides.maxBytes = signalOverridesJson["maxSize"].asSizeOptional();
+                rawDataBufferOverridesPerSignal.emplace_back( signalOverrides );
             }
-            rawDataBufferManagerConfig = RawData::BufferManagerConfig::create(
-                rawBufferSize,
-                rawDataBufferJsonConfig.isMember( "reservedSizePerSignal" )
-                    ? boost::make_optional( getJsonValueAsSize( rawDataBufferJsonConfig["reservedSizePerSignal"] ) )
-                    : boost::none,
-                rawDataBufferJsonConfig.isMember( "maxSamplesPerSignal" )
-                    ? boost::make_optional( getJsonValueAsSize( rawDataBufferJsonConfig["maxSamplesPerSignal"] ) )
-                    : boost::none,
-                rawDataBufferJsonConfig.isMember( "maxSizePerSample" )
-                    ? boost::make_optional( getJsonValueAsSize( rawDataBufferJsonConfig["maxSizePerSample"] ) )
-                    : boost::none,
-                rawDataBufferJsonConfig.isMember( "maxSizePerSignal" )
-                    ? boost::make_optional( getJsonValueAsSize( rawDataBufferJsonConfig["maxSizePerSignal"] ) )
-                    : boost::none,
-                rawDataBufferOverridesPerSignal );
+            rawDataBufferManagerConfig =
+                RawData::BufferManagerConfig::create( rawBufferSize,
+                                                      rawDataBufferJsonConfig["reservedSizePerSignal"].asSizeOptional(),
+                                                      rawDataBufferJsonConfig["maxSamplesPerSignal"].asSizeOptional(),
+                                                      rawDataBufferJsonConfig["maxSizePerSample"].asSizeOptional(),
+                                                      rawDataBufferJsonConfig["maxSizePerSignal"].asSizeOptional(),
+                                                      rawDataBufferOverridesPerSignal );
             if ( !rawDataBufferManagerConfig )
             {
                 FWE_LOG_ERROR( "Failed to create raw data buffer manager config" );
@@ -403,7 +365,10 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 #endif
 
         // For asynchronous connect the call needs to be done after all channels created and setTopic calls
-        mConnectivityModule->connect();
+        if ( !mConnectivityModule->connect() )
+        {
+            return false;
+        }
         /*************************Connectivity bootstrap end***************************************/
 
         /*************************Remote Profiling bootstrap begin**********************************/
@@ -416,7 +381,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
              * "Warning" all log messages with this or a higher log level are mirrored over MQTT
              */
             stringToLogLevel(
-                config["staticConfig"]["remoteProfilerDefaultValues"]["loggingUploadLevelThreshold"].asString(),
+                config["staticConfig"]["remoteProfilerDefaultValues"]["loggingUploadLevelThreshold"].asStringRequired(),
                 logThreshold );
 
             /*
@@ -438,10 +403,11 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             mRemoteProfiler = std::make_unique<RemoteProfiler>(
                 mConnectivityChannelMetricsUpload,
                 mConnectivityChannelLogsUpload,
-                config["staticConfig"]["remoteProfilerDefaultValues"]["metricsUploadIntervalMs"].asUInt(),
-                config["staticConfig"]["remoteProfilerDefaultValues"]["loggingUploadMaxWaitBeforeUploadMs"].asUInt(),
+                config["staticConfig"]["remoteProfilerDefaultValues"]["metricsUploadIntervalMs"].asU32Required(),
+                config["staticConfig"]["remoteProfilerDefaultValues"]["loggingUploadMaxWaitBeforeUploadMs"]
+                    .asU32Required(),
                 logThreshold,
-                config["staticConfig"]["remoteProfilerDefaultValues"]["profilerPrefix"].asString() );
+                config["staticConfig"]["remoteProfilerDefaultValues"]["profilerPrefix"].asStringRequired() );
             if ( !mRemoteProfiler->start() )
             {
                 FWE_LOG_WARN(
@@ -456,22 +422,23 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 
         // Below are three buffers to be shared between Vehicle Data Consumer and Collection Engine
         // Signal Buffer are a lock-free multi-producer single consumer buffer
-        auto signalBufferPtr =
-            std::make_shared<SignalBuffer>( config["staticConfig"]["bufferSizes"]["decodedSignalsBufferSize"].asInt() );
+        auto signalBufferPtr = std::make_shared<SignalBuffer>(
+            config["staticConfig"]["bufferSizes"]["decodedSignalsBufferSize"].asSizeRequired() );
         // Create the Data Inspection Queue
         mCollectedDataReadyToPublish = std::make_shared<CollectedDataReadyToPublish>(
-            config["staticConfig"]["internalParameters"]["readyToPublishDataBufferSize"].asInt() );
+            config["staticConfig"]["internalParameters"]["readyToPublishDataBufferSize"].asSizeRequired() );
 
         // Init and start the Inspection Engine
         mCollectionInspectionWorkerThread = std::make_shared<CollectionInspectionWorkerThread>();
         if ( ( !mCollectionInspectionWorkerThread->init(
                  signalBufferPtr,
                  mCollectedDataReadyToPublish,
-                 config["staticConfig"]["threadIdleTimes"]["inspectionThreadIdleTimeMs"].asUInt(),
+                 config["staticConfig"]["threadIdleTimes"]["inspectionThreadIdleTimeMs"].asU32Required()
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                 rawDataBufferManager,
+                     ,
+                 rawDataBufferManager
 #endif
-                 config["staticConfig"]["internalParameters"]["dataReductionProbabilityDisabled"].asBool() ) ) ||
+                 ) ) ||
              ( !mCollectionInspectionWorkerThread->start() ) )
         {
             FWE_LOG_ERROR( "Failed to init and start the Inspection Engine" );
@@ -488,7 +455,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         }
         else
         {
-            auto s3MaxConnections = config["staticConfig"]["s3Upload"]["maxConnections"].asUInt();
+            auto s3MaxConnections = config["staticConfig"]["s3Upload"]["maxConnections"].asU32Required();
             s3MaxConnections = s3MaxConnections > 0U ? s3MaxConnections : 1U;
             auto createTransferManagerWrapper =
                 [this, s3MaxConnections]( Aws::Client::ClientConfiguration &clientConfiguration,
@@ -506,23 +473,23 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 return std::make_shared<TransferManagerWrapper>(
                     Aws::Transfer::TransferManager::Create( transferManagerConfiguration ) );
             };
-            mS3Sender = std::make_shared<S3Sender>( mPayloadManager,
-                                                    createTransferManagerWrapper,
-                                                    config["staticConfig"]["s3Upload"]["multipartSize"].asUInt() );
+            mS3Sender =
+                std::make_shared<S3Sender>( mPayloadManager,
+                                            createTransferManagerWrapper,
+                                            config["staticConfig"]["s3Upload"]["multipartSize"].asSizeRequired() );
         }
-        auto ionWriter = std::make_shared<DataSenderIonWriter>(
-            rawDataBufferManager, config["staticConfig"]["mqttConnection"]["clientId"].asString() );
+        auto ionWriter = std::make_shared<DataSenderIonWriter>( rawDataBufferManager, clientId );
 #endif
         mDataSenderManager = std::make_shared<DataSenderManager>(
             mConnectivityChannelSendVehicleData,
             mPayloadManager,
             mCANIDTranslator,
-            config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asUInt()
+            config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asU32Required()
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
                 ,
             mS3Sender,
             ionWriter,
-            config["staticConfig"]["mqttConnection"]["clientId"].asString()
+            clientId
 #endif
         );
         mDataSenderManagerWorkerThread = std::make_shared<DataSenderManagerWorkerThread>(
@@ -533,11 +500,8 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
             return false;
         }
 
-        if ( !mCollectionInspectionWorkerThread->subscribeListener( mDataSenderManagerWorkerThread.get() ) )
-        {
-            FWE_LOG_ERROR( "Failed register the Data Sender Thread to the Inspection Module" );
-            return false;
-        }
+        mCollectionInspectionWorkerThread->subscribeToDataReadyToPublish(
+            std::bind( &DataSenderManagerWorkerThread::onDataReadyToPublish, mDataSenderManagerWorkerThread.get() ) );
         /*************************DataSender bootstrap end*********************************/
 
         /*************************CollectionScheme Ingestion bootstrap begin*********************************/
@@ -556,7 +520,7 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 
         if ( !mCollectionSchemeManagerPtr->init(
                  config["staticConfig"]["publishToCloudParameters"]["collectionSchemeManagementCheckinIntervalMs"]
-                     .asUInt(),
+                     .asU32Required(),
                  mPersistDecoderManifestCollectionSchemesAndData,
                  mCANIDTranslator
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -571,37 +535,32 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 
         // Make sure the CollectionScheme Ingestion can notify the CollectionScheme Manager about the arrival
         // of new artifacts over the offboardconnectivity channel.
-        if ( !mSchemaPtr->subscribeListener(
-                 static_cast<CollectionSchemeManagementListener *>( mCollectionSchemeManagerPtr.get() ) ) )
-        {
-            FWE_LOG_ERROR( "Failed register the CollectionScheme Manager to the CollectionScheme Ingestion Module" );
-            return false;
-        }
+        mSchemaPtr->subscribeToCollectionSchemeUpdate( std::bind( &CollectionSchemeManager::onCollectionSchemeUpdate,
+                                                                  mCollectionSchemeManagerPtr.get(),
+                                                                  std::placeholders::_1 ) );
+        mSchemaPtr->subscribeToDecoderManifestUpdate( std::bind( &CollectionSchemeManager::onDecoderManifestUpdate,
+                                                                 mCollectionSchemeManagerPtr.get(),
+                                                                 std::placeholders::_1 ) );
 
         // Make sure the CollectionScheme Manager can notify the Inspection Engine about the availability of
         // a new set of collection CollectionSchemes.
-        if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                 static_cast<IActiveConditionProcessor *>( mCollectionInspectionWorkerThread.get() ) ) )
-        {
-            FWE_LOG_ERROR( "Failed register the Inspection Engine to the CollectionScheme Manager Module" );
-            return false;
-        }
+        mCollectionSchemeManagerPtr->subscribeToInspectionMatrixChange(
+            std::bind( &CollectionInspectionWorkerThread::onChangeInspectionMatrix,
+                       mCollectionInspectionWorkerThread.get(),
+                       std::placeholders::_1 ) );
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
         // Make sure the CollectionScheme Manager can notify the Data Sender about the availability of
         // a new set of collection CollectionSchemes.
-        if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                 static_cast<IActiveCollectionSchemesListener *>( mDataSenderManagerWorkerThread.get() ) ) )
-        {
-            FWE_LOG_ERROR( "Failed register the Data Sender to the CollectionScheme Manager Module" );
-            return false;
-        }
-        if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                 static_cast<IActiveDecoderDictionaryListener *>( ionWriter.get() ) ) )
-        {
-            FWE_LOG_ERROR( "Failed register the IonWriter to the CollectionScheme Manager Module" );
-            return false;
-        }
+        mCollectionSchemeManagerPtr->subscribeToCollectionSchemeListChange(
+            std::bind( &DataSenderManagerWorkerThread::onChangeCollectionSchemeList,
+                       mDataSenderManagerWorkerThread.get(),
+                       std::placeholders::_1 ) );
+        mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+            std::bind( &DataSenderIonWriter::onChangeOfActiveDictionary,
+                       ionWriter.get(),
+                       std::placeholders::_1,
+                       std::placeholders::_2 ) );
 #endif
 
         // Allow CollectionSchemeManagement to send checkins through the Schema Object Callback
@@ -611,16 +570,19 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 
         auto obdOverCANModuleInit = false;
         mCANDataConsumer = std::make_unique<CANDataConsumer>( signalBufferPtr );
-        for ( const auto &interfaceName : config["networkInterfaces"] )
+        for ( unsigned i = 0; i < config["networkInterfaces"].getArraySizeRequired(); i++ )
         {
-            const auto &interfaceType = interfaceName["type"].asString();
+            const auto networkInterfaceConfig = config["networkInterfaces"][i];
+            const auto interfaceType = networkInterfaceConfig["type"].asStringRequired();
+            const auto interfaceId = networkInterfaceConfig["interfaceId"].asStringRequired();
 
             if ( interfaceType == CAN_INTERFACE_TYPE )
             {
                 CanTimestampType canTimestampType = CanTimestampType::KERNEL_SOFTWARE_TIMESTAMP; // default
-                if ( interfaceName[CAN_INTERFACE_TYPE].isMember( "timestampType" ) )
+                auto canConfig = networkInterfaceConfig[CAN_INTERFACE_TYPE];
+                if ( canConfig.isMember( "timestampType" ) )
                 {
-                    auto timestampTypeInput = interfaceName[CAN_INTERFACE_TYPE]["timestampType"].asString();
+                    auto timestampTypeInput = canConfig["timestampType"].asStringRequired();
                     bool success = stringToCanTimestampType( timestampTypeInput, canTimestampType );
                     if ( !success )
                     {
@@ -628,25 +590,24 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                                       " so default to Software" );
                     }
                 }
-                auto canChannelId = mCANIDTranslator.getChannelNumericID( interfaceName["interfaceId"].asString() );
+                auto canChannelId = mCANIDTranslator.getChannelNumericID( interfaceId );
                 auto canSourcePtr = std::make_unique<CANDataSource>(
                     canChannelId,
                     canTimestampType,
-                    interfaceName[CAN_INTERFACE_TYPE]["interfaceName"].asString(),
-                    interfaceName[CAN_INTERFACE_TYPE]["protocolName"].asString() == "CAN-FD",
-                    config["staticConfig"]["threadIdleTimes"]["socketCANThreadIdleTimeMs"].asUInt(),
+                    canConfig["interfaceName"].asStringRequired(),
+                    canConfig["protocolName"].asStringRequired() == "CAN-FD",
+                    config["staticConfig"]["threadIdleTimes"]["socketCANThreadIdleTimeMs"].asU32Required(),
                     *mCANDataConsumer );
                 if ( !canSourcePtr->init() )
                 {
                     FWE_LOG_ERROR( "Failed to initialize CANDataSource" );
                     return false;
                 }
-                if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                         static_cast<IActiveDecoderDictionaryListener *>( canSourcePtr.get() ) ) )
-                {
-                    FWE_LOG_ERROR( "Failed to register the CANDataSource to the CollectionScheme Manager" );
-                    return false;
-                }
+                mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    std::bind( &CANDataSource::onChangeOfActiveDictionary,
+                               canSourcePtr.get(),
+                               std::placeholders::_1,
+                               std::placeholders::_2 ) );
                 mCANDataSources.push_back( std::move( canSourcePtr ) );
             }
             else if ( interfaceType == OBD_INTERFACE_TYPE )
@@ -655,14 +616,14 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 {
                     auto obdOverCANModule = std::make_shared<OBDOverCANModule>();
                     obdOverCANModuleInit = true;
-                    const auto &broadcastRequests = interfaceName[OBD_INTERFACE_TYPE]["broadcastRequests"];
+                    auto obdConfig = networkInterfaceConfig[OBD_INTERFACE_TYPE];
                     if ( obdOverCANModule->init(
                              signalBufferPtr,
-                             interfaceName[OBD_INTERFACE_TYPE]["interfaceName"].asString(),
-                             interfaceName[OBD_INTERFACE_TYPE]["pidRequestIntervalSeconds"].asUInt(),
-                             interfaceName[OBD_INTERFACE_TYPE]["dtcRequestIntervalSeconds"].asUInt(),
+                             obdConfig["interfaceName"].asStringRequired(),
+                             obdConfig["pidRequestIntervalSeconds"].asU32Required(),
+                             obdConfig["dtcRequestIntervalSeconds"].asU32Required(),
                              // Broadcast mode is enabled by default if not defined in config:
-                             broadcastRequests.isNull() || broadcastRequests.asBool() ) )
+                             obdConfig["broadcastRequests"].asBoolOptional().get_value_or( true ) ) )
                     {
                         // Connect the OBD Module
                         mOBDOverCANModule = obdOverCANModule;
@@ -672,18 +633,15 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                             return false;
                         }
 
-                        if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                                 static_cast<IActiveDecoderDictionaryListener *>( mOBDOverCANModule.get() ) ) )
-                        {
-                            FWE_LOG_ERROR( "Failed to register the OBD Module to the CollectionScheme Manager" );
-                            return false;
-                        }
-                        if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                                 static_cast<IActiveConditionProcessor *>( mOBDOverCANModule.get() ) ) )
-                        {
-                            FWE_LOG_ERROR( "Failed to register the OBD Module to the CollectionScheme Manager" );
-                            return false;
-                        }
+                        mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                            std::bind( &OBDOverCANModule::onChangeOfActiveDictionary,
+                                       mOBDOverCANModule.get(),
+                                       std::placeholders::_1,
+                                       std::placeholders::_2 ) );
+                        mCollectionSchemeManagerPtr->subscribeToInspectionMatrixChange(
+                            std::bind( &OBDOverCANModule::onChangeInspectionMatrix,
+                                       mOBDOverCANModule.get(),
+                                       std::placeholders::_1 ) );
                     }
                 }
                 else
@@ -696,36 +654,33 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 if ( mExternalCANDataSource == nullptr )
                 {
                     mExternalCANDataSource = std::make_unique<ExternalCANDataSource>( *mCANDataConsumer );
-                    if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                             static_cast<IActiveDecoderDictionaryListener *>( mExternalCANDataSource.get() ) ) )
-                    {
-                        FWE_LOG_ERROR( "Failed to register the ExternalCANDataSource to the CollectionScheme Manager" );
-                        return false;
-                    }
+                    mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                        std::bind( &ExternalCANDataSource::onChangeOfActiveDictionary,
+                                   mExternalCANDataSource.get(),
+                                   std::placeholders::_1,
+                                   std::placeholders::_2 ) );
                 }
             }
 #ifdef FWE_FEATURE_ROS2
             else if ( interfaceType == ROS2_INTERFACE_TYPE )
             {
                 ROS2DataSourceConfig ros2Config;
-                if ( !ROS2DataSourceConfig::parseFromJson( interfaceName, ros2Config ) )
+                if ( !ROS2DataSourceConfig::parseFromJson( networkInterfaceConfig, ros2Config ) )
                 {
-                    FWE_LOG_ERROR( "Could not parse ros2Interface configuration" );
                     return false;
                 }
                 mROS2DataSource = std::make_shared<ROS2DataSource>( ros2Config, signalBufferPtr, rawDataBufferManager );
                 mROS2DataSource->connect();
-                if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                         static_cast<IActiveDecoderDictionaryListener *>( mROS2DataSource.get() ) ) )
-                {
-                    FWE_LOG_ERROR( "Failed register the ROS2 Data Source to the CollectionScheme Manager Module" );
-                    return false;
-                }
+                mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    std::bind( &ROS2DataSource::onChangeOfActiveDictionary,
+                               mROS2DataSource.get(),
+                               std::placeholders::_1,
+                               std::placeholders::_2 ) );
             }
 #endif
             else
             {
-                FWE_LOG_ERROR( interfaceName["type"].asString() + " is not supported" );
+                FWE_LOG_ERROR( interfaceType + " is not supported" );
             }
         }
 
@@ -749,18 +704,18 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         CANRawFrameID canRawFrameId{};
         uint16_t latitudeStartBit{};
         uint16_t longitudeStartBit{};
-        if ( config["staticConfig"].isMember( "iWaveGpsExample" ) )
+        if ( config["staticConfig"].isMember( CONFIG_SECTION_IWAVE_GPS ) )
         {
-            FWE_LOG_TRACE( "Found 'iWaveGpsExample' section in config file" );
-            pathToNmeaSource = config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::PATH_TO_NMEA].asString();
+            FWE_LOG_TRACE( "Found '" + CONFIG_SECTION_IWAVE_GPS + "' section in config file" );
+            const auto iwaveConfig = config["staticConfig"][CONFIG_SECTION_IWAVE_GPS];
+            pathToNmeaSource = iwaveConfig[IWaveGpsSource::PATH_TO_NMEA].asStringRequired();
             canChannel = mCANIDTranslator.getChannelNumericID(
-                config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::CAN_CHANNEL_NUMBER].asString() );
-            canRawFrameId =
-                stringToU32( config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::CAN_RAW_FRAME_ID].asString() );
-            latitudeStartBit = static_cast<uint16_t>( stringToU32(
-                config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::LATITUDE_START_BIT].asString() ) );
-            longitudeStartBit = static_cast<uint16_t>( stringToU32(
-                config["staticConfig"]["iWaveGpsExample"][IWaveGpsSource::LONGITUDE_START_BIT].asString() ) );
+                iwaveConfig[IWaveGpsSource::CAN_CHANNEL_NUMBER].asStringRequired() );
+            canRawFrameId = iwaveConfig[IWaveGpsSource::CAN_RAW_FRAME_ID].asU32FromStringRequired();
+            latitudeStartBit =
+                static_cast<uint16_t>( iwaveConfig[IWaveGpsSource::LATITUDE_START_BIT].asU32FromStringRequired() );
+            longitudeStartBit =
+                static_cast<uint16_t>( iwaveConfig[IWaveGpsSource::LONGITUDE_START_BIT].asU32FromStringRequired() );
         }
         else
         {
@@ -779,12 +734,11 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
                 FWE_LOG_ERROR( "IWaveGps initialization failed" );
                 return false;
             }
-            if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                     static_cast<IActiveDecoderDictionaryListener *>( mIWaveGpsSource.get() ) ) )
-            {
-                FWE_LOG_ERROR( "Failed to register the IWaveGps to the CollectionScheme Manager" );
-                return false;
-            }
+            mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                std::bind( &IWaveGpsSource::onChangeOfActiveDictionary,
+                           mIWaveGpsSource.get(),
+                           std::placeholders::_1,
+                           std::placeholders::_2 ) );
             mIWaveGpsSource->start();
         }
         /********************************IWave GPS Example NMEA reader end******************************/
@@ -794,19 +748,18 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         /********************************External GPS Example NMEA reader *********************************/
         mExternalGpsSource = std::make_shared<ExternalGpsSource>( signalBufferPtr );
         bool externalGpsInitSuccessful = false;
-        if ( config["staticConfig"].isMember( "externalGpsExample" ) )
+        if ( config["staticConfig"].isMember( CONFIG_SECTION_EXTERNAL_GPS ) )
         {
-            FWE_LOG_TRACE( "Found 'externalGpsExample' section in config file" );
+            FWE_LOG_TRACE( "Found '" + CONFIG_SECTION_EXTERNAL_GPS + "' section in config file" );
+            auto externalGpsConfig = config["staticConfig"][CONFIG_SECTION_EXTERNAL_GPS];
             externalGpsInitSuccessful = mExternalGpsSource->init(
                 mCANIDTranslator.getChannelNumericID(
-                    config["staticConfig"]["externalGpsExample"][ExternalGpsSource::CAN_CHANNEL_NUMBER].asString() ),
-                stringToU32(
-                    config["staticConfig"]["externalGpsExample"][ExternalGpsSource::CAN_RAW_FRAME_ID].asString() ),
-                static_cast<uint16_t>( stringToU32(
-                    config["staticConfig"]["externalGpsExample"][ExternalGpsSource::LATITUDE_START_BIT].asString() ) ),
+                    externalGpsConfig[ExternalGpsSource::CAN_CHANNEL_NUMBER].asStringRequired() ),
+                externalGpsConfig[ExternalGpsSource::CAN_RAW_FRAME_ID].asU32FromStringRequired(),
                 static_cast<uint16_t>(
-                    stringToU32( config["staticConfig"]["externalGpsExample"][ExternalGpsSource::LONGITUDE_START_BIT]
-                                     .asString() ) ) );
+                    externalGpsConfig[ExternalGpsSource::LATITUDE_START_BIT].asU32FromStringRequired() ),
+                static_cast<uint16_t>(
+                    externalGpsConfig[ExternalGpsSource::LONGITUDE_START_BIT].asU32FromStringRequired() ) );
         }
         else
         {
@@ -816,12 +769,11 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         }
         if ( externalGpsInitSuccessful )
         {
-            if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                     static_cast<IActiveDecoderDictionaryListener *>( mExternalGpsSource.get() ) ) )
-            {
-                FWE_LOG_ERROR( "Failed to register the ExternalGpsSource to the CollectionScheme Manager" );
-                return false;
-            }
+            mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                std::bind( &ExternalGpsSource::onChangeOfActiveDictionary,
+                           mExternalGpsSource.get(),
+                           std::placeholders::_1,
+                           std::placeholders::_2 ) );
             mExternalGpsSource->start();
         }
         else
@@ -836,13 +788,14 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         /********************************AAOS VHAL Example reader *********************************/
         mAaosVhalSource = std::make_shared<AaosVhalSource>( signalBufferPtr );
         bool aaosVhalInitSuccessful = false;
-        if ( config["staticConfig"].isMember( "aaosVhalExample" ) )
+        if ( config["staticConfig"].isMember( CONFIG_SECTION_AAOS_VHAL ) )
         {
-            FWE_LOG_TRACE( "Found 'aaosVhalExample' section in config file" );
-            aaosVhalInitSuccessful = mAaosVhalSource->init(
-                mCANIDTranslator.getChannelNumericID(
-                    config["staticConfig"]["aaosVhalExample"][AaosVhalSource::CAN_CHANNEL_NUMBER].asString() ),
-                stringToU32( config["staticConfig"]["aaosVhalExample"][AaosVhalSource::CAN_RAW_FRAME_ID].asString() ) );
+            FWE_LOG_TRACE( "Found '" + CONFIG_SECTION_AAOS_VHAL + "' section in config file" );
+            auto aaosConfig = config["staticConfig"][CONFIG_SECTION_AAOS_VHAL];
+            aaosVhalInitSuccessful =
+                mAaosVhalSource->init( mCANIDTranslator.getChannelNumericID(
+                                           aaosConfig[AaosVhalSource::CAN_CHANNEL_NUMBER].asStringRequired() ),
+                                       aaosConfig[AaosVhalSource::CAN_RAW_FRAME_ID].asU32FromStringRequired() );
         }
         else
         {
@@ -852,12 +805,11 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
         }
         if ( aaosVhalInitSuccessful )
         {
-            if ( !mCollectionSchemeManagerPtr->subscribeListener(
-                     static_cast<IActiveDecoderDictionaryListener *>( mAaosVhalSource.get() ) ) )
-            {
-                FWE_LOG_ERROR( "Failed to register the AaosVhalExample to the CollectionScheme Manager" );
-                return false;
-            }
+            mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                std::bind( &AaosVhalSource::onChangeOfActiveDictionary,
+                           mAaosVhalSource.get(),
+                           std::placeholders::_1,
+                           std::placeholders::_2 ) );
             mAaosVhalSource->start();
         }
         else
@@ -869,7 +821,8 @@ IoTFleetWiseEngine::connect( const Json::Value &config )
 #endif
 
         mPrintMetricsCyclicPeriodMs =
-            config["staticConfig"]["internalParameters"]["metricsCyclicPrintIntervalMs"].asUInt(); // default to 0
+            config["staticConfig"]["internalParameters"]["metricsCyclicPrintIntervalMs"].asU32Optional().get_value_or(
+                0 );
     }
     catch ( const std::exception &e )
     {
@@ -1087,7 +1040,7 @@ IoTFleetWiseEngine::setExternalOBDPIDResponse( PID pid, const std::vector<uint8_
 }
 
 void
-IoTFleetWiseEngine::ingestExternalCANMessage( const std::string &interfaceId,
+IoTFleetWiseEngine::ingestExternalCANMessage( const InterfaceID &interfaceId,
                                               Timestamp timestamp,
                                               uint32_t messageId,
                                               const std::vector<uint8_t> &data )

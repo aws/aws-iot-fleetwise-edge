@@ -103,9 +103,10 @@ message CollectionScheme {
     uint32 priority = 13;
 
     /*
-     * An optional probabilities message indicating the probability that a CollectionScheme be enacted.
+     * This field was never supported, so it should not be used any more.
      */
-    Probabilities probabilities = 14;
+    reserved 14;
+    reserved "probabilities";
 
     /*
      * This field was never supported, so it should not be used any more.
@@ -140,14 +141,6 @@ message S3UploadMetadata {
      * Account ID of the bucket owner, required to enforce the expected bucket owner
      */
     string bucket_owner_account_id = 4;
-}
-
-message Probabilities {
-    /*
-     * Double between 0 and 1 giving the probability after a condition is met.
-     * 0: never send, 1: send always. It is usable for both condition and time based collectionSchemes.
-     */
-     double probability_to_send = 1;
 }
 
 /*

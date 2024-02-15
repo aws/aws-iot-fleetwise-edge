@@ -117,10 +117,6 @@ struct InvalidComplexVariant
 
 using ComplexDataElement = boost::variant<PrimitiveData, ComplexArray, ComplexStruct, InvalidComplexVariant>;
 
-using ComplexDataInterfaceId = std::string;
-
-const std::string INVALID_COMPLEX_DATA_INTERFACE = std::string(); // empty string is not valid
-
 using ComplexDataMessageId = std::string;
 
 static constexpr char COMPLEX_DATA_MESSAGE_ID_SEPARATOR = ':';

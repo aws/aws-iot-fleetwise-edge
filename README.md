@@ -119,7 +119,7 @@ information.
 - [GoogleTest: v1.10.0](https://github.com/google/googletest)
 - [Google Benchmark: v1.6.1](https://github.com/google/benchmark)
 - [Protobuf: v3.21.12](https://github.com/protocolbuffers/protobuf)
-- [Boost: v1.71.1](https://github.com/boostorg/boost)
+- [Boost: v1.78.0](https://github.com/boostorg/boost)
 - [JsonCpp: v1.9.5](https://github.com/open-source-parsers/jsoncpp)
 - [Snappy: v1.1.8](https://github.com/google/snappy)
 

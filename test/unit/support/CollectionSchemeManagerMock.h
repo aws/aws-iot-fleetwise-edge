@@ -6,7 +6,6 @@
 #include "ClockHandler.h"
 #include "CollectionSchemeIngestion.h"
 #include "CollectionSchemeIngestionList.h"
-#include "CollectionSchemeManagementListener.h"
 #include "CollectionSchemeManager.h"
 #include "DecoderManifestIngestion.h"
 #include "Listener.h"

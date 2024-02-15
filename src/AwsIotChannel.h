@@ -3,15 +3,21 @@
 
 #pragma once
 
+#include "Clock.h"
+#include "ClockHandler.h"
 #include "IConnectionTypes.h"
 #include "IConnectivityChannel.h"
 #include "IConnectivityModule.h"
+#include "IReceiver.h"
 #include "ISender.h"
+#include "Listener.h"
 #include "MqttClientWrapper.h"
 #include "PayloadManager.h"
 #include <atomic>
+#include <aws/crt/mqtt/Mqtt5Client.h>
 #include <cstddef>
 #include <cstdint>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -65,6 +71,12 @@ public:
      */
     bool unsubscribe();
 
+    /**
+     * @brief Unsubscribe from the MQTT topic asynchronously
+     * @return A future that can be used to wait for the unsubscribe to finish. It will return True on success.
+     */
+    std::future<bool> unsubscribeAsync();
+
     bool isAlive() override;
 
     size_t getMaxSendSize() const override;
@@ -76,6 +88,10 @@ public:
     ConnectivityError sendFile( const std::string &filePath,
                                 size_t size,
                                 CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) override;
+
+    void subscribeToDataReceived( OnDataReceivedCallback callback ) override;
+
+    void onDataReceived( const Aws::Crt::Mqtt5::PublishReceivedEventData &eventData );
 
     void
     invalidateConnection()
@@ -103,6 +119,8 @@ public:
 
 private:
     bool isAliveNotThreadSafe();
+
+    // coverity[autosar_cpp14_a0_1_3_violation] false positive - function is used
     bool
     isTopicValid()
     {
@@ -117,6 +135,7 @@ private:
      */
     static const size_t AWS_IOT_MAX_MESSAGE_SIZE = 131072; // = 128 KiB
     IConnectivityModule *mConnectivityModule;
+    ThreadSafeListeners<OnDataReceivedCallback> mListeners;
     std::shared_ptr<PayloadManager> mPayloadManager;
     std::shared_ptr<MqttClientWrapper> &mMqttClient;
     std::mutex mConnectivityMutex;
@@ -124,6 +143,11 @@ private:
     std::string mTopicName;
     std::atomic<bool> mSubscribed;
     std::atomic<unsigned> mPayloadCountSent{};
+
+    /**
+     * @brief Clock member variable used to generate the time an MQTT message was received
+     */
+    std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
 
     bool mSubscription;
 };

@@ -171,11 +171,13 @@ if [ "${VEHICLE_NAME}" == "" ]; then
     fi
 fi
 
-if [ "${DBC_FILE}" == "" ] && [ "${CAMPAIGN_FILE}" == "" ]; then
-    INCLUDED_SIGNALS="${DEFAULT_INCLUDED_SIGNALS}"
-fi
-if [ "${ROS2_CONFIG_FILE}" == "" ] && [ "${S3_CAMPAIGN_FILE}" == "" ]; then
-    INCLUDED_SIGNALS="${INCLUDED_SIGNALS}${DEFAULT_INCLUDED_SIGNALS_VISION_SYSTEM_DATA}"
+if [ "${INCLUDED_SIGNALS}" == "" ]; then
+    if [ "${DBC_FILE}" == "" ] && [ "${CAMPAIGN_FILE}" == "" ]; then
+        INCLUDED_SIGNALS="${DEFAULT_INCLUDED_SIGNALS}"
+    fi
+    if [ "${ROS2_CONFIG_FILE}" == "" ] && [ "${S3_CAMPAIGN_FILE}" == "" ]; then
+        INCLUDED_SIGNALS="${INCLUDED_SIGNALS}${DEFAULT_INCLUDED_SIGNALS_VISION_SYSTEM_DATA}"
+    fi
 fi
 
 if ( [ "${DBC_FILE}" != "" ] && [ "${CAMPAIGN_FILE}" == "" ] ); then
@@ -395,7 +397,6 @@ aws iam wait role-exists \
     --role-name "${SERVICE_ROLE}"
 
 echo "Creating service role policy..."
-# TODO: VISION_SYSTEMS_DATA_PREVIEW: Remove timestream:DescribeTable after issue fixed in cloud
 SERVICE_ROLE_POLICY=$(cat <<'EOF'
 {
     "Version": "2012-10-17",

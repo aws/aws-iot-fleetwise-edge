@@ -7,14 +7,12 @@
 #include "CollectionInspectionWorkerThread.h"
 #include "CollectionSchemeIngestion.h"
 #include "CollectionSchemeIngestionList.h"
-#include "CollectionSchemeManagementListener.h"
 #include "CollectionSchemeManager.h"
 #include "DecoderManifestIngestion.h"
 #include "ICollectionScheme.h"
 #include "ICollectionSchemeList.h"
 #include "IDecoderDictionary.h"
 #include "IDecoderManifest.h"
-#include "Listener.h"
 #include "MessageTypes.h"
 #include "OBDOverCANModule.h"
 #include "SignalTypes.h"
@@ -57,8 +55,8 @@ public:
     }
     IDecoderManifestTest(
         std::string id,
-        std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap,
-        std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> signalToFrameAndNodeID,
+        std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap,
+        std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID,
         std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
         ,
@@ -86,7 +84,7 @@ public:
         return ID;
     }
     const CANMessageFormat &
-    getCANMessageFormat( CANRawFrameID canId, CANInterfaceID interfaceId ) const
+    getCANMessageFormat( CANRawFrameID canId, InterfaceID interfaceId ) const
     {
         return mFormatMap.at( interfaceId ).at( canId );
     }
@@ -95,7 +93,7 @@ public:
     {
         return true;
     }
-    std::pair<CANRawFrameID, CANInterfaceID>
+    std::pair<CANRawFrameID, InterfaceID>
     getCANFrameAndInterfaceID( SignalID signalId ) const override
     {
         return mSignalToFrameAndNodeID.at( signalId );
@@ -108,7 +106,7 @@ public:
         {
             return VehicleDataSourceProtocol::RAW_SOCKET;
         }
-        else if ( signalID < 0x10000 )
+        else if ( signalID < 0x2000 )
         {
             return VehicleDataSourceProtocol::OBD;
         }
@@ -159,8 +157,8 @@ public:
 
 private:
     std::string ID;
-    std::unordered_map<CANInterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> mFormatMap;
-    std::unordered_map<SignalID, std::pair<CANRawFrameID, CANInterfaceID>> mSignalToFrameAndNodeID;
+    std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> mFormatMap;
+    std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> mSignalToFrameAndNodeID;
     std::unordered_map<SignalID, PIDSignalDecoderFormat> mSignalIDToPIDDecoderFormat;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     std::unordered_map<SignalID, ComplexSignalDecoderFormat> mComplexSignalMap;
@@ -311,18 +309,6 @@ public:
     std::vector<ICollectionSchemePtr> mCollectionSchemeTest;
 };
 
-/* mock producer class that sends update to PM mocking PI */
-class CollectionSchemeManagerTestProducer : public ThreadListeners<CollectionSchemeManagementListener>
-{
-public:
-    CollectionSchemeManagerTestProducer()
-    {
-    }
-    ~CollectionSchemeManagerTestProducer()
-    {
-    }
-};
-
 /* mock OBDOverCANModule class that receive decoder dictionary update from PM */
 class OBDOverCANModuleMock : public OBDOverCANModule
 {
@@ -335,8 +321,7 @@ public:
     {
     }
     void
-    onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
-                                VehicleDataSourceProtocol networkProtocol ) override
+    onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary, VehicleDataSourceProtocol networkProtocol )
     {
         OBDOverCANModule::onChangeOfActiveDictionary( dictionary, networkProtocol );
         mUpdateFlag = true;
@@ -402,21 +387,14 @@ public:
     }
 
     void
-    myRegisterListener()
-    {
-        mProducer.subscribeListener( this );
-    }
-    void
     myInvokeCollectionScheme()
     {
-        mProducer.notifyListeners<const ICollectionSchemeListPtr &>(
-            &CollectionSchemeManagementListener::onCollectionSchemeUpdate, mPlTest );
+        this->onCollectionSchemeUpdate( mPlTest );
     }
     void
     myInvokeDecoderManifest()
     {
-        mProducer.notifyListeners<const IDecoderManifestPtr &>(
-            &CollectionSchemeManagementListener::onDecoderManifestUpdate, mDmTest );
+        this->onDecoderManifestUpdate( mDmTest );
     }
     void
     updateAvailable()
@@ -549,7 +527,6 @@ public:
     }
 
 public:
-    CollectionSchemeManagerTestProducer mProducer;
     IDecoderManifestPtr mDmTest;
     std::shared_ptr<ICollectionSchemeListTest> mPlTest;
 
