@@ -55,8 +55,7 @@ if ${INSTALL_BUILD_TIME_DEPS}; then
     apt update
     apt install -y \
         build-essential \
-        clang-format-10 \
-        clang-tidy-10 \
+        clang-tidy-12 \
         cmake \
         doxygen \
         faketime \
@@ -67,8 +66,7 @@ if ${INSTALL_BUILD_TIME_DEPS}; then
         unzip \
         wget \
         zlib1g-dev
-    update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-10 1000
-    update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-10 1000
+    update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-12 1000
 fi
 
 if ${WITH_ROS2_SUPPORT}; then

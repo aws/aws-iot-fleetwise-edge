@@ -29,11 +29,11 @@ static const std::string normal;
 static const std::string reset{ "\x1b[0m" };
 } // namespace Color
 
-LogLevel gSystemWideLogLevel;
-LogColorOption gLogColorOption = LogColorOption::Auto;
+LogLevel gSystemWideLogLevel;                          // NOLINT Global log level
+LogColorOption gLogColorOption = LogColorOption::Auto; // NOLINT Global log color
 
-static std::mutex gLogForwardingMutex;
-static ILogger *gLogForwarder = nullptr;
+static std::mutex gLogForwardingMutex;   // NOLINT Global log forwarding mutex
+static ILogger *gLogForwarder = nullptr; // NOLINT Global log forwarder
 
 void
 setLogForwarding( ILogger *logForwarder )

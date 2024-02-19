@@ -78,7 +78,7 @@ public:
      * To avoid duplication this counter is used as the uppermost Bit INTERNAL_SIGNAL_ID_BITMASK must be set
      * the MSB can never be used
      */
-    static std::atomic<uint32_t> mPartialSignalCounter;
+    static std::atomic<uint32_t> mPartialSignalCounter; // NOLINT Global atomic partial signal counter
 
     const PartialSignalIDLookup &getPartialSignalIdToSignalPathLookupTable() const override;
 

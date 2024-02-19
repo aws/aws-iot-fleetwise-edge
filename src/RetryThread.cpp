@@ -11,7 +11,7 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-std::atomic<int> RetryThread::fInstanceCounter( 0 );
+std::atomic<int> RetryThread::fInstanceCounter( 0 ); // NOLINT Global atomic instance counter
 
 RetryThread::RetryThread( IRetryable &retryable, uint32_t startBackoffMs, uint32_t maxBackoffMs )
     : fRetryable( retryable )

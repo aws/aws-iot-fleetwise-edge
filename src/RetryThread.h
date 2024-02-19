@@ -82,7 +82,7 @@ public:
 private:
     static void doWork( void *data );
 
-    static std::atomic<int> fInstanceCounter;
+    static std::atomic<int> fInstanceCounter; // NOLINT Global atomic instance counter
     IRetryable &fRetryable;
     int fInstance;
     const uint32_t fStartBackoffMs;
