@@ -50,7 +50,7 @@ stringToLogLevel( const std::string level, LogLevel &outLogLevel )
     return true;
 }
 
-extern LogLevel gSystemWideLogLevel;
+extern LogLevel gSystemWideLogLevel; // NOLINT Global log level
 
 } // namespace IoTFleetWise
 } // namespace Aws

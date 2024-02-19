@@ -149,8 +149,8 @@ ROS2DataSource::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dict
 
 // Name the executer threads the first time they process a callback. Until then they will have the name of the main
 // thread fwVNROS2main
-static thread_local bool alreadyNamedThread{ false };
-static std::atomic<int> threadCounter{ 0 };
+static thread_local bool gAlreadyNamedThread{ false }; // NOLINT Thread local thread named flag
+static std::atomic<int> gThreadCounter{ 0 };           // NOLINT Global atomic thread counter
 
 /*
  * called from multiple threads in parallel as callback group is Reentrant
@@ -158,12 +158,12 @@ static std::atomic<int> threadCounter{ 0 };
 void
 ROS2DataSource::topicCallback( std::shared_ptr<rclcpp::SerializedMessage> msg, std::string dictionaryMessageId )
 {
-    if ( !alreadyNamedThread )
+    if ( !gAlreadyNamedThread )
     {
         // coverity[misra_cpp_2008_rule_5_2_10_violation] For std::atomic this must be performed in a single statement
         // coverity[autosar_cpp14_m5_2_10_violation] For std::atomic this must be performed in a single statement
-        Thread::setCurrentThreadName( "fwVNROS2exec" + std::to_string( threadCounter++ ) );
-        alreadyNamedThread = true;
+        Thread::setCurrentThreadName( "fwVNROS2exec" + std::to_string( gThreadCounter++ ) );
+        gAlreadyNamedThread = true;
     }
     FWE_LOG_TRACE( "Received message with size:" + std::to_string( msg->get_rcl_serialized_message().buffer_length ) +
                    " for message id: '" + dictionaryMessageId + "'" );

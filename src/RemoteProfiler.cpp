@@ -15,9 +15,6 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-const char *RemoteProfiler::NAME_TOP_LEVEL_LOG_ARRAY = "LogEvents";
-const char *RemoteProfiler::NAME_TOP_LEVEL_LOG_PREFIX = "Prefix";
-
 RemoteProfiler::RemoteProfiler( std::shared_ptr<ISender> metricsSender,
                                 std::shared_ptr<ISender> logSender,
                                 uint32_t initialMetricsUploadInterval,

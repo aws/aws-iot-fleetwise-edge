@@ -30,8 +30,8 @@ class RemoteProfiler : public IMetricsReceiver, public ILogger
 {
 public:
     static const uint16_t MAX_PARALLEL_METRICS = 10;
-    static const char *NAME_TOP_LEVEL_LOG_ARRAY;
-    static const char *NAME_TOP_LEVEL_LOG_PREFIX;
+    static constexpr const char *NAME_TOP_LEVEL_LOG_ARRAY = "LogEvents";
+    static constexpr const char *NAME_TOP_LEVEL_LOG_PREFIX = "Prefix";
 
     static const uint32_t MAX_BYTES_FOR_SINGLE_LOG_UPLOAD =
         16384; // 16KiB. Must be << 128KiB because its sent in one MQTT message

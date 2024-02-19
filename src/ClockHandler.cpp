@@ -16,8 +16,8 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-static std::shared_ptr<const Clock> gClock;
-static std::mutex gClockMutex;
+static std::shared_ptr<const Clock> gClock; // NOLINT Global clock instance
+static std::mutex gClockMutex;              // NOLINT Global clock mutex
 
 class ChronoClock : public Clock
 {

@@ -101,7 +101,7 @@ stringToLogColorOption( const std::string level, LogColorOption &outLogColorOpti
     return true;
 }
 
-extern LogColorOption gLogColorOption;
+extern LogColorOption gLogColorOption; // NOLINT Global log color
 
 } // namespace IoTFleetWise
 } // namespace Aws

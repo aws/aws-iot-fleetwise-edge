@@ -28,11 +28,11 @@ namespace IoTFleetWise
  */
 struct S3UploadParams
 {
-    std::string region{ "" };      // bucket region, set on the campaign level, attribute of S3 client
-    std::string bucketName{ "" };  // bucket name, set on the campaign level, attribute of S3 request
-    std::string bucketOwner{ "" }; // bucket owner account ID, set on the campaign level, attribute of S3 request
-    std::string objectName{ "" };  // object key, attribute of S3 request
-    std::string uploadID{ "" };    // upload ID of the multipart upload
+    std::string region;        // bucket region, set on the campaign level, attribute of S3 client
+    std::string bucketName;    // bucket name, set on the campaign level, attribute of S3 request
+    std::string bucketOwner;   // bucket owner account ID, set on the campaign level, attribute of S3 request
+    std::string objectName;    // object key, attribute of S3 request
+    std::string uploadID;      // upload ID of the multipart upload
     uint16_t multipartID{ 0 }; // multipartID of a single part of the multipart upload, allowed values are 1 to 10000
 
 public:

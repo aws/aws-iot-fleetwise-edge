@@ -19,7 +19,7 @@ namespace IoTFleetWise
 {
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-std::atomic<uint32_t> CollectionSchemeIngestion::mPartialSignalCounter( 0 );
+std::atomic<uint32_t> CollectionSchemeIngestion::mPartialSignalCounter( 0 ); // NOLINT Global atomic signal counter
 #endif
 
 CollectionSchemeIngestion::~CollectionSchemeIngestion()

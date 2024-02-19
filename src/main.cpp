@@ -18,9 +18,8 @@
 #include <rclcpp/rclcpp.hpp>
 #endif
 
-// coverity[autosar_cpp14_a2_11_1_violation]
-static volatile sig_atomic_t mSignal = 0; // volatile has to be used since it will be modified by a signal handler,
-                                          // executed as result of an asynchronous interrupt
+// coverity[autosar_cpp14_a2_11_1_violation] volatile required as it will be modified by a signal handler
+static volatile sig_atomic_t mSignal = 0; // NOLINT Global signal
 
 extern "C"
 {

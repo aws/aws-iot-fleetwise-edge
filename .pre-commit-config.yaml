@@ -46,7 +46,7 @@ repos:
         verbose: true
         types: [c++]
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v10.0.1
+    rev: v12.0.1
     hooks:
       - id: clang-format
   - repo: https://github.com/PyCQA/autoflake
