@@ -159,7 +159,8 @@ EOF
             "Effect": "Allow",
             "Action": [
                 "timestream:WriteRecords",
-                "timestream:Select"
+                "timestream:Select",
+                "timestream:DescribeTable"
             ]
         },
         {
