@@ -220,6 +220,9 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         --disable-rtsp
         --without-zstd
         --host=arm-linux
+        --without-ca-bundle
+        --without-ca-path
+        --with-ca-fallback
         --prefix=/usr/local/arm-linux-gnueabihf"
     if [ "${SHARED_LIBS}" == "OFF" ]; then
         LDFLAGS="-static" PKG_CONFIG="pkg-config --static" CC=arm-linux-gnueabihf-gcc \

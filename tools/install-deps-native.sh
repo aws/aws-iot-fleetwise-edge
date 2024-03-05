@@ -194,6 +194,9 @@ if ${INSTALL_BUILD_TIME_DEPS} && ( ! ${USE_CACHE} || [ ! -d ${PREFIX} ] ); then
         --disable-unix-sockets
         --disable-rtsp
         --without-zstd
+        --without-ca-bundle
+        --without-ca-path
+        --with-ca-fallback
         --prefix=${PREFIX}"
     if [ "${SHARED_LIBS}" == "OFF" ]; then
         LDFLAGS="-static" PKG_CONFIG="pkg-config --static" \
