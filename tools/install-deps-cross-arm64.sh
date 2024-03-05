@@ -220,6 +220,9 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/aarch64-linux-gnu ] || [ ! -d ${NATIVE_PR
         --disable-rtsp
         --without-zstd
         --host=aarch64-linux
+        --without-ca-bundle
+        --without-ca-path
+        --with-ca-fallback
         --prefix=/usr/local/aarch64-linux-gnu"
     if [ "${SHARED_LIBS}" == "OFF" ]; then
         LDFLAGS="-static" PKG_CONFIG="pkg-config --static" CC=aarch64-linux-gnu-gcc \

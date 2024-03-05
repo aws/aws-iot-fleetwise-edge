@@ -249,6 +249,9 @@ install_deps() {
             --disable-ldap \
             --enable-ipv6 \
             --with-ssl=${INSTALL_PREFIX} \
+            --without-ca-bundle \
+            --without-ca-path \
+            --with-ca-fallback \
             --disable-unix-sockets \
             --disable-rtsp \
             --host=${HOST_PLATFORM} \
