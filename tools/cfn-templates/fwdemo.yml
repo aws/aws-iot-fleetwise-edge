@@ -28,12 +28,15 @@ Parameters:
   IoTCoreRegion:
     Description:
       "Region in which to create IoT Things. This must be the same region used to create IoT
-      FleetWise Vehicles."
+      FleetWise Vehicles. Refer to https://docs.aws.amazon.com/general/latest/gr/iotfleetwise.html
+      to find the list of available regions."
     Type: String
     Default: "us-east-1"
     AllowedValues:
       - "us-east-1"
       - "eu-central-1"
+      - "us-west-2"
+      - "ap-south-1"
   IoTCoreEndpointUrl:
     Description: "Endpoint URL for IoT Core (leave blank for automatic)"
     Type: String
