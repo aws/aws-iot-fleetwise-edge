@@ -465,39 +465,39 @@ Mappings:
   # Ubuntu 20.04 arm64 AMIs
   AMIRegionMap:
     ap-northeast-1:
-      AMIID: ami-0fca1ab148deb91e9
+      AMIID: ami-0efa1a324595d0b84
     ap-northeast-2:
-      AMIID: ami-0debc037a6fbf0880
+      AMIID: ami-0ba7f7d242d32053d
     ap-northeast-3:
-      AMIID: ami-0e0c9a86fa480cbdd
+      AMIID: ami-0e2ca02324585286a
     ap-south-1:
-      AMIID: ami-0b361b1741bbfcaee
+      AMIID: ami-041825fa76be30c53
     ap-southeast-1:
-      AMIID: ami-0609b81b1bf972e92
+      AMIID: ami-01a1cbd8bdcf5289b
     ap-southeast-2:
-      AMIID: ami-084d30aebaf5bf74d
+      AMIID: ami-0f07eeb9fd7282946
     ca-central-1:
-      AMIID: ami-0bdf3f76775413310
+      AMIID: ami-0b771226fdad5b612
     eu-central-1:
-      AMIID: ami-078b059cb23a24d14
+      AMIID: ami-0385d7f83a8512cb6
     eu-north-1:
-      AMIID: ami-0bd8fea7bacfec62d
+      AMIID: ami-01e212a3bed9859e2
     eu-west-1:
-      AMIID: ami-04ccf3e01fdf54149
+      AMIID: ami-0465af6f7b54918e0
     eu-west-2:
-      AMIID: ami-0bc726a68a1518222
+      AMIID: ami-0986c12e436426a03
     eu-west-3:
-      AMIID: ami-094744a068567aac3
+      AMIID: ami-054c6450f8a23344f
     sa-east-1:
-      AMIID: ami-068d659c379fe55b7
+      AMIID: ami-057cd114ba7af49ea
     us-east-1:
-      AMIID: ami-08fb735e987e5662e
+      AMIID: ami-034a94f85c50a71e3
     us-east-2:
-      AMIID: ami-068592b43b78d7edb
+      AMIID: ami-0ad277cd361e06ec9
     us-west-1:
-      AMIID: ami-0a85cc41938519cec
+      AMIID: ami-0d09a1cb21151f2b5
     us-west-2:
-      AMIID: ami-063dc709a09d2d944
+      AMIID: ami-00794dde9e16c27ff
   FleetSizeEc2InstanceTypeMap:
     "1":
       InstanceType: m6g.xlarge
