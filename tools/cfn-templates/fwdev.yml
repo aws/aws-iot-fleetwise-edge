@@ -17,6 +17,14 @@ Parameters:
       - m6g.8xlarge
       - m6g.12xlarge
       - m6g.16xlarge
+      - m5.large
+      - m5.xlarge
+      - m5.2xlarge
+      - m5.4xlarge
+      - m5.8xlarge
+      - m5.12xlarge
+      - m5.16xlarge
+      - m5.24xlarge
   Ec2KeyPair:
     Description: Name of SSH key pair (required)
     Type: String
@@ -77,7 +85,13 @@ Resources:
     Properties:
       LaunchTemplateName: !Sub ${AWS::StackName}-EC2-LaunchTemplate
       LaunchTemplateData:
-        ImageId: !FindInMap [AMIRegionMap, !Ref "AWS::Region", AMIID]
+        ImageId: !FindInMap
+          - !FindInMap
+            - InstanceArchMap
+            - !Ref Ec2InstanceType
+            - AmiRegionMap
+          - !Ref "AWS::Region"
+          - AMIID
         KeyName: !Ref Ec2KeyPair
         InstanceType: !Ref Ec2InstanceType
         IamInstanceProfile:
@@ -98,60 +112,62 @@ Resources:
               DeleteOnTermination: true
               Encrypted: true
         UserData:
-          Fn::Base64: !Sub |
-            #!/bin/bash
-            set -euo pipefail
+          Fn::Base64: !Sub
+            - |
+              #!/bin/bash
+              set -euo pipefail
 
-            # Wait for any existing package install to finish
-            i=0
-            while true; do
-              if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
-                i=0
-              else
-                i=`expr $i + 1`
-                if expr $i \>= 10 > /dev/null; then
-                  break
+              # Wait for any existing package install to finish
+              i=0
+              while true; do
+                if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
+                  i=0
+                else
+                  i=`expr $i + 1`
+                  if expr $i \>= 10 > /dev/null; then
+                    break
+                  fi
                 fi
+                sleep 1
+              done
+
+              # Upgrade system and reboot if required
+              apt update
+              apt upgrade -y
+              if [ -f /var/run/reboot-required ]; then
+                # Delete the UserData info file so that we run again after reboot
+                rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
+                reboot
+                exit
               fi
-              sleep 1
-            done
 
-            # Upgrade system and reboot if required
-            apt update
-            apt upgrade -y
-            if [ -f /var/run/reboot-required ]; then
-              # Delete the UserData info file so that we run again after reboot
-              rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
-              reboot
-              exit
-            fi
+              # Install helper scripts:
+              apt update
+              apt install -y python3-setuptools
+              mkdir -p /opt/aws/bin
+              wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+              python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
+              rm aws-cfn-bootstrap-py3-latest.tar.gz
 
-            # Install helper scripts:
-            apt update
-            apt install -y python3-setuptools
-            mkdir -p /opt/aws/bin
-            wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-            python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
-            rm aws-cfn-bootstrap-py3-latest.tar.gz
+              # On error, signal back to cfn:
+              error_handler() {
+                /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+              }
+              trap error_handler ERR
 
-            # On error, signal back to cfn:
-            error_handler() {
-              /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
-            }
-            trap error_handler ERR
+              # Install packages
+              apt update
+              apt install -y ec2-instance-connect htop jq unzip zip
 
-            # Install packages
-            apt update
-            apt install -y ec2-instance-connect htop jq unzip zip
+              # Install AWS CLI:
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-${Arch}.zip" -o "awscliv2.zip"
+              unzip -q awscliv2.zip
+              ./aws/install
+              rm awscliv2.zip
 
-            # Install AWS CLI:
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
-            unzip -q awscliv2.zip
-            ./aws/install
-            rm awscliv2.zip
-
-            # Signal init complete:
-            /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+              # Signal init complete:
+              /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+            - Arch: !FindInMap [InstanceArchMap, !Ref Ec2InstanceType, Arch]
   Ec2Instance:
     Type: AWS::EC2::Instance
     CreationPolicy:
@@ -163,8 +179,57 @@ Resources:
         LaunchTemplateId: !Ref Ec2LaunchTemplate
         Version: !GetAtt Ec2LaunchTemplate.LatestVersionNumber
 Mappings:
+  InstanceArchMap:
+    m6g.medium:
+      AmiRegionMap: AMIRegionMapArm64
+      Arch: aarch64
+    m6g.large:
+      AmiRegionMap: AMIRegionMapArm64
+      Arch: aarch64
+    m6g.xlarge:
+      AmiRegionMap: AMIRegionMapArm64
+      Arch: aarch64
+    m6g.2xlarge:
+      AmiRegionMap: AMIRegionMapArm64
+      Arch: aarch64
+    m6g.4xlarge:
+      AmiRegionMap: AMIRegionMapArm64
+      Arch: aarch64
+    m6g.8xlarge:
+      AmiRegionMap: AMIRegionMapArm64
+      Arch: aarch64
+    m6g.12xlarge:
+      AmiRegionMap: AMIRegionMapArm64
+      Arch: aarch64
+    m6g.16xlarge:
+      AmiRegionMap: AMIRegionMapArm64
+      Arch: aarch64
+    m5.large:
+      AmiRegionMap: AMIRegionMapAmd64
+      Arch: aarch64
+    m5.xlarge:
+      AmiRegionMap: AMIRegionMapAmd64
+      Arch: x86_64
+    m5.2xlarge:
+      AmiRegionMap: AMIRegionMapAmd64
+      Arch: x86_64
+    m5.4xlarge:
+      AmiRegionMap: AMIRegionMapAmd64
+      Arch: x86_64
+    m5.8xlarge:
+      AmiRegionMap: AMIRegionMapAmd64
+      Arch: x86_64
+    m5.12xlarge:
+      AmiRegionMap: AMIRegionMapAmd64
+      Arch: x86_64
+    m5.16xlarge:
+      AmiRegionMap: AMIRegionMapAmd64
+      Arch: x86_64
+    m5.24xlarge:
+      AmiRegionMap: AMIRegionMapAmd64
+      Arch: x86_64
   # Ubuntu 20.04 arm64 AMIs
-  AMIRegionMap:
+  AMIRegionMapArm64:
     ap-northeast-1:
       AMIID: ami-0efa1a324595d0b84
     ap-northeast-2:
@@ -199,6 +264,42 @@ Mappings:
       AMIID: ami-0d09a1cb21151f2b5
     us-west-2:
       AMIID: ami-00794dde9e16c27ff
+  # Ubuntu 20.04 amd64 AMIs
+  AMIRegionMapAmd64:
+    ap-northeast-1:
+      AMIID: ami-0e592cbfcd8da59ba
+    ap-northeast-2:
+      AMIID: ami-071ba42b78218ac5a
+    ap-northeast-3:
+      AMIID: ami-04f0a75bd3d2afd88
+    ap-south-1:
+      AMIID: ami-00b9de22adf577ac9
+    ap-southeast-1:
+      AMIID: ami-02ade692eafd8fc35
+    ap-southeast-2:
+      AMIID: ami-047308819d98b95fc
+    ca-central-1:
+      AMIID: ami-0e0ac272cd74bdb14
+    eu-central-1:
+      AMIID: ami-0d342235295932397
+    eu-north-1:
+      AMIID: ami-0617128955c512af7
+    eu-west-1:
+      AMIID: ami-074026bca1acff478
+    eu-west-2:
+      AMIID: ami-0075ab29261b6f690
+    eu-west-3:
+      AMIID: ami-0a8569b42cd808207
+    sa-east-1:
+      AMIID: ami-03211d1b02a459e41
+    us-east-1:
+      AMIID: ami-0f81732f07ce19b1c
+    us-east-2:
+      AMIID: ami-0e99f6d19f9c4276c
+    us-west-1:
+      AMIID: ami-0b7dd63c6a810b1dd
+    us-west-2:
+      AMIID: ami-0c4ccec3a7c74d2e9
 Outputs:
   Ec2InstanceId:
     Description: "EC2 instance ID"
