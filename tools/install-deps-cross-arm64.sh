@@ -225,14 +225,14 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/aarch64-linux-gnu ] || [ ! -d ${NATIVE_PR
         --with-ca-fallback
         --prefix=/usr/local/aarch64-linux-gnu"
     if [ "${SHARED_LIBS}" == "OFF" ]; then
-        LDFLAGS="-static" PKG_CONFIG="pkg-config --static" CC=aarch64-linux-gnu-gcc \
+        LDFLAGS="-static" PKG_CONFIG="pkg-config --static" CC=aarch64-linux-gnu-gcc PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu \
         ../configure \
             --disable-shared \
             --enable-static \
             ${CURL_OPTIONS}
         make install -j`nproc` V=1 LDFLAGS="-static"
     else
-        CC=aarch64-linux-gnu-gcc \
+        CC=aarch64-linux-gnu-gcc PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu \
         ../configure \
             --enable-shared \
             --disable-static \

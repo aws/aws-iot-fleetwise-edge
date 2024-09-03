@@ -242,7 +242,7 @@ install_deps() {
         RANLIB=${TOOLCHAIN}/bin/llvm-ranlib \
         STRIP=${TOOLCHAIN}/bin/llvm-strip \
         LDFLAGS="-static" \
-        PKG_CONFIG="pkg-config --static" \
+        PKG_CONFIG="pkg-config --static" PKG_CONFIG_LIBDIR=${INSTALL_PREFIX} \
         ./configure \
             --disable-shared \
             --enable-static \
