@@ -225,14 +225,14 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         --with-ca-fallback
         --prefix=/usr/local/arm-linux-gnueabihf"
     if [ "${SHARED_LIBS}" == "OFF" ]; then
-        LDFLAGS="-static" PKG_CONFIG="pkg-config --static" CC=arm-linux-gnueabihf-gcc \
+        LDFLAGS="-static" PKG_CONFIG="pkg-config --static" CC=arm-linux-gnueabihf-gcc PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf \
         ../configure \
             --disable-shared \
             --enable-static \
             ${CURL_OPTIONS}
         make install -j`nproc` V=1 LDFLAGS="-static"
     else
-        CC=arm-linux-gnueabihf-gcc \
+        CC=arm-linux-gnueabihf-gcc PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf \
         ../configure \
             --enable-shared \
             --disable-static \
