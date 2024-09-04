@@ -5,16 +5,23 @@
 set -eo pipefail
 
 WITH_ROS2_SUPPORT="false"
+EXTRA_CTEST_ARGS=""
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case $1 in
         --with-ros2-support)
             WITH_ROS2_SUPPORT="true"
+            shift
+            ;;
+        --extra-ctest-args)
+            EXTRA_CTEST_ARGS=$2
+            shift
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --with-ros2-support  Test with ROS2 support"
+            echo "  --extra-ctest-args   Args to be passed to ctest eg. -E <tests to skip>"
             exit 0
             ;;
         esac
@@ -26,10 +33,8 @@ parse_args "$@"
 
 if ${WITH_ROS2_SUPPORT}; then
     source /opt/ros/galactic/setup.bash
-    # colcon hides the test output, so use tail in the background.
-    tail -F log/latest_test/iotfleetwise/stdout_stderr.log &
-    colcon test --return-code-on-test-failure
+    cd build/iotfleetwise
 else
     cd build
-    ctest -V
 fi
+ctest -V ${EXTRA_CTEST_ARGS}
