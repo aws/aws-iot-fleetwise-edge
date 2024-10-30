@@ -5,6 +5,7 @@
 #include "CollectionInspectionAPITypes.h"
 #include "IDecoderDictionary.h"
 #include "MessageTypes.h"
+#include "QueueTypes.h"
 #include "SignalTypes.h"
 #include "VehicleDataSourceTypes.h"
 #include "WaitUntil.h"
@@ -68,7 +69,9 @@ protected:
 // Test if valid gps data
 TEST_F( IWaveGpsSourceTest, testDecoding )
 {
-    SignalBufferPtr signalBufferPtr = std::make_shared<SignalBuffer>( 100 );
+    auto signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
     // Random data so checksum etc. will not be valid
     *nmeaFile << "$GPGSV,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25*26\n"
                  "GPGSV,27,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,25*26\\n\n"
@@ -76,17 +79,17 @@ TEST_F( IWaveGpsSourceTest, testDecoding )
                  "$GPGGA,133120.00,5234.56789,N,01234.56789,E,1,08,0.6,123.4,M,56.7,M,,*89\n\n"
                  "$GPVTG,29.30,T,31.32,M,33.34,N,35.36,K,A*37C\n\n\n";
     nmeaFile->close();
-    IWaveGpsSource gpsSource( signalBufferPtr );
+    IWaveGpsSource gpsSource( signalBufferDistributor );
     ASSERT_FALSE( gpsSource.init( filePath, INVALID_CAN_SOURCE_NUMERIC_ID, 1, 0, 32 ) );
     ASSERT_TRUE( gpsSource.init( filePath, 1, 1, 0, 32 ) );
     gpsSource.connect();
     gpsSource.start();
 
     CollectedDataFrame collectedDataFrame;
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    DELAY_ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
 
-    WAIT_ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+    WAIT_ASSERT_TRUE( signalBuffer->pop( collectedDataFrame ) );
 
     auto firstSignal = collectedDataFrame.mCollectedSignals[0];
     auto secondSignal = collectedDataFrame.mCollectedSignals[1];
@@ -104,18 +107,21 @@ TEST_F( IWaveGpsSourceTest, testDecoding )
 // Test longitude west
 TEST_F( IWaveGpsSourceTest, testWestNegativeLongitude )
 {
-    SignalBufferPtr signalBufferPtr = std::make_shared<SignalBuffer>( 100 );
+    SignalBufferPtr signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+
     // instead of E for east now, W for West
     *nmeaFile << "$GPGGA,133120.00,5234.56789,N,01234.56789,W,1,08,0.6,123.4,M,56.7,M,,*89\n\n";
     nmeaFile->close();
-    IWaveGpsSource gpsSource( signalBufferPtr );
+    IWaveGpsSource gpsSource( signalBufferDistributor );
     gpsSource.init( filePath, 1, 1, 0, 32 );
     gpsSource.connect();
     gpsSource.start();
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
 
     CollectedDataFrame collectedDataFrame;
-    WAIT_ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+    WAIT_ASSERT_TRUE( signalBuffer->pop( collectedDataFrame ) );
 
     auto firstSignal = collectedDataFrame.mCollectedSignals[0];
     auto secondSignal = collectedDataFrame.mCollectedSignals[1];

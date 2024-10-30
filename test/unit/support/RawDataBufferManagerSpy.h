@@ -52,7 +52,8 @@ public:
                    RawData::BufferHandleUsageStage handleUsageStage ) );
 
     RawData::BufferErrorCode
-    updateConfig( const std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> &updatedSignals )
+    updateConfig(
+        const std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> &updatedSignals ) override
     {
         mockedUpdateConfig( updatedSignals );
         return RawData::BufferManager::updateConfig( updatedSignals );
@@ -61,6 +62,15 @@ public:
     MOCK_METHOD( RawData::BufferErrorCode,
                  mockedUpdateConfig,
                  ( ( const std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> &updatedSignals ) ) );
+
+    RawData::LoanedFrame
+    borrowFrame( RawData::BufferTypeId typeId, RawData::BufferHandle handle ) override
+    {
+        mockedBorrowFrame( typeId, handle );
+        return RawData::BufferManager::borrowFrame( typeId, handle );
+    }
+
+    MOCK_METHOD( void, mockedBorrowFrame, ( RawData::BufferTypeId typeId, RawData::BufferHandle handle ) );
 };
 
 } // namespace Testing

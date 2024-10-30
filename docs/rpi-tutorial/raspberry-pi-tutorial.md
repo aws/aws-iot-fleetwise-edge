@@ -122,6 +122,33 @@ to take action based on your use of AWS IoT FleetWise._**
    ```
 1. Save the file (`CTRL+O`, `CTRL+X`) and reboot the Raspberry Pi (`sudo reboot`).
 
+1. The Raspberry Pi can be used to collect data from a real vehicle, by connecting it via an
+   [OBD-II plug connector](https://www.amazon.com/s?k=obd-ii+plug+open+wire), or you can also follow
+   these steps to setup a CAN simulator also on the Raspberry Pi to supply CAN data to FWE:
+   1. Physically connect the `CAN0` and `CAN1` interfaces together on the CAN Bus Expansion HAT
+      using two pieces of wire. (This will allow CAN messages to be sent on the `can0` interface,
+      otherwise without physical acknowledgements nothing can be sent.)
+      - Connect `CAN0` `H` to `CAN1` `H`
+      - Connect `CAN0` `L` to `CAN1` `L`
+   1. On the Raspberry Pi, install the simulator dependencies:
+      ```bash
+      sudo apt update
+      sudo apt install -y python3 python3-pip
+      pip3 install \
+         wrapt==1.10.0 \
+         cantools==36.4.0 \
+         prompt_toolkit==3.0.21 \
+         python-can==3.3.4 \
+         can-isotp==1.7 \
+         matplotlib==3.4.3
+      ```
+   1. Run the simulator on the `can0` interface, and leave this terminal open while you continue
+      with the remaining steps:
+      ```bash
+      cd ~/aws-iot-fleetwise-deploy/tools/cansim
+      python3 cansim.py -i can0
+      ```
+
 ## Step 2: Launch your development machine
 
 These steps require an Ubuntu 20.04 development machine with 10 GB free disk space. If necessary,
@@ -231,8 +258,8 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    ```
 
 1. As described in step 4 of [setting up the Raspberry Pi](#step-1-setup-the-raspberry-pi), connect
-   through SSH to the Raspberry Pi. On the Raspberry Pi, install your Edge Agent as a service by
-   running the following command:
+   through SSH to the Raspberry Pi in a new terminal. On the Raspberry Pi, install your Edge Agent
+   as a service by running the following command:
 
    ```bash
    mkdir -p ~/aws-iot-fleetwise-deploy && cd ~/aws-iot-fleetwise-deploy \
@@ -288,7 +315,12 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    commands:
 
    ```bash
-   ./demo.sh --vehicle-name fwdemo-rpi --campaign-file campaign-obd-heartbeat.json
+   ./demo.sh \
+      --vehicle-name fwdemo-rpi \
+      --node-file obd-nodes.json \
+      --decoder-file obd-decoders.json \
+      --network-interface-file network-interface-obd.json \
+      --campaign-file campaign-obd-heartbeat.json
    ```
 
    The demo script:
@@ -296,14 +328,11 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
    1. Creates an Amazon Timestream database and table.
    1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
-   1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and
-      secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list.
-   1. Creates a model manifest that references the signal catalog with all of the OBD and DBC
-      signals.
+   1. Creates a signal catalog based on `obd-nodes.json`.
+   1. Creates a model manifest that references the signal catalog with all of the OBD signals.
    1. Activates the model manifest.
    1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for decoding
-      OBD signals from the network interfaces defined in `network-interfaces.json`.
-   1. Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest.
+      signals from the network interfaces defined in `network-interface-obd.json`.
    1. Updates the decoder manifest to set the status as `ACTIVE`.
    1. Creates a vehicle with a name equal to `fwdemo-rpi`, the same as the name passed to
       `provision.sh`.

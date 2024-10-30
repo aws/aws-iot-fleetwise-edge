@@ -251,6 +251,8 @@ struct SignalBufferOverrides
 };
 
 // coverity[cert_dcl60_cpp_violation] false positive - class only defined once
+// coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
+// coverity[misra_cpp_2008_rule_3_2_2_violation ] false positive - class only defined once
 class BufferManagerConfig
 {
 public:
@@ -317,7 +319,7 @@ private:
     size_t mMaxBytesPerSample{ 0 };
     size_t mMaxBytesPerSignal{ 0 };
 
-    std::unordered_map<std::string, std::unordered_map<std::string, SignalBufferOverrides>>
+    std::unordered_map<InterfaceID, std::unordered_map<std::string, SignalBufferOverrides>>
         mOverridesPerSignal; // It can contain config overrides for a specific signal. When a signal is not
                              // present in this map, the default config (defined by the other members) is used. The
                              // first key is the interfaceId and the second key is the messageId. Both are needed to
@@ -400,7 +402,7 @@ public:
      * to this handle will be kept. It may need to be released to give space to more recent data.
      * When the data needs to be read, the handle should be passed to the borrowFrame method.
      */
-    virtual BufferHandle push( uint8_t *data, size_t size, Timestamp receiveTimestamp, BufferTypeId typeId );
+    virtual BufferHandle push( const uint8_t *data, size_t size, Timestamp receiveTimestamp, BufferTypeId typeId );
 
     /**
      * @brief Get the Statistics for a particular signal raw buffer
@@ -430,7 +432,7 @@ public:
      * @param handle Unique handle of the raw data requested
      * @return LoanedFrame
      */
-    LoanedFrame borrowFrame( BufferTypeId typeId, BufferHandle handle );
+    virtual LoanedFrame borrowFrame( BufferTypeId typeId, BufferHandle handle );
 
     /**
      * @brief Mark a handle as being used and for what purpose.

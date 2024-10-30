@@ -4,16 +4,16 @@
 #pragma once
 
 #include "ICollectionScheme.h"
+#include "SignalTypes.h"
 #include "collection_schemes.pb.h"
 #include "common_types.pb.h"
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <string>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-#include "SignalTypes.h"
 #include <atomic>
+#include <utility>
 #endif
 
 namespace Aws
@@ -28,7 +28,14 @@ namespace IoTFleetWise
 class CollectionSchemeIngestion : public ICollectionScheme
 {
 public:
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    CollectionSchemeIngestion( std::shared_ptr<PartialSignalIDLookup> partialSignalIDLookup )
+        : mPartialSignalIDLookup( std::move( partialSignalIDLookup ) )
+    {
+    }
+#else
     CollectionSchemeIngestion() = default;
+#endif
     ~CollectionSchemeIngestion() override;
 
     CollectionSchemeIngestion( const CollectionSchemeIngestion & ) = delete;
@@ -36,15 +43,19 @@ public:
     CollectionSchemeIngestion( CollectionSchemeIngestion && ) = delete;
     CollectionSchemeIngestion &operator=( CollectionSchemeIngestion && ) = delete;
 
+    bool operator==( const ICollectionScheme &other ) const override;
+
+    bool operator!=( const ICollectionScheme &other ) const override;
+
     bool isReady() const override;
 
     bool build() override;
 
     bool copyData( std::shared_ptr<Schemas::CollectionSchemesMsg::CollectionScheme> protoCollectionSchemeMessagePtr );
 
-    const std::string &getCollectionSchemeID() const override;
+    const SyncID &getCollectionSchemeID() const override;
 
-    const std::string &getDecoderManifestID() const override;
+    const SyncID &getDecoderManifestID() const override;
 
     uint64_t getStartTime() const override;
 
@@ -120,7 +131,7 @@ private:
     /**
      * @brief unordered_map from partial signal ID to pair of signal path and signal ID
      */
-    PartialSignalIDLookup mPartialSignalIDLookup;
+    std::shared_ptr<PartialSignalIDLookup> mPartialSignalIDLookup;
 
     /**
      * @brief Required metadata for S3 upload
@@ -132,6 +143,7 @@ private:
      * @brief Function used to Flatten the Abstract Syntax Tree (AST)
      */
     ExpressionNode *serializeNode( const Schemas::CommonTypesMsg::ConditionNode &node,
+                                   ExpressionNode_t &expressionNodes,
                                    std::size_t &nextIndex,
                                    int remainingDepth );
 

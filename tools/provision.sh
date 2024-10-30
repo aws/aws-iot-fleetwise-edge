@@ -111,33 +111,35 @@ fi
 
 NAME="${VEHICLE_NAME}-${TIMESTAMP}"
 
-if [ ${ONLY_CLEAN_UP} == true ]; then
-
-    PRINCIPAL_ARN=$(aws iot list-thing-principals --thing-name ${VEHICLE_NAME} --region ${REGION} | jq -r ".principals[0]")
+if ${ONLY_CLEAN_UP}; then
+    PRINCIPAL_ARN=$(aws iot list-thing-principals --thing-name ${VEHICLE_NAME} --region ${REGION} ${ENDPOINT_URL_OPTION} | jq -r ".principals[0]")
     CERTIFICATE_ID=$(echo ${PRINCIPAL_ARN} | cut -d'/' -f2 )
-    POLICY_NAME=$(aws iot list-principal-policies --principal ${PRINCIPAL_ARN} --region ${REGION} | jq -r ".policies[0].policyName")
+    POLICY_NAME=$(aws iot list-principal-policies --principal ${PRINCIPAL_ARN} --region ${REGION} ${ENDPOINT_URL_OPTION} | jq -r ".policies[0].policyName")
 
     RETRY_COUNTER=10
-    while ! aws iot delete-thing --thing-name ${VEHICLE_NAME} --region ${REGION}
-    do
+    while true; do
         # Delete depending resources
-        aws iot detach-thing-principal --thing-name ${VEHICLE_NAME} --principal ${PRINCIPAL_ARN} --region ${REGION} || true
-        aws iot detach-principal-policy --policy-name "${POLICY_NAME}" --principal ${PRINCIPAL_ARN} --region ${REGION} || true
-        aws iot delete-policy --policy-name "${POLICY_NAME}" --region ${REGION} || true
-        aws iot update-certificate --certificate-id ${CERTIFICATE_ID} --new-status INACTIVE --region ${REGION} || true
-        aws iot delete-certificate --certificate-id ${CERTIFICATE_ID} --region ${REGION} || true
-
-        echo "Wait one second before next retry"
-        sleep 1
-        if [ "${RETRY_COUNTER}" -eq "0" ]; then
-            echo "Failed aws iot delete-thing"
-            exit 1
+        aws iot detach-thing-principal --thing-name ${VEHICLE_NAME} --principal ${PRINCIPAL_ARN} --region ${REGION} ${ENDPOINT_URL_OPTION} || true
+        aws iot detach-principal-policy --policy-name "${POLICY_NAME}" --principal ${PRINCIPAL_ARN} --region ${REGION} ${ENDPOINT_URL_OPTION} || true
+        aws iot delete-policy --policy-name "${POLICY_NAME}" --region ${REGION} ${ENDPOINT_URL_OPTION} || true
+        aws iot update-certificate --certificate-id ${CERTIFICATE_ID} --new-status INACTIVE --region ${REGION} ${ENDPOINT_URL_OPTION} || true
+        aws iot delete-certificate --certificate-id ${CERTIFICATE_ID} --region ${REGION} ${ENDPOINT_URL_OPTION} || true
+        if DELETE_THING_STATUS=`aws iot delete-thing --thing-name ${VEHICLE_NAME} --region ${REGION} ${ENDPOINT_URL_OPTION}`; then
+            break
+        elif ! echo ${DELETE_THING_STATUS} | grep -q "InvalidRequestException"; then
+            echo "${DELETE_THING_STATUS}" >&2
+            exit -1
+        else
+            if [ "${RETRY_COUNTER}" -eq "0" ]; then
+                echo "Failed aws iot delete-thing"
+                exit 1
+            fi
+            ((RETRY_COUNTER--))
+            sleep 1
         fi
-        ((RETRY_COUNTER--))
     done
     echo "Successfully deleted iot thing"
     exit 0
-
 fi
 
 echo -n "Date: "

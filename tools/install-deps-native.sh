@@ -52,8 +52,8 @@ parse_args() {
 parse_args "$@"
 
 if ${INSTALL_BUILD_TIME_DEPS}; then
-    apt update
-    apt install -y \
+    apt update -o DPkg::Lock::Timeout=120
+    apt install -y -o DPkg::Lock::Timeout=120 \
         build-essential \
         clang-tidy-12 \
         cmake \
@@ -70,17 +70,17 @@ if ${INSTALL_BUILD_TIME_DEPS}; then
 fi
 
 if ${WITH_ROS2_SUPPORT}; then
-    command -v wget > /dev/null || ( apt update && apt install -y wget )
+    command -v wget > /dev/null || ( apt update -o DPkg::Lock::Timeout=120 && apt install -y -o DPkg::Lock::Timeout=120 wget)
     wget -q https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O /usr/share/keyrings/ros-archive-keyring.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(source /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list
-    apt update
-    apt install -y \
+    apt update -o DPkg::Lock::Timeout=120
+    apt install -y -o DPkg::Lock::Timeout=120 \
         ros-galactic-rclcpp \
         ros-galactic-rosbag2 \
         ros-galactic-ros2topic \
         ros-galactic-sensor-msgs
     if ${INSTALL_BUILD_TIME_DEPS}; then
-        apt install -y \
+        apt install -y -o DPkg::Lock::Timeout=120 \
             ros-galactic-rosidl-default-generators \
             python3-colcon-common-extensions
     fi
@@ -95,9 +95,7 @@ if ${INSTALL_BUILD_TIME_DEPS} && [ ! -f /usr/include/linux/can/isotp.h ]; then
     rm -rf can-isotp
 fi
 
-if [ -z "${PREFIX+x}" ]; then
-    PREFIX="/usr/local/`gcc -dumpmachine`"
-fi
+: ${PREFIX:="/usr/local/`gcc -dumpmachine`"}
 
 if ${INSTALL_BUILD_TIME_DEPS} && ( ! ${USE_CACHE} || [ ! -d ${PREFIX} ] ); then
     mkdir -p ${PREFIX}
@@ -247,7 +245,6 @@ if ${INSTALL_BUILD_TIME_DEPS} && ( ! ${USE_CACHE} || [ ! -d ${PREFIX} ] ); then
         -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_ONLY='transfer;s3-crt;iot' \
-        -DAWS_CUSTOM_MEMORY_MANAGEMENT=ON \
         ${AWS_SDK_CPP_OPTIONS} \
         -DCMAKE_INSTALL_PREFIX=${PREFIX} \
         ..

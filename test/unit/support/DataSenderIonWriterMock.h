@@ -27,7 +27,7 @@ public:
 
     MOCK_METHOD( void,
                  setupVehicleData,
-                 ( const TriggeredCollectionSchemeDataPtr &mTriggeredCollectionSchemeData ),
+                 ( std::shared_ptr<const TriggeredVisionSystemData> mTriggeredVisionSystemData ),
                  ( override ) );
 
     MOCK_METHOD( std::unique_ptr<StreambufBuilder>, getStreambufBuilder, (), ( override ) );

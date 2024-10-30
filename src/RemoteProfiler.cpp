@@ -54,12 +54,13 @@ RemoteProfiler::sendMetricsOut()
     Json::StreamWriterBuilder builder;
     builder["indentation"] = ""; // If you want whitespace-less output
     const std::string output = Json::writeString( builder, fMetricsRoot );
-    uint32_t ret = static_cast<uint32_t>(
-        fMetricsSender->sendBuffer( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() ) );
-    if ( static_cast<uint32_t>( ConnectivityError::Success ) != ret )
-    {
-        FWE_LOG_ERROR( "Send error " + std::to_string( static_cast<uint32_t>( ret ) ) );
-    }
+    fMetricsSender->sendBuffer(
+        reinterpret_cast<const uint8_t *>( output.c_str() ), output.length(), []( ConnectivityError result ) {
+            if ( result == ConnectivityError::Success )
+            {
+                FWE_LOG_ERROR( "Send error " + std::to_string( static_cast<uint32_t>( result ) ) );
+            }
+        } );
     fMetricsRoot.clear();
     fCurrentMetricsPending = 0;
 }
@@ -81,12 +82,13 @@ RemoteProfiler::sendLogsOut()
 
         if ( ( fLogSender != nullptr ) )
         {
-            uint32_t ret = static_cast<uint32_t>(
-                fLogSender->sendBuffer( reinterpret_cast<const uint8_t *>( output.c_str() ), output.length() ) );
-            if ( static_cast<uint32_t>( ConnectivityError::Success ) != ret )
-            {
-                FWE_LOG_ERROR( " Send error " + std::to_string( static_cast<uint32_t>( ret ) ) );
-            }
+            fLogSender->sendBuffer(
+                reinterpret_cast<const uint8_t *>( output.c_str() ), output.length(), []( ConnectivityError result ) {
+                    if ( result == ConnectivityError::Success )
+                    {
+                        FWE_LOG_ERROR( "Send error " + std::to_string( static_cast<uint32_t>( result ) ) );
+                    }
+                } );
         }
     }
 }
@@ -103,14 +105,15 @@ RemoteProfiler::logMessage( LogLevel level,
         return;
     }
     Json::Value logNode;
-
+    const std::string timestamp = fClock->currentTimeToIsoString();
     logNode["logLevel"] = levelToString( level );
     logNode["logFile"] = filename;
     logNode["logLineNumber"] = lineNumber;
     logNode["logFunction"] = function;
     logNode["logEntry"] = logEntry;
+    logNode["logTimestamp"] = timestamp;
     uint32_t size = static_cast<uint32_t>( filename.length() + function.length() + logEntry.length() +
-                                           JSON_MAX_OVERHEAD_BYTES_PER_LOG );
+                                           timestamp.length() + JSON_MAX_OVERHEAD_BYTES_PER_LOG );
     bool sendOutBeforeAdding = false;
     {
         std::lock_guard<std::mutex> lock( loggingMutex );

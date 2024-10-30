@@ -33,11 +33,17 @@ BS_:
 
 BU_:
 
+BO_ 769 Connectivity: 1 Vector__XXX
+ SG_ NetworkType : 7|8@0+ (1,0) [0|3] "" Vector__XXX
+
 BO_ 401 ECM: 8 Vector__XXX
  SG_ DemoEngineTorque : 3|12@0+ (0.5,-848) [-848|1199.5] "Nm" Vector__XXX
 
 BO_ 532 ABS: 6 Vector__XXX
  SG_ DemoBrakePedalPressure : 0|8@0+ (75,0) [0|19125] "kPa" Vector__XXX
+
+BO_ 1217 BCM: 8 Vector__XXX
+ SG_ DemoEngineCoolantTemperature : 23|8@0+ (1,-40) [-40|215] "deg C" Vector__XXX
 
 BA_DEF_ SG_  "SignalType" STRING ;
 BA_DEF_ SG_  "SignalLongName" STRING ;
@@ -45,5 +51,7 @@ BA_DEF_ BO_  "GenMsgCycleTime" INT 0 10000;
 BA_DEF_DEF_  "SignalType" "";
 BA_DEF_DEF_  "SignalLongName" "";
 BA_DEF_DEF_  "GenMsgCycleTime" 0;
+BA_ "GenMsgCycleTime" BO_ 769 1000;
 BA_ "GenMsgCycleTime" BO_ 401 12;
 BA_ "GenMsgCycleTime" BO_ 532 50;
+BA_ "GenMsgCycleTime" BO_ 1217 500;

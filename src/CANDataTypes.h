@@ -12,56 +12,19 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-union CANPhysicalValue {
-    double doubleVal;
-    uint64_t uint64Val;
-    int64_t int64Val;
-};
-
-struct CANPhysicalValueType
-{
-    CANPhysicalValue signalValue;
-    SignalType signalType;
-
-    template <typename T>
-    CANPhysicalValueType( T val, SignalType type )
-        : signalType( type )
-    {
-        switch ( signalType )
-        {
-        case SignalType::UINT64:
-            signalValue.uint64Val = static_cast<uint64_t>( val );
-            break;
-        case SignalType::INT64:
-            signalValue.int64Val = static_cast<int64_t>( val );
-            break;
-        default:
-            signalValue.doubleVal = static_cast<double>( val );
-        }
-    }
-
-    SignalType
-    getType() const
-    {
-        return signalType;
-    }
-};
-
 struct CANDecodedSignal
 {
 
-    CANDecodedSignal( uint32_t signalID, int64_t rawValue, CANPhysicalValueType physicalValue, SignalType signalTypeIn )
+    CANDecodedSignal( uint32_t signalID, DecodedSignalValue physicalValue, SignalType signalTypeIn )
         : mSignalID( signalID )
-        , mRawValue( rawValue )
         , mPhysicalValue( physicalValue )
         , mSignalType( signalTypeIn )
     {
     }
 
     uint32_t mSignalID;
-    int64_t mRawValue;
-    CANPhysicalValueType mPhysicalValue;
-    SignalType mSignalType{ SignalType::DOUBLE };
+    DecodedSignalValue mPhysicalValue;
+    SignalType mSignalType{ SignalType::UNKNOWN };
 };
 
 /**

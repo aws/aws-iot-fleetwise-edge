@@ -494,7 +494,12 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    commands:
 
    ```bash
-   ./demo.sh --vehicle-name fwdemo-g26 --campaign-file campaign-obd-heartbeat.json
+   ./demo.sh \
+      --vehicle-name fwdemo-g26 \
+      --node-file obd-nodes.json \
+      --decoder-file obd-decoders.json \
+      --network-interface-file network-interface-obd.json \
+      --campaign-file campaign-obd-heartbeat.json
    ```
 
    The demo script:
@@ -502,14 +507,11 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
    1. Creates an Amazon Timestream database and table.
    1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
-   1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and
-      secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list.
-   1. Creates a model manifest that references the signal catalog with all of the OBD and DBC
-      signals.
+   1. Creates a signal catalog based on `obd-nodes.json`.
+   1. Creates a model manifest that references the signal catalog with all of the OBD signals.
    1. Activates the model manifest.
    1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for decoding
-      OBD signals from the network interfaces defined in `network-interfaces.json`.
-   1. Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest.
+      signals from the network interfaces defined in `network-interfaces-obd.json`.
    1. Updates the decoder manifest to set the status as `ACTIVE`.
    1. Creates a vehicle with a name equal to `fwdemo-g26`, the same as the name passed to
       `provision.sh`.

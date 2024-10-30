@@ -3,11 +3,11 @@
 
 #include "RemoteProfiler.h"
 #include "IConnectionTypes.h"
-#include "ISender.h"
 #include "LogLevel.h"
 #include "SenderMock.h"
 #include "WaitUntil.h"
 #include <atomic>
+#include <functional>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <json/json.h>
@@ -22,6 +22,7 @@ namespace IoTFleetWise
 
 using ::testing::_;
 using ::testing::Gt;
+using ::testing::InvokeArgument;
 using ::testing::Return;
 using ::testing::Sequence;
 using ::testing::StrictMock;
@@ -41,7 +42,7 @@ TEST( RemoteProfilerTest, MetricsUpload )
 {
     auto senderMock = std::make_shared<StrictMock<Testing::SenderMock>>();
     EXPECT_CALL( *senderMock, mockedSendBuffer( _, Gt( 0 ), _ ) )
-        .WillRepeatedly( Return( ConnectivityError::Success ) );
+        .WillRepeatedly( InvokeArgument<2>( ConnectivityError::Success ) );
 
     auto mockLogSender = std::make_shared<Testing::SenderMock>();
     RemoteProfiler profiler( senderMock, mockLogSender, 1000, 1000, LogLevel::Trace, "Test" );

@@ -5,15 +5,16 @@
 
 #include "CANInterfaceIDTranslator.h"
 #include "CacheAndPersist.h"
+#include "CheckinSender.h"
 #include "Clock.h"
 #include "ClockHandler.h"
 #include "CollectionInspectionAPITypes.h"
+#include "ICollectionScheme.h"
 #include "ICollectionSchemeList.h"
-#include "ICollectionSchemeManager.h"
 #include "IDecoderDictionary.h"
 #include "IDecoderManifest.h"
 #include "Listener.h"
-#include "SchemaListener.h"
+#include "RawDataManager.h"
 #include "Signal.h"
 #include "SignalTypes.h"
 #include "Thread.h"
@@ -31,7 +32,7 @@
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include "MessageTypes.h"
-#include "RawDataManager.h"
+#include <unordered_map>
 #endif
 
 namespace Aws
@@ -39,13 +40,11 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-using SchemaListenerPtr = std::shared_ptr<SchemaListener>;
-
 /* TimeData is used in mTimeline, the second parameter in the pair is a CollectionScheme ID */
 struct TimeData
 {
     TimePoint time;
-    std::string id;
+    SyncID id;
 
     bool
     operator>( const TimeData &other ) const
@@ -67,8 +66,7 @@ struct TimeData
   request.
  * 7. Notify other components about currently Enabled CollectionSchemes.
  */
-
-class CollectionSchemeManager : public ICollectionSchemeManager
+class CollectionSchemeManager // NOLINT(clang-analyzer-optin.performance.Padding)
 {
 public:
     /**
@@ -99,38 +97,25 @@ public:
     using OnCollectionSchemeListChangeCallback =
         std::function<void( const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes )>;
 
-    CollectionSchemeManager() = default;
+    CollectionSchemeManager(
+        std::shared_ptr<CacheAndPersist>
+            schemaPersistencyPtr,                  /**< shared pointer to collectionSchemePersistency object */
+        CANInterfaceIDTranslator &canIDTranslator, /**< canIDTranslator used to translate the cloud used Interface
+                                                     ID to the the internal channel id */
+        std::shared_ptr<CheckinSender>
+            checkinSender, /**< the checkin sender that needs to be updated with the current documents */
+        std::shared_ptr<RawData::BufferManager> rawDataBufferManager =
+            nullptr /**< rawDataBufferManager Optional manager to handle raw data. If not given, raw data
+                       collection will be disabled */
+    );
 
-    CollectionSchemeManager( std::string dm_id );
-
-    CollectionSchemeManager( std::string dm_id,
-                             std::map<std::string, ICollectionSchemePtr> mapEnabled,
-                             std::map<std::string, ICollectionSchemePtr> mapIdle );
-
-    ~CollectionSchemeManager() override;
+    ~CollectionSchemeManager();
 
     CollectionSchemeManager( const CollectionSchemeManager & ) = delete;
     CollectionSchemeManager &operator=( const CollectionSchemeManager & ) = delete;
     CollectionSchemeManager( CollectionSchemeManager && ) = delete;
     CollectionSchemeManager &operator=( CollectionSchemeManager && ) = delete;
 
-    /**
-     * @brief Initializes collectionScheme management session.
-     *
-     * @return True if successful. False otherwise.
-     */
-    bool init( uint32_t checkinIntervalMsec, /**< checkin message interval in millisecond */
-               const std::shared_ptr<CacheAndPersist>
-                   &schemaPersistencyPtr,                /**< shared pointer to collectionSchemePersistency object */
-               CANInterfaceIDTranslator &canIDTranslator /**< canIDTranslator used to translate the cloud used Interface
-                                                            ID to the the internal channel id */
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-               ,
-               std::shared_ptr<RawData::BufferManager> rawDataBufferManager =
-                   nullptr /**< rawDataBufferManager Optional manager to handle raw data. If not given, raw data
-                              collection will be disabled */
-#endif
-    );
     /**
      * @brief Sets up connection with CollectionScheme Ingestion and start main thread.
      * @return True if successful. False otherwise.
@@ -158,7 +143,7 @@ public:
      * A lock in the function is applied to handle the race condition between AwdIoT context and PM context.
      *
      */
-    void onCollectionSchemeUpdate( const ICollectionSchemeListPtr &collectionSchemeList ) override;
+    void onCollectionSchemeUpdate( const ICollectionSchemeListPtr &collectionSchemeList );
 
     /**
      * @brief callback for CollectionScheme Ingestion to send update of IDecoderManifest
@@ -170,25 +155,13 @@ public:
      * A lock in the function is applied to handle the race condition between AwdIoT context and PM context.
 
      */
-    void onDecoderManifestUpdate( const IDecoderManifestPtr &decoderManifest ) override;
-
-    /**
-     * @brief Used by the bootstrap to set the SchemaListener pointer to allow CollectionScheme Management to send data
-     * to CollectionScheme Ingestion
-     *
-     * @param collectionSchemeIngestionListenerPtr
-     */
-    inline void
-    setSchemaListenerPtr( const SchemaListenerPtr collectionSchemeIngestionListenerPtr )
-    {
-        mSchemaListenerPtr = collectionSchemeIngestionListenerPtr;
-    }
+    void onDecoderManifestUpdate( const IDecoderManifestPtr &decoderManifest );
 
     /**
      * @brief Returns the current list of collection scheme ARNs
      * @return List of collection scheme ARNs
      */
-    std::vector<std::string> getCollectionSchemeArns();
+    std::vector<SyncID> getCollectionSchemeArns();
 
     /**
      * @brief Subscribe to changes in the active decoder dictionary
@@ -258,7 +231,7 @@ private:
      * @param currTime time when main thread wakes up
      */
     static void printEventLogMsg( std::string &msg,
-                                  const std::string &id,
+                                  const SyncID &id,
                                   const Timestamp &startTime,
                                   const Timestamp &stopTime,
                                   const TimePoint &currTime );
@@ -280,14 +253,8 @@ private:
     void printWakeupStatus( std::string &wakeupStr ) const;
 
     /**
-     * @brief clean up collectionScheme maps and timeline
-     *
-     */
-    void cleanupCollectionSchemes();
-
-    /**
      * @brief Fill up the fields in ConditionWithCollectedData
-     * To be called by inspectionMatrixExtractor
+     * To be called by matrixExtractor
      *
      * @param collectionScheme the collectionScheme where the info is retrieved
      * @param conditionData object ConditionWithCollectedData to be filled
@@ -295,31 +262,51 @@ private:
     void addConditionData( const ICollectionSchemePtr &collectionScheme, ConditionWithCollectedData &conditionData );
 
     /**
-     * @brief initialize in mTimeLine to send checkin message
-     */
-    void prepareCheckinTimer();
-
-    /**
      * @brief checks if there is any enabled or idle collectionScheme in the system
      * returns true when there is
      */
     bool isCollectionSchemeLoaded();
 
+    bool isCollectionSchemesInSyncWithDm();
+
+    void extractCondition( const std::shared_ptr<InspectionMatrix> &inspectionMatrix,
+                           const ICollectionSchemePtr &collectionScheme,
+                           std::vector<const ExpressionNode *> &nodes,
+                           std::map<const ExpressionNode *, uint32_t> &nodeToIndexMap,
+                           uint32_t &index,
+                           const ExpressionNode *initialNode );
+
 protected:
-    bool rebuildMapsandTimeLine( const TimePoint &currTime ) override;
+    bool rebuildMapsandTimeLine( const TimePoint &currTime );
 
-    bool updateMapsandTimeLine( const TimePoint &currTime ) override;
+    bool updateMapsandTimeLine( const TimePoint &currTime );
 
-    bool checkTimeLine( const TimePoint &currTime ) override;
+    bool checkTimeLine( const TimePoint &currTime );
 
     /**
      * @brief This function extract the decoder dictionary from decoder manifest and polices
-     *
-     * @param decoderDictionaryMap pass reference of the map of decoder dictionary. This map contains dictionaries for
-     * different network types
      */
     void decoderDictionaryExtractor(
-        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap );
+        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>>
+            &decoderDictionaryMap /**< pass reference of the map of decoder dictionary. This map contains dictionaries
+                                     for different network types */
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        ,
+        std::shared_ptr<InspectionMatrix> inspectionMatrix /**< the inspection matrix that will be updated with the
+                                                              right signal types for partial signals */
+#endif
+    );
+
+    void addSignalToDecoderDictionaryMap(
+        SignalID signalId,
+        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        ,
+        std::unordered_map<SignalID, SignalType> &partialSignalTypes,
+        SignalID topLevelSignalId = INVALID_SIGNAL_ID,
+        SignalPath signalPath = SignalPath()
+#endif
+    );
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     /**
@@ -330,18 +317,23 @@ protected:
      * @param partialSignalID the ID that should be used for a partial signal. Only used if signalPath is not empty
      * @param signalPath if not empty this signal is a partialSignal and partialSignalID will be use
      * @param complexSignalRootType the root complex type of this signal
+     * @param partialSignalTypes the map that will be updated with the signal types for partial signals
      */
     void putComplexSignalInDictionary( ComplexDataMessageFormat &complexSignal,
                                        SignalID signalID,
                                        PartialSignalID partialSignalID,
                                        SignalPath &signalPath,
-                                       ComplexDataTypeId complexSignalRootType );
+                                       ComplexDataTypeId complexSignalRootType,
+                                       std::unordered_map<SignalID, SignalType> &partialSignalTypes );
 
     /**
-     * @brief Fills up and creates the BufferConfig and sends it to the Raw Buffer Manager
+     * @brief Fills up and creates the BufferConfig with complex signals
+     * @param complexDataDecoderDictionary current complex data decoder dict
+     * @param updatedSignals map of the signals that will be updated by Raw Buffer Manager
      */
-    void updateRawDataBufferConfig(
-        std::shared_ptr<Aws::IoTFleetWise::ComplexDataDecoderDictionary> complexDataDecoderDictionary );
+    void updateRawDataBufferConfigComplexSignals(
+        std::shared_ptr<Aws::IoTFleetWise::ComplexDataDecoderDictionary> complexDataDecoderDictionary,
+        std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> &updatedSignals );
 #endif
 
     /**
@@ -354,30 +346,23 @@ protected:
     void decoderDictionaryUpdater(
         std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap );
 
-    void inspectionMatrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix ) override;
+    void matrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix );
 
-    void inspectionMatrixUpdater( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) override;
+    void inspectionMatrixUpdater( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix );
 
-    bool retrieve( DataType retrieveType ) override;
+    bool retrieve( DataType retrieveType );
 
-    void store( DataType storeType ) override;
+    void store( DataType storeType );
 
-    bool processDecoderManifest() override;
+    bool processDecoderManifest();
 
-    bool processCollectionScheme() override;
+    bool processCollectionScheme();
 
-    bool sendCheckin() override;
+    void updateCheckinDocuments();
 
-    void updateAvailable() override;
+    void updateAvailable();
 
 private:
-    // default checkin interval set to 5 mins
-    static constexpr int DEFAULT_CHECKIN_INTERVAL_IN_MILLISECOND = 300000;
-    // Checkin retry interval. Used issue checkins to the cloud as soon as possible, set to 5 seconds
-    static constexpr int RETRY_CHECKIN_INTERVAL_IN_MILLISECOND = 5000;
-    // checkIn ID in parallel to collectionScheme IDs
-    static const std::string CHECKIN;
-
     Thread mThread;
     // Atomic flag to signal the state of main thread. If true, we should stop
     std::atomic<bool> mShouldStop{ false };
@@ -388,38 +373,40 @@ private:
     Signal mWait;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
 
-    // Shared pointer to a SchemaListener Object allow CollectionSchemeManagement to send data to Schema
-    SchemaListenerPtr mSchemaListenerPtr;
+    std::shared_ptr<CheckinSender> mCheckinSender;
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     // Shared pointer to a Raw Data Buffer Manager Object allow CollectionSchemeManagement to send BufferConfig to
     // the Manager
     std::shared_ptr<RawData::BufferManager> mRawDataBufferManager;
-#endif
-
-    // Idle collectionScheme collection
-    std::map<std::string, ICollectionSchemePtr> mIdleCollectionSchemeMap;
-
-    // Enabled collectionScheme collection
-    std::map<std::string, ICollectionSchemePtr> mEnabledCollectionSchemeMap;
 
     // Builds vector of ActiveCollectionSchemes and notifies listeners about the update
-    void updateActiveSchemesListeners();
-
-    // ID for the decoder manifest currently in use
-    std::string mCurrentDecoderManifestID;
-
-    // Time interval in ms to send checkin message
-    uint64_t mCheckinIntervalInMsec{ DEFAULT_CHECKIN_INTERVAL_IN_MILLISECOND };
+    void updateActiveCollectionSchemeListeners();
 
     // Get the Signal Type from DM
     inline SignalType
     getSignalType( const SignalID signalID )
     {
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        // For internal signals we won't find the type in the decoder manifest. The type will be
+        // determined later after both collection schemes and decoder manifest are processed.
+        if ( ( signalID & INTERNAL_SIGNAL_ID_BITMASK ) != 0 )
+        {
+            return SignalType::UNKNOWN;
+        }
+#endif
         return mDecoderManifest->getSignalType( signalID );
     }
 
 protected:
+    // Idle collectionScheme collection
+    std::map<SyncID, ICollectionSchemePtr> mIdleCollectionSchemeMap;
+
+    // Enabled collectionScheme collection
+    std::map<SyncID, ICollectionSchemePtr> mEnabledCollectionSchemeMap;
+
+    // ID for the decoder manifest currently in use
+    SyncID mCurrentDecoderManifestID;
+
     /*
      * PM Local storage of CollectionSchemeList and mDecoderManifest so that PM can work on these objects
      * out of critical section

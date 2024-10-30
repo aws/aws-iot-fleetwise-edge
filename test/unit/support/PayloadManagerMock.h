@@ -22,36 +22,7 @@ public:
     PayloadManagerMock()
         : PayloadManager( nullptr ){};
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-    MOCK_METHOD( bool,
-                 storeData,
-                 ( const std::uint8_t *buf,
-                   size_t size,
-                   const CollectionSchemeParams &collectionSchemeParams,
-                   const struct S3UploadParams &s3UploadParams ),
-                 ( override ) );
-#else
-    MOCK_METHOD( bool,
-                 storeData,
-                 ( const std::uint8_t *buf, size_t size, const CollectionSchemeParams &collectionSchemeParams ),
-                 ( override ) );
-
-#endif
-
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-    MOCK_METHOD( void,
-                 storeMetadata,
-                 ( const std::string filename,
-                   size_t size,
-                   const CollectionSchemeParams &collectionSchemeParams,
-                   const struct S3UploadParams &s3UploadParams ),
-                 ( override ) );
-#else
-    MOCK_METHOD( void,
-                 storeMetadata,
-                 ( const std::string filename, size_t size, const CollectionSchemeParams &collectionSchemeParams ),
-                 ( override ) );
-#endif
+    MOCK_METHOD( bool, storeData, ( const std::uint8_t *buf, size_t size, const Json::Value &metadata ), ( override ) );
 
     MOCK_METHOD( ErrorCode, retrievePayloadMetadata, ( Json::Value & files ), ( override ) );
 

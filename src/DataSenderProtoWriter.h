@@ -6,9 +6,12 @@
 #include "CANInterfaceIDTranslator.h"
 #include "CollectionInspectionAPITypes.h"
 #include "OBDDataTypes.h"
+#include "RawDataManager.h"
 #include "TimeTypes.h"
 #include "vehicle_data.pb.h"
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 namespace Aws
@@ -26,7 +29,8 @@ public:
     /**
      * @brief Constructor. Setup the DataSenderProtoWriter.
      */
-    DataSenderProtoWriter( CANInterfaceIDTranslator &canIDTranslator );
+    DataSenderProtoWriter( CANInterfaceIDTranslator &canIDTranslator,
+                           std::shared_ptr<RawData::BufferManager> rawDataBufferManager );
 
     /**
      * @brief Destructor.
@@ -45,7 +49,7 @@ public:
      *                                 to be sent to cloud
      * @param collectionEventID       a unique ID to tie multiple signals to a single collection event
      */
-    void setupVehicleData( const TriggeredCollectionSchemeDataPtr triggeredCollectionSchemeData,
+    void setupVehicleData( std::shared_ptr<const TriggeredCollectionSchemeData> triggeredCollectionSchemeData,
                            uint32_t collectionEventID );
 
     /**
@@ -69,6 +73,10 @@ public:
      */
     void append( const std::string &dtc );
 
+    //==================================================================================================================
+    // NOTE: If you add new `append` functions for new types, also add them to `splitVehicleData` and `mergeVehicleData`
+    //==================================================================================================================
+
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     /**
      * @brief Appends uploaded S3 object info to the output protobuf
@@ -86,11 +94,16 @@ public:
     void setupDTCInfo( const DTCInfo &msg );
 
     /**
-     * @brief Gets the total number of collectionScheme messages sent to the cloud
+     * @brief Gets the estimated vehicle data size in bytes
      *
-     * @return the total number of collectionScheme messages added to the edge to cloud payload
+     * @return the size in bytes
      */
-    unsigned getVehicleDataMsgCount() const;
+    size_t getVehicleDataEstimatedSize() const;
+
+    /**
+     * @return True if any non-metadata is present in mVehicleData
+     */
+    bool isVehicleDataAdded() const;
 
     /**
      * @brief Serializes the vehicle data to be sent to cloud
@@ -101,11 +114,30 @@ public:
 
     bool serializeVehicleData( std::string *out ) const;
 
+    /**
+     * @brief Used when the serialized payload has exceeded the maximum payload size.
+     * Splits the data out to a temporary instance.
+     * @param data Output data
+     */
+    void splitVehicleData( Schemas::VehicleDataMsg::VehicleData &data );
+
+    /**
+     * @brief Used when the serialized payload has exceeded the maximum payload size.
+     * Merges back the data from a temporary instance.
+     * @param data Input data
+     */
+    void mergeVehicleData( Schemas::VehicleDataMsg::VehicleData &data );
+
 private:
+    // 2-byte overhead for LEN field, assuming strings will mostly be up to 127 bytes long. If they're larger, the size
+    // of the string will anyway dominate the estimated size.
+    static constexpr unsigned STRING_OVERHEAD = 2;
     Timestamp mTriggerTime;
-    unsigned mVehicleDataMsgCount{}; // tracks the number of messages being sent in the edge to cloud payload
+    size_t mMetaDataEstimatedSize{};    // The estimated size in bytes of the metadata
+    size_t mVehicleDataEstimatedSize{}; // The total estimated size in bytes of the mVehicleData including the metadata
     Schemas::VehicleDataMsg::VehicleData mVehicleData{};
     CANInterfaceIDTranslator mIDTranslator;
+    std::shared_ptr<RawData::BufferManager> mRawDataBufferManager;
 };
 
 } // namespace IoTFleetWise

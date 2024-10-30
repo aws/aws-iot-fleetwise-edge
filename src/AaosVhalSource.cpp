@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "AaosVhalSource.h"
-#include "LoggingModule.h"
-#include "TraceModule.h"
+#include "CollectionInspectionAPITypes.h"
+#include "QueueTypes.h"
 #include <utility>
 
 namespace Aws
@@ -14,8 +14,8 @@ namespace IoTFleetWise
 // NOLINT below due to C++17 warning of redundant declarations that are required to maintain C++14 compatibility
 constexpr const char *AaosVhalSource::CAN_CHANNEL_NUMBER; // NOLINT
 constexpr const char *AaosVhalSource::CAN_RAW_FRAME_ID;   // NOLINT
-AaosVhalSource::AaosVhalSource( SignalBufferPtr signalBufferPtr )
-    : mSignalBufferPtr{ std::move( signalBufferPtr ) }
+AaosVhalSource::AaosVhalSource( SignalBufferDistributorPtr signalBufferDistributor )
+    : mSignalBufferDistributor{ std::move( signalBufferDistributor ) }
 {
 }
 
@@ -55,21 +55,14 @@ AaosVhalSource::getVehiclePropertyInfo()
 }
 
 void
-AaosVhalSource::setVehicleProperty( SignalID signalId, double value )
+AaosVhalSource::setVehicleProperty( SignalID signalId, const DecodedSignalValue &value )
 {
+    auto signalType = SignalType::DOUBLE;
     auto timestamp = mClock->systemTimeSinceEpochMs();
     CollectedSignalsGroup collectedSignalsGroup;
-    collectedSignalsGroup.push_back( CollectedSignal( signalId, timestamp, value ) );
+    collectedSignalsGroup.push_back( CollectedSignal::fromDecodedSignal( signalId, timestamp, value, signalType ) );
 
-    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-
-    if ( !mSignalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) )
-    {
-        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS );
-        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-        FWE_LOG_WARN( "Signal buffer full" );
-    }
+    mSignalBufferDistributor->push( CollectedDataFrame( collectedSignalsGroup ) );
 }
 
 void

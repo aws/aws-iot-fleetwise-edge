@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "ExternalGpsSource.h"
+#include "CollectionInspectionAPITypes.h"
 #include "LoggingModule.h"
-#include "TraceModule.h"
+#include "QueueTypes.h"
+#include "SignalTypes.h"
 #include <string>
 #include <utility>
 
@@ -17,8 +19,8 @@ constexpr const char *ExternalGpsSource::CAN_CHANNEL_NUMBER;  // NOLINT
 constexpr const char *ExternalGpsSource::CAN_RAW_FRAME_ID;    // NOLINT
 constexpr const char *ExternalGpsSource::LATITUDE_START_BIT;  // NOLINT
 constexpr const char *ExternalGpsSource::LONGITUDE_START_BIT; // NOLINT
-ExternalGpsSource::ExternalGpsSource( SignalBufferPtr signalBufferPtr )
-    : mSignalBufferPtr{ std::move( signalBufferPtr ) }
+ExternalGpsSource::ExternalGpsSource( SignalBufferDistributorPtr signalBufferDistributor )
+    : mSignalBufferDistributor{ std::move( signalBufferDistributor ) }
 {
 }
 
@@ -42,7 +44,7 @@ ExternalGpsSource::init( CANChannelNumericID canChannel,
 const char *
 ExternalGpsSource::getThreadName()
 {
-    return "ExternalGpsSource";
+    return "ExternalGpsSrc";
 }
 
 void
@@ -64,18 +66,10 @@ ExternalGpsSource::setLocation( double latitude, double longitude )
     }
     auto timestamp = mClock->systemTimeSinceEpochMs();
     CollectedSignalsGroup collectedSignalsGroup;
-    collectedSignalsGroup.push_back( CollectedSignal( latitudeSignalId, timestamp, latitude ) );
-    collectedSignalsGroup.push_back( CollectedSignal( longitudeSignalId, timestamp, longitude ) );
+    collectedSignalsGroup.push_back( CollectedSignal( latitudeSignalId, timestamp, latitude, SignalType::DOUBLE ) );
+    collectedSignalsGroup.push_back( CollectedSignal( longitudeSignalId, timestamp, longitude, SignalType::DOUBLE ) );
 
-    TraceModule::get().addToAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS, 2 );
-    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-
-    if ( !mSignalBufferPtr->push( CollectedDataFrame( std::move( collectedSignalsGroup ) ) ) )
-    {
-        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-        TraceModule::get().subtractFromAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS, 2 );
-        FWE_LOG_WARN( "Signal buffer full" );
-    }
+    mSignalBufferDistributor->push( CollectedDataFrame( std::move( collectedSignalsGroup ) ) );
 }
 
 void

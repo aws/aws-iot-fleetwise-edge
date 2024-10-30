@@ -1,5 +1,61 @@
 # Change Log
 
+## v1.1.2 (2024-10-29)
+
+Bug fixes:
+
+- MQTT connection fixes:
+  - Retry MQTT topic subscription when it fails. When FWE starts up, it tries to establish the MQTT
+    connection and retries until it succeeds. Only after that, it subscribes to the topics. But if a
+    subscription failed (e.g. due to network issues), it never retried, making FWE never receive
+    messages from the topic until the process is restarted.
+  - On shutdown only unsubscribe to MQTT Channels that are subscribed
+  - When persistent sessions are enabled, don't unsubscribe on shutdown. This is required for FWE to
+    receive messages while it was offline.
+  - Connect only after all listeners are subscribed. If a message was received right after
+    connection was established, it could be silently ignored because the listeners for the topic
+    weren't registered yet.
+- ROS2 related bug fixes:
+  - If more than one campaign used a ROS2 signal in its expression, only the first campaign would
+    receive data for evaluation.
+  - If FWE receives a campaign more than once from the cloud, data collection would stop due to
+    internal signal IDs being reallocated.
+  - Fixed segfault for VSD build when campaigns received before decoder manifest
+- Fixed invalid read on shutdown when network is down
+
+Improvements:
+
+- Update AWS C++ SDK to `v1.11.284`.
+- Update Boost to `1.84.0`.
+- Enable flow control for MQTT5 client (when using `iotCore` connection type). This limits data sent
+  by FWE to what is defined in IoT Core limits for throughput and number of publishes.
+- Change default values for some MQTT connection settings and make them configurable in the config
+  file. All defaults are now the same as the AWS SDK:
+  - Keep alive interval changed from `60` seconds to `1200` seconds. Set `keepAliveIntervalSeconds`
+    to override it.
+  - Ping timeout default changed from `3000` ms to `30000` ms. Set `pingTimeoutMs` to override it.
+  - Persistent sessions are now disabled by default. Set `sessionExpiryIntervalSeconds` to a
+    non-zero value to enable it.
+- Add implicit casting between numeric and Boolean data types in expression evaluation. E.g.
+  `1 + true` will equal `2`, and `false || 3` will equal `true`.
+- Add support for relative paths to the certificate, private key files and persistency directory,
+  relative to the directory containing the configuration JSON file.
+- Make `demo.sh` more generic, by 1/ Allowing multiple 'node', 'decoder', 'network interface', and
+  'campaign' JSON files to be passed, rather than having specific options for CAN, OBD and ROS2, 2/
+  Add `--data-destination` option to specify data destination (default is still Amazon Timestream.)
+  This allows the Android-specific demo script to be removed.
+- Previously if the CAN network interface goes down, FWE would exit with an error. Now it will
+  continue to run and will resume data collection if the interface comes back up, however it will
+  still exit with an error if the interface is removed from the system.
+- Improved developer guides
+- Added Disconnect Packet to the MQTT Client Stop sequence to help customers understand what the
+  reason for the vehicle disconnection from the broker
+- Added usage of data type from decoder manifest for CAN and OBD signals
+- Add new signal type UNKNOWN
+- Split MQTT channels into separate Sender and Receiver compared to previously using the same
+  channel instance to send and receive messages
+- Adaptive payload sizing for both compressed and uncompressed data
+
 ## v1.1.1 (2024-02-12)
 
 Bug fixes:

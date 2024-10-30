@@ -4,57 +4,27 @@
 
 set -euo pipefail
 
-if [ -z "${INPUT_CONFIG_FILE+x}" ]; then
-    INPUT_CONFIG_FILE=""
-fi
-if [ -z "${OUTPUT_CONFIG_FILE+x}" ]; then
-    OUTPUT_CONFIG_FILE=""
-fi
-if [ -z "${CERTIFICATE+x}" ]; then
-    CERTIFICATE=""
-fi
-if [ -z "${CERTIFICATE_FILE+x}" ]; then
-    CERTIFICATE_FILE="/etc/aws-iot-fleetwise/certificate.pem"
-fi
-if [ -z "${PRIVATE_KEY+x}" ]; then
-    PRIVATE_KEY=""
-fi
-if [ -z "${PRIVATE_KEY_FILE+x}" ]; then
-    PRIVATE_KEY_FILE="/etc/aws-iot-fleetwise/private-key.key"
-fi
-if [ -z "${VEHICLE_NAME+x}" ]; then
-    VEHICLE_NAME=""
-fi
-if [ -z "${ENDPOINT_URL+x}" ]; then
-    ENDPOINT_URL=""
-fi
-if [ -z "${CAN_BUS0+x}" ]; then
-    CAN_BUS0=""
-fi
-if [ -z "${LOG_LEVEL+x}" ]; then
-    LOG_LEVEL="Info"
-fi
-if [ -z "${LOG_COLOR+x}" ]; then
-    LOG_COLOR="Auto"
-fi
-if [ -z "${PERSISTENCY_PATH+x}" ]; then
-    PERSISTENCY_PATH="/var/aws-iot-fleetwise/"
-fi
-if [ -z "${TOPIC_PREFIX+x}" ]; then
-    TOPIC_PREFIX="\$aws/iotfleetwise/"
-fi
-if [ -z "${CONNECTION_TYPE+x}" ]; then
-    CONNECTION_TYPE="iotCore"
-fi
-if [ -z "${CREDS_ENDPOINT_URL+x}" ]; then
-    CREDS_ENDPOINT_URL=""
-fi
-if [ -z "${CREDS_ROLE_ALIAS+x}" ]; then
-    CREDS_ROLE_ALIAS=""
-fi
-if [ -z "${RAW_DATA_BUFFER_SIZE+x}" ]; then
-    RAW_DATA_BUFFER_SIZE=1073741824
-fi
+# Allow options to also be set as env vars, but set default values if missing
+: ${INPUT_CONFIG_FILE:=""}
+: ${OUTPUT_CONFIG_FILE:=""}
+: ${CERTIFICATE:=""}
+: ${CERTIFICATE_FILE:="/etc/aws-iot-fleetwise/certificate.pem"}
+: ${PRIVATE_KEY:=""}
+: ${PRIVATE_KEY_FILE:="/etc/aws-iot-fleetwise/private-key.key"}
+: ${VEHICLE_NAME:=""}
+: ${ENDPOINT_URL:=""}
+: ${CAN_BUS0:=""}
+: ${LOG_LEVEL:="Info"}
+: ${LOG_COLOR:="Auto"}
+: ${PERSISTENCY_PATH:="/var/aws-iot-fleetwise/"}
+: ${TOPIC_PREFIX:="\$aws/iotfleetwise/"}
+: ${CONNECTION_TYPE:="iotCore"}
+: ${KEEP_ALIVE_INTERVAL_SECONDS:="60"}
+: ${PING_TIMEOUT_MS:="30000"}
+: ${SESSION_EXPIRY_INTERVAL_SECONDS:="0"}
+: ${CREDS_ENDPOINT_URL:=""}
+: ${CREDS_ROLE_ALIAS:=""}
+: ${RAW_DATA_BUFFER_SIZE:=1073741824}
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -69,6 +39,18 @@ parse_args() {
             ;;
         --connection-type)
             CONNECTION_TYPE=$2
+            shift
+            ;;
+        --keep-alive-interval-seconds)
+            KEEP_ALIVE_INTERVAL_SECONDS=$2
+            shift
+            ;;
+        --ping-timeout-ms)
+            PING_TIMEOUT_MS=$2
+            shift
+            ;;
+        --session-expiry-interval-seconds)
+            SESSION_EXPIRY_INTERVAL_SECONDS=$2
             shift
             ;;
         --vehicle-name)
@@ -129,23 +111,26 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --input-config-file <FILE>    Input JSON config file"
-            echo "  --output-config-file <FILE>   Output JSON config file"
-            echo "  --connection-type <TYPE>      Connectivity connection type, default: ${CONNECTION_TYPE}"
-            echo "  --vehicle-name <NAME>         Vehicle name"
-            echo "  --endpoint-url <URL>          IoT Core MQTT endpoint URL"
-            echo "  --can-bus0 <BUS>              CAN bus 0, e.g. vcan0"
-            echo "  --certificate <CERTIFICATE>   Certificate"
-            echo "  --certificate-file <FILE>     Certificate file, default: ${CERTIFICATE_FILE}"
-            echo "  --private-key <KEY>           Private key"
-            echo "  --private-key-file <FILE>     Private key file, default: ${PRIVATE_KEY_FILE}"
-            echo "  --persistency-path <PATH>     Persistency path, default: ${PERSISTENCY_PATH}"
-            echo "  --topic-prefix <PREFIX>       IoT MQTT topic prefix, default: ${TOPIC_PREFIX}"
-            echo "  --log-level <LEVEL>           Log level. Either: Off, Error, Warning, Info, Trace. Default: ${LOG_LEVEL}"
-            echo "  --log-color <COLOR_OPTION>    Whether logs should be colored. Either: Auto, Yes, No. Default: ${LOG_COLOR}"
-            echo "  --creds-endpoint-url <URL>    Endpoint URL for AWS IoT Credentials Provider"
-            echo "  --creds-role-alias <ALIAS>    Role alias for AWS IoT Credentials Provider"
-            echo "  --raw-data-buffer-size <SIZE> Raw data buffer size, default: ${RAW_DATA_BUFFER_SIZE}"
+            echo "  --input-config-file <FILE>               Input JSON config file"
+            echo "  --output-config-file <FILE>              Output JSON config file"
+            echo "  --connection-type <TYPE>                 Connectivity connection type, default: ${CONNECTION_TYPE}"
+            echo "  --keep-alive-interval-seconds <INT>      (\"iotCore\" connection type only) Keep alive interval for MQTT client, default: ${KEEP_ALIVE_INTERVAL_SECONDS}"
+            echo "  --ping-timeout-ms <INT>                  (\"iotCore\" connection type only) Ping timeout for MQTT client, default: ${PING_TIMEOUT_MS}"
+            echo "  --session-expiry-interval-seconds <INT>  (\"iotCore\" connection type only) Expiry interval for persistent sessions, 0 means disabled, default: ${SESSION_EXPIRY_INTERVAL_SECONDS}"
+            echo "  --vehicle-name <NAME>                    Vehicle name"
+            echo "  --endpoint-url <URL>                     IoT Core MQTT endpoint URL"
+            echo "  --can-bus0 <BUS>                         CAN bus 0, e.g. vcan0"
+            echo "  --certificate <CERTIFICATE>              Certificate"
+            echo "  --certificate-file <FILE>                Certificate file, default: ${CERTIFICATE_FILE}"
+            echo "  --private-key <KEY>                      Private key"
+            echo "  --private-key-file <FILE>                Private key file, default: ${PRIVATE_KEY_FILE}"
+            echo "  --persistency-path <PATH>                Persistency path, default: ${PERSISTENCY_PATH}"
+            echo "  --topic-prefix <PREFIX>                  IoT MQTT topic prefix, default: ${TOPIC_PREFIX}"
+            echo "  --log-level <LEVEL>                      Log level. Either: Off, Error, Warning, Info, Trace. Default: ${LOG_LEVEL}"
+            echo "  --log-color <COLOR_OPTION>               Whether logs should be colored. Either: Auto, Yes, No. Default: ${LOG_COLOR}"
+            echo "  --creds-endpoint-url <URL>               Endpoint URL for AWS IoT Credentials Provider"
+            echo "  --creds-role-alias <ALIAS>               Role alias for AWS IoT Credentials Provider"
+            echo "  --raw-data-buffer-size <SIZE>            Raw data buffer size, default: ${RAW_DATA_BUFFER_SIZE}"
             exit 0
             ;;
         esac
@@ -203,12 +188,18 @@ if [ "$CONNECTION_TYPE" == "iotCore" ]; then
         | if [[ $PRIVATE_KEY ]]; \
             then jq "del(.staticConfig.mqttConnection.privateKeyFilename)" | jq ".staticConfig.mqttConnection.privateKey=\"${PRIVATE_KEY}\""; \
             else jq ".staticConfig.mqttConnection.privateKeyFilename=\"${PRIVATE_KEY_FILE}\""; \
-            fi`
+            fi \
+        | jq ".staticConfig.mqttConnection.keepAliveIntervalSeconds=${KEEP_ALIVE_INTERVAL_SECONDS}" \
+        | jq ".staticConfig.mqttConnection.pingTimeoutMs=${PING_TIMEOUT_MS}" \
+        | jq ".staticConfig.mqttConnection.sessionExpiryIntervalSeconds=${SESSION_EXPIRY_INTERVAL_SECONDS}"`
 elif [ "$CONNECTION_TYPE" == "iotGreengrassV2" ]; then
     OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" \
         | jq "del(.staticConfig.mqttConnection.endpointUrl)" \
         | jq "del(.staticConfig.mqttConnection.certificateFilename)" \
-        | jq "del(.staticConfig.mqttConnection.privateKeyFilename)"`
+        | jq "del(.staticConfig.mqttConnection.privateKeyFilename)" \
+        | jq "del(.staticConfig.mqttConnection.keepAliveIntervalSeconds)" \
+        | jq "del(.staticConfig.mqttConnection.pingTimeoutMs)" \
+        | jq "del(.staticConfig.mqttConnection.sessionExpiryIntervalSeconds)"`
 else
     echo "Error: Unknown connection type ${CONNECTION_TYPE}"
 fi

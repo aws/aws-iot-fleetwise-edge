@@ -4,6 +4,8 @@
 #include "CustomDataSource.h"
 #include "LoggingModule.h"
 #include "Timer.h"
+#include <cstring>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
@@ -39,6 +41,11 @@ CustomDataSource::start()
         const auto name = getThreadName();
         if ( name != nullptr )
         {
+            if ( strnlen( name, 16 ) > 15 )
+            {
+                FWE_LOG_WARN( "Thread name '" + std::string( name ) +
+                              "' is larger than 15 chars. Setting the thread name will likely fail." );
+            }
             mThread.setThreadName( name );
         }
     }

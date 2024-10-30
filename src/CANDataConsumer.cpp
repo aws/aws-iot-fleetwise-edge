@@ -4,9 +4,11 @@
 #include "CANDataConsumer.h"
 #include "CANDataTypes.h"
 #include "CANDecoder.h"
+#include "CollectionInspectionAPITypes.h"
 #include "EnumUtility.h"
 #include "LoggingModule.h"
 #include "MessageTypes.h"
+#include "QueueTypes.h"
 #include "TraceModule.h"
 #include <algorithm>
 #include <array>
@@ -21,8 +23,8 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-CANDataConsumer::CANDataConsumer( SignalBufferPtr signalBufferPtr )
-    : mSignalBufferPtr{ std::move( signalBufferPtr ) }
+CANDataConsumer::CANDataConsumer( SignalBufferDistributorPtr signalBufferDistributor )
+    : mSignalBufferDistributor{ std::move( signalBufferDistributor ) }
 {
 }
 
@@ -93,8 +95,9 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
         // Create Collected Data Frame
         CollectedDataFrame collectedDataFrame;
         // Check if we want to collect RAW CAN Frame; If so we also need to ensure Buffer is valid
-        if ( ( mSignalBufferPtr.get() != nullptr ) && ( ( collectType == CANMessageCollectType::RAW ) ||
-                                                        ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ) )
+        if ( ( mSignalBufferDistributor.get() != nullptr ) &&
+             ( ( collectType == CANMessageCollectType::RAW ) ||
+               ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ) )
         {
             // prepare the raw CAN Frame
             struct CollectedCanRawFrame canRawFrame;
@@ -108,8 +111,9 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
             collectedDataFrame.mCollectedCanRawFrame = std::make_shared<CollectedCanRawFrame>( canRawFrame );
         }
         // check if we want to decode can frame into signals and collect signals
-        if ( ( mSignalBufferPtr.get() != nullptr ) && ( ( collectType == CANMessageCollectType::DECODE ) ||
-                                                        ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ) )
+        if ( ( mSignalBufferDistributor.get() != nullptr ) &&
+             ( ( collectType == CANMessageCollectType::DECODE ) ||
+               ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ) )
         {
             if ( format.isValid() )
             {
@@ -121,33 +125,11 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
                     for ( auto const &signal : decodedSignals )
                     {
                         // Create Collected Signal Object
-                        struct CollectedSignal collectedSignal;
-                        const auto signalType = signal.mSignalType;
-                        switch ( signalType )
-                        {
-                        case SignalType::UINT64:
-                            collectedSignal = CollectedSignal{ signal.mSignalID,
-                                                               timestamp,
-                                                               signal.mPhysicalValue.signalValue.uint64Val,
-                                                               signal.mSignalType };
-                            break;
-                        case SignalType::INT64:
-                            collectedSignal = CollectedSignal{ signal.mSignalID,
-                                                               timestamp,
-                                                               signal.mPhysicalValue.signalValue.int64Val,
-                                                               signal.mSignalType };
-                            break;
-                        default:
-                            collectedSignal = CollectedSignal{ signal.mSignalID,
-                                                               timestamp,
-                                                               signal.mPhysicalValue.signalValue.doubleVal,
-                                                               signal.mSignalType };
-                            break;
-                        }
                         // Only add valid signals to the vector
-                        if ( collectedSignal.signalID != INVALID_SIGNAL_ID )
+                        if ( signal.mSignalID != INVALID_SIGNAL_ID )
                         {
-                            collectedSignalsGroup.push_back( collectedSignal );
+                            collectedSignalsGroup.push_back( CollectedSignal::fromDecodedSignal(
+                                signal.mSignalID, timestamp, signal.mPhysicalValue, signal.mSignalType ) );
                         }
                     }
                     collectedDataFrame.mCollectedSignals = collectedSignalsGroup;
@@ -169,33 +151,7 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
 
         TraceModule::get().sectionEnd( traceSection );
 
-        // Increase all queue metrics before pushing data to the buffer
-        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-
-        auto collectedSignals = collectedDataFrame.mCollectedSignals.size();
-        TraceModule::get().addToAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
-                                                collectedSignals );
-
-        bool canRawFrameCollected = collectedDataFrame.mCollectedCanRawFrame != nullptr;
-        if ( canRawFrameCollected )
-        {
-            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
-        }
-
-        if ( !mSignalBufferPtr->push( std::move( collectedDataFrame ) ) )
-        {
-            TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-
-            if ( canRawFrameCollected )
-            {
-                TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
-            }
-
-            TraceModule::get().subtractFromAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
-                                                           collectedSignals );
-
-            FWE_LOG_WARN( "Signal buffer full" );
-        }
+        mSignalBufferDistributor->push( std::move( collectedDataFrame ) );
     }
 }
 

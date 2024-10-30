@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "AwsBootstrap.h"
-#include "AwsSDKMemoryManager.h"
 #include "LoggingModule.h"
 #include <aws/core/Aws.h>
 #include <aws/crt/Api.h>
@@ -26,11 +25,6 @@ struct AwsBootstrap::Impl
     {
         // Enable for logging
         // mOptions.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Info;
-
-        // We are using a memory manager that is not suitable for over-aligned types.
-        // Since we do not use alignas in our codebase, we are OK.
-        auto &memMgr = AwsSDKMemoryManager::getInstance();
-        mOptions.memoryManagementOptions.memoryManager = &memMgr;
 
         auto clientBootstrapFn = [this]() -> std::shared_ptr<Aws::Crt::Io::ClientBootstrap> {
             // You need an event loop group to process IO events.

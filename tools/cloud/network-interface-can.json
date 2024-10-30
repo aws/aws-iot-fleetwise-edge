@@ -1,0 +1,11 @@
+[
+  {
+    "interfaceId": "1",
+    "type": "CAN_INTERFACE",
+    "canInterface": {
+      "name": "can0",
+      "protocolName": "CAN",
+      "protocolVersion": "2.0B"
+    }
+  }
+]

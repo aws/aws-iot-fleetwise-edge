@@ -20,8 +20,8 @@ can_sim = canigen.Canigen(
     database_filename=None if args.only_obd else "hscan.dbc",
     obd_config_filename="obd_config.json",
 )
-BRAKE_PRESSURE_SIGNAL = "BrakePedalPressure"
-ENGINE_TORQUE_SIGNAL = "EngineTorque"
+BRAKE_PRESSURE_SIGNAL = "DemoBrakePedalPressure"
+ENGINE_TORQUE_SIGNAL = "DemoEngineTorque"
 
 
 def set_with_print(func, name, val):

@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
 # check if Doxygen is installed
 find_package(Doxygen OPTIONAL_COMPONENTS dot)
 

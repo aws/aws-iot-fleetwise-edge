@@ -15,6 +15,7 @@ SERVICE_ROLE="IoTFleetWiseServiceRole"
 SERVICE_ROLE_POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/"
 FLEET_SIZE=1
 BATCH_SIZE=$((`nproc`*4))
+CAMPAIGN_NAMES=""
 
 if [ -f demo.env ]; then
     source demo.env
@@ -68,7 +69,7 @@ parse_args() {
     fi
     if [ "${VEHICLE_NAME}" == "" ]; then
         echo "Error: Vehicle name not provided"
-        exit -1
+        exit 1
     fi
     if [ "${DISAMBIGUATOR}" != "" ]; then
         DISAMBIGUATOR="-${DISAMBIGUATOR}"
@@ -99,25 +100,30 @@ echo "Vehicle name: ${VEHICLE_NAME}"
 echo "Fleet size: ${FLEET_SIZE}"
 echo "Vehicles: ${VEHICLES[@]}"
 
+FAILED_CLEAN_UP_STEPS=""
+
 # $1 is the campaign name
 suspend_and_delete_campaign(){
-    echo "Suspending campaign..."
+    echo "Suspending campaign $1..."
     aws iotfleetwise update-campaign \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
         --name $1 \
-        --action SUSPEND 2> /dev/null | jq -r .arn || true
+        --action SUSPEND | jq -r .arn \
+        || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} suspend-campaign"
 
-    echo "Deleting campaign..."
+    echo "Deleting campaign $1..."
     aws iotfleetwise delete-campaign \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --name $1 2> /dev/null | jq -r .arn || true
+        --name $1 | jq -r .arn \
+        || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-campaign"
 }
 
-suspend_and_delete_campaign ${NAME}-campaign
-suspend_and_delete_campaign ${NAME}-campaign-s3-json
-suspend_and_delete_campaign ${NAME}-campaign-s3-parquet
+for CAMPAIGN_NAME in $(echo $CAMPAIGN_NAMES | tr "," " "); do
+    suspend_and_delete_campaign $CAMPAIGN_NAME
+done
 
 for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
+    PIDS=()
     for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
         vehicle=${VEHICLES[$((i+j))]}
         echo "Disassociating vehicle ${vehicle}..."
@@ -127,14 +133,18 @@ for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
             aws iotfleetwise disassociate-vehicle-fleet \
                 ${ENDPOINT_URL_OPTION} --region ${REGION} \
                 --fleet-id ${NAME}-fleet \
-                --vehicle-name "${vehicle}" 2> /dev/null || true \
-        2>&3 &} 3>&2 2>/dev/null
+                --vehicle-name "${vehicle}" \
+        2>&3 &} 3>&2
+        PIDS+=($!)
     done
     # Wait for all background processes to finish
-    wait
+    for PID in ${PIDS[@]}; do
+        wait $PID || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} disassociate-vehicle-fleet"
+    done
 done
 
 for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
+    PIDS=()
     for ((j=0; j<${BATCH_SIZE} && i+j<${FLEET_SIZE}; j++)); do
         vehicle=${VEHICLES[$((i+j))]}
         echo "Deleting vehicle ${vehicle}..."
@@ -143,36 +153,105 @@ for ((i=0; i<${FLEET_SIZE}; i+=${BATCH_SIZE})); do
         { \
             aws iotfleetwise delete-vehicle \
                 ${ENDPOINT_URL_OPTION} --region ${REGION} \
-                --vehicle-name "${vehicle}" 2> /dev/null || true \
-        2>&3 &} 3>&2 2>/dev/null
+                --vehicle-name "${vehicle}" \
+        2>&3 &} 3>&2
+        PIDS+=($!)
     done
     # Wait for all background processes to finish
-    wait
+    for PID in ${PIDS[@]}; do
+        wait $PID || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-vehicle"
+    done
 done
 
 echo "Deleting fleet..."
 aws iotfleetwise delete-fleet \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
-    --fleet-id ${NAME}-fleet 2> /dev/null || true
+    --fleet-id ${NAME}-fleet \
+    || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-fleet"
 
 echo "Deleting decoder manifest..."
 aws iotfleetwise delete-decoder-manifest \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
-    --name ${NAME}-decoder-manifest 2> /dev/null || true
+    --name ${NAME}-decoder-manifest \
+    || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-decoder-manifest"
 
 echo "Deleting model manifest..."
 aws iotfleetwise delete-model-manifest \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
-    --name ${NAME}-model-manifest 2> /dev/null || true
-
-echo "Deleting service role and policy..."
-aws iam detach-role-policy --role-name ${SERVICE_ROLE} --policy-arn ${SERVICE_ROLE_POLICY_ARN} --region ${REGION} || true
-aws iam delete-policy --policy-arn ${SERVICE_ROLE_POLICY_ARN} --region ${REGION} || true
-aws iam delete-role --role-name ${SERVICE_ROLE} --region ${REGION} || true
+    --name ${NAME}-model-manifest \
+    || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-model-manifest"
 
 if [ "${SIGNAL_CATALOG}" != "" ]; then
     echo "Deleting signal catalog..."
     aws iotfleetwise delete-signal-catalog \
         ${ENDPOINT_URL_OPTION} --region ${REGION} \
-        --name ${SIGNAL_CATALOG} 2> /dev/null || true
+        --name ${SIGNAL_CATALOG} \
+        || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-signal-catalog"
+fi
+
+# The role might not exist depending on which type of campaign was created, so only try to delete
+# it if it exists.
+echo "Checking if role exists: ${SERVICE_ROLE}"
+if ! GET_ROLE_OUTPUT=$(aws iam get-role --region ${REGION} --role-name ${SERVICE_ROLE} 2>&1); then
+    if ! echo ${GET_ROLE_OUTPUT} | grep -q "NoSuchEntity"; then
+        echo ${GET_ROLE_OUTPUT}
+        FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} get-role"
+    fi
+else
+    echo "Deleting service role and policy..."
+    ATTACHED_POLICIES=$(
+        aws iam list-attached-role-policies \
+            --region ${REGION} \
+            --role-name ${SERVICE_ROLE} --query 'AttachedPolicies[].PolicyArn' --output text
+    )
+    for POLICY_ARN in $ATTACHED_POLICIES; do
+        echo "Detaching policy: $POLICY_ARN from role: $SERVICE_ROLE"
+        aws iam detach-role-policy \
+            --region ${REGION} \
+            --role-name ${SERVICE_ROLE} --policy-arn ${POLICY_ARN} \
+            || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} detach-role-policy"
+
+        MAX_ATTEMPTS=60
+        for i in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Deleting policy ${POLICY_ARN}. This might take a while until detach-role-policy operation propagates"
+            if aws iam delete-policy --region ${REGION} --policy-arn ${POLICY_ARN}; then
+                break
+            elif $i -eq $MAX_ATTEMPTS; then
+                FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-policy"
+            else
+                sleep 1
+            fi
+        done
+    done
+
+    INLINE_POLICIES=$(
+        aws iam list-role-policies \
+            --region ${REGION} \
+            --role-name ${SERVICE_ROLE} --query 'PolicyNames[]' --output text
+    )
+    for POLICY_NAME in $INLINE_POLICIES; do
+        echo "Deleting inline policy: $POLICY_NAME from role: $SERVICE_ROLE"
+        aws iam delete-role-policy \
+            --region ${REGION} \
+            --role-name ${SERVICE_ROLE} --policy-name ${POLICY_NAME} \
+            || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-role-policy"
+    done
+
+
+    MAX_ATTEMPTS=60
+    for i in $(seq 1 $MAX_ATTEMPTS); do
+        echo "Deleting service role ${SERVICE_ROLE}. This may take a while until the policy deletion propagates."
+        if aws iam delete-role --region ${REGION} --role-name ${SERVICE_ROLE}; then
+            break
+        elif $i -eq $MAX_ATTEMPTS; then
+            FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-role"
+        else
+            sleep 1
+        fi
+    done
+fi
+
+if [ "${FAILED_CLEAN_UP_STEPS}" != "" ]; then
+    echo "Failed to clean up the following resources: ${FAILED_CLEAN_UP_STEPS}"
+    exit 1
 fi

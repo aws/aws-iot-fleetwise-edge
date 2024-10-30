@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "OBDOverCANECU.h"
+#include "CollectionInspectionAPITypes.h"
 #include "EnumUtility.h"
 #include "ISOTPOverCANOptions.h"
 #include "LoggingModule.h"
+#include "QueueTypes.h"
 #include "SignalTypes.h"
 #include "TraceModule.h"
 #include <algorithm>
@@ -29,7 +31,7 @@ OBDOverCANECU::init( const std::string &gatewayCanInterfaceName,
                      const uint32_t rxId,
                      const uint32_t txId,
                      bool isExtendedId,
-                     SignalBufferPtr &signalBufferPtr,
+                     SignalBufferDistributorPtr &signalBufferDistributor,
                      int broadcastSocket )
 {
     ISOTPOverCANSenderReceiverOptions optionsECU;
@@ -39,7 +41,7 @@ OBDOverCANECU::init( const std::string &gatewayCanInterfaceName,
     optionsECU.mIsExtendedId = isExtendedId;
     optionsECU.mBroadcastSocket = broadcastSocket;
     mOBDDataDecoder = obdDataDecoder;
-    mSignalBufferPtr = signalBufferPtr;
+    mSignalBufferDistributor = signalBufferDistributor;
 
     std::stringstream streamRx;
     streamRx << std::hex << rxId;
@@ -130,7 +132,7 @@ OBDOverCANECU::requestReceiveEmissionPIDs( const SID sid )
             requestReceivePIDs( pidItr, sid, pids, info );
         }
 
-        pushPIDs( info, mClock->systemTimeSinceEpochMs(), mSignalBufferPtr, mStreamRxID );
+        pushPIDs( info, mClock->systemTimeSinceEpochMs(), mSignalBufferDistributor, mStreamRxID );
     }
     return numRequests;
 }
@@ -138,7 +140,7 @@ OBDOverCANECU::requestReceiveEmissionPIDs( const SID sid )
 void
 OBDOverCANECU::pushPIDs( const EmissionInfo &info,
                          Timestamp receptionTime,
-                         SignalBufferPtr &signalBufferPtr,
+                         SignalBufferDistributorPtr &signalBufferDistributor,
                          const std::string &streamRxID )
 {
     CollectedSignalsGroup collectedSignalsGroup;
@@ -173,17 +175,7 @@ OBDOverCANECU::pushPIDs( const EmissionInfo &info,
         }
     }
 
-    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-    TraceModule::get().addToAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
-                                            collectedSignalsGroup.size() );
-
-    if ( !signalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) )
-    {
-        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-        TraceModule::get().subtractFromAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
-                                                       collectedSignalsGroup.size() );
-        FWE_LOG_WARN( "Signal buffer full with ECU " + streamRxID );
-    }
+    signalBufferDistributor->push( CollectedDataFrame( collectedSignalsGroup ) );
 }
 
 bool

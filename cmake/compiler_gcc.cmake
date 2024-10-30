@@ -1,4 +1,6 @@
-add_compile_options(-Wconversion -Wall -Wextra -pedantic -ffunction-sections -fdata-sections)
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+add_compile_options(-Wconversion -Wall -Wextra -pedantic -ffunction-sections -fdata-sections -fno-omit-frame-pointer)
 link_libraries(
   -Wl,--gc-sections # Remove all unreferenced sections
   $<$<BOOL:${FWE_STRIP_SYMBOLS}>:-Wl,-s> # Strip all symbols

@@ -3,13 +3,15 @@
 
 #include "S3Sender.h"
 #include "LoggingModule.h"
+#include "TraceModule.h"
+#include <aws/core/client/ClientConfiguration.h>
 #include <aws/core/utils/memory/stl/AWSMap.h>
+#include <aws/core/utils/memory/stl/AWSString.h>
 #include <aws/crt/io/Bootstrap.h>
 #include <aws/s3-crt/model/PutObjectRequest.h>
 #include <aws/s3/model/CreateMultipartUploadRequest.h>
 #include <aws/s3/model/PutObjectRequest.h>
 #include <aws/s3/model/UploadPartRequest.h>
-#include <aws/transfer/TransferHandle.h>
 #include <aws/transfer/TransferManager.h>
 #include <istream>
 #include <utility>
@@ -36,15 +38,8 @@ transferStatusToString( Aws::Transfer::TransferStatus transferStatus )
     return ss.str();
 }
 
-S3Sender::S3Sender(
-
-    std::shared_ptr<PayloadManager> payloadManager,
-    std::function<std::shared_ptr<TransferManagerWrapper>(
-        Aws::Client::ClientConfiguration &clientConfiguration,
-        Aws::Transfer::TransferManagerConfiguration &transferManagerConfiguration )> createTransferManagerWrapper,
-    size_t multipartSize )
+S3Sender::S3Sender( CreateTransferManagerWrapper createTransferManagerWrapper, size_t multipartSize )
     : mMultipartSize{ multipartSize == 0 ? DEFAULT_MULTIPART_SIZE : multipartSize }
-    , mPayloadManager( std::move( payloadManager ) )
     , mCreateTransferManagerWrapper( std::move( createTransferManagerWrapper ) )
 {
 }
@@ -81,36 +76,43 @@ S3Sender::disconnect()
     return true;
 }
 
-ConnectivityError
+void
 S3Sender::sendStream( std::unique_ptr<StreambufBuilder> streambufBuilder,
                       const S3UploadMetadata &uploadMetadata,
                       const std::string &objectKey,
-                      std::function<void( bool success )> resultCallback )
+                      ResultCallback resultCallback )
 {
     if ( streambufBuilder == nullptr )
     {
         FWE_LOG_ERROR( "No valid streambuf builder provided for the upload" );
-        return ConnectivityError::WrongInputData;
+        resultCallback( ConnectivityError::WrongInputData, nullptr );
+        return;
     }
 
     if ( mCreateTransferManagerWrapper == nullptr )
     {
         FWE_LOG_ERROR( "No S3 client configured" );
-        persistS3Request( std::move( streambufBuilder ), objectKey );
-        return ConnectivityError::NotConfigured;
+        // TODO: Once we move the simultaneous uploads limit to DataSenderManager, we won't need to
+        // pass the streambuf via callback, because VisionSystemDataSender will already pass the
+        // streambuf instead of the StreambufBuilder to S3Sender. So VisionSystemDataSender will already
+        // have a reference/pointer to the data.
+        // coverity[autosar_cpp14_a20_8_6_violation] no way to construct it with make_shared
+        std::shared_ptr<std::streambuf> streambuf = streambufBuilder->build();
+        resultCallback( ConnectivityError::NotConfigured, streambuf );
+        return;
     }
 
     {
         std::lock_guard<std::mutex> lock( mQueuedAndOngoingUploadsLookupMutex );
 
-        FWE_LOG_INFO( "Queuing async upload for object " + objectKey + " to the bucket " + uploadMetadata.bucketName );
+        FWE_LOG_INFO( "Queuing async upload for object " + objectKey + " to the bucket " + uploadMetadata.bucketName +
+                      " , Current queue size: " + std::to_string( mQueuedUploads.size() ) );
         mQueuedUploads.push( { std::move( streambufBuilder ), uploadMetadata, objectKey, resultCallback } );
+        TraceModule::get().setVariable( TraceVariable::QUEUED_S3_OBJECTS, mQueuedUploads.size() );
     }
 
     submitQueuedUploads();
-
-    return ConnectivityError::Success;
-} // namespace IoTFleetWise
+}
 
 void
 S3Sender::submitQueuedUploads()
@@ -119,17 +121,20 @@ S3Sender::submitQueuedUploads()
 
     while ( ( mOngoingUploads.size() < MAX_SIMULTANEOUS_FILES ) && ( !mQueuedUploads.empty() ) )
     {
+        ResultCallback resultCallback;
         QueuedUploadMetadata &queuedUploadMetadata = mQueuedUploads.front();
         auto streambuf = queuedUploadMetadata.streambufBuilder->build();
         auto uploadMetadata = queuedUploadMetadata.uploadMetadata;
         auto objectKey = queuedUploadMetadata.objectKey;
-        auto resultCallback = queuedUploadMetadata.resultCallback;
+        resultCallback = queuedUploadMetadata.resultCallback;
         mQueuedUploads.pop();
+        TraceModule::get().setVariable( TraceVariable::QUEUED_S3_OBJECTS, mQueuedUploads.size() );
 
         if ( streambuf == nullptr )
         {
             FWE_LOG_WARN( "Skipping upload of object " + objectKey + " to the bucket " + uploadMetadata.bucketName +
                           " because its data is not available anymore" );
+            resultCallback( ConnectivityError::WrongInputData, nullptr );
             continue;
         }
 
@@ -141,6 +146,7 @@ S3Sender::submitQueuedUploads()
         {
             FWE_LOG_ERROR( "Could not prepare data for the upload of object " + objectKey + " to the bucket " +
                            uploadMetadata.bucketName );
+            resultCallback( ConnectivityError::WrongInputData, nullptr );
             continue;
         }
 
@@ -200,6 +206,7 @@ S3Sender::getTransferManagerWrapper( const S3UploadMetadata &uploadMetadata )
 void
 S3Sender::transferStatusUpdatedCallback( const std::shared_ptr<const Aws::Transfer::TransferHandle> &transferHandle )
 {
+    // coverity[check_return] Status can be used directly without being checked
     auto transferStatus = transferHandle->GetStatus();
     FWE_LOG_TRACE( "Transfer status for object " + transferHandle->GetKey() +
                    " updated: " + transferStatusToString( transferStatus ) +
@@ -256,46 +263,18 @@ S3Sender::transferStatusUpdatedCallback( const std::shared_ptr<const Aws::Transf
         }
     }
 
-    std::function<void( bool success )> resultCallback;
+    ResultCallback resultCallback;
+    std::shared_ptr<std::streambuf> streambuf;
     {
         std::lock_guard<std::mutex> lock( mQueuedAndOngoingUploadsLookupMutex );
         resultCallback = mOngoingUploads[transferHandle->GetKey()].resultCallback;
+        streambuf = mOngoingUploads[transferHandle->GetKey()].streambuf;
         mOngoingUploads.erase( transferHandle->GetKey() );
     }
 
     submitQueuedUploads();
 
-    if ( resultCallback )
-    {
-        resultCallback( result );
-    }
-}
-
-void
-S3Sender::persistS3Request( std::unique_ptr<StreambufBuilder> streambufBuilder, std::string objectKey )
-{
-    // TODO: persist/retry on fail. Retry will only be executed as upload of the persisted data.
-    // Temp change: dump data from stream into the file here
-    if ( mPayloadManager == nullptr )
-    {
-        FWE_LOG_WARN( "Could not persist data for object " + objectKey + " : Payload manager is not configured." );
-        return;
-    }
-    if ( streambufBuilder == nullptr )
-    {
-        FWE_LOG_WARN( "Could not persist data for object " + objectKey + " : Invalid streambuf builder provided." );
-        return;
-    }
-
-    auto streambuf = streambufBuilder->build();
-    if ( streambuf == nullptr )
-    {
-        FWE_LOG_WARN( "Could not persist data for object " + objectKey + " : Invalid stream." );
-        return;
-    }
-
-    streambuf->pubseekoff( std::streambuf::off_type( 0 ), std::ios_base::beg, std::ios_base::in );
-    mPayloadManager->storeIonData( std::move( streambuf ), objectKey );
+    resultCallback( result ? ConnectivityError::Success : ConnectivityError::TransmissionError, streambuf );
 }
 
 } // namespace IoTFleetWise

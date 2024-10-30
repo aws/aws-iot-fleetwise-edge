@@ -6,6 +6,7 @@
 #include "CollectionInspectionAPITypes.h"
 #include "IDecoderDictionary.h"
 #include "MessageTypes.h"
+#include "QueueTypes.h"
 #include "SignalTypes.h"
 #include "TimeTypes.h"
 #include "VehicleDataSourceTypes.h"
@@ -86,6 +87,7 @@ protected:
         sigFormat1.mSizeInBits = 30;
         sigFormat1.mOffset = 0.0;
         sigFormat1.mFactor = 1.0;
+        sigFormat1.mSignalType = SignalType::DOUBLE;
 
         CANSignalFormat sigFormat2;
         sigFormat2.mSignalID = 7;
@@ -95,6 +97,7 @@ protected:
         sigFormat2.mSizeInBits = 31;
         sigFormat2.mOffset = 0.0;
         sigFormat2.mFactor = 1.0;
+        sigFormat2.mSignalType = SignalType::DOUBLE;
 
         decoderMethod.format.mSignals.push_back( sigFormat1 );
         decoderMethod.format.mSignals.push_back( sigFormat2 );
@@ -115,25 +118,30 @@ protected:
 
 TEST_F( ExternalCANDataSourceTest, testNoDecoderDictionary )
 {
-    auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
+    auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
 
-    CANDataConsumer consumer{ signalBufferPtr };
+    CANDataConsumer consumer{ signalBufferDistributor };
     ExternalCANDataSource dataSource{ consumer };
     CollectedDataFrame collectedDataFrame;
     sendTestMessage( dataSource, 0 );
-    ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
 }
 
 TEST_F( ExternalCANDataSourceTest, testValidDecoderDictionary )
 {
-    auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
+    auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
 
-    CANDataConsumer consumer{ signalBufferPtr };
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+
+    CANDataConsumer consumer{ signalBufferDistributor };
     ExternalCANDataSource dataSource{ consumer };
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     CollectedDataFrame collectedDataFrame;
     sendTestMessage( dataSource, 0 );
-    ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+    ASSERT_TRUE( signalBuffer->pop( collectedDataFrame ) );
     auto signal = collectedDataFrame.mCollectedSignals[0];
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_EQ( signal.signalID, 1 );
@@ -153,28 +161,31 @@ TEST_F( ExternalCANDataSourceTest, testValidDecoderDictionary )
 
     // Test message a different message ID and non-monotonic time is not received
     sendTestMessage( dataSource, 0, 0x456, 1 );
-    ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
 
     // Test invalidation of decoder dictionary
     dataSource.onChangeOfActiveDictionary( nullptr, VehicleDataSourceProtocol::RAW_SOCKET );
     sendTestMessage( dataSource, 0 );
-    ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
     // Check it ignores dictionaries for other protocols
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::OBD );
     sendTestMessage( dataSource, 0 );
-    ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
 }
 
 TEST_F( ExternalCANDataSourceTest, testCanFDSocketMode )
 {
-    auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
+    auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
 
-    CANDataConsumer consumer{ signalBufferPtr };
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+
+    CANDataConsumer consumer{ signalBufferDistributor };
     ExternalCANDataSource dataSource{ consumer };
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     CollectedDataFrame collectedDataFrame;
     sendTestFDMessage( dataSource, 0 );
-    ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+    ASSERT_TRUE( signalBuffer->pop( collectedDataFrame ) );
     auto signal = collectedDataFrame.mCollectedSignals[0];
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_EQ( signal.signalID, 1 );
@@ -193,19 +204,22 @@ TEST_F( ExternalCANDataSourceTest, testCanFDSocketMode )
     {
         ASSERT_EQ( frame->data[i], i );
     }
-    ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
 }
 
 TEST_F( ExternalCANDataSourceTest, testExtractExtendedID )
 {
-    auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
+    auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
 
-    CANDataConsumer consumer{ signalBufferPtr };
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+
+    CANDataConsumer consumer{ signalBufferDistributor };
     ExternalCANDataSource dataSource{ consumer };
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     CollectedDataFrame collectedDataFrame;
     sendTestMessageExtendedID( dataSource, 0 );
-    ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+    ASSERT_TRUE( signalBuffer->pop( collectedDataFrame ) );
     auto signal = collectedDataFrame.mCollectedSignals[0];
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_EQ( signal.signalID, 1 );
@@ -224,7 +238,7 @@ TEST_F( ExternalCANDataSourceTest, testExtractExtendedID )
     {
         ASSERT_EQ( frame->data[i], i );
     }
-    ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
 }
 
 } // namespace IoTFleetWise

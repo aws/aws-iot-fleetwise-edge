@@ -4,6 +4,7 @@
 #pragma once
 
 #include "IConnectionTypes.h"
+#include <functional>
 #include <string>
 
 namespace Aws
@@ -25,6 +26,21 @@ struct CollectionSchemeParams
 };
 
 /**
+ * @brief called after data is sent
+ *
+ * Be cautious this callback will happen from a different thread and the callee
+ * needs to ensure that the data is treated in a thread safe manner when copying it.
+ *
+ * @param result whether the data was successfully sent or not
+ */
+using OnDataSentCallback = std::function<void( ConnectivityError result )>;
+
+/**
+ * @brief called after the mqtt client is connected
+ */
+using OnConnectionEstablishedCallback = std::function<void()>;
+
+/**
  * @brief This interface will be used by all objects sending data to the cloud
  *
  * The configuration will done by the bootstrap with the implementing class.
@@ -34,6 +50,7 @@ class ISender
 
 public:
     virtual ~ISender() = default;
+
     /**
      * @brief indicates if the connection is established and authenticated
      *
@@ -62,31 +79,18 @@ public:
      *               The data in this buffer is associated with one collectionScheme.
      * @param size number of accessible bytes in buf. If bigger than getMaxSendSize() this function
      *              will return an error and nothing will be sent.
-     * @param collectionSchemeParams object containing collectionScheme related metadata for data persistency and
-     * transmission
-     *
-     * @return SUCCESS if connection is established.
+     * @param callback callback that will be called when the operation completes (successfully or not).
+     *                 IMPORTANT: The callback can be called by the same thread before sendBuffer even returns
+     *                 or a separate thread, depending on whether the results are known synchronously or asynchronously.
      */
-    virtual ConnectivityError sendBuffer(
-        const std::uint8_t *buf,
-        size_t size,
-        CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) = 0;
+    virtual void sendBuffer( const std::uint8_t *buf, size_t size, OnDataSentCallback callback ) = 0;
 
-    /**
-     * @brief called to send data from file to the cloud
-     *
-     * The function will return after async upload was successfully initiated or error occurred.
-     *
-     * @param filePath path to the file to upload
-     * @param size size of the payload
-     * @param collectionSchemeParams object containing collectionScheme related metadata for data persistency and
-     * transmission
-     *
-     * @return SUCCESS if connection is established.
-     */
-    virtual ConnectivityError sendFile( const std::string &filePath,
-                                        size_t size,
-                                        CollectionSchemeParams collectionSchemeParams = CollectionSchemeParams() ) = 0;
+    virtual void sendBufferToTopic( const std::string &topic,
+                                    const std::uint8_t *buf,
+                                    size_t size,
+                                    OnDataSentCallback callback ) = 0;
+
+    virtual unsigned getPayloadCountSent() const = 0;
 };
 
 } // namespace IoTFleetWise

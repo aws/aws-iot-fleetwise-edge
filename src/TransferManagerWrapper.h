@@ -3,7 +3,10 @@
 
 #pragma once
 
+#include <aws/core/client/ClientConfiguration.h>
 #include <aws/transfer/TransferManager.h>
+#include <functional>
+#include <memory>
 
 namespace Aws
 {
@@ -82,6 +85,10 @@ public:
 private:
     std::shared_ptr<Aws::Transfer::TransferManager> mTransferManager;
 };
+
+using CreateTransferManagerWrapper = std::function<std::shared_ptr<TransferManagerWrapper>(
+    Aws::Client::ClientConfiguration &clientConfiguration,
+    Aws::Transfer::TransferManagerConfiguration &transferManagerConfiguration )>;
 
 } // namespace IoTFleetWise
 } // namespace Aws

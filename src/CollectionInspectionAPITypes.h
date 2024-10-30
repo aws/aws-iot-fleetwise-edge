@@ -4,14 +4,18 @@
 #pragma once
 
 #include "CANDataTypes.h"
+#include "DataSenderTypes.h"
 #include "EventTypes.h"
+#include "Listener.h"
+#include "LoggingModule.h"
 #include "MessageTypes.h"
 #include "OBDDataTypes.h"
+#include "QueueTypes.h"
 #include "SignalTypes.h"
-#include <mutex>
-#include <queue>
+#include "TraceModule.h"
+#include <bitset>
+#include <functional>
 #include <vector>
-
 namespace Aws
 {
 namespace IoTFleetWise
@@ -37,43 +41,46 @@ struct PassThroughMetadata
     bool compress{ false };
     bool persist{ false };
     uint32_t priority{ 0 };
-    std::string decoderID;
-    std::string collectionSchemeID;
+    SyncID decoderID;
+    SyncID collectionSchemeID;
 };
 
 // As a start these structs are mainly a copy of the data defined in ICollectionScheme but as plain old data structures
 struct InspectionMatrixSignalCollectionInfo
 {
     SignalID signalID;
-    uint32_t sampleBufferSize;        /**<  at least this amount of last x samples will be kept in buffer*/
+    size_t sampleBufferSize;          /**<  at least this amount of last x samples will be kept in buffer*/
     uint32_t minimumSampleIntervalMs; /**<  zero means all signals are recorded as seen on the bus */
     uint32_t fixedWindowPeriod;       /**< zero means no fixed window sampling would happen */
     bool isConditionOnlySignal;       /**< Should the collected signals be sent to cloud or are the number
                                        * of samples in the buffer only necessary for condition evaluation
                                        */
-    SignalType signalType{ SignalType::DOUBLE };
+    SignalType signalType{ SignalType::UNKNOWN };
 };
 
 struct InspectionMatrixCanFrameCollectionInfo
 {
     CANRawFrameID frameID;
     CANChannelNumericID channelID;
-    uint32_t sampleBufferSize;        /**<  at least this amount of last x raw can frames will be kept in buffer */
+    size_t sampleBufferSize;          /**<  at least this amount of last x raw can frames will be kept in buffer */
     uint32_t minimumSampleIntervalMs; /**<  0 which all frames are recording as seen on the bus */
 };
 
 struct ConditionWithCollectedData
 {
-    const ExpressionNode *condition; /**< points into InspectionMatrix.expressionNodes;
-                                      * Raw pointer is used as needed for efficient AST and ConditionWithCollectedData
-                                      * never exists without the relevant InspectionMatrix */
-    uint32_t minimumPublishIntervalMs;
-    uint32_t afterDuration;
+    const ExpressionNode *condition =
+        nullptr; /**< points into InspectionMatrix.expressionNodes;
+                  * Raw pointer is used as needed for efficient AST and ConditionWithCollectedData
+                  * never exists without the relevant InspectionMatrix */
+    uint32_t minimumPublishIntervalMs{};
+    uint32_t afterDuration{};
     std::vector<InspectionMatrixSignalCollectionInfo> signals;
     std::vector<InspectionMatrixCanFrameCollectionInfo> canFrames;
-    bool includeActiveDtcs;
-    bool triggerOnlyOnRisingEdge;
+    bool includeActiveDtcs{};
+    bool triggerOnlyOnRisingEdge{};
     PassThroughMetadata metadata;
+    bool isStaticCondition{ true };
+    bool alwaysEvaluateCondition{ false };
 };
 
 struct InspectionMatrix
@@ -83,6 +90,97 @@ struct InspectionMatrix
                                                         * to increase performance the expressionNodes from one
                                                         * collectionScheme should be close to each other (memory
                                                         * locality). The traversal is depth first preorder */
+};
+
+struct InspectionValue
+{
+    InspectionValue() = default;
+    InspectionValue( const InspectionValue & ) = delete;
+    InspectionValue &operator=( const InspectionValue & ) = delete;
+    InspectionValue( InspectionValue && ) = default;
+    InspectionValue &operator=( InspectionValue && ) = delete;
+    ~InspectionValue() = default;
+    enum class DataType
+    {
+        UNDEFINED,
+        BOOL,
+        DOUBLE,
+    };
+    DataType type = DataType::UNDEFINED;
+    bool boolVal{};
+    double doubleVal{};
+    InspectionValue &
+    operator=( bool val )
+    {
+        boolVal = val;
+        type = DataType::BOOL;
+        return *this;
+    }
+    InspectionValue &
+    operator=( double val )
+    {
+        doubleVal = val;
+        type = DataType::DOUBLE;
+        return *this;
+    }
+    InspectionValue &
+    operator=( int val )
+    {
+        *this = static_cast<double>( val );
+        return *this;
+    }
+    bool
+    isBoolOrDouble() const
+    {
+        return ( type == DataType::BOOL ) || ( type == DataType::DOUBLE );
+    }
+    double
+    asDouble() const
+    {
+        return ( type == DataType::BOOL ) ? ( boolVal ? 1.0 : 0.0 ) : doubleVal;
+    }
+    bool
+    asBool() const
+    {
+        return ( type == DataType::DOUBLE ) ? ( doubleVal != 0.0 ) : boolVal;
+    }
+};
+
+struct SampleConsumed
+{
+    bool
+    isAlreadyConsumed( uint32_t conditionId )
+    {
+        return mAlreadyConsumed.test( conditionId );
+    }
+    void
+    setAlreadyConsumed( uint32_t conditionId, bool value )
+    {
+        if ( conditionId == ALL_CONDITIONS )
+        {
+            if ( value )
+            {
+                mAlreadyConsumed.set();
+            }
+            else
+            {
+                mAlreadyConsumed.reset();
+            }
+        }
+        else
+        {
+            mAlreadyConsumed[conditionId] = value;
+        }
+    }
+
+private:
+    std::bitset<MAX_NUMBER_OF_ACTIVE_CONDITION> mAlreadyConsumed{ 0 };
+};
+template <typename T>
+struct SignalSample : SampleConsumed
+{
+    T mValue;
+    Timestamp mTimestamp{ 0 };
 };
 
 // These values are provided by the CANDataConsumers
@@ -120,6 +218,13 @@ union SignalValue {
     uint32_t uint32Val;
     int32_t int32Val;
     uint64_t uint64Val;
+    struct RawDataVal
+    {
+        uint32_t signalId;
+        uint32_t handle;
+    };
+    RawDataVal rawDataVal;
+
     SignalValue &
     operator=( const uint8_t value )
     {
@@ -193,12 +298,18 @@ union SignalValue {
         boolVal = value;
         return *this;
     }
+    SignalValue &
+    operator=( const RawDataVal value )
+    {
+        rawDataVal = value;
+        return *this;
+    }
 };
 
 struct SignalValueWrapper
 {
     SignalValue value{ 0 };
-    SignalType type{ SignalType::DOUBLE };
+    SignalType type{ SignalType::UNKNOWN };
 
     SignalValueWrapper() = default;
     ~SignalValueWrapper() = default;
@@ -238,15 +349,6 @@ struct CollectedSignal
     SignalValueWrapper value;
 
     CollectedSignal() = default;
-
-    // Backward Compatibility
-    template <typename T>
-    CollectedSignal( SignalID signalIDIn, Timestamp receiveTimeIn, T sigValue )
-        : signalID( signalIDIn )
-        , receiveTime( receiveTimeIn )
-    {
-        value.setVal<double>( static_cast<double>( sigValue ), SignalType::DOUBLE );
-    }
 
     template <typename T>
     CollectedSignal( SignalID signalIDIn, Timestamp receiveTimeIn, T sigValue, SignalType sigType )
@@ -288,11 +390,31 @@ struct CollectedSignal
         case SignalType::BOOLEAN:
             value.setVal<bool>( static_cast<bool>( sigValue ), sigType );
             break;
+        case SignalType::UNKNOWN:
+            // Signal of type UNKNOWN will not be collected
+            break;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-        case SignalType::RAW_DATA_BUFFER_HANDLE:
+        case SignalType::COMPLEX_SIGNAL:
             value.setVal<uint32_t>( static_cast<uint32_t>( sigValue ), sigType );
             break;
 #endif
+        }
+    }
+
+    static CollectedSignal
+    fromDecodedSignal( SignalID signalIDIn,
+                       Timestamp receiveTimeIn,
+                       const DecodedSignalValue &decodedSignalValue,
+                       SignalType signalType )
+    {
+        switch ( decodedSignalValue.signalType )
+        {
+        case SignalType::UINT64:
+            return CollectedSignal{ signalIDIn, receiveTimeIn, decodedSignalValue.signalValue.uint64Val, signalType };
+        case SignalType::INT64:
+            return CollectedSignal{ signalIDIn, receiveTimeIn, decodedSignalValue.signalValue.int64Val, signalType };
+        default:
+            return CollectedSignal{ signalIDIn, receiveTimeIn, decodedSignalValue.signalValue.doubleVal, signalType };
         }
     }
 
@@ -350,72 +472,17 @@ struct CollectedDataFrame
     DTCInfoPtr mActiveDTCs;
 };
 
-// Thread-safe queue with mutex
-template <typename T>
-struct LockedQueue
-{
-public:
-    LockedQueue( size_t maxSize )
-        : mMaxSize( maxSize )
-    {
-    }
-    bool
-    push( const T &&element )
-    {
-        std::lock_guard<std::mutex> lock( mMutex );
-        if ( ( mQueue.size() + 1 ) > mMaxSize )
-        {
-            return false;
-        }
-        mQueue.push( element );
-        return true;
-    }
-    bool
-    pop( T &element )
-    {
-        std::lock_guard<std::mutex> lock( mMutex );
-        if ( mQueue.empty() )
-        {
-            return false;
-        }
-        element = mQueue.front();
-        mQueue.pop();
-        return true;
-    }
-    template <typename Functor>
-    size_t
-    consumeAll( const Functor &functor )
-    {
-        size_t consumed = 0;
-        T element;
-        while ( pop( element ) )
-        {
-            functor( element );
-            consumed++;
-        }
-        return consumed;
-    }
-    // coverity[misra_cpp_2008_rule_14_7_1_violation] Required in unit tests
-    bool
-    isEmpty()
-    {
-        std::lock_guard<std::mutex> lock( mMutex );
-        return mQueue.empty();
-    }
-
-private:
-    std::mutex mMutex;
-    size_t mMaxSize;
-    std::queue<T> mQueue;
-};
-
 // Buffer that sends data to Collection Engine
 using SignalBuffer = LockedQueue<CollectedDataFrame>;
 // Shared Pointer type to the buffer that sends data to Collection Engine
+// coverity[misra_cpp_2008_rule_0_1_5_violation] definition needed for tests
+// coverity[autosar_cpp14_a0_1_6_violation] same
 using SignalBufferPtr = std::shared_ptr<SignalBuffer>;
+using SignalBufferDistributor = LockedQueueDistributor<CollectedDataFrame>;
+using SignalBufferDistributorPtr = std::shared_ptr<SignalBufferDistributor>;
 
 // Output of collection Inspection Engine
-struct TriggeredCollectionSchemeData
+struct TriggeredCollectionSchemeData : DataToSend
 {
     PassThroughMetadata metadata;
     Timestamp triggerTime;
@@ -426,10 +493,52 @@ struct TriggeredCollectionSchemeData
 #endif
     DTCInfo mDTCInfo;
     EventID eventID;
+
+    ~TriggeredCollectionSchemeData() override = default;
+
+    SenderDataType
+    getDataType() const override
+    {
+        return SenderDataType::TELEMETRY;
+    }
 };
 
-using TriggeredCollectionSchemeDataPtr = std::shared_ptr<const TriggeredCollectionSchemeData>;
-using CollectedDataReadyToPublish = LockedQueue<TriggeredCollectionSchemeDataPtr>;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+struct TriggeredVisionSystemData : DataToSend
+{
+    PassThroughMetadata metadata;
+    Timestamp triggerTime;
+    std::vector<CollectedSignal> signals;
+    EventID eventID;
+
+    ~TriggeredVisionSystemData() override = default;
+
+    SenderDataType
+    getDataType() const override
+    {
+        return SenderDataType::VISION_SYSTEM;
+    }
+};
+#endif
+
+struct CollectionInspectionEngineOutput
+{
+    std::shared_ptr<TriggeredCollectionSchemeData> triggeredCollectionSchemeData;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    std::shared_ptr<TriggeredVisionSystemData> triggeredVisionSystemData;
+#endif
+};
+
+enum class ExpressionErrorCode
+{
+    SUCCESSFUL,
+    SIGNAL_NOT_FOUND,
+    FUNCTION_DATA_NOT_AVAILABLE,
+    STACK_DEPTH_REACHED,
+    NOT_IMPLEMENTED_TYPE,
+    NOT_IMPLEMENTED_FUNCTION,
+    TYPE_MISMATCH
+};
 
 } // namespace IoTFleetWise
 } // namespace Aws

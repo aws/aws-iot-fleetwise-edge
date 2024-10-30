@@ -5,7 +5,8 @@
       "canInterface": {
         "interfaceName": "vcan0",
         "protocolName": "CAN",
-        "protocolVersion": "2.0A"
+        "protocolVersion": "2.0A",
+        "timestampType": "Software"
       },
       "interfaceId": "1",
       "type": "canInterface"
@@ -53,7 +54,8 @@
     "internalParameters": {
       "readyToPublishDataBufferSize": 10000,
       "systemWideLogLevel": "Trace",
-      "persistencyUploadRetryIntervalMs": 5000
+      "persistencyUploadRetryIntervalMs": 5000,
+      "maximumAwsSdkHeapMemoryBytes": 10000000
     },
     "publishToCloudParameters": {
       "maxPublishMessageCount": 1000,
@@ -84,6 +86,24 @@
       "metricsUploadIntervalMs": 60000,
       "loggingUploadMaxWaitBeforeUploadMs": 60000,
       "profilerPrefix": "TestVehicle1"
+    },
+    "credentialsProvider": {
+      "endpointUrl": "my-endpoint.my-region.amazonaws.com",
+      "roleAlias": "my-role-alias"
+    },
+    "s3Upload": {
+      "maxConnections": 1,
+      "multipartSize": 123
+    },
+    "visionSystemDataCollection": {
+      "rawDataBuffer": {
+        "overridesPerSignal": [
+          {
+            "interfaceId": "my-vsd-interface",
+            "messageId": "my-message"
+          }
+        ]
+      }
     }
   }
 }

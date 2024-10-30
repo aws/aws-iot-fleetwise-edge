@@ -10,6 +10,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 namespace Aws
@@ -25,9 +26,9 @@ class AaosVhalSource : public CustomDataSource
 {
 public:
     /**
-     *     @param signalBufferPtr the signal buffer is used pass extracted data
+     * @param signalBufferDistributor Signal buffer distributor
      */
-    AaosVhalSource( SignalBufferPtr signalBufferPtr );
+    AaosVhalSource( SignalBufferDistributorPtr signalBufferDistributor );
     /**
      * Initialize AaosVhalSource and set filter for CustomDataSource
      *
@@ -55,7 +56,7 @@ public:
      * @param signalId Signal ID
      * @param value Property value
      */
-    void setVehicleProperty( SignalID signalId, double value );
+    void setVehicleProperty( SignalID signalId, const DecodedSignalValue &value );
 
     static constexpr const char *CAN_CHANNEL_NUMBER = "canChannel";
     static constexpr const char *CAN_RAW_FRAME_ID = "canFrameId";
@@ -65,7 +66,8 @@ protected:
     const char *getThreadName() override;
 
 private:
-    SignalBufferPtr mSignalBufferPtr;
+    SignalBufferDistributorPtr mSignalBufferDistributor;
+    std::unordered_map<SignalID, SignalType> mSignalIdToSignalType;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     CANChannelNumericID mCanChannel{ INVALID_CAN_SOURCE_NUMERIC_ID };
     CANRawFrameID mCanRawFrameId{ 0 };

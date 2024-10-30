@@ -24,19 +24,31 @@ public:
     struct SentBufferData
     {
         std::string data;
-        CollectionSchemeParams collectionSchemeParams;
+        OnDataSentCallback callback;
     };
 
     MOCK_METHOD( bool, isAlive, (), ( override ) );
 
     MOCK_METHOD( size_t, getMaxSendSize, (), ( const, override ) );
 
-    ConnectivityError
-    sendBuffer( const std::uint8_t *buf, size_t size, CollectionSchemeParams collectionSchemeParams ) override
+    void
+    sendBuffer( const std::uint8_t *buf, size_t size, OnDataSentCallback callback ) override
     {
         std::lock_guard<std::mutex> lock( mSentBufferDataMutex );
-        mSentBufferData.push_back( SentBufferData{ std::string( buf, buf + size ), collectionSchemeParams } );
-        return mockedSendBuffer( buf, size, collectionSchemeParams );
+        mSentBufferData.push_back( SentBufferData{ std::string( buf, buf + size ), callback } );
+        mockedSendBuffer( buf, size, callback );
+    }
+
+    void
+    sendBufferToTopic( __attribute__( ( unused ) ) const std::string &topic,
+                       const std::uint8_t *buf,
+                       size_t size,
+                       OnDataSentCallback callback ) override
+    {
+        // TODO: Make a map of topic to SentBufferData. For now, mark topic parameter as unused
+        std::lock_guard<std::mutex> lock( mSentBufferDataMutex );
+        mSentBufferData.push_back( SentBufferData{ std::string( buf, buf + size ), callback } );
+        mockedSendBuffer( buf, size, callback );
     }
 
     std::vector<SentBufferData>
@@ -46,14 +58,16 @@ public:
         return mSentBufferData;
     }
 
-    MOCK_METHOD( ConnectivityError,
-                 mockedSendBuffer,
-                 ( const std::uint8_t *buf, size_t size, CollectionSchemeParams collectionSchemeParams ) );
+    void
+    clearSentBufferData()
+    {
+        std::lock_guard<std::mutex> lock( mSentBufferDataMutex );
+        mSentBufferData.clear();
+    }
 
-    MOCK_METHOD( ConnectivityError,
-                 sendFile,
-                 ( const std::string &filePath, size_t size, CollectionSchemeParams collectionSchemeParams ),
-                 ( override ) );
+    MOCK_METHOD( void, mockedSendBuffer, ( const std::uint8_t *buf, size_t size, OnDataSentCallback callback ) );
+
+    MOCK_METHOD( unsigned, getPayloadCountSent, (), ( const, override ) );
 
 private:
     // Record the calls so that we can wait for asynchronous calls to happen.

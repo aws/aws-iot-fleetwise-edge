@@ -3,12 +3,23 @@
 
 #include "CollectionSchemeManagerTest.h"
 #include "CANInterfaceIDTranslator.h"
+#include "CacheAndPersist.h"
+#include "CheckinSender.h"
 #include "Clock.h"
 #include "ClockHandler.h"
+#include "CollectionSchemeManagerMock.h"
+#include "SchemaListener.h"
+#include "Testing.h"
+#include "TimeTypes.h"
 #include "WaitUntil.h"
+#include "collection_schemes.pb.h"
+#include "decoder_manifest.pb.h"
 #include <chrono>
+#include <functional>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <iostream>
+#include <mutex>
 #include <thread>
 
 namespace Aws
@@ -16,26 +27,104 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-/**********************test body ***********************************************/
-TEST( CollectionSchemeManagerTest, StopMainTest )
+using ::testing::_;
+using ::testing::InvokeArgument;
+using ::testing::NiceMock;
+using ::testing::Return;
+using ::testing::StrictMock;
+
+class SchemaListenerMock : public SchemaListener
 {
-    CANInterfaceIDTranslator canIDTranslator;
-    CollectionSchemeManagerTest test;
-    test.init( 50, nullptr, canIDTranslator );
-    ASSERT_TRUE( test.connect() );
+public:
+    void
+    sendCheckin( const std::vector<SyncID> &documentARNs, OnCheckinSentCallback callback ) override
+    {
+        mockedSendCheckin( documentARNs, callback );
+        std::lock_guard<std::mutex> lock( sentDocumentsMutex );
+        mSentDocuments.push_back( documentARNs );
+    }
+
+    MOCK_METHOD( void, mockedSendCheckin, ( const std::vector<SyncID> &documentARNs, OnCheckinSentCallback callback ) );
+
+    std::vector<std::vector<SyncID>>
+    getSentDocuments()
+    {
+        std::lock_guard<std::mutex> lock( sentDocumentsMutex );
+        return mSentDocuments;
+    }
+
+    int
+    getLastSentDocuments( std::vector<SyncID> &sentDocuments )
+    {
+        std::lock_guard<std::mutex> lock( sentDocumentsMutex );
+        if ( mSentDocuments.empty() )
+        {
+            return -1;
+        }
+        sentDocuments = mSentDocuments.back();
+        return static_cast<int>( sentDocuments.size() );
+    }
+
+private:
+    std::vector<std::vector<SyncID>> mSentDocuments;
+    std::mutex sentDocumentsMutex;
+};
+
+class CollectionSchemeManagerTest : public ::testing::Test
+{
+protected:
+    CollectionSchemeManagerTest()
+        : mCollectionSchemeManager( nullptr, mCanIDTranslator, std::make_shared<CheckinSender>( nullptr ) )
+    {
+    }
+
+    void
+    SetUp() override
+    {
+        mCollectionSchemeManager.subscribeToInspectionMatrixChange(
+            [&]( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) {
+                mReceivedInspectionMatrices.emplace_back( inspectionMatrix );
+            } );
+    }
+
+    void
+    TearDown() override
+    {
+        WAIT_ASSERT_TRUE( mCollectionSchemeManager.disconnect() );
+    }
+
+    CANInterfaceIDTranslator mCanIDTranslator;
+    CollectionSchemeManagerWrapper mCollectionSchemeManager;
+    std::vector<std::shared_ptr<const InspectionMatrix>> mReceivedInspectionMatrices;
+    std::shared_ptr<const Clock> mTestClock = ClockHandler::getClock();
+};
+
+std::vector<SignalID>
+getSignalIdsFromCondition( const ConditionWithCollectedData &condition )
+{
+    std::vector<SignalID> signalIds;
+    for ( const auto &signal : condition.signals )
+    {
+        signalIds.push_back( signal.signalID );
+    }
+    return signalIds;
+}
+
+TEST_F( CollectionSchemeManagerTest, StopMain )
+{
+    ASSERT_TRUE( mCollectionSchemeManager.connect() );
 
     /* stopping idling main thread */
-    WAIT_ASSERT_TRUE( test.disconnect() );
+    WAIT_ASSERT_TRUE( mCollectionSchemeManager.disconnect() );
 
     /* build DMs */
-    ASSERT_TRUE( test.connect() );
+    ASSERT_TRUE( mCollectionSchemeManager.connect() );
     IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
     std::vector<ICollectionSchemePtr> testList1;
 
     /* build collectionScheme list1 */
-    std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */
-    TimePoint currTime = testClock->timeSinceEpoch();
+    TimePoint currTime = mTestClock->timeSinceEpoch();
     Timestamp startTime = currTime.systemTimeMs + SECOND_TO_MILLISECOND( 1 );
     Timestamp stopTime = startTime + SECOND_TO_MILLISECOND( 25 );
     ICollectionSchemePtr collectionScheme =
@@ -44,65 +133,60 @@ TEST( CollectionSchemeManagerTest, StopMainTest )
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     /* create ICollectionSchemeList */
-    test.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList1 );
+    mCollectionSchemeManager.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList1 );
     /* sending lists and dm to PM */
-    test.mDmTest = testDM1;
-    test.myInvokeDecoderManifest();
+    mCollectionSchemeManager.mDmTest = testDM1;
+    mCollectionSchemeManager.myInvokeDecoderManifest();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    test.myInvokeCollectionScheme();
+    mCollectionSchemeManager.myInvokeCollectionScheme();
+    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     /* stopping main thread servicing a collectionScheme ending in 25 seconds */
-    WAIT_ASSERT_TRUE( test.disconnect() );
+    WAIT_ASSERT_TRUE( mCollectionSchemeManager.disconnect() );
 }
 
-TEST( CollectionSchemeManagerTest, CollectionSchemeUpdateCallBackTest )
+TEST_F( CollectionSchemeManagerTest, CollectionSchemeUpdateCallBack )
 {
-    CollectionSchemeManagerTest test;
     std::vector<ICollectionSchemePtr> emptyList;
-    CANInterfaceIDTranslator canIDTranslator;
-    test.init( 50, nullptr, canIDTranslator );
-    test.setmCollectionSchemeAvailable( false );
-    test.setmProcessCollectionScheme( false );
+    mCollectionSchemeManager.setmCollectionSchemeAvailable( false );
+    mCollectionSchemeManager.setmProcessCollectionScheme( false );
     // pl is null
-    test.mPlTest = nullptr;
-    test.myInvokeCollectionScheme();
-    ASSERT_TRUE( test.getmCollectionSchemeAvailable() );
-    test.updateAvailable();
-    ASSERT_FALSE( test.getmCollectionSchemeAvailable() );
-    ASSERT_FALSE( test.getmProcessCollectionScheme() );
+    mCollectionSchemeManager.mPlTest = nullptr;
+    mCollectionSchemeManager.myInvokeCollectionScheme();
+    ASSERT_TRUE( mCollectionSchemeManager.getmCollectionSchemeAvailable() );
+    mCollectionSchemeManager.updateAvailable();
+    ASSERT_FALSE( mCollectionSchemeManager.getmCollectionSchemeAvailable() );
+    ASSERT_FALSE( mCollectionSchemeManager.getmProcessCollectionScheme() );
     // pl is valid
-    test.mPlTest = std::make_shared<ICollectionSchemeListTest>( emptyList );
-    test.myInvokeCollectionScheme();
-    ASSERT_TRUE( test.getmCollectionSchemeAvailable() );
-    test.updateAvailable();
-    ASSERT_FALSE( test.getmCollectionSchemeAvailable() );
-    ASSERT_TRUE( test.getmProcessCollectionScheme() );
+    mCollectionSchemeManager.mPlTest = std::make_shared<ICollectionSchemeListTest>( emptyList );
+    mCollectionSchemeManager.myInvokeCollectionScheme();
+    ASSERT_TRUE( mCollectionSchemeManager.getmCollectionSchemeAvailable() );
+    mCollectionSchemeManager.updateAvailable();
+    ASSERT_FALSE( mCollectionSchemeManager.getmCollectionSchemeAvailable() );
+    ASSERT_TRUE( mCollectionSchemeManager.getmProcessCollectionScheme() );
 }
 
-TEST( CollectionSchemeManagerTest, DecoderManifestUpdateCallBackTest )
+TEST_F( CollectionSchemeManagerTest, DecoderManifestUpdateCallBack )
 {
-    CollectionSchemeManagerTest test;
-    CANInterfaceIDTranslator canIDTranslator;
-    test.init( 50, nullptr, canIDTranslator );
-    test.setmDecoderManifestAvailable( false );
-    test.setmProcessDecoderManifest( false );
+    mCollectionSchemeManager.setmDecoderManifestAvailable( false );
+    mCollectionSchemeManager.setmProcessDecoderManifest( false );
     // dm is null
-    test.mDmTest = nullptr;
-    test.myInvokeDecoderManifest();
-    ASSERT_TRUE( test.getmDecoderManifestAvailable() );
-    test.updateAvailable();
-    ASSERT_FALSE( test.getmDecoderManifestAvailable() );
-    ASSERT_FALSE( test.getmProcessDecoderManifest() );
+    mCollectionSchemeManager.mDmTest = nullptr;
+    mCollectionSchemeManager.myInvokeDecoderManifest();
+    ASSERT_TRUE( mCollectionSchemeManager.getmDecoderManifestAvailable() );
+    mCollectionSchemeManager.updateAvailable();
+    ASSERT_FALSE( mCollectionSchemeManager.getmDecoderManifestAvailable() );
+    ASSERT_FALSE( mCollectionSchemeManager.getmProcessDecoderManifest() );
     // pl is valid
-    test.mDmTest = std::make_shared<IDecoderManifestTest>( "" );
-    test.myInvokeDecoderManifest();
-    ASSERT_TRUE( test.getmDecoderManifestAvailable() );
-    test.updateAvailable();
-    ASSERT_FALSE( test.getmDecoderManifestAvailable() );
-    ASSERT_TRUE( test.getmProcessDecoderManifest() );
+    mCollectionSchemeManager.mDmTest = std::make_shared<IDecoderManifestTest>( "" );
+    mCollectionSchemeManager.myInvokeDecoderManifest();
+    ASSERT_TRUE( mCollectionSchemeManager.getmDecoderManifestAvailable() );
+    mCollectionSchemeManager.updateAvailable();
+    ASSERT_FALSE( mCollectionSchemeManager.getmDecoderManifestAvailable() );
+    ASSERT_TRUE( mCollectionSchemeManager.getmProcessDecoderManifest() );
 }
 
-TEST( CollectionSchemeManagerTest, MockProducerTest )
+TEST_F( CollectionSchemeManagerTest, MockProducer )
 {
     /*
      * This is the integration test of PM. A mock producer is creating mocking CollectionScheme Ingestion sending
@@ -132,10 +216,7 @@ TEST( CollectionSchemeManagerTest, MockProducerTest )
      * watching mTimeLine run to complete all collectionSchemes.
      */
     /* start PM main thread */
-    CollectionSchemeManagerTest test;
-    CANInterfaceIDTranslator canIDTranslator;
-    test.init( 50, nullptr, canIDTranslator );
-    ASSERT_TRUE( test.connect() );
+    ASSERT_TRUE( mCollectionSchemeManager.connect() );
 
     /* build DMs */
     IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
@@ -143,8 +224,7 @@ TEST( CollectionSchemeManagerTest, MockProducerTest )
     std::vector<ICollectionSchemePtr> testList1, testList2, testList3;
 
     /* build collectionScheme list1 */
-    std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePoint currTime = testClock->timeSinceEpoch();
+    TimePoint currTime = mTestClock->timeSinceEpoch();
     Timestamp startTime = currTime.systemTimeMs + 100;
     Timestamp stopTime = startTime + 500;
     ICollectionSchemePtr collectionScheme =
@@ -156,53 +236,53 @@ TEST( CollectionSchemeManagerTest, MockProducerTest )
     collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME2", "DM1", startTime, stopTime );
     testList1.emplace_back( collectionScheme );
     /* create ICollectionSchemeList */
-    test.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList1 );
+    mCollectionSchemeManager.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList1 );
     //////////////////// test starts here////////////////////////////////
     /* sending lists and dm to PM */
     std::cout << COUT_GTEST_MGT << "Step1: send DM1 and COLLECTIONSCHEME1 and COLLECTIONSCHEME2 " << ANSI_TXT_DFT
               << std::endl;
-    test.mDmTest = testDM1;
-    test.myInvokeDecoderManifest();
+    mCollectionSchemeManager.mDmTest = testDM1;
+    mCollectionSchemeManager.myInvokeDecoderManifest();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    test.myInvokeCollectionScheme();
+    mCollectionSchemeManager.myInvokeCollectionScheme();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     // remove CollectionScheme1, don't send DM
     std::cout << COUT_GTEST_MGT << "Step2: remove COLLECTIONSCHEME1 " << ANSI_TXT_DFT << std::endl;
     testList2.emplace_back( testList1[1] );
-    test.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList2 );
-    test.myInvokeCollectionScheme();
+    mCollectionSchemeManager.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList2 );
+    mCollectionSchemeManager.myInvokeCollectionScheme();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     /* add COLLECTIONSCHEME3  */
     std::cout << COUT_GTEST_MGT << "Step3: add COLLECTIONSCHEME3 " << ANSI_TXT_DFT << std::endl;
-    currTime = testClock->timeSinceEpoch();
+    currTime = mTestClock->timeSinceEpoch();
     startTime = currTime.systemTimeMs + 100;
     stopTime = startTime + 500;
     collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME3", "DM1", startTime, stopTime );
     testList2.emplace_back( collectionScheme );
-    test.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList2 );
-    test.myInvokeCollectionScheme();
+    mCollectionSchemeManager.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList2 );
+    mCollectionSchemeManager.myInvokeCollectionScheme();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     /* send DM2 and list2(of DM1) to PM, PM will stop all collectionSchemes */
     std::cout << COUT_GTEST_MGT << "Step4: send DM2 " << ANSI_TXT_DFT << std::endl;
-    test.mDmTest = testDM2;
-    test.myInvokeDecoderManifest();
+    mCollectionSchemeManager.mDmTest = testDM2;
+    mCollectionSchemeManager.myInvokeDecoderManifest();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     std::cout << COUT_GTEST_MGT << "Step5: send DM1 again " << ANSI_TXT_DFT << std::endl;
-    test.mDmTest = testDM1;
-    test.myInvokeDecoderManifest();
+    mCollectionSchemeManager.mDmTest = testDM1;
+    mCollectionSchemeManager.myInvokeDecoderManifest();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     std::cout << COUT_GTEST_MGT << "Step6: send DM2 again " << ANSI_TXT_DFT << std::endl;
-    test.mDmTest = testDM2;
-    test.myInvokeDecoderManifest();
+    mCollectionSchemeManager.mDmTest = testDM2;
+    mCollectionSchemeManager.myInvokeDecoderManifest();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
 
     /* build list3 with DM2 */
-    currTime = testClock->timeSinceEpoch();
+    currTime = mTestClock->timeSinceEpoch();
     startTime = currTime.systemTimeMs + 100;
     stopTime = startTime + 500;
     collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME4", "DM2", startTime, stopTime );
@@ -213,35 +293,31 @@ TEST( CollectionSchemeManagerTest, MockProducerTest )
     testList3.emplace_back( collectionScheme );
     /* send list3 to PM, PM will start rebuilding all collectionSchemes */
     std::cout << COUT_GTEST_MGT << "Step7: send COLLECTIONSCHEME4 and COLLECTIONSCHEME5 " << ANSI_TXT_DFT << std::endl;
-    test.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList3 );
-    test.myInvokeCollectionScheme();
+    mCollectionSchemeManager.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList3 );
+    mCollectionSchemeManager.myInvokeCollectionScheme();
     std::this_thread::sleep_for( std::chrono::milliseconds( 200 ) );
     /* send empty list of any DM */
     std::cout << COUT_GTEST_MGT << "Step7: send empty collectionSchemeList " << ANSI_TXT_DFT << std::endl;
     testList2.clear();
-    test.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList2 );
-    test.myInvokeCollectionScheme();
+    mCollectionSchemeManager.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList2 );
+    mCollectionSchemeManager.myInvokeCollectionScheme();
 
-    WAIT_ASSERT_TRUE( test.disconnect() );
+    WAIT_ASSERT_TRUE( mCollectionSchemeManager.disconnect() );
 }
 
-TEST( CollectionSchemeManagerTest, getCollectionSchemeArns )
+TEST_F( CollectionSchemeManagerTest, getCollectionSchemeArns )
 {
-    CANInterfaceIDTranslator canIDTranslator;
-    CollectionSchemeManagerTest test;
-    test.init( 50, nullptr, canIDTranslator );
-    ASSERT_TRUE( test.connect() );
+    ASSERT_TRUE( mCollectionSchemeManager.connect() );
 
-    ASSERT_EQ( test.getCollectionSchemeArns(), std::vector<std::string>() );
+    ASSERT_EQ( mCollectionSchemeManager.getCollectionSchemeArns(), std::vector<SyncID>() );
 
     /* build DMs */
     IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
     std::vector<ICollectionSchemePtr> testList1;
 
     /* build collectionScheme list1 */
-    std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */
-    TimePoint currTime = testClock->timeSinceEpoch();
+    TimePoint currTime = mTestClock->timeSinceEpoch();
     Timestamp startTime = currTime.systemTimeMs + SECOND_TO_MILLISECOND( 1 );
     Timestamp stopTime = startTime + SECOND_TO_MILLISECOND( 25 );
     ICollectionSchemePtr collectionScheme =
@@ -250,18 +326,290 @@ TEST( CollectionSchemeManagerTest, getCollectionSchemeArns )
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     /* create ICollectionSchemeList */
-    test.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList1 );
+    mCollectionSchemeManager.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList1 );
     /* sending lists and dm to PM */
-    test.mDmTest = testDM1;
-    test.myInvokeDecoderManifest();
+    mCollectionSchemeManager.mDmTest = testDM1;
+    mCollectionSchemeManager.myInvokeDecoderManifest();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
-    test.myInvokeCollectionScheme();
+    mCollectionSchemeManager.myInvokeCollectionScheme();
 
-    WAIT_ASSERT_EQ( test.getCollectionSchemeArns(), std::vector<std::string>( { "COLLECTIONSCHEME1" } ) );
+    WAIT_ASSERT_EQ( mCollectionSchemeManager.getCollectionSchemeArns(),
+                    std::vector<SyncID>( { "COLLECTIONSCHEME1" } ) );
 
     /* stopping main thread servicing a collectionScheme ending in 25 seconds */
-    WAIT_ASSERT_TRUE( test.disconnect() );
+    WAIT_ASSERT_TRUE( mCollectionSchemeManager.disconnect() );
 }
+
+TEST_F( CollectionSchemeManagerTest, SendCheckinPeriodically )
+{
+    uint32_t checkinIntervalMs = 100;
+    auto schemaListenerMock = std::make_shared<StrictMock<SchemaListenerMock>>();
+    auto checkinSender = std::make_shared<CheckinSender>( schemaListenerMock, checkinIntervalMs );
+    CollectionSchemeManagerWrapper collectionSchemeManager( nullptr, mCanIDTranslator, checkinSender );
+
+    EXPECT_CALL( *schemaListenerMock, mockedSendCheckin( _, _ ) ).WillRepeatedly( InvokeArgument<1>( true ) );
+
+    std::vector<SyncID> sentDocuments;
+    ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), -1 );
+    ASSERT_TRUE( checkinSender->start() );
+
+    // No checkin should be sent until CollectionSchemeManager is started, because if CollectionSchemeManager
+    // restores data from persistency layer, the first checkin message should contain the restored
+    // documents instead of being an empty checkin.
+    std::this_thread::sleep_for( std::chrono::milliseconds( checkinIntervalMs * 2 ) );
+    ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), -1 );
+
+    ASSERT_TRUE( collectionSchemeManager.connect() );
+
+    // Now that CollectionSchemeManager is started and nothing is persisted, the first checkin should
+    // be empty
+    WAIT_ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), 0 );
+
+    /* build DMs */
+    IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    std::vector<ICollectionSchemePtr> testList1;
+    /* build collectionScheme list1 */
+    TimePoint currTime = mTestClock->timeSinceEpoch();
+    Timestamp startTime = currTime.systemTimeMs + SECOND_TO_MILLISECOND( 1 );
+    Timestamp stopTime = startTime + SECOND_TO_MILLISECOND( 25 );
+    testList1.emplace_back(
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startTime, stopTime ) );
+    testList1.emplace_back(
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME2", "DM1", startTime, stopTime ) );
+
+    collectionSchemeManager.mPlTest = std::make_shared<ICollectionSchemeListTest>( testList1 );
+    collectionSchemeManager.mDmTest = testDM1;
+    collectionSchemeManager.myInvokeDecoderManifest();
+    collectionSchemeManager.myInvokeCollectionScheme();
+
+    WAIT_ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), 3 );
+    ASSERT_EQ( sentDocuments[0], "COLLECTIONSCHEME1" );
+    ASSERT_EQ( sentDocuments[1], "COLLECTIONSCHEME2" );
+    ASSERT_EQ( sentDocuments[2], "DM1" );
+
+    auto numOfMessagesSent = schemaListenerMock->getSentDocuments().size();
+
+    std::this_thread::sleep_for( std::chrono::milliseconds( checkinIntervalMs * 5 ) );
+
+    // Make sure checkin is sent periodically, but leave some margin for small timing differences
+    ASSERT_GE( schemaListenerMock->getSentDocuments().size(), numOfMessagesSent + 4U );
+    ASSERT_LT( schemaListenerMock->getSentDocuments().size(), numOfMessagesSent + 6U );
+}
+
+TEST_F( CollectionSchemeManagerTest, SendFirstCheckinWithPersistedDocuments )
+{
+    auto storage = createCacheAndPersist();
+
+    // Store some documents
+    {
+
+        Schemas::DecoderManifestMsg::DecoderManifest protoDM;
+        protoDM.set_sync_id( "DM1" );
+        Schemas::DecoderManifestMsg::CANSignal *protoCANSignalA = protoDM.add_can_signals();
+        protoCANSignalA->set_signal_id( 3908 );
+
+        std::string protoSerializedBuffer;
+        ASSERT_TRUE( protoDM.SerializeToString( &protoSerializedBuffer ) );
+        ASSERT_EQ( storage->write( reinterpret_cast<const uint8_t *>( protoSerializedBuffer.data() ),
+                                   protoSerializedBuffer.size(),
+                                   DataType::DECODER_MANIFEST ),
+                   ErrorCode::SUCCESS );
+    }
+
+    {
+        Schemas::CollectionSchemesMsg::CollectionSchemes protoCollectionSchemesMsg;
+        auto collectionScheme1 = protoCollectionSchemesMsg.add_collection_schemes();
+        collectionScheme1->set_campaign_sync_id( "COLLECTIONSCHEME1" );
+        collectionScheme1->set_decoder_manifest_sync_id( "DM1" );
+        Schemas::CollectionSchemesMsg::TimeBasedCollectionScheme *timeBasedCollectionScheme =
+            collectionScheme1->mutable_time_based_collection_scheme();
+        timeBasedCollectionScheme->set_time_based_collection_scheme_period_ms( 5000 );
+        collectionScheme1->set_expiry_time_ms_epoch( mTestClock->systemTimeSinceEpochMs() + 30000 );
+        auto collectionScheme2 = protoCollectionSchemesMsg.add_collection_schemes();
+        collectionScheme2->set_campaign_sync_id( "COLLECTIONSCHEME2" );
+        collectionScheme2->set_decoder_manifest_sync_id( "DM1" );
+        collectionScheme2->set_expiry_time_ms_epoch( mTestClock->systemTimeSinceEpochMs() + 30000 );
+        timeBasedCollectionScheme = collectionScheme2->mutable_time_based_collection_scheme();
+        timeBasedCollectionScheme->set_time_based_collection_scheme_period_ms( 5000 );
+
+        std::string protoSerializedBuffer;
+        ASSERT_TRUE( protoCollectionSchemesMsg.SerializeToString( &protoSerializedBuffer ) );
+        ASSERT_EQ( storage->write( reinterpret_cast<const uint8_t *>( protoSerializedBuffer.data() ),
+                                   protoSerializedBuffer.size(),
+                                   DataType::COLLECTION_SCHEME_LIST ),
+                   ErrorCode::SUCCESS );
+    }
+
+    uint32_t checkinIntervalMs = 100;
+    auto schemaListenerMock = std::make_shared<StrictMock<SchemaListenerMock>>();
+    auto checkinSender = std::make_shared<CheckinSender>( schemaListenerMock, checkinIntervalMs );
+    CollectionSchemeManagerWrapper collectionSchemeManager( storage, mCanIDTranslator, checkinSender );
+
+    EXPECT_CALL( *schemaListenerMock, mockedSendCheckin( _, _ ) ).WillRepeatedly( InvokeArgument<1>( true ) );
+
+    std::vector<SyncID> sentDocuments;
+    ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), -1 );
+    ASSERT_TRUE( checkinSender->start() );
+
+    // No checkin should be sent until CollectionSchemeManager is started, because if CollectionSchemeManager
+    // restores data from persistency layer, the first checkin message should contain the restored
+    // documents instead of being an empty checkin.
+    std::this_thread::sleep_for( std::chrono::milliseconds( checkinIntervalMs * 2 ) );
+    ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), -1 );
+
+    ASSERT_TRUE( collectionSchemeManager.connect() );
+
+    // Now that CollectionSchemeManager is started and restored persisted data, the first checkin should
+    // contain the restored documents.
+    WAIT_ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), 3 );
+    ASSERT_EQ( sentDocuments[0], "COLLECTIONSCHEME1" );
+    ASSERT_EQ( sentDocuments[1], "COLLECTIONSCHEME2" );
+    ASSERT_EQ( sentDocuments[2], "DM1" );
+}
+
+TEST_F( CollectionSchemeManagerTest, RetryCheckinOnFailure )
+{
+    uint32_t checkinIntervalMs = 100;
+    auto schemaListenerMock = std::make_shared<StrictMock<SchemaListenerMock>>();
+    auto checkinSender = std::make_shared<CheckinSender>( schemaListenerMock, checkinIntervalMs );
+    CollectionSchemeManagerWrapper collectionSchemeManager( nullptr, mCanIDTranslator, checkinSender );
+
+    EXPECT_CALL( *schemaListenerMock, mockedSendCheckin( _, _ ) ).WillRepeatedly( InvokeArgument<1>( true ) );
+
+    std::vector<SyncID> sentDocuments;
+    ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), -1 );
+    ASSERT_TRUE( checkinSender->start() );
+
+    // No checkin should be sent until CollectionSchemeManager is started, because if CollectionSchemeManager
+    // restores data from persistency layer, the first checkin message should contain the restored
+    // documents instead of being an empty checkin.
+    std::this_thread::sleep_for( std::chrono::milliseconds( checkinIntervalMs * 2 ) );
+    ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), -1 );
+
+    EXPECT_CALL( *schemaListenerMock, mockedSendCheckin( _, _ ) ).WillRepeatedly( InvokeArgument<1>( false ) );
+
+    ASSERT_TRUE( collectionSchemeManager.connect() );
+
+    WAIT_ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), 0 );
+
+    /* build DMs */
+    IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    collectionSchemeManager.mDmTest = testDM1;
+    collectionSchemeManager.myInvokeDecoderManifest();
+
+    WAIT_ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), 1 );
+    ASSERT_EQ( sentDocuments[0], "DM1" );
+}
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+TEST_F( CollectionSchemeManagerTest, ReceiveCollectionSchemeUpdateWithExistingSchemes )
+{
+    IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    mCollectionSchemeManager.mDmTest = testDM1;
+    mCollectionSchemeManager.myInvokeDecoderManifest();
+    ASSERT_TRUE( mCollectionSchemeManager.connect() );
+
+    WAIT_ASSERT_EQ( mReceivedInspectionMatrices.size(), 1U );
+
+    auto currentTimeMs = mTestClock->timeSinceEpoch().systemTimeMs;
+    auto startTimeInNearFuture = currentTimeMs + 500;
+    auto stopTimeInDistantFuture = currentTimeMs + 200000;
+    auto startTimeInThePast = currentTimeMs - 1000;
+    std::vector<SignalCollectionInfo> signals1 = { SignalCollectionInfo{ 0xFFFF0000 },
+                                                   SignalCollectionInfo{ 0xFFFF0001 } };
+    ICollectionScheme::PartialSignalIDLookup partialSignalIDLookup1{
+        { 0xFFFF0000, std::pair<SignalID, SignalPath>( 0x2000000, SignalPath{ 1, 2, 5 } ) },
+        { 0xFFFF0001, std::pair<SignalID, SignalPath>( 0x2000000, SignalPath{ 1, 1, 3 } ) } };
+    auto idleCollectionScheme = std::make_shared<ICollectionSchemeTest>( "IdleCollectionScheme",
+                                                                         "DM1",
+                                                                         startTimeInNearFuture,
+                                                                         stopTimeInDistantFuture,
+                                                                         signals1,
+                                                                         std::vector<CanFrameCollectionInfo>{},
+                                                                         partialSignalIDLookup1 );
+
+    std::vector<SignalCollectionInfo> signals2 = { SignalCollectionInfo{ 0xFFFF0002 },
+                                                   SignalCollectionInfo{ 0xFFFF0003 } };
+    ICollectionScheme::PartialSignalIDLookup partialSignalIDLookup2{
+        { 0xFFFF0002, std::pair<SignalID, SignalPath>( 0x2000001, SignalPath{ 1, 2, 5 } ) },
+        { 0xFFFF0003, std::pair<SignalID, SignalPath>( 0x2000001, SignalPath{ 1, 1, 3 } ) } };
+    auto enabledCollectionScheme = std::make_shared<ICollectionSchemeTest>( "EnabledCollectionScheme",
+                                                                            "DM1",
+                                                                            startTimeInThePast,
+                                                                            stopTimeInDistantFuture,
+                                                                            signals2,
+                                                                            std::vector<CanFrameCollectionInfo>{},
+                                                                            partialSignalIDLookup2 );
+
+    mCollectionSchemeManager.onCollectionSchemeUpdate( std::make_shared<ICollectionSchemeListTest>(
+        std::vector<ICollectionSchemePtr>{ idleCollectionScheme, enabledCollectionScheme } ) );
+
+    WAIT_ASSERT_EQ( mReceivedInspectionMatrices.size(), 2U );
+
+    // Repeat the same collection schemes, but modify the signals for the idle one. This is to make
+    // sure that later when CollectionSchemeManager enables this collection scheme, it will use the
+    // new signal IDs.
+    signals1 = { SignalCollectionInfo{ 0xFFFF0010 }, SignalCollectionInfo{ 0xFFFF0011 } };
+    partialSignalIDLookup1 = { { 0xFFFF0010, std::pair<SignalID, SignalPath>( 0x2000000, SignalPath{ 1, 2, 5 } ) },
+                               { 0xFFFF0011, std::pair<SignalID, SignalPath>( 0x2000000, SignalPath{ 1, 1, 3 } ) } };
+    idleCollectionScheme = std::make_shared<ICollectionSchemeTest>( "IdleCollectionScheme",
+                                                                    "DM1",
+                                                                    startTimeInNearFuture,
+                                                                    stopTimeInDistantFuture,
+                                                                    signals1,
+                                                                    std::vector<CanFrameCollectionInfo>{},
+                                                                    partialSignalIDLookup1 );
+
+    enabledCollectionScheme = std::make_shared<ICollectionSchemeTest>( "EnabledCollectionScheme",
+                                                                       "DM1",
+                                                                       startTimeInThePast,
+                                                                       stopTimeInDistantFuture,
+                                                                       signals2,
+                                                                       std::vector<CanFrameCollectionInfo>{},
+                                                                       partialSignalIDLookup2 );
+    mCollectionSchemeManager.onCollectionSchemeUpdate( std::make_shared<ICollectionSchemeListTest>(
+        std::vector<ICollectionSchemePtr>{ enabledCollectionScheme, idleCollectionScheme } ) );
+
+    WAIT_ASSERT_EQ( mReceivedInspectionMatrices.size(), 3U );
+
+    // Now send the same collection schemes, but slightly modified. In general collection schemes
+    // coming from the Cloud with the same ID should be considered the same. But for complex data
+    // some the partial signal IDs are generated by us and they can change when we ingest a new
+    // message from the Cloud.
+    idleCollectionScheme =
+        std::make_shared<ICollectionSchemeTest>( "IdleCollectionScheme",
+                                                 "DM1",
+                                                 // Also make the idle collection scheme become enabled
+                                                 startTimeInNearFuture,
+                                                 stopTimeInDistantFuture,
+                                                 signals1,
+                                                 std::vector<CanFrameCollectionInfo>{},
+                                                 partialSignalIDLookup1 );
+
+    signals2 = { SignalCollectionInfo{ 0xFFFF0012 }, SignalCollectionInfo{ 0xFFFF0013 } };
+    partialSignalIDLookup2 = { { 0xFFFF0012, std::pair<SignalID, SignalPath>( 0x2000001, SignalPath{ 1, 2, 5 } ) },
+                               { 0xFFFF0013, std::pair<SignalID, SignalPath>( 0x2000001, SignalPath{ 1, 1, 3 } ) } };
+    enabledCollectionScheme = std::make_shared<ICollectionSchemeTest>( "EnabledCollectionScheme",
+                                                                       "DM1",
+                                                                       startTimeInThePast,
+                                                                       stopTimeInDistantFuture,
+                                                                       signals2,
+                                                                       std::vector<CanFrameCollectionInfo>{},
+                                                                       partialSignalIDLookup2 );
+    mCollectionSchemeManager.onCollectionSchemeUpdate( std::make_shared<ICollectionSchemeListTest>(
+        std::vector<ICollectionSchemePtr>{ enabledCollectionScheme, idleCollectionScheme } ) );
+
+    WAIT_ASSERT_EQ( mReceivedInspectionMatrices.size(), 4U );
+
+    auto lastReceivedInspectionMatrix = mReceivedInspectionMatrices.at( 3 );
+    ASSERT_EQ( lastReceivedInspectionMatrix->conditions.size(), 2U );
+
+    ASSERT_EQ( getSignalIdsFromCondition( lastReceivedInspectionMatrix->conditions.at( 0 ) ),
+               ( std::vector<SignalID>{ 0xFFFF0012, 0xFFFF0013 } ) );
+    ASSERT_EQ( getSignalIdsFromCondition( lastReceivedInspectionMatrix->conditions.at( 1 ) ),
+               ( std::vector<SignalID>{ 0xFFFF0010, 0xFFFF0011 } ) );
+}
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

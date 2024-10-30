@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "IWaveGpsSource.h"
+#include "CollectionInspectionAPITypes.h"
 #include "LoggingModule.h"
-#include "TraceModule.h"
+#include "QueueTypes.h"
 #include <boost/filesystem.hpp>
 #include <cmath>
 #include <cstdlib>
@@ -30,8 +31,8 @@ const std::string DEFAULT_PATH_TO_NMEA_SOURCE = "/dev/" + DEFAULT_NMEA_SOURCE;
 const std::string SYS_USB_DEVICES_PATH = "/sys/bus/usb/devices";
 const std::string QUECTEL_VENDOR_ID = "2c7c";
 
-static std::string
-getFileContents( const std::string &p )
+std::string
+IWaveGpsSource::getFileContents( const std::string &p )
 {
     constexpr auto NUM_CHARS = 1;
     std::string ret;
@@ -47,8 +48,8 @@ getFileContents( const std::string &p )
     return ret;
 }
 
-static bool
-detectQuectelDevice()
+bool
+IWaveGpsSource::detectQuectelDevice()
 {
     if ( !boost::filesystem::exists( DEFAULT_PATH_TO_NMEA_SOURCE ) )
     {
@@ -73,8 +74,8 @@ detectQuectelDevice()
     return false;
 }
 
-IWaveGpsSource::IWaveGpsSource( SignalBufferPtr signalBufferPtr )
-    : mSignalBufferPtr{ std::move( signalBufferPtr ) }
+IWaveGpsSource::IWaveGpsSource( SignalBufferDistributorPtr signalBufferDistributor )
+    : mSignalBufferDistributor{ std::move( signalBufferDistributor ) }
 {
 }
 
@@ -160,27 +161,18 @@ IWaveGpsSource::pollData()
     }
 
     // If values were found pass them on as Signals similar to CAN Signals
-    if ( foundValid && mSignalBufferPtr != nullptr )
+    if ( foundValid && mSignalBufferDistributor != nullptr )
     {
         mValidCoordinateCounter++;
         auto timestamp = mClock->systemTimeSinceEpochMs();
 
         CollectedSignalsGroup collectedSignalsGroup;
-        collectedSignalsGroup.push_back(
-            CollectedSignal( getSignalIdFromStartBit( mLatitudeStartBit ), timestamp, lastValidLatitude ) );
-        collectedSignalsGroup.push_back(
-            CollectedSignal( getSignalIdFromStartBit( mLongitudeStartBit ), timestamp, lastValidLongitude ) );
+        collectedSignalsGroup.push_back( CollectedSignal(
+            getSignalIdFromStartBit( mLatitudeStartBit ), timestamp, lastValidLatitude, SignalType::DOUBLE ) );
+        collectedSignalsGroup.push_back( CollectedSignal(
+            getSignalIdFromStartBit( mLongitudeStartBit ), timestamp, lastValidLongitude, SignalType::DOUBLE ) );
 
-        TraceModule::get().addToAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS, 2 );
-        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-
-        if ( !mSignalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) )
-        {
-            TraceModule::get().subtractFromAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
-                                                           2 );
-            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-            FWE_LOG_WARN( "Signal buffer full" );
-        }
+        mSignalBufferDistributor->push( CollectedDataFrame( collectedSignalsGroup ) );
     }
     if ( mCyclicLoggingTimer.getElapsedMs().count() > CYCLIC_LOG_PERIOD_MS )
     {

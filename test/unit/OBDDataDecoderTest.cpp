@@ -63,7 +63,7 @@ protected:
     }
 
     void
-    assertSignalValue( const OBDSignal &obdSignal, double expectedSignalValue, SignalType expectedSignalType )
+    assertSignalValue( const DecodedSignalValue &obdSignal, double expectedSignalValue, SignalType expectedSignalType )
     {
         switch ( expectedSignalType )
         {
@@ -117,7 +117,10 @@ class OBDDataDecoderTestWithAllSignalTypes : public OBDDataDecoderTest, public t
 {
 };
 
-INSTANTIATE_TEST_SUITE_P( AllSignals, OBDDataDecoderTestWithAllSignalTypes, allSignalTypes, signalTypeToString );
+INSTANTIATE_TEST_SUITE_P( AllSignals,
+                          OBDDataDecoderTestWithAllSignalTypes,
+                          allSignalTypes,
+                          signalTypeParamInfoToString );
 
 class OBDDataDecoderTestWithSignedSignalTypes : public OBDDataDecoderTest,
                                                 public testing::WithParamInterface<SignalType>
@@ -127,7 +130,7 @@ class OBDDataDecoderTestWithSignedSignalTypes : public OBDDataDecoderTest,
 INSTANTIATE_TEST_SUITE_P( SignedSignals,
                           OBDDataDecoderTestWithSignedSignalTypes,
                           signedSignalTypes,
-                          signalTypeToString );
+                          signalTypeParamInfoToString );
 
 TEST_P( OBDDataDecoderTestWithAllSignalTypes, FullSingleByte )
 {

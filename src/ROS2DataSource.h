@@ -100,7 +100,7 @@ class ROS2DataSource
 {
 public:
     ROS2DataSource( ROS2DataSourceConfig config,
-                    SignalBufferPtr signalBufferPtr,
+                    SignalBufferDistributorPtr signalBufferDistributor,
                     std::shared_ptr<RawData::BufferManager> rawDataBufferManager = nullptr );
     ~ROS2DataSource();
 
@@ -328,7 +328,7 @@ private:
     mutable std::mutex mThreadMutex;
     Signal mWait;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
-    SignalBufferPtr mSignalBufferPtr;
+    SignalBufferDistributorPtr mSignalBufferDistributor;
 
     std::mutex mDecoderDictMutex;
     std::atomic<bool> mEventNewDecoderManifestAvailable{ false };

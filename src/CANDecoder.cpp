@@ -55,25 +55,22 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
                                   " and type as uint64" );
                 }
                 auto physicalRawValue = static_cast<uint64_t>( multiplexorValue );
-                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
-                decodedSignals.emplace_back(
-                    CANDecodedSignal( it->mSignalID, rawValue, physicalValue, CANsignalType ) );
+                auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
+                decodedSignals.emplace_back( CANDecodedSignal( it->mSignalID, physicalValue, CANsignalType ) );
                 break;
             }
             case ( SignalType::INT64 ): {
 
                 auto physicalRawValue = static_cast<int64_t>( multiplexorValue );
-                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
-                decodedSignals.emplace_back(
-                    CANDecodedSignal( it->mSignalID, rawValue, physicalValue, CANsignalType ) );
+                auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
+                decodedSignals.emplace_back( CANDecodedSignal( it->mSignalID, physicalValue, CANsignalType ) );
                 break;
             }
             default: {
 
                 auto physicalRawValue = static_cast<double>( multiplexorValue );
-                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
-                decodedSignals.emplace_back(
-                    CANDecodedSignal( it->mSignalID, rawValue, physicalValue, CANsignalType ) );
+                auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
+                decodedSignals.emplace_back( CANDecodedSignal( it->mSignalID, physicalValue, CANsignalType ) );
                 break;
             }
             }
@@ -122,26 +119,26 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
                 uint64_t physicalRawValue =
                     static_cast<uint64_t>( rawValue ) * static_cast<uint64_t>( format.mSignals[i].mFactor ) +
                     static_cast<uint64_t>( format.mSignals[i].mOffset );
-                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
+                auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
                 decodedSignals.emplace_back(
-                    CANDecodedSignal( format.mSignals[i].mSignalID, rawValue, physicalValue, CANsignalType ) );
+                    CANDecodedSignal( format.mSignals[i].mSignalID, physicalValue, CANsignalType ) );
                 break;
             }
             case ( SignalType::INT64 ): {
                 auto physicalRawValue =
                     static_cast<int64_t>( rawValue ) * static_cast<int64_t>( format.mSignals[i].mFactor ) +
                     static_cast<int64_t>( format.mSignals[i].mOffset );
-                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
+                auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
                 decodedSignals.emplace_back(
-                    CANDecodedSignal( format.mSignals[i].mSignalID, rawValue, physicalValue, CANsignalType ) );
+                    CANDecodedSignal( format.mSignals[i].mSignalID, physicalValue, CANsignalType ) );
                 break;
             }
             default: {
                 auto physicalRawValue =
                     static_cast<double>( rawValue ) * format.mSignals[i].mFactor + format.mSignals[i].mOffset;
-                auto physicalValue = CANPhysicalValueType( physicalRawValue, CANsignalType );
+                auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
                 decodedSignals.emplace_back(
-                    CANDecodedSignal( format.mSignals[i].mSignalID, rawValue, physicalValue, CANsignalType ) );
+                    CANDecodedSignal( format.mSignals[i].mSignalID, physicalValue, CANsignalType ) );
             }
             }
         }

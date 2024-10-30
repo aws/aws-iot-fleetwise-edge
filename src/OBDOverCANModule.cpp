@@ -6,8 +6,8 @@
 #include "ISOTPOverCANOptions.h"
 #include "LoggingModule.h"
 #include "MessageTypes.h"
+#include "QueueTypes.h"
 #include "SignalTypes.h"
-#include "TraceModule.h"
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
@@ -44,19 +44,19 @@ OBDOverCANModule::~OBDOverCANModule()
 }
 
 bool
-OBDOverCANModule::init( SignalBufferPtr signalBufferPtr,
+OBDOverCANModule::init( SignalBufferDistributorPtr signalBufferDistributor,
                         const std::string &gatewayCanInterfaceName,
                         uint32_t pidRequestIntervalSeconds,
                         uint32_t dtcRequestIntervalSeconds,
                         bool broadcastRequests )
 {
-    if ( ( signalBufferPtr.get() == nullptr ) )
+    if ( ( signalBufferDistributor.get() == nullptr ) )
     {
         FWE_LOG_ERROR( "Received Buffer nullptr" );
         return false;
     }
 
-    mSignalBufferPtr = signalBufferPtr;
+    mSignalBufferDistributor = signalBufferDistributor;
     mOBDDataDecoder = std::make_shared<OBDDataDecoder>( mDecoderDictionaryPtr );
     mGatewayCanInterfaceName = gatewayCanInterfaceName;
     mPIDRequestIntervalSeconds = pidRequestIntervalSeconds;
@@ -235,20 +235,8 @@ OBDOverCANModule::doWork( void *data )
                 // there was a OBD request that did not return any SID::STORED_DTCs
                 if ( successfulDTCRequest )
                 {
-                    TraceModule::get().incrementAtomicVariable(
-                        TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-                    TraceModule::get().incrementAtomicVariable(
-                        TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS );
-
-                    if ( !obdModule->mSignalBufferPtr->push(
-                             CollectedDataFrame( std::make_shared<DTCInfo>( dtcInfo ) ) ) )
-                    {
-                        TraceModule::get().decrementAtomicVariable(
-                            TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-                        TraceModule::get().decrementAtomicVariable(
-                            TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS );
-                        FWE_LOG_WARN( "DTC Buffer full" );
-                    }
+                    obdModule->mSignalBufferDistributor->push(
+                        CollectedDataFrame( std::make_shared<DTCInfo>( dtcInfo ) ) );
                 }
             }
         }
@@ -495,7 +483,7 @@ OBDOverCANModule::initECUs( bool isExtendedID, std::vector<uint32_t> &canIDRespo
                          rxID,
                          getTxIDByRxID( isExtendedID, rxID ),
                          isExtendedID,
-                         mSignalBufferPtr,
+                         mSignalBufferDistributor,
                          broadcastSocket ) )
         {
             return false;
@@ -597,7 +585,7 @@ OBDOverCANModule::setExternalPIDResponse( PID pid, std::vector<uint8_t> response
     {
         return;
     }
-    OBDOverCANECU::pushPIDs( info, mClock->systemTimeSinceEpochMs(), mSignalBufferPtr, "" );
+    OBDOverCANECU::pushPIDs( info, mClock->systemTimeSinceEpochMs(), mSignalBufferDistributor, "" );
 }
 
 void

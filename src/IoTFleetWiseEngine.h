@@ -7,19 +7,23 @@
 #include "CANDataSource.h"
 #include "CANInterfaceIDTranslator.h"
 #include "CacheAndPersist.h"
+#include "CheckinSender.h"
 #include "Clock.h"
 #include "ClockHandler.h"
-#include "CollectionInspectionAPITypes.h"
+#include "CollectionInspectionEngine.h"
 #include "CollectionInspectionWorkerThread.h"
 #include "CollectionSchemeManager.h"
 #include "DataSenderManager.h"
 #include "DataSenderManagerWorkerThread.h"
+#include "DataSenderTypes.h"
 #include "ExternalCANDataSource.h"
-#include "IConnectivityChannel.h"
 #include "IConnectivityModule.h"
+#include "IReceiver.h"
+#include "ISender.h"
 #include "OBDDataTypes.h"
 #include "OBDOverCANModule.h"
 #include "PayloadManager.h"
+#include "RawDataManager.h"
 #include "RemoteProfiler.h"
 #include "Schema.h"
 #include "Signal.h"
@@ -28,6 +32,7 @@
 #include "TimeTypes.h"
 #include "Timer.h"
 #include <atomic>
+#include <boost/filesystem.hpp>
 #include <cstdint>
 #include <json/json.h>
 #include <memory>
@@ -45,10 +50,19 @@
 #ifdef FWE_FEATURE_IWAVE_GPS
 #include "IWaveGpsSource.h"
 #endif
+#ifdef FWE_FEATURE_S3
+#include <aws/core/VersionConfig.h>
+#include <aws/core/auth/AWSCredentialsProvider.h>
+#if ( AWS_SDK_VERSION_MAJOR > 1 ) ||                                                                                   \
+    ( ( AWS_SDK_VERSION_MAJOR == 1 ) &&                                                                                \
+      ( ( AWS_SDK_VERSION_MINOR > 11 ) || ( ( AWS_SDK_VERSION_MINOR == 11 ) && ( AWS_SDK_VERSION_PATCH >= 224 ) ) ) )
+#include <aws/core/utils/threading/PooledThreadExecutor.h>
+#else
+#include <aws/core/utils/threading/Executor.h>
+#endif
+#endif
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include "S3Sender.h"
-#include <aws/core/auth/AWSCredentialsProvider.h>
-#include <aws/core/utils/threading/Executor.h>
 #endif
 #ifdef FWE_FEATURE_ROS2
 #include "ROS2DataSource.h"
@@ -78,7 +92,7 @@ public:
     IoTFleetWiseEngine( IoTFleetWiseEngine && ) = delete;
     IoTFleetWiseEngine &operator=( IoTFleetWiseEngine && ) = delete;
 
-    bool connect( const Json::Value &jsonConfig );
+    bool connect( const Json::Value &jsonConfig, const boost::filesystem::path &configFileDirectoryPath );
     bool start();
     bool stop();
     bool disconnect();
@@ -132,7 +146,7 @@ public:
      * @param signalId Signal ID
      * @param value Vehicle property value
      */
-    void setVehicleProperty( uint32_t signalId, double value );
+    void setVehicleProperty( uint32_t signalId, const DecodedSignalValue &value );
 #endif
 
     /**
@@ -149,7 +163,7 @@ private:
     static void doWork( void *data );
 
 public:
-    std::shared_ptr<CollectedDataReadyToPublish> mCollectedDataReadyToPublish;
+    std::shared_ptr<DataSenderQueue> mCollectedDataReadyToPublish;
     // Object for handling persistency for decoder manifest, collectionSchemes and edge to cloud payload
     std::shared_ptr<CacheAndPersist> mPersistDecoderManifestCollectionSchemesAndData;
 
@@ -173,26 +187,33 @@ private:
     std::unique_ptr<CANDataConsumer> mCANDataConsumer;
 
     std::shared_ptr<IConnectivityModule> mConnectivityModule;
-    std::shared_ptr<IConnectivityChannel> mConnectivityChannelSendVehicleData;
-    std::shared_ptr<IConnectivityChannel> mConnectivityChannelSendCheckin;
-    std::shared_ptr<IConnectivityChannel> mConnectivityChannelReceiveCollectionSchemeList;
-    std::shared_ptr<IConnectivityChannel> mConnectivityChannelReceiveDecoderManifest;
+    std::shared_ptr<ISender> mSenderVehicleData;
+    std::shared_ptr<ISender> mSenderCheckin;
+    std::shared_ptr<IReceiver> mReceiverCollectionSchemeList;
+    std::shared_ptr<IReceiver> mReceiverDecoderManifest;
     std::shared_ptr<PayloadManager> mPayloadManager;
 
     std::shared_ptr<Schema> mSchemaPtr;
+    std::shared_ptr<CheckinSender> mCheckinSender;
     std::shared_ptr<CollectionSchemeManager> mCollectionSchemeManagerPtr;
 
+    std::shared_ptr<RawData::BufferManager> mRawBufferManager;
+    std::shared_ptr<CollectionInspectionEngine> mCollectionInspectionEngine;
     std::shared_ptr<CollectionInspectionWorkerThread> mCollectionInspectionWorkerThread;
 
     std::shared_ptr<DataSenderManager> mDataSenderManager;
     std::shared_ptr<DataSenderManagerWorkerThread> mDataSenderManagerWorkerThread;
 
     std::unique_ptr<RemoteProfiler> mRemoteProfiler;
-    std::shared_ptr<IConnectivityChannel> mConnectivityChannelMetricsUpload;
-    std::shared_ptr<IConnectivityChannel> mConnectivityChannelLogsUpload;
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    std::shared_ptr<ISender> mSenderMetrics;
+    std::shared_ptr<ISender> mSenderLogs;
+#ifdef FWE_FEATURE_S3
     std::shared_ptr<Aws::Auth::AWSCredentialsProvider> mAwsCredentialsProvider;
     std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor> mTransferManagerExecutor;
+    std::mutex mTransferManagerExecutorMutex;
+    std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor> getTransferManagerExecutor();
+#endif
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     std::shared_ptr<S3Sender> mS3Sender;
 #endif
 #ifdef FWE_FEATURE_IWAVE_GPS

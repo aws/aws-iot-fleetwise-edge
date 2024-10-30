@@ -9,14 +9,5 @@
       "pidRequestIntervalSeconds": 5,
       "dtcRequestIntervalSeconds": 5
     }
-  },
-  {
-    "interfaceId": "1",
-    "type": "CAN_INTERFACE",
-    "canInterface": {
-      "name": "can0",
-      "protocolName": "CAN",
-      "protocolVersion": "2.0B"
-    }
   }
 ]

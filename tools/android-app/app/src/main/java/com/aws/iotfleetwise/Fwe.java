@@ -73,7 +73,7 @@ public class Fwe {
      * @param signalId Signal ID
      * @param value Vehicle property value
      */
-    public native static void setVehicleProperty(int signalId, double value);
+    public native static void setVehicleProperty(int signalId, Object value);
 
     /**
      * Get a status summary

@@ -15,50 +15,90 @@
       "additionalProperties": false,
       "description": "Persisted payload filenames with associated metadata",
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "filename": {
-            "type": "string",
-            "description": "Payload filename"
+        "anyOf": [
+          {
+            "type": "object",
+            "description": "Legacy payload metadata for Telemetry. This is only produced by older versions.",
+            "additionalProperties": false,
+            "properties": {
+              "filename": {
+                "type": "string",
+                "description": "Payload filename"
+              },
+              "payloadSize": {
+                "type": "number",
+                "description": "Payload size is used to validate that payload was persisted completely"
+              },
+              "compressionRequired": {
+                "type": "boolean",
+                "description": "Specifies if payload compression was required by campaign"
+              },
+              "s3UploadMetadata": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "bucketName": {
+                    "type": "string",
+                    "description": "S3 bucket name set in campaign"
+                  },
+                  "bucketOwner": {
+                    "type": "string",
+                    "description": "Account ID of the bucket owner"
+                  },
+                  "region": {
+                    "type": "string",
+                    "description": "Region of S3 bucket set in campaign"
+                  },
+                  "uploadID": {
+                    "type": "string",
+                    "description": "Upload ID for multipart upload"
+                  },
+                  "partNumber": {
+                    "type": "number",
+                    "description": "ID of multipart for multipart upload"
+                  }
+                },
+                "required": ["bucketName", "region"]
+              }
+            },
+            "required": ["filename", "payloadSize", "compressionRequired"]
           },
-          "payloadSize": {
-            "type": "number",
-            "description": "Payload size is used to validate that payload was persisted completely"
-          },
-          "compressionRequired": {
-            "type": "boolean",
-            "description": "Specifies if payload compression was required by campaign"
-          },
-          "s3UploadMetadata": {
+          {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "bucketName": {
+              "type": {
                 "type": "string",
-                "description": "S3 bucket name set in campaign"
+                "description": "Specifies the type of this payload",
+                "enum": ["Telemetry"]
               },
-              "bucketOwner": {
-                "type": "string",
-                "description": "Account ID of the bucket owner"
-              },
-              "region": {
-                "type": "string",
-                "description": "Region of S3 bucket set in campaign"
-              },
-              "uploadID": {
-                "type": "string",
-                "description": "Upload ID for multipart upload"
-              },
-              "partNumber": {
-                "type": "number",
-                "description": "ID of multipart for multipart upload"
+              "payload": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "description": "Payload metadata for Telemetry data",
+                    "additionalProperties": false,
+                    "properties": {
+                      "filename": {
+                        "type": "string",
+                        "description": "Payload filename"
+                      },
+                      "payloadSize": {
+                        "type": "number",
+                        "description": "Payload size is used to validate that payload was persisted completely"
+                      },
+                      "compressionRequired": {
+                        "type": "boolean",
+                        "description": "Specifies if payload compression was required by campaign"
+                      }
+                    },
+                    "required": ["filename", "payloadSize", "compressionRequired"]
+                  }
+                ]
               }
-            },
-            "required": ["bucketName", "region"]
+            }
           }
-        },
-        "required": ["filename", "payloadSize", "compressionRequired"]
+        ]
       }
     }
   },

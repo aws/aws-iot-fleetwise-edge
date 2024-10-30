@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <json/json.h>
+#include <stdexcept>
 #include <string>
 
 namespace Aws
@@ -54,6 +55,16 @@ private:
     const Json::Value &mConfig;
     std::string mPath;
     std::string getValueString() const;
+
+    // Suppress false positive for Coverity autosar_cpp14_a15_1_3_violation - all exceptions thrown are uniquely
+    // identified by the config path
+    static inline std::runtime_error
+    runtimeError( int line, const std::string &message )
+    {
+        // Ignore the line, passing it convinces Coverity that this is a unique exception
+        static_cast<void>( line );
+        return std::runtime_error( message );
+    }
 };
 
 } // namespace IoTFleetWise

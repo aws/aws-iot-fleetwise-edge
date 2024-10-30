@@ -194,7 +194,19 @@ CANDataSource::doWork( void *data )
         int nmsgs = recvmmsg( dataSource->mSocket, &msg[0], PARALLEL_RECEIVED_FRAMES_FROM_KERNEL, 0, nullptr );
         // coverity[autosar_cpp14_m19_3_1_violation]
         // coverity[misra_cpp_2008_rule_19_3_1_violation] errno needs to be used to recognize network down
-        FWE_GRACEFUL_FATAL_ASSERT( ( nmsgs != -1 ) || ( errno != ENETDOWN ), "Network interface went down", );
+        FWE_GRACEFUL_FATAL_ASSERT( ( nmsgs != -1 ) || ( errno != ENODEV ), "Network interface was removed", );
+        // coverity[autosar_cpp14_m19_3_1_violation]
+        // coverity[misra_cpp_2008_rule_19_3_1_violation] errno needs to be used to recognize network down
+        if ( ( nmsgs == -1 ) && ( ( errno == ENETDOWN ) || ( errno == ENETUNREACH ) ) )
+        {
+            // coverity[autosar_cpp14_m19_3_1_violation]
+            // coverity[misra_cpp_2008_rule_19_3_1_violation] errno needs to be used to recognize network down
+            FWE_LOG_ERROR( "Network interface went down or unreachable with Syscall errno: " +
+                           std::to_string( errno ) );
+            // Not much to do here, Socket is still alive, when network is back, we continue to consume.
+        }
+        // Else, the socket is non blocking, so we might expect -1 as a nmsgs
+
         for ( int i = 0; i < nmsgs; i++ )
         {
             // After waking up the Socket Can old messages in the kernel queue need to be ignored

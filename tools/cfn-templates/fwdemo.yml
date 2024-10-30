@@ -58,6 +58,11 @@ Parameters:
     Description: "Maximum size of raw data buffer in bytes. Applicable when EnableROS2 is true."
     Type: Number
     Default: 2147483648
+  FweLogLevel:
+    Description: "Set the log level in the FWE config file. Use 'Trace' for most verbosity."
+    Type: String
+    Default: "Info"
+    AllowedValues: ["Trace", "Info", "Warning", "Error"]
 Conditions:
   KeyPairSpecifiedCondition: !Not [!Equals [!Ref Ec2KeyPair, ""]]
 Resources:
@@ -133,23 +138,13 @@ Resources:
             #!/bin/bash
             set -xeuo pipefail
 
-            # Wait for any existing package install to finish
-            i=0
-            while true; do
-              if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
-                i=0
-              else
-                i=`expr $i + 1`
-                if expr $i \>= 10 > /dev/null; then
-                  break
-                fi
-              fi
-              sleep 1
-            done
+            # Disable unattended upgrades
+            systemctl stop unattended-upgrades
+            systemctl disable unattended-upgrades
 
             # Upgrade system and reboot if required
-            apt update
-            apt upgrade -y
+            apt update -o DPkg::Lock::Timeout=120
+            apt upgrade -y -o DPkg::Lock::Timeout=120
             if [ -f /var/run/reboot-required ]; then
               # Delete the UserData info file so that we run again after reboot
               rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
@@ -158,8 +153,8 @@ Resources:
             fi
 
             # Install helper scripts:
-            apt update
-            apt install -y python3-setuptools
+            apt update -o DPkg::Lock::Timeout=120
+            apt install -y -o DPkg::Lock::Timeout=120 python3-setuptools
             mkdir -p /opt/aws/bin
             wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
             python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
@@ -179,8 +174,8 @@ Resources:
             printf "RateLimitBurst=0\nSystemMaxUse=1G\n" >> /etc/systemd/journald.conf
 
             # Install packages
-            apt update
-            apt install -y wget ec2-instance-connect htop jq unzip
+            apt update -o DPkg::Lock::Timeout=120
+            apt install -y -o DPkg::Lock::Timeout=120 wget ec2-instance-connect htop jq unzip
 
             # Install AWS CLI:
             curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
@@ -231,6 +226,8 @@ Resources:
               ./tools/configure-fwe.sh \
                 --input-config-file "configuration/static-config.json" \
                 --output-config-file "/etc/aws-iot-fleetwise/config-0.json" \
+                --log-color Yes \
+                --log-level ${FweLogLevel} \
                 --vehicle-name "${AWS::StackName}" \
                 --endpoint-url "${IoTThing.iotEndpoint}" \
                 --topic-prefix '${IoTMqttTopicPrefix}' \
@@ -266,6 +263,10 @@ Resources:
 
             # Signal init complete:
             /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+
+            # Re-enable unattended upgrades
+            systemctl enable unattended-upgrades
+            systemctl start unattended-upgrades
   Ec2Instance:
     Type: AWS::EC2::Instance
     CreationPolicy:

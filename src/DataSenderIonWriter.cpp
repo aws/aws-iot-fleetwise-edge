@@ -1,3 +1,6 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 #include "DataSenderIonWriter.h"
 #include "EventTypes.h"
 #include "LoggingModule.h"
@@ -97,6 +100,8 @@ protected:
         return mIonWriteBuffer[0];
     }
 
+    // coverity[autosar_cpp14_m3_9_1_violation] false-positive, redeclaration is compatible
+    // coverity[misra_cpp_2008_rule_3_9_1_violation] same
     std::streampos
     seekpos( std::streampos sp, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out ) override
     {
@@ -362,7 +367,7 @@ private:
                     // coverity[misra_cpp_2008_rule_5_0_9_violation] same
                     // coverity[cert_ctr54_cpp_violation] same
                     mWrittenBytesInIonWriteBuffer =
-                        static_cast<uint64_t>( stream->curr - static_cast<BYTE *>( &( *mIonWriteBuffer.begin() ) ) );
+                        static_cast<size_t>( stream->curr - static_cast<BYTE *>( &( *mIonWriteBuffer.begin() ) ) );
                 }
                 if ( stream->curr == stream->limit )
                 { // only increase buffer if necessary
@@ -523,8 +528,8 @@ private:
 
     Timestamp mTriggerTime;
     EventID mEventId;
-    std::string mDecoderManifestId;
-    std::string mCollectionSchemeId;
+    SyncID mDecoderManifestId;
+    SyncID mCollectionSchemeId;
     std::string mVehicleId;
 
     // Metadata:
@@ -551,8 +556,8 @@ public:
                          std::string vehicleId,
                          Timestamp triggerTime,
                          EventID eventId,
-                         std::string decoderManifestId,
-                         std::string collectionSchemeId )
+                         SyncID decoderManifestId,
+                         SyncID collectionSchemeId )
         : mRawDataBufferManager( std::move( rawDataBufferManager ) )
         , mVehicleId( std::move( vehicleId ) )
         , mTriggerTime( triggerTime )
@@ -590,8 +595,8 @@ private:
     std::string mVehicleId;
     Timestamp mTriggerTime;
     EventID mEventId;
-    std::string mDecoderManifestId;
-    std::string mCollectionSchemeId;
+    SyncID mDecoderManifestId;
+    SyncID mCollectionSchemeId;
 
     std::vector<FrameInfoForIon> mFramesToSendOut;
 };
@@ -643,7 +648,7 @@ DataSenderIonWriter::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr 
 DataSenderIonWriter::~DataSenderIonWriter() = default;
 
 void
-DataSenderIonWriter::setupVehicleData( const TriggeredCollectionSchemeDataPtr &triggeredCollectionSchemeData )
+DataSenderIonWriter::setupVehicleData( std::shared_ptr<const TriggeredVisionSystemData> triggeredVisionSystemData )
 {
     mEstimatedBytesInCurrentStream = ESTIMATED_SERIALIZED_EVENT_METADATA_BYTES; // reset and start new
     if ( mRawDataBufferManager != nullptr )
@@ -652,10 +657,10 @@ DataSenderIonWriter::setupVehicleData( const TriggeredCollectionSchemeDataPtr &t
         mCurrentStreamBuilder =
             std::make_unique<IonStreambufBuilder>( mRawDataBufferManager,
                                                    mVehicleId,
-                                                   triggeredCollectionSchemeData->triggerTime,
-                                                   triggeredCollectionSchemeData->eventID,
-                                                   triggeredCollectionSchemeData->metadata.decoderID,
-                                                   triggeredCollectionSchemeData->metadata.collectionSchemeID );
+                                                   triggeredVisionSystemData->triggerTime,
+                                                   triggeredVisionSystemData->eventID,
+                                                   triggeredVisionSystemData->metadata.decoderID,
+                                                   triggeredVisionSystemData->metadata.collectionSchemeID );
     }
     else
     {
@@ -704,7 +709,7 @@ void
 DataSenderIonWriter::append( const CollectedSignal &signal )
 {
     // Currently ION file only supports raw data
-    if ( ( signal.value.type == SignalType::RAW_DATA_BUFFER_HANDLE ) && ( mCurrentStreamBuilder != nullptr ) )
+    if ( ( signal.value.type == SignalType::COMPLEX_SIGNAL ) && ( mCurrentStreamBuilder != nullptr ) )
     {
         if ( mRawDataBufferManager != nullptr )
         {

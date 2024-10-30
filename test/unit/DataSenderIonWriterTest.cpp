@@ -41,11 +41,11 @@ protected:
         dictionary = std::make_shared<ComplexDataDecoderDictionary>();
         dictionary->complexMessageDecoderMethod["ros2"]["SignalInfoFor1234Name:TypeEncoded"].mSignalId = 1234;
 
-        triggeredCollectionSchemeData = std::make_shared<TriggeredCollectionSchemeData>();
-        triggeredCollectionSchemeData->metadata.decoderID = "TESTDECODERID";
-        triggeredCollectionSchemeData->metadata.collectionSchemeID = "TESTCOLLECTIONSCHEME";
-        triggeredCollectionSchemeData->triggerTime = 1000000;
-        triggeredCollectionSchemeData->eventID = 579;
+        triggeredVisionSystemData = std::make_shared<TriggeredVisionSystemData>();
+        triggeredVisionSystemData->metadata.decoderID = "TESTDECODERID";
+        triggeredVisionSystemData->metadata.collectionSchemeID = "TESTCOLLECTIONSCHEME";
+        triggeredVisionSystemData->triggerTime = 1000000;
+        triggeredVisionSystemData->eventID = 579;
 
         bufferManager = std::make_shared<NiceMock<Testing::RawDataBufferManagerSpy>>(
             RawData::BufferManagerConfig::create().get() );
@@ -56,7 +56,7 @@ protected:
 
         ionWriter = std::make_unique<DataSenderIonWriter>( bufferManager, "DemoVehicle" );
         ionWriter->onChangeOfActiveDictionary( dictionary, VehicleDataSourceProtocol::COMPLEX_DATA );
-        ionWriter->setupVehicleData( triggeredCollectionSchemeData );
+        ionWriter->setupVehicleData( triggeredVisionSystemData );
     }
 
     void
@@ -65,7 +65,7 @@ protected:
     }
 
     std::shared_ptr<ComplexDataDecoderDictionary> dictionary;
-    std::shared_ptr<TriggeredCollectionSchemeData> triggeredCollectionSchemeData;
+    std::shared_ptr<TriggeredVisionSystemData> triggeredVisionSystemData;
     std::shared_ptr<NiceMock<Testing::RawDataBufferManagerSpy>> bufferManager;
     RawData::SignalUpdateConfig signalConfig;
     std::unique_ptr<DataSenderIonWriter> ionWriter;
@@ -80,7 +80,7 @@ TEST_F( DataSenderIonWriterTest, StreamOutputIonAfterSeekTheSame )
     for ( int i = 0; i < 3; i++ )
     {
         ionWriter->append( CollectedSignal(
-            static_cast<SignalID>( signalConfig.typeId ), 3000000 + i, handle, SignalType::RAW_DATA_BUFFER_HANDLE ) );
+            static_cast<SignalID>( signalConfig.typeId ), 3000000 + i, handle, SignalType::COMPLEX_SIGNAL ) );
     }
     auto estimatedSize = ionWriter->getEstimatedSizeInBytes();
     auto stream = ionWriter->getStreambufBuilder()->build();
@@ -91,7 +91,7 @@ TEST_F( DataSenderIonWriterTest, StreamOutputIonAfterSeekTheSame )
 
     EXPECT_THAT( firstIterationString, HasSubstr( "collection_event_time" ) );
     EXPECT_THAT( firstIterationString, HasSubstr( "signal_name" ) );
-    EXPECT_THAT( firstIterationString, HasSubstr( triggeredCollectionSchemeData->metadata.collectionSchemeID ) );
+    EXPECT_THAT( firstIterationString, HasSubstr( triggeredVisionSystemData->metadata.collectionSchemeID ) );
     EXPECT_THAT( firstIterationString, HasSubstr( "SignalInfoFor1234Name" ) );
 
     // for better analysis create file
@@ -131,7 +131,7 @@ TEST_F( DataSenderIonWriterTest, StreamOutputIonAfterAbsoluteSeek )
     for ( int i = 0; i < 3; i++ )
     {
         ionWriter->append( CollectedSignal(
-            static_cast<SignalID>( signalConfig.typeId ), 3000000 + i, handle, SignalType::RAW_DATA_BUFFER_HANDLE ) );
+            static_cast<SignalID>( signalConfig.typeId ), 3000000 + i, handle, SignalType::COMPLEX_SIGNAL ) );
     }
     auto estimatedSize = ionWriter->getEstimatedSizeInBytes();
     auto stream = ionWriter->getStreambufBuilder()->build();
@@ -143,7 +143,7 @@ TEST_F( DataSenderIonWriterTest, StreamOutputIonAfterAbsoluteSeek )
 
     EXPECT_THAT( firstIterationString, HasSubstr( "collection_event_time" ) );
     EXPECT_THAT( firstIterationString, HasSubstr( "signal_name" ) );
-    EXPECT_THAT( firstIterationString, HasSubstr( triggeredCollectionSchemeData->metadata.collectionSchemeID ) );
+    EXPECT_THAT( firstIterationString, HasSubstr( triggeredVisionSystemData->metadata.collectionSchemeID ) );
     EXPECT_THAT( firstIterationString, HasSubstr( "SignalInfoFor1234Name" ) );
 
     // for better analysis create file
@@ -226,7 +226,7 @@ TEST_F( DataSenderIonWriterTest, StreamOutputHugeIon )
     for ( int i = 0; i < 1000; i++ )
     {
         ionWriter->append( CollectedSignal(
-            static_cast<SignalID>( signalConfig.typeId ), 33444444, handle, SignalType::RAW_DATA_BUFFER_HANDLE ) );
+            static_cast<SignalID>( signalConfig.typeId ), 33444444, handle, SignalType::COMPLEX_SIGNAL ) );
     }
     auto stream = ionWriter->getStreambufBuilder()->build();
     {
@@ -251,7 +251,7 @@ TEST_F( DataSenderIonWriterTest, StreamTellgStream )
     for ( int i = 0; i < 3; i++ )
     {
         ionWriter->append( CollectedSignal(
-            static_cast<SignalID>( signalConfig.typeId ), 3000000 + i, handle, SignalType::RAW_DATA_BUFFER_HANDLE ) );
+            static_cast<SignalID>( signalConfig.typeId ), 3000000 + i, handle, SignalType::COMPLEX_SIGNAL ) );
     }
 
     auto stream = ionWriter->getStreambufBuilder()->build();
@@ -306,10 +306,10 @@ TEST_F( DataSenderIonWriterTest, ReturnNullStreamWhenAllDataIsDeleted )
         handle2,
         RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD ) );
 
-    ionWriter->append( CollectedSignal(
-        static_cast<SignalID>( signalConfig.typeId ), 3000000, handle1, SignalType::RAW_DATA_BUFFER_HANDLE ) );
-    ionWriter->append( CollectedSignal(
-        static_cast<SignalID>( signalConfig.typeId ), 3000001, handle2, SignalType::RAW_DATA_BUFFER_HANDLE ) );
+    ionWriter->append(
+        CollectedSignal( static_cast<SignalID>( signalConfig.typeId ), 3000000, handle1, SignalType::COMPLEX_SIGNAL ) );
+    ionWriter->append(
+        CollectedSignal( static_cast<SignalID>( signalConfig.typeId ), 3000001, handle2, SignalType::COMPLEX_SIGNAL ) );
 
     // Before we get the stream, make the buffer manager delete the data
     ASSERT_TRUE( bufferManager->decreaseHandleUsageHint(
@@ -351,8 +351,8 @@ TEST_F( DataSenderIonWriterTest, HandleUsageIsUpdatedWhenStreamIsCreated )
                          RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD ) )
             .Times( 1 );
     }
-    ionWriter->append( CollectedSignal(
-        static_cast<SignalID>( signalConfig.typeId ), 3000000, handle, SignalType::RAW_DATA_BUFFER_HANDLE ) );
+    ionWriter->append(
+        CollectedSignal( static_cast<SignalID>( signalConfig.typeId ), 3000000, handle, SignalType::COMPLEX_SIGNAL ) );
 
     // Now then the stream is really created the usage should be set as uploading, which should prevent data
     // to be deleted.

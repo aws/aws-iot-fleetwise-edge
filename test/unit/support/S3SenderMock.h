@@ -21,16 +21,16 @@ class S3SenderMock : public S3Sender
 {
 public:
     S3SenderMock()
-        : S3Sender( nullptr, nullptr, 0 )
+        : S3Sender( nullptr, 0 )
     {
     }
 
-    MOCK_METHOD( ConnectivityError,
+    MOCK_METHOD( void,
                  sendStream,
                  ( std::unique_ptr<StreambufBuilder> streambufBuilder,
                    const S3UploadMetadata &uploadMetadata,
                    const std::string &objectKey,
-                   std::function<void( bool success )> resultCallback ),
+                   ResultCallback resultCallback ),
                  ( override ) );
 };
 

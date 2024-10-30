@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <atomic>
-#include <aws/core/utils/memory/MemorySystemInterface.h>
 #include <cstddef>
+#include <mutex>
 
 namespace Aws
 {
@@ -11,26 +11,16 @@ namespace IoTFleetWise
 {
 
 /**
- * @brief A minimal allocate implementation.
- * In this memory manager, we store the size of the requested memory at the beginning of the allocated block
- * and keep track of how much memory we are allocating and deallocating
+ * @brief Keep track of how much memory we are using for AWS SDK
  *
- * NOTE: This allocator does not handle over-aligned types . See
- * https://en.cppreference.com/w/cpp/language/object#Alignment.
- * If you are using over-aligned types, do not use this allocator.
+ * Note that this is not an allocator. The methods of this class should be called before calling
+ * some SDK operation and after the operation succeeds or fails.
  */
-class AwsSDKMemoryManager : public Aws::Utils::Memory::MemorySystemInterface
+class AwsSDKMemoryManager
 {
 public:
     static AwsSDKMemoryManager &getInstance();
 
-    void Begin() override;
-
-    void End() override;
-
-    void *AllocateMemory( std::size_t blockSize, std::size_t alignment, const char *allocationTag = nullptr ) override;
-
-    void FreeMemory( void *memoryPtr ) override;
     /**
      * @brief Set the Limit of maximal memory usage
      *
@@ -45,7 +35,7 @@ public:
      *
      * @return std::size_t
      */
-    std::size_t getLimit() const;
+    std::size_t getLimit();
 
     /**
      * @brief Reserve a chunk of memory for usage later
@@ -76,6 +66,8 @@ private:
     static constexpr std::size_t MAXIMUM_AWS_SDK_HEAP_MEMORY_BYTES = 10000000;
 
     size_t mMaximumAwsSDKMemorySize = MAXIMUM_AWS_SDK_HEAP_MEMORY_BYTES;
+
+    std::mutex mMutex;
 };
 
 } // namespace IoTFleetWise

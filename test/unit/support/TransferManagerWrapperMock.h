@@ -69,12 +69,14 @@ public:
 
     MOCK_METHOD( std::shared_ptr<Aws::Transfer::TransferHandle>,
                  RetryUpload,
-                 (const Aws::String &, const std::shared_ptr<Aws::Transfer::TransferHandle> &));
+                 (const Aws::String &, const std::shared_ptr<Aws::Transfer::TransferHandle> &),
+                 ( override ) );
 
     MOCK_METHOD( std::shared_ptr<Aws::Transfer::TransferHandle>,
                  RetryUpload,
                  ( const std::shared_ptr<Aws::IOStream> &stream,
-                   const std::shared_ptr<Aws::Transfer::TransferHandle> &retryHandle ) );
+                   const std::shared_ptr<Aws::Transfer::TransferHandle> &retryHandle ),
+                 ( override ) );
 };
 
 } // namespace IoTFleetWise

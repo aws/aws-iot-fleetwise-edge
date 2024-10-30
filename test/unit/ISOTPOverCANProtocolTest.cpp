@@ -39,7 +39,7 @@ protected:
     {
         if ( !socketAvailable() )
         {
-            GTEST_SKIP() << "Skipping test fixture due to unavailability of socket";
+            GTEST_FAIL() << "Test failed due to unavailability of socket";
         }
     }
 

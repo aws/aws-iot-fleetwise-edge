@@ -17,12 +17,12 @@ Schema::Schema( std::shared_ptr<IReceiver> receiverDecoderManifest,
     : mSender( std::move( sender ) )
 {
     // Register the listeners
-    receiverDecoderManifest->subscribeToDataReceived( [this]( const ReceivedChannelMessage &receivedChannelMessage ) {
-        onDecoderManifestReceived( receivedChannelMessage.buf, receivedChannelMessage.size );
+    receiverDecoderManifest->subscribeToDataReceived( [this]( const ReceivedConnectivityMessage &receivedMessage ) {
+        onDecoderManifestReceived( receivedMessage.buf, receivedMessage.size );
     } );
     receiverCollectionSchemeList->subscribeToDataReceived(
-        [this]( const ReceivedChannelMessage &receivedChannelMessage ) {
-            onCollectionSchemeReceived( receivedChannelMessage.buf, receivedChannelMessage.size );
+        [this]( const ReceivedConnectivityMessage &receivedMessage ) {
+            onCollectionSchemeReceived( receivedMessage.buf, receivedMessage.size );
         } );
 }
 
@@ -32,7 +32,7 @@ Schema::onDecoderManifestReceived( const uint8_t *buf, size_t size )
     // Check for a empty input data
     if ( ( buf == nullptr ) || ( size == 0 ) )
     {
-        FWE_LOG_ERROR( "Received empty CollectionScheme List data from Cloud" );
+        FWE_LOG_ERROR( "Received empty Decoder Manifest List data from the Cloud" );
         return;
     }
 
@@ -75,8 +75,8 @@ Schema::onCollectionSchemeReceived( const uint8_t *buf, size_t size )
     FWE_LOG_TRACE( "Received CollectionSchemeList" );
 }
 
-bool
-Schema::sendCheckin( const std::vector<std::string> &documentARNs )
+void
+Schema::sendCheckin( const std::vector<SyncID> &documentARNs, OnCheckinSentCallback callback )
 {
     mProtoCheckinMsg.Clear();
 
@@ -92,59 +92,60 @@ Schema::sendCheckin( const std::vector<std::string> &documentARNs )
     if ( !mProtoCheckinMsg.SerializeToString( &mProtoCheckinMsgOutput ) )
     {
         FWE_LOG_ERROR( "Checkin serialization failed" );
-        return false;
+        callback( false );
+        return;
     }
-    else
-    {
-        // transmit the data to the cloud
-        FWE_LOG_TRACE( "Sending a Checkin message to the backend" );
-        return transmitCheckin();
-    }
+
+    // transmit the data to the cloud
+    FWE_LOG_TRACE( "Sending a Checkin message to the backend" );
+    transmitCheckin( callback );
 }
 
-bool
-Schema::transmitCheckin()
+void
+Schema::transmitCheckin( OnCheckinSentCallback callback )
 {
     if ( mSender == nullptr )
     {
         FWE_LOG_ERROR( "Invalid sender instance" );
-        return false;
+        callback( false );
+        return;
     }
 
-    auto res = mSender->sendBuffer( reinterpret_cast<const uint8_t *>( mProtoCheckinMsgOutput.data() ),
-                                    mProtoCheckinMsgOutput.size() );
+    // Trace log for more verbose Checkin Info
+    std::string checkinDebugString;
+    checkinDebugString = "Checkin data: timestamp: " + std::to_string( mProtoCheckinMsg.timestamp_ms_epoch() );
+    checkinDebugString += " with " + std::to_string( mProtoCheckinMsg.document_sync_ids_size() ) + " documents: [";
 
-    if ( res == ConnectivityError::Success )
+    for ( int i = 0; i < mProtoCheckinMsg.document_sync_ids_size(); i++ )
     {
-        FWE_LOG_TRACE( "Checkin Message sent to the backend" );
-
-        // Trace log for more verbose Checkin Info
-        std::string checkinDebugString;
-        checkinDebugString = "Checkin data: timestamp: " + std::to_string( mProtoCheckinMsg.timestamp_ms_epoch() );
-        checkinDebugString += " with " + std::to_string( mProtoCheckinMsg.document_sync_ids_size() ) + " documents: [";
-
-        for ( int i = 0; i < mProtoCheckinMsg.document_sync_ids_size(); i++ )
+        if ( i > 0 )
         {
-            if ( i > 0 )
-            {
-                checkinDebugString += ", ";
-            }
-            checkinDebugString += mProtoCheckinMsg.document_sync_ids( i );
+            checkinDebugString += ", ";
         }
-        checkinDebugString += "]";
+        checkinDebugString += mProtoCheckinMsg.document_sync_ids( i );
+    }
+    checkinDebugString += "]";
 
-        FWE_LOG_TRACE( checkinDebugString );
-        return true;
-    }
-    else if ( res == ConnectivityError::NoConnection )
-    {
-        return false;
-    }
-    else
-    {
-        FWE_LOG_ERROR( "offboardconnectivity error, will retry sending the checkin message" );
-        return false;
-    }
+    mSender->sendBuffer( reinterpret_cast<const uint8_t *>( mProtoCheckinMsgOutput.data() ),
+                         mProtoCheckinMsgOutput.size(),
+                         [checkinDebugString, callback]( ConnectivityError result ) {
+                             if ( result == ConnectivityError::Success )
+                             {
+                                 FWE_LOG_TRACE( "Checkin Message sent to the backend" );
+                                 FWE_LOG_TRACE( checkinDebugString );
+                                 callback( true );
+                             }
+                             else if ( result == ConnectivityError::NoConnection )
+                             {
+                                 FWE_LOG_TRACE( "Couldn't send checkin message because there is no connection" );
+                                 callback( false );
+                             }
+                             else
+                             {
+                                 FWE_LOG_ERROR( "offboardconnectivity error, will retry sending the checkin message" );
+                                 callback( false );
+                             }
+                         } );
 }
 
 } // namespace IoTFleetWise

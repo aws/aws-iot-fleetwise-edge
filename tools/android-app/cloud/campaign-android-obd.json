@@ -1,0 +1,93 @@
+{
+  "compression": "SNAPPY",
+  "diagnosticsMode": "SEND_ACTIVE_DTCS",
+  "spoolingMode": "TO_DISK",
+  "collectionScheme": {
+    "timeBasedCollectionScheme": {
+      "periodMs": 10000
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.CurrentLocation.Latitude"
+    },
+    {
+      "name": "Vehicle.CurrentLocation.Longitude"
+    },
+    {
+      "name": "Vehicle.OBD.EngineLoad"
+    },
+    {
+      "name": "Vehicle.OBD.CoolantTemperature"
+    },
+    {
+      "name": "Vehicle.OBD.FuelPressure"
+    },
+    {
+      "name": "Vehicle.OBD.EngineSpeed"
+    },
+    {
+      "name": "Vehicle.OBD.Speed"
+    },
+    {
+      "name": "Vehicle.OBD.IntakeTemp"
+    },
+    {
+      "name": "Vehicle.OBD.ThrottlePosition"
+    },
+    {
+      "name": "Vehicle.OBD.RunTime"
+    },
+    {
+      "name": "Vehicle.OBD.FuelLevel"
+    },
+    {
+      "name": "Vehicle.OBD.BarometricPressure"
+    },
+    {
+      "name": "Vehicle.OBD.ControlModuleVoltage"
+    },
+    {
+      "name": "Vehicle.OBD.AbsoluteLoad"
+    },
+    {
+      "name": "Vehicle.OBD.AmbientAirTemperature"
+    },
+    {
+      "name": "Vehicle.OBD.FuelType"
+    },
+    {
+      "name": "Vehicle.OBD.HybridBatteryRemaining"
+    },
+    {
+      "name": "Vehicle.OBD.OilTemperature"
+    },
+    {
+      "name": "Vehicle.OBD.FuelRate"
+    },
+    {
+      "name": "Vehicle.OBD.DemandEngineTorque"
+    },
+    {
+      "name": "Vehicle.OBD.ActualEngineTorque"
+    },
+    {
+      "name": "Vehicle.OBD.MafA"
+    },
+    {
+      "name": "Vehicle.OBD.MafB"
+    },
+    {
+      "name": "Vehicle.OBD.MAF"
+    },
+    {
+      "name": "Vehicle.OBD.TransmissionActualGearStatusSupport"
+    },
+    {
+      "name": "Vehicle.OBD.TransmissionActualGearRatio"
+    },
+    {
+      "name": "Vehicle.OBD.Odometer"
+    }
+  ]
+}

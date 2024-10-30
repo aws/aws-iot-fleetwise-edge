@@ -4,22 +4,11 @@
 #include "AwsSDKMemoryManager.h"
 #include "TraceModule.h"
 #include <cstddef>
-#include <cstdlib>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
-
-using Byte = unsigned char;
-
-// offset to store value of memory size allocated
-// Since different types have different alignment requirements,
-// we use the largest available alignment offset.
-// Note: This however does not work for over-aligned types
-// https://en.cppreference.com/w/cpp/language/object#Alignment
-// We are OK at the moment to not handled over-aligned types since we do not have any usage of "alignas"
-constexpr auto ALIGN_OFFSET = alignof( std::max_align_t );
 
 AwsSDKMemoryManager &
 AwsSDKMemoryManager::getInstance()
@@ -28,73 +17,17 @@ AwsSDKMemoryManager::getInstance()
     return instance;
 }
 
-void
-AwsSDKMemoryManager::Begin()
-{
-}
-
-void
-AwsSDKMemoryManager::End()
-{
-}
-
-void *
-AwsSDKMemoryManager::AllocateMemory( std::size_t blockSize, std::size_t alignment, const char *allocationTag )
-{
-    // suppress unused parameter errors
-    (void)alignment;
-    (void)allocationTag;
-
-    // Verify that the object fits into the memory block
-    static_assert( ALIGN_OFFSET >= sizeof( std::size_t ), "too big memory size block" );
-
-    auto realSize = blockSize + ALIGN_OFFSET;
-    void *pMem = malloc( realSize ); // NOLINT(cppcoreguidelines-no-malloc)
-
-    if ( pMem == nullptr )
-    {
-        return nullptr;
-    }
-
-    // store the allocated memory's size
-    *( static_cast<std::size_t *>( pMem ) ) = realSize;
-    mMemoryUsedAndReserved += realSize;
-    TraceModule::get().setVariable( TraceVariable::MQTT_HEAP_USAGE, mMemoryUsedAndReserved );
-
-    // return a pointer to the block offset from the size storage location
-    return static_cast<Byte *>( pMem ) + ALIGN_OFFSET;
-}
-
-void
-AwsSDKMemoryManager::FreeMemory( void *memoryPtr )
-{
-    if ( memoryPtr == nullptr )
-    {
-        return;
-    }
-
-    // go back to the memory location where stored the size
-    auto pMem = static_cast<void *>( static_cast<Byte *>( memoryPtr ) - ALIGN_OFFSET );
-    // read the size value
-    auto realSize = *( static_cast<std::size_t *>( pMem ) );
-
-    // free the memory
-    free( pMem ); // NOLINT(cppcoreguidelines-no-malloc)
-
-    // update the stats
-    mMemoryUsedAndReserved -= realSize;
-    TraceModule::get().setVariable( TraceVariable::MQTT_HEAP_USAGE, mMemoryUsedAndReserved );
-}
-
 std::size_t
-AwsSDKMemoryManager::getLimit() const
+AwsSDKMemoryManager::getLimit()
 {
+    std::lock_guard<std::mutex> lock( mMutex );
     return mMaximumAwsSDKMemorySize;
 }
 
 bool
 AwsSDKMemoryManager::setLimit( size_t size )
 {
+    std::lock_guard<std::mutex> lock( mMutex );
     if ( size == 0U )
     {
         return false;
@@ -106,11 +39,12 @@ AwsSDKMemoryManager::setLimit( size_t size )
 bool
 AwsSDKMemoryManager::reserveMemory( std::size_t bytes )
 {
-    if ( ( mMemoryUsedAndReserved + bytes + ALIGN_OFFSET ) > mMaximumAwsSDKMemorySize )
+    std::lock_guard<std::mutex> lock( mMutex );
+    if ( ( mMemoryUsedAndReserved + bytes ) > mMaximumAwsSDKMemorySize )
     {
         return false;
     }
-    mMemoryUsedAndReserved += ( bytes + ALIGN_OFFSET );
+    mMemoryUsedAndReserved += bytes;
     TraceModule::get().setVariable( TraceVariable::MQTT_HEAP_USAGE, mMemoryUsedAndReserved );
     return true;
 }
@@ -118,7 +52,8 @@ AwsSDKMemoryManager::reserveMemory( std::size_t bytes )
 std::size_t
 AwsSDKMemoryManager::releaseReservedMemory( std::size_t bytes )
 {
-    mMemoryUsedAndReserved -= ( bytes + ALIGN_OFFSET );
+    std::lock_guard<std::mutex> lock( mMutex );
+    mMemoryUsedAndReserved -= bytes;
     TraceModule::get().setVariable( TraceVariable::MQTT_HEAP_USAGE, mMemoryUsedAndReserved );
     return mMemoryUsedAndReserved;
 }

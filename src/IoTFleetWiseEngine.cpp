@@ -7,12 +7,16 @@
 #include "AwsSDKMemoryManager.h"
 #include "CollectionInspectionAPITypes.h"
 #include "DataSenderManager.h"
+#include "DataSenderProtoWriter.h"
+#include "DataSenderTypes.h"
 #include "ILogger.h"
 #include "IoTFleetWiseConfig.h"
 #include "LogLevel.h"
 #include "LoggingModule.h"
 #include "MqttClientWrapper.h"
+#include "QueueTypes.h"
 #include "SignalTypes.h"
+#include "TelemetryDataSender.h"
 #include "TraceModule.h"
 #include <algorithm>
 #include <aws/crt/Api.h>
@@ -23,23 +27,26 @@
 #include <exception>
 #include <fstream>
 #include <functional>
+#include <unordered_map>
 #include <utility>
 
 #ifdef FWE_FEATURE_GREENGRASSV2
-#include "AwsGGConnectivityModule.h"
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "AwsGreengrassV2ConnectivityModule.h"
+#ifdef FWE_FEATURE_S3
 #include <aws/core/auth/AWSCredentialsProviderChain.h>
 #endif
 #endif
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#ifdef FWE_FEATURE_S3
 #include "Credentials.h"
-#include "DataSenderIonWriter.h"
-#include "RawDataManager.h"
 #include "TransferManagerWrapper.h"
 #include <aws/core/client/ClientConfiguration.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/S3ServiceClientModel.h>
 #include <aws/transfer/TransferManager.h>
+#endif
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "DataSenderIonWriter.h"
+#include "VisionSystemDataSender.h"
 #endif
 
 namespace Aws
@@ -90,7 +97,38 @@ getFileContents( const std::string &p )
     return ret;
 }
 
+/**
+ * @brief Get the absolute file path, if the path is already absolute its returned.
+ *
+ * @param p The file path
+ * @param basePath Base path to which the p is relative
+ * @return boost::filesystem::path Absolute file path
+ */
+boost::filesystem::path
+getAbsolutePath( const std::string &p, const boost::filesystem::path &basePath )
+{
+    boost::filesystem::path filePath( p );
+    if ( !filePath.is_absolute() )
+    {
+        return basePath / filePath;
+    }
+    return filePath;
+}
+
 } // namespace
+
+#ifdef FWE_FEATURE_S3
+std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor>
+IoTFleetWiseEngine::getTransferManagerExecutor()
+{
+    std::lock_guard<std::mutex> lock( mTransferManagerExecutorMutex );
+    if ( mTransferManagerExecutor == nullptr )
+    {
+        mTransferManagerExecutor = Aws::MakeShared<Aws::Utils::Threading::PooledThreadExecutor>( "executor", 25 );
+    }
+    return mTransferManagerExecutor;
+}
+#endif
 
 IoTFleetWiseEngine::IoTFleetWiseEngine()
 {
@@ -108,27 +146,35 @@ IoTFleetWiseEngine::~IoTFleetWiseEngine()
 }
 
 bool
-IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
+IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesystem::path &configFileDirectoryPath )
 {
     // Main bootstrap sequence.
     try
     {
         IoTFleetWiseConfig config( jsonConfig );
-        const auto persistencyPath = config["staticConfig"]["persistency"]["persistencyPath"].asStringRequired();
-        /*************************Payload Manager and Persistency library bootstrap begin*********/
-        // Create an object for Persistency
-        mPersistDecoderManifestCollectionSchemesAndData = std::make_shared<CacheAndPersist>(
-            persistencyPath, config["staticConfig"]["persistency"]["persistencyPartitionMaxSize"].asSizeRequired() );
-        if ( !mPersistDecoderManifestCollectionSchemesAndData->init() )
+        uint64_t persistencyUploadRetryIntervalMs = 0;
+        if ( ( config["staticConfig"].isMember( "persistency" ) ) )
         {
-            FWE_LOG_ERROR( "Failed to init persistency library" );
+            const auto persistencyPath = config["staticConfig"]["persistency"]["persistencyPath"].asStringRequired();
+            /*************************Payload Manager and Persistency library bootstrap begin*********/
+            // Create an object for Persistency
+            mPersistDecoderManifestCollectionSchemesAndData = std::make_shared<CacheAndPersist>(
+                getAbsolutePath( persistencyPath, configFileDirectoryPath ).string(),
+                config["staticConfig"]["persistency"]["persistencyPartitionMaxSize"].asSizeRequired() );
+            if ( !mPersistDecoderManifestCollectionSchemesAndData->init() )
+            {
+                FWE_LOG_ERROR( "Failed to init persistency library" );
+            }
+            persistencyUploadRetryIntervalMs =
+                config["staticConfig"]["persistency"]["persistencyUploadRetryIntervalMs"].asU64Optional().get_value_or(
+                    DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS );
+            // Payload Manager for offline data management
+            mPayloadManager = std::make_shared<PayloadManager>( mPersistDecoderManifestCollectionSchemesAndData );
         }
-        uint64_t persistencyUploadRetryIntervalMs =
-            config["staticConfig"]["persistency"]["persistencyUploadRetryIntervalMs"].asU64Optional().get_value_or(
-                DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS );
-        // Payload Manager for offline data management
-        mPayloadManager = std::make_shared<PayloadManager>( mPersistDecoderManifestCollectionSchemesAndData );
-
+        else
+        {
+            FWE_LOG_INFO( "Persistency feature is disabled in the configuration." );
+        }
         /*************************Payload Manager and Persistency library bootstrap end************/
 
         /*************************CAN InterfaceID to InternalID Translator begin*********/
@@ -219,7 +265,10 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
             }
             else if ( mqttConfig.isMember( "privateKeyFilename" ) )
             {
-                privateKey = getFileContents( mqttConfig["privateKeyFilename"].asStringRequired() );
+                auto privKeyPathAbs =
+                    getAbsolutePath( mqttConfig["privateKeyFilename"].asStringRequired(), configFileDirectoryPath )
+                        .string();
+                privateKey = getFileContents( privKeyPathAbs );
             }
             if ( mqttConfig.isMember( "certificate" ) )
             {
@@ -227,7 +276,10 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
             }
             else if ( mqttConfig.isMember( "certificateFilename" ) )
             {
-                certificate = getFileContents( mqttConfig["certificateFilename"].asStringRequired() );
+                auto certPathAbs =
+                    getAbsolutePath( mqttConfig["certificateFilename"].asStringRequired(), configFileDirectoryPath )
+                        .string();
+                certificate = getFileContents( certPathAbs );
             }
             if ( mqttConfig.isMember( "rootCA" ) )
             {
@@ -235,7 +287,10 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
             }
             else if ( mqttConfig.isMember( "rootCAFilename" ) )
             {
-                rootCA = getFileContents( mqttConfig["rootCAFilename"].asStringRequired() );
+                auto rootCAPathAbs =
+                    getAbsolutePath( mqttConfig["rootCAFilename"].asStringRequired(), configFileDirectoryPath )
+                        .string();
+                rootCA = getFileContents( rootCAPathAbs );
             }
             // coverity[autosar_cpp14_a20_8_5_violation] - can't use make_unique as the constructor is private
             auto builder = std::unique_ptr<Aws::Iot::Mqtt5ClientBuilder>(
@@ -258,10 +313,20 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
                 builderWrapper = std::make_unique<MqttClientBuilderWrapper>( std::move( builder ) );
             }
 
-            mConnectivityModule =
-                std::make_shared<AwsIotConnectivityModule>( rootCA, clientId, std::move( builderWrapper ) );
+            AwsIotConnectivityConfig mqttConnectionConfig;
+            mqttConnectionConfig.keepAliveIntervalSeconds =
+                static_cast<uint16_t>( mqttConfig["keepAliveIntervalSeconds"].asU32Optional().get_value_or(
+                    MQTT_KEEP_ALIVE_INTERVAL_SECONDS ) );
+            mqttConnectionConfig.pingTimeoutMs =
+                mqttConfig["pingTimeoutMs"].asU32Optional().get_value_or( MQTT_PING_TIMEOUT_MS );
+            mqttConnectionConfig.sessionExpiryIntervalSeconds =
+                mqttConfig["sessionExpiryIntervalSeconds"].asU32Optional().get_value_or(
+                    MQTT_SESSION_EXPIRY_INTERVAL_SECONDS );
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            mConnectivityModule = std::make_shared<AwsIotConnectivityModule>(
+                rootCA, clientId, std::move( builderWrapper ), mqttConnectionConfig );
+
+#ifdef FWE_FEATURE_S3
             if ( config["staticConfig"].isMember( "credentialsProvider" ) )
             {
                 auto crtCredentialsProvider = createX509CredentialsProvider(
@@ -279,8 +344,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
         else if ( connectionType == "iotGreengrassV2" )
         {
             FWE_LOG_INFO( "ConnectionType is iotGreengrassV2" );
-            mConnectivityModule = std::make_shared<AwsGGConnectivityModule>( bootstrapPtr );
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            mConnectivityModule = std::make_shared<AwsGreengrassV2ConnectivityModule>( bootstrapPtr );
+#ifdef FWE_FEATURE_S3
             mAwsCredentialsProvider = std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>();
 #endif
         }
@@ -293,41 +358,37 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
 
         // Only CAN data channel needs a payloadManager object for persistency and compression support,
         // for other components this will be nullptr
-        mConnectivityChannelSendVehicleData =
-            mConnectivityModule->createNewChannel( mPayloadManager, mqttConfig["canDataTopic"].asStringRequired() );
+        mSenderVehicleData = mConnectivityModule->createSender( mqttConfig["canDataTopic"].asStringRequired() );
 
-        mConnectivityChannelReceiveCollectionSchemeList = mConnectivityModule->createNewChannel(
-            nullptr, mqttConfig["collectionSchemeListTopic"].asStringRequired(), true );
+        mReceiverCollectionSchemeList =
+            mConnectivityModule->createReceiver( mqttConfig["collectionSchemeListTopic"].asStringRequired() );
 
-        mConnectivityChannelReceiveDecoderManifest = mConnectivityModule->createNewChannel(
-            nullptr, mqttConfig["decoderManifestTopic"].asStringRequired(), true );
+        mReceiverDecoderManifest =
+            mConnectivityModule->createReceiver( mqttConfig["decoderManifestTopic"].asStringRequired() );
 
         /*
-         * Over this channel metrics like performance (resident ram pages, cpu time spent in threads)
+         * Over this sender, metrics like performance (resident ram pages, cpu time spent in threads)
          * and tracing metrics like internal variables and time spent in specially instrumented functions
          * spent are uploaded in json format over mqtt.
          */
         auto metricsUploadTopic = mqttConfig["metricsUploadTopic"].asStringOptional().get_value_or( "" );
         if ( !metricsUploadTopic.empty() )
         {
-            mConnectivityChannelMetricsUpload = mConnectivityModule->createNewChannel( nullptr, metricsUploadTopic );
+            mSenderMetrics = mConnectivityModule->createSender( metricsUploadTopic );
         }
         /*
-         * Over this channel log messages that are currently logged to STDOUT are uploaded in json
+         * Over this sender, log messages that are currently logged to STDOUT are uploaded in json
          * format over MQTT.
          */
         auto loggingUploadTopic = mqttConfig["loggingUploadTopic"].asStringOptional().get_value_or( "" );
         if ( !loggingUploadTopic.empty() )
         {
-            mConnectivityChannelLogsUpload = mConnectivityModule->createNewChannel( nullptr, loggingUploadTopic );
+            mSenderLogs = mConnectivityModule->createSender( loggingUploadTopic );
         }
 
         // Create an ISender for sending Checkins
-        mConnectivityChannelSendCheckin =
-            mConnectivityModule->createNewChannel( nullptr, mqttConfig["checkinTopic"].asStringRequired() );
+        mSenderCheckin = mConnectivityModule->createSender( mqttConfig["checkinTopic"].asStringRequired() );
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-        std::shared_ptr<RawData::BufferManager> rawDataBufferManager;
         boost::optional<RawData::BufferManagerConfig> rawDataBufferManagerConfig;
         auto rawDataBufferJsonConfig = config["staticConfig"]["visionSystemDataCollection"]["rawDataBuffer"];
         auto rawBufferSize = rawDataBufferJsonConfig["maxSize"].asSizeOptional();
@@ -360,15 +421,9 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
                 FWE_LOG_ERROR( "Failed to create raw data buffer manager config" );
                 return false;
             }
-            rawDataBufferManager = std::make_shared<RawData::BufferManager>( rawDataBufferManagerConfig.get() );
+            mRawBufferManager = std::make_shared<RawData::BufferManager>( rawDataBufferManagerConfig.get() );
         }
-#endif
 
-        // For asynchronous connect the call needs to be done after all channels created and setTopic calls
-        if ( !mConnectivityModule->connect() )
-        {
-            return false;
-        }
         /*************************Connectivity bootstrap end***************************************/
 
         /*************************Remote Profiling bootstrap begin**********************************/
@@ -401,53 +456,82 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
             // loggingUploadMaxWaitBeforeUploadMs
             // profilerPrefix
             mRemoteProfiler = std::make_unique<RemoteProfiler>(
-                mConnectivityChannelMetricsUpload,
-                mConnectivityChannelLogsUpload,
+                mSenderMetrics,
+                mSenderLogs,
                 config["staticConfig"]["remoteProfilerDefaultValues"]["metricsUploadIntervalMs"].asU32Required(),
                 config["staticConfig"]["remoteProfilerDefaultValues"]["loggingUploadMaxWaitBeforeUploadMs"]
                     .asU32Required(),
                 logThreshold,
                 config["staticConfig"]["remoteProfilerDefaultValues"]["profilerPrefix"].asStringRequired() );
-            if ( !mRemoteProfiler->start() )
-            {
-                FWE_LOG_WARN(
-
-                    "Failed to start the Remote Profiler - No remote profiling available until FWE restart" );
-            }
             setLogForwarding( mRemoteProfiler.get() );
         }
         /*************************Remote Profiling bootstrap ends**********************************/
 
         /*************************Inspection Engine bootstrap begin*********************************/
 
-        // Below are three buffers to be shared between Vehicle Data Consumer and Collection Engine
-        // Signal Buffer are a lock-free multi-producer single consumer buffer
-        auto signalBufferPtr = std::make_shared<SignalBuffer>(
-            config["staticConfig"]["bufferSizes"]["decodedSignalsBufferSize"].asSizeRequired() );
+        auto signalBufferSize = config["staticConfig"]["bufferSizes"]["decodedSignalsBufferSize"].asSizeRequired();
+        auto signalBuffer =
+            std::make_shared<SignalBuffer>( signalBufferSize,
+                                            "Signal Buffer",
+                                            TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES,
+                                            // Notify listeners when 10% of the buffer is full so that we don't
+                                            // let it grow too much.
+                                            signalBufferSize / 10 );
+
+        auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+        signalBufferDistributor->registerQueue( signalBuffer );
+
         // Create the Data Inspection Queue
-        mCollectedDataReadyToPublish = std::make_shared<CollectedDataReadyToPublish>(
-            config["staticConfig"]["internalParameters"]["readyToPublishDataBufferSize"].asSizeRequired() );
+        mCollectedDataReadyToPublish = std::make_shared<DataSenderQueue>(
+            config["staticConfig"]["internalParameters"]["readyToPublishDataBufferSize"].asSizeRequired(),
+            "Collected Data",
+            TraceAtomicVariable::QUEUE_INSPECTION_TO_SENDER );
+
+        auto dataSenderProtoWriter = std::make_shared<DataSenderProtoWriter>( mCANIDTranslator, mRawBufferManager );
+        auto payloadConfigUncompressed = config["staticConfig"]["payloadAdaption"]["uncompressed"];
+        PayloadAdaptionConfig payloadAdaptionConfigUncompressed{
+            payloadConfigUncompressed["transmitThresholdStartPercent"].asU32Optional().get_value_or( 80 ),
+            payloadConfigUncompressed["payloadSizeLimitMinPercent"].asU32Optional().get_value_or( 70 ),
+            payloadConfigUncompressed["payloadSizeLimitMaxPercent"].asU32Optional().get_value_or( 90 ),
+            payloadConfigUncompressed["transmitThresholdAdaptPercent"].asU32Optional().get_value_or( 10 ) };
+        auto payloadConfigCompressed = config["staticConfig"]["payloadAdaption"]["compressed"];
+        // Snappy typically compresses to around 30% of original size, so set the starting compressed transmit threshold
+        // to double the maximum payload size:
+        PayloadAdaptionConfig payloadAdaptionConfigCompressed{
+            payloadConfigCompressed["transmitThresholdStartPercent"].asU32Optional().get_value_or( 200 ),
+            payloadConfigCompressed["payloadSizeLimitMinPercent"].asU32Optional().get_value_or( 70 ),
+            payloadConfigCompressed["payloadSizeLimitMaxPercent"].asU32Optional().get_value_or( 90 ),
+            payloadConfigCompressed["transmitThresholdAdaptPercent"].asU32Optional().get_value_or( 10 ) };
+        auto telemetryDataSender = std::make_shared<TelemetryDataSender>( mSenderVehicleData,
+                                                                          dataSenderProtoWriter,
+                                                                          payloadAdaptionConfigUncompressed,
+                                                                          payloadAdaptionConfigCompressed );
+        std::unordered_map<SenderDataType, std::shared_ptr<DataSender>> dataSenders;
+        dataSenders[SenderDataType::TELEMETRY] = telemetryDataSender;
 
         // Init and start the Inspection Engine
-        mCollectionInspectionWorkerThread = std::make_shared<CollectionInspectionWorkerThread>();
+        mCollectionInspectionEngine = std::make_shared<CollectionInspectionEngine>();
+        mCollectionInspectionWorkerThread =
+            std::make_shared<CollectionInspectionWorkerThread>( *mCollectionInspectionEngine );
         if ( ( !mCollectionInspectionWorkerThread->init(
-                 signalBufferPtr,
+                 signalBuffer,
                  mCollectedDataReadyToPublish,
-                 config["staticConfig"]["threadIdleTimes"]["inspectionThreadIdleTimeMs"].asU32Required()
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                     ,
-                 rawDataBufferManager
-#endif
-                 ) ) ||
+                 config["staticConfig"]["threadIdleTimes"]["inspectionThreadIdleTimeMs"].asU32Required(),
+                 mRawBufferManager ) ) ||
              ( !mCollectionInspectionWorkerThread->start() ) )
         {
             FWE_LOG_ERROR( "Failed to init and start the Inspection Engine" );
             return false;
         }
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        signalBuffer->subscribeToNewDataAvailable( std::bind( &CollectionInspectionWorkerThread::onNewDataAvailable,
+                                                              mCollectionInspectionWorkerThread.get() ) );
         /*************************Inspection Engine bootstrap end***********************************/
 
         /*************************DataSender bootstrap begin*********************************/
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        std::shared_ptr<DataSenderIonWriter> ionWriter;
+        std::shared_ptr<VisionSystemDataSender> visionSystemDataSender;
         if ( ( mAwsCredentialsProvider == nullptr ) || ( !config["staticConfig"].isMember( "s3Upload" ) ) )
         {
             FWE_LOG_INFO( "S3 sender not initialized so no vision-system-data data upload will be supported. Add "
@@ -462,9 +546,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
                                           Aws::Transfer::TransferManagerConfiguration &transferManagerConfiguration )
                 -> std::shared_ptr<TransferManagerWrapper> {
                 clientConfiguration.maxConnections = s3MaxConnections;
-                mTransferManagerExecutor =
-                    Aws::MakeShared<Aws::Utils::Threading::PooledThreadExecutor>( "executor", 25 );
-                transferManagerConfiguration.transferExecutor = mTransferManagerExecutor.get();
+                transferManagerConfiguration.transferExecutor = getTransferManagerExecutor().get();
                 auto s3Client =
                     std::make_shared<Aws::S3::S3Client>( mAwsCredentialsProvider,
                                                          Aws::MakeShared<Aws::S3::S3EndpointProvider>( "S3Client" ),
@@ -473,34 +555,28 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
                 return std::make_shared<TransferManagerWrapper>(
                     Aws::Transfer::TransferManager::Create( transferManagerConfiguration ) );
             };
-            mS3Sender =
-                std::make_shared<S3Sender>( mPayloadManager,
-                                            createTransferManagerWrapper,
-                                            config["staticConfig"]["s3Upload"]["multipartSize"].asSizeRequired() );
+            mS3Sender = std::make_shared<S3Sender>(
+                createTransferManagerWrapper, config["staticConfig"]["s3Upload"]["multipartSize"].asSizeRequired() );
+            ionWriter = std::make_shared<DataSenderIonWriter>( mRawBufferManager, clientId );
+            visionSystemDataSender = std::make_shared<VisionSystemDataSender>(
+                mCollectedDataReadyToPublish, mS3Sender, ionWriter, clientId );
+            dataSenders[SenderDataType::VISION_SYSTEM] = visionSystemDataSender;
         }
-        auto ionWriter = std::make_shared<DataSenderIonWriter>( rawDataBufferManager, clientId );
 #endif
-        mDataSenderManager = std::make_shared<DataSenderManager>(
-            mConnectivityChannelSendVehicleData,
-            mPayloadManager,
-            mCANIDTranslator,
-            config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asU32Required()
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                ,
-            mS3Sender,
-            ionWriter,
-            clientId
-#endif
-        );
+
+        mDataSenderManager =
+            std::make_shared<DataSenderManager>( std::move( dataSenders ), mSenderVehicleData, mPayloadManager );
+        std::vector<std::shared_ptr<DataSenderQueue>> dataToSendQueues = { mCollectedDataReadyToPublish };
         mDataSenderManagerWorkerThread = std::make_shared<DataSenderManagerWorkerThread>(
-            mConnectivityModule, mDataSenderManager, persistencyUploadRetryIntervalMs, mCollectedDataReadyToPublish );
+            mConnectivityModule, mDataSenderManager, persistencyUploadRetryIntervalMs, dataToSendQueues );
         if ( !mDataSenderManagerWorkerThread->start() )
         {
             FWE_LOG_ERROR( "Failed to init and start the Data Sender" );
             return false;
         }
 
-        mCollectionInspectionWorkerThread->subscribeToDataReadyToPublish(
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        mCollectedDataReadyToPublish->subscribeToNewDataAvailable(
             std::bind( &DataSenderManagerWorkerThread::onDataReadyToPublish, mDataSenderManagerWorkerThread.get() ) );
         /*************************DataSender bootstrap end*********************************/
 
@@ -509,41 +585,35 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
         // CollectionScheme Ingestion module executes in the context for the offboardconnectivity thread. Upcoming
         // messages are expected to come either on the decoder manifest topic or the collectionScheme topic or both
         // ( eventually ).
-        mSchemaPtr = std::make_shared<Schema>( mConnectivityChannelReceiveDecoderManifest,
-                                               mConnectivityChannelReceiveCollectionSchemeList,
-                                               mConnectivityChannelSendCheckin );
+        mSchemaPtr =
+            std::make_shared<Schema>( mReceiverDecoderManifest, mReceiverCollectionSchemeList, mSenderCheckin );
 
         /*****************************CollectionScheme Management bootstrap begin*****************************/
 
-        // Create and connect the CollectionScheme Manager
-        mCollectionSchemeManagerPtr = std::make_shared<CollectionSchemeManager>();
+        // Allow CollectionSchemeManagement to send checkins through the Schema Object Callback
+        mCheckinSender = std::make_shared<CheckinSender>(
+            mSchemaPtr,
+            config["staticConfig"]["publishToCloudParameters"]["collectionSchemeManagementCheckinIntervalMs"]
+                .asU32Required() );
 
-        if ( !mCollectionSchemeManagerPtr->init(
-                 config["staticConfig"]["publishToCloudParameters"]["collectionSchemeManagementCheckinIntervalMs"]
-                     .asU32Required(),
-                 mPersistDecoderManifestCollectionSchemesAndData,
-                 mCANIDTranslator
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                 ,
-                 rawDataBufferManager
-#endif
-                 ) )
-        {
-            FWE_LOG_ERROR( "Failed to init the CollectionScheme Manager" );
-            return false;
-        }
+        // Create and connect the CollectionScheme Manager
+        mCollectionSchemeManagerPtr = std::make_shared<CollectionSchemeManager>(
+            mPersistDecoderManifestCollectionSchemesAndData, mCANIDTranslator, mCheckinSender, mRawBufferManager );
 
         // Make sure the CollectionScheme Ingestion can notify the CollectionScheme Manager about the arrival
-        // of new artifacts over the offboardconnectivity channel.
+        // of new artifacts over the offboardconnectivity receiver.
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
         mSchemaPtr->subscribeToCollectionSchemeUpdate( std::bind( &CollectionSchemeManager::onCollectionSchemeUpdate,
                                                                   mCollectionSchemeManagerPtr.get(),
                                                                   std::placeholders::_1 ) );
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
         mSchemaPtr->subscribeToDecoderManifestUpdate( std::bind( &CollectionSchemeManager::onDecoderManifestUpdate,
                                                                  mCollectionSchemeManagerPtr.get(),
                                                                  std::placeholders::_1 ) );
 
         // Make sure the CollectionScheme Manager can notify the Inspection Engine about the availability of
         // a new set of collection CollectionSchemes.
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
         mCollectionSchemeManagerPtr->subscribeToInspectionMatrixChange(
             std::bind( &CollectionInspectionWorkerThread::onChangeInspectionMatrix,
                        mCollectionInspectionWorkerThread.get(),
@@ -552,24 +622,30 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
         // Make sure the CollectionScheme Manager can notify the Data Sender about the availability of
         // a new set of collection CollectionSchemes.
-        mCollectionSchemeManagerPtr->subscribeToCollectionSchemeListChange(
-            std::bind( &DataSenderManagerWorkerThread::onChangeCollectionSchemeList,
-                       mDataSenderManagerWorkerThread.get(),
-                       std::placeholders::_1 ) );
-        mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
-            std::bind( &DataSenderIonWriter::onChangeOfActiveDictionary,
-                       ionWriter.get(),
-                       std::placeholders::_1,
-                       std::placeholders::_2 ) );
-#endif
+        if ( visionSystemDataSender != nullptr )
+        {
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            mCollectionSchemeManagerPtr->subscribeToCollectionSchemeListChange(
+                std::bind( &VisionSystemDataSender::onChangeCollectionSchemeList,
+                           visionSystemDataSender.get(),
+                           std::placeholders::_1 ) );
+        }
 
-        // Allow CollectionSchemeManagement to send checkins through the Schema Object Callback
-        mCollectionSchemeManagerPtr->setSchemaListenerPtr( mSchemaPtr );
+        if ( ionWriter != nullptr )
+        {
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                std::bind( &DataSenderIonWriter::onChangeOfActiveDictionary,
+                           ionWriter.get(),
+                           std::placeholders::_1,
+                           std::placeholders::_2 ) );
+        }
+#endif
 
         /********************************Data source bootstrap start*******************************/
 
         auto obdOverCANModuleInit = false;
-        mCANDataConsumer = std::make_unique<CANDataConsumer>( signalBufferPtr );
+        mCANDataConsumer = std::make_unique<CANDataConsumer>( signalBufferDistributor );
         for ( unsigned i = 0; i < config["networkInterfaces"].getArraySizeRequired(); i++ )
         {
             const auto networkInterfaceConfig = config["networkInterfaces"][i];
@@ -603,6 +679,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
                     FWE_LOG_ERROR( "Failed to initialize CANDataSource" );
                     return false;
                 }
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
                     std::bind( &CANDataSource::onChangeOfActiveDictionary,
                                canSourcePtr.get(),
@@ -618,7 +695,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
                     obdOverCANModuleInit = true;
                     auto obdConfig = networkInterfaceConfig[OBD_INTERFACE_TYPE];
                     if ( obdOverCANModule->init(
-                             signalBufferPtr,
+                             signalBufferDistributor,
                              obdConfig["interfaceName"].asStringRequired(),
                              obdConfig["pidRequestIntervalSeconds"].asU32Required(),
                              obdConfig["dtcRequestIntervalSeconds"].asU32Required(),
@@ -633,11 +710,13 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
                             return false;
                         }
 
+                        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                         mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
                             std::bind( &OBDOverCANModule::onChangeOfActiveDictionary,
                                        mOBDOverCANModule.get(),
                                        std::placeholders::_1,
                                        std::placeholders::_2 ) );
+                        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                         mCollectionSchemeManagerPtr->subscribeToInspectionMatrixChange(
                             std::bind( &OBDOverCANModule::onChangeInspectionMatrix,
                                        mOBDOverCANModule.get(),
@@ -651,15 +730,17 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
             }
             else if ( interfaceType == EXTERNAL_CAN_INTERFACE_TYPE )
             {
-                if ( mExternalCANDataSource == nullptr )
+                if ( mExternalCANDataSource != nullptr )
                 {
-                    mExternalCANDataSource = std::make_unique<ExternalCANDataSource>( *mCANDataConsumer );
-                    mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
-                        std::bind( &ExternalCANDataSource::onChangeOfActiveDictionary,
-                                   mExternalCANDataSource.get(),
-                                   std::placeholders::_1,
-                                   std::placeholders::_2 ) );
+                    continue;
                 }
+                mExternalCANDataSource = std::make_unique<ExternalCANDataSource>( *mCANDataConsumer );
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    std::bind( &ExternalCANDataSource::onChangeOfActiveDictionary,
+                               mExternalCANDataSource.get(),
+                               std::placeholders::_1,
+                               std::placeholders::_2 ) );
             }
 #ifdef FWE_FEATURE_ROS2
             else if ( interfaceType == ROS2_INTERFACE_TYPE )
@@ -669,8 +750,10 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
                 {
                     return false;
                 }
-                mROS2DataSource = std::make_shared<ROS2DataSource>( ros2Config, signalBufferPtr, rawDataBufferManager );
+                mROS2DataSource =
+                    std::make_shared<ROS2DataSource>( ros2Config, signalBufferDistributor, mRawBufferManager );
                 mROS2DataSource->connect();
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
                     std::bind( &ROS2DataSource::onChangeOfActiveDictionary,
                                mROS2DataSource.get(),
@@ -686,6 +769,24 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
 
         /********************************Data source bootstrap end*******************************/
 
+        // For asynchronous connect the call needs to be done after all senders and receivers are
+        // created and all receiver listeners are subscribed.
+        if ( !mConnectivityModule->connect() )
+        {
+            return false;
+        }
+
+        if ( ( mRemoteProfiler != nullptr ) && ( !mRemoteProfiler->start() ) )
+        {
+            FWE_LOG_WARN( "Failed to start the Remote Profiler - No remote profiling available until FWE restart" );
+        }
+
+        if ( !mCheckinSender->start() )
+        {
+            FWE_LOG_ERROR( "Failed to start the Checkin thread" );
+            return false;
+        }
+
         // Only start the CollectionSchemeManager after all listeners have subscribed, otherwise
         // they will not be notified of the initial decoder manifest and collection schemes that are
         // read from persistent memory:
@@ -698,7 +799,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
 
 #ifdef FWE_FEATURE_IWAVE_GPS
         /********************************IWave GPS Example NMEA reader *********************************/
-        mIWaveGpsSource = std::make_shared<IWaveGpsSource>( signalBufferPtr );
+        mIWaveGpsSource = std::make_shared<IWaveGpsSource>( signalBufferDistributor );
         std::string pathToNmeaSource;
         CANChannelNumericID canChannel{};
         CANRawFrameID canRawFrameId{};
@@ -734,6 +835,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
                 FWE_LOG_ERROR( "IWaveGps initialization failed" );
                 return false;
             }
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
                 std::bind( &IWaveGpsSource::onChangeOfActiveDictionary,
                            mIWaveGpsSource.get(),
@@ -746,7 +848,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
 
 #ifdef FWE_FEATURE_EXTERNAL_GPS
         /********************************External GPS Example NMEA reader *********************************/
-        mExternalGpsSource = std::make_shared<ExternalGpsSource>( signalBufferPtr );
+        mExternalGpsSource = std::make_shared<ExternalGpsSource>( signalBufferDistributor );
         bool externalGpsInitSuccessful = false;
         if ( config["staticConfig"].isMember( CONFIG_SECTION_EXTERNAL_GPS ) )
         {
@@ -769,6 +871,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
         }
         if ( externalGpsInitSuccessful )
         {
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
                 std::bind( &ExternalGpsSource::onChangeOfActiveDictionary,
                            mExternalGpsSource.get(),
@@ -786,7 +889,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
 
 #ifdef FWE_FEATURE_AAOS_VHAL
         /********************************AAOS VHAL Example reader *********************************/
-        mAaosVhalSource = std::make_shared<AaosVhalSource>( signalBufferPtr );
+        mAaosVhalSource = std::make_shared<AaosVhalSource>( signalBufferDistributor );
         bool aaosVhalInitSuccessful = false;
         if ( config["staticConfig"].isMember( CONFIG_SECTION_AAOS_VHAL ) )
         {
@@ -805,6 +908,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig )
         }
         if ( aaosVhalInitSuccessful )
         {
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
                 std::bind( &AaosVhalSource::onChangeOfActiveDictionary,
                            mAaosVhalSource.get(),
@@ -891,6 +995,12 @@ IoTFleetWiseEngine::disconnect()
         return false;
     }
 
+    if ( !mCheckinSender->stop() )
+    {
+        FWE_LOG_ERROR( "Failed to stop the Checkin thread" );
+        return false;
+    }
+
     for ( auto &source : mCANDataSources )
     {
         if ( !source->disconnect() )
@@ -900,7 +1010,7 @@ IoTFleetWiseEngine::disconnect()
         }
     }
 
-    if ( mConnectivityModule->isAlive() && ( !mConnectivityModule->disconnect() ) )
+    if ( !mConnectivityModule->disconnect() )
     {
         FWE_LOG_ERROR( "Could not disconnect the offboard connectivity" );
         return false;
@@ -1082,8 +1192,9 @@ IoTFleetWiseEngine::getVehiclePropertyInfo()
     }
     return propertyInfo;
 }
+
 void
-IoTFleetWiseEngine::setVehicleProperty( uint32_t signalId, double value )
+IoTFleetWiseEngine::setVehicleProperty( uint32_t signalId, const DecodedSignalValue &value )
 {
     if ( mAaosVhalSource == nullptr )
     {
@@ -1096,8 +1207,8 @@ IoTFleetWiseEngine::setVehicleProperty( uint32_t signalId, double value )
 std::string
 IoTFleetWiseEngine::getStatusSummary()
 {
-    if ( mConnectivityModule == nullptr || mCollectionSchemeManagerPtr == nullptr ||
-         mConnectivityChannelSendVehicleData == nullptr || mOBDOverCANModule == nullptr )
+    if ( mConnectivityModule == nullptr || mCollectionSchemeManagerPtr == nullptr || mSenderVehicleData == nullptr ||
+         mOBDOverCANModule == nullptr )
     {
         return "";
     }
@@ -1120,7 +1231,7 @@ IoTFleetWiseEngine::getStatusSummary()
     }
     status += "\n";
 
-    status += "Payloads sent: " + std::to_string( mConnectivityChannelSendVehicleData->getPayloadCountSent() ) + "\n\n";
+    status += "Payloads sent: " + std::to_string( mSenderVehicleData->getPayloadCountSent() ) + "\n\n";
     return status;
 }
 

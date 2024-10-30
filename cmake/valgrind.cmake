@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
 if(FWE_VALGRIND)
   find_program(VALGRIND_COMMAND valgrind)
   if(NOT VALGRIND_COMMAND)

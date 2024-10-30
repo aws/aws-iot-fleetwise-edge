@@ -13,6 +13,7 @@
 #include "ISender.h"
 #include "Listener.h"
 #include "SchemaListener.h"
+#include "SignalTypes.h"
 #include "checkin.pb.h"
 #include <cstddef>
 #include <cstdint>
@@ -89,9 +90,11 @@ public:
      * system.
      *
      * @param documentARNs List of the ARNs
-     * @return True if the message has been sent. False otherwise.
+     * @param callback callback that will be called when the operation completes (successfully or not).
+     *                 IMPORTANT: The callback can be called by the same thread before sendBuffer even returns
+     *                 or a separate thread, depending on whether the results are known synchronously or asynchronously.
      */
-    bool sendCheckin( const std::vector<std::string> &documentARNs ) override;
+    void sendCheckin( const std::vector<SyncID> &documentARNs, OnCheckinSentCallback callback ) override;
 
 private:
     /**
@@ -133,10 +136,11 @@ private:
 
     /**
      * @brief Sends an mProtoCheckinMsgOutput string on the checkin topic
-     * @return True if the Connectivity Module packed and send the data out of the process space.
-     * It does not guarantee that the data reached the Checkin topic ( best effort QoS )
+     * @param callback callback that will be called when the operation completes (successfully or not).
+     *                 IMPORTANT: The callback can be called by the same thread before sendBuffer even returns
+     *                 or a separate thread, depending on whether the results are known synchronously or asynchronously.
      */
-    bool transmitCheckin();
+    void transmitCheckin( OnCheckinSentCallback callback );
 };
 
 } // namespace IoTFleetWise

@@ -3,3 +3,5 @@ demo.env
 collected-data-*
 ros2-nodes.json
 ros2-decoders.json
+can-nodes.json
+can-decoders.json

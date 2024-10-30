@@ -5,12 +5,8 @@
 
 #include "ICollectionScheme.h"
 #include "IConnectionTypes.h"
-#include "PayloadManager.h"
 #include "StreambufBuilder.h"
 #include "TransferManagerWrapper.h"
-#include <aws/core/client/ClientConfiguration.h>
-#include <aws/core/utils/memory/stl/AWSString.h>
-#include <aws/transfer/TransferHandle.h>
 #include <aws/transfer/TransferManager.h>
 #include <cstddef>
 #include <cstdint>
@@ -33,18 +29,13 @@ namespace IoTFleetWise
 class S3Sender
 {
 public:
+    using ResultCallback = std::function<void( ConnectivityError result, std::shared_ptr<std::streambuf> data )>;
+
     /**
-     * @param payloadManager the payload manager to be used when data needs to be persisted. nullptr
-     *                       can be passed. In such case, data won't be persisted after a failure.
      * @param createTransferManagerWrapper a factory function that creates a new Transfer Manager instance
      * @param multipartSize the size that will be used to decide whether to try a multipart upload
      */
-    S3Sender(
-        std::shared_ptr<PayloadManager> payloadManager,
-        std::function<std::shared_ptr<TransferManagerWrapper>(
-            Aws::Client::ClientConfiguration &clientConfiguration,
-            Aws::Transfer::TransferManagerConfiguration &transferManagerConfiguration )> createTransferManagerWrapper,
-        size_t multipartSize );
+    S3Sender( CreateTransferManagerWrapper createTransferManagerWrapper, size_t multipartSize );
     virtual ~S3Sender() = default;
 
     S3Sender() = delete;
@@ -55,41 +46,37 @@ public:
 
     virtual bool disconnect();
 
-    virtual ConnectivityError sendStream( std::unique_ptr<StreambufBuilder> streambufBuilder,
-                                          const S3UploadMetadata &uploadMetadata,
-                                          const std::string &objectKey,
-                                          std::function<void( bool success )> resultCallback );
+    virtual void sendStream( std::unique_ptr<StreambufBuilder> streambufBuilder,
+                             const S3UploadMetadata &uploadMetadata,
+                             const std::string &objectKey,
+                             ResultCallback resultCallback );
 
 private:
     size_t mMultipartSize;
     std::unordered_map<std::string, std::shared_ptr<TransferManagerWrapper>> mRegionToTransferManagerWrapper;
-    std::shared_ptr<PayloadManager> mPayloadManager;
-    std::function<std::shared_ptr<TransferManagerWrapper>(
-        Aws::Client::ClientConfiguration &clientConfiguration,
-        Aws::Transfer::TransferManagerConfiguration &transferManagerConfiguration )>
-        mCreateTransferManagerWrapper;
+    CreateTransferManagerWrapper mCreateTransferManagerWrapper;
 
     struct OngoingUploadMetadata
     {
         std::shared_ptr<std::streambuf> streambuf;
-        std::function<void( bool success )> resultCallback;
+        ResultCallback resultCallback;
         std::shared_ptr<TransferManagerWrapper> transferManagerWrapper;
         std::shared_ptr<Aws::Transfer::TransferHandle> transferHandle;
         uint8_t attempts;
     };
     std::mutex mQueuedAndOngoingUploadsLookupMutex;
-    std::unordered_map<Aws::String, OngoingUploadMetadata> mOngoingUploads;
+    std::unordered_map<std::string, OngoingUploadMetadata> mOngoingUploads;
     struct QueuedUploadMetadata
     {
         std::unique_ptr<StreambufBuilder> streambufBuilder;
         S3UploadMetadata uploadMetadata;
         std::string objectKey;
-        std::function<void( bool success )> resultCallback;
+        ResultCallback resultCallback;
     };
     std::queue<QueuedUploadMetadata> mQueuedUploads;
 
     /**
-     * @brief TODO
+     * @brief check the ongoing uploads and submit uploads from the queue if possible
      */
     void submitQueuedUploads();
 
@@ -109,14 +96,6 @@ private:
      * the status of a transfer changes.
      */
     void transferStatusUpdatedCallback( const std::shared_ptr<const Aws::Transfer::TransferHandle> &transferHandle );
-
-    /**
-     * @brief Pass data stream to the payload manager to persist
-     *
-     * @param streambufBuilder object that can create the stream with data to persist
-     * @param objectKey S3 object key
-     */
-    void persistS3Request( std::unique_ptr<StreambufBuilder> streambufBuilder, std::string objectKey );
 };
 
 } // namespace IoTFleetWise

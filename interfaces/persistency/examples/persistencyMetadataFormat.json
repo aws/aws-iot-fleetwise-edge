@@ -12,25 +12,11 @@
       "compressionRequired": true
     },
     {
-      "filename": "exampleFile3.10n",
-      "payloadSize": 3428,
-      "compressionRequired": false,
-      "s3UploadMetadata": {
-        "bucketName": "example-bucket-name",
-        "bucketOwner": "012345678901",
-        "region": "eu-central-1"
-      }
-    },
-    {
-      "filename": "exampleFile4.10n",
-      "payloadSize": 245,
-      "compressionRequired": false,
-      "s3UploadMetadata": {
-        "bucketName": "example-bucket-name",
-        "bucketOwner": "012345678901",
-        "region": "eu-central-1",
-        "uploadID": "VCVsb2FkIElEIGZvciBlbZZpbmcncyBteS1tb3ZpZS5tMnRzIHVwbG9hZR",
-        "partNumber": 1
+      "type": "Telemetry",
+      "payload": {
+        "filename": "exampleFile3.bin",
+        "payloadSize": 245,
+        "compressionRequired": false
       }
     }
   ]

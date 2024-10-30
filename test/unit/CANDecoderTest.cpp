@@ -58,8 +58,8 @@ TEST( CANDecoderTest, CANDecoderTestSimpleMessage )
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 7 };
     ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
     ASSERT_EQ( decodedSignals.size(), 2 );
-    ASSERT_EQ( decodedSignals[0].mRawValue, 13 );
-    ASSERT_EQ( decodedSignals[1].mRawValue, 4084 );
+    ASSERT_EQ( decodedSignals[0].mPhysicalValue.signalValue.doubleVal, 13 );
+    ASSERT_DOUBLE_EQ( decodedSignals[1].mPhysicalValue.signalValue.doubleVal, 408.4 );
 }
 
 TEST( CANDecoderTest, CANDecoderTestSimpleMessage2 )
@@ -104,8 +104,8 @@ TEST( CANDecoderTest, CANDecoderTestSimpleMessage2 )
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 7 };
     ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
     ASSERT_EQ( decodedSignals.size(), 2 );
-    ASSERT_EQ( decodedSignals[0].mRawValue, 153638137 );
-    ASSERT_EQ( decodedSignals[1].mRawValue, -299667802 );
+    ASSERT_EQ( decodedSignals[0].mPhysicalValue.signalValue.doubleVal, 153638137 );
+    ASSERT_EQ( decodedSignals[1].mPhysicalValue.signalValue.doubleVal, -299667802 );
 }
 
 // Precision Test
@@ -252,9 +252,9 @@ TEST( CANDecoderTest, CANDecoderTestSimpleMessage3 )
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 2, 3 };
     ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
     ASSERT_EQ( decodedSignals.size(), 3 );
-    EXPECT_EQ( decodedSignals[0].mRawValue, 0x2301 );
-    EXPECT_EQ( decodedSignals[1].mRawValue, 0x4567 );
-    EXPECT_EQ( decodedSignals[2].mRawValue, 0x89AB );
+    EXPECT_EQ( decodedSignals[0].mPhysicalValue.signalValue.doubleVal, 0x2301 );
+    EXPECT_EQ( decodedSignals[1].mPhysicalValue.signalValue.doubleVal, 0x4567 );
+    EXPECT_EQ( decodedSignals[2].mPhysicalValue.signalValue.doubleVal, 0x89AB );
 }
 TEST( CANDecoderTest, CANDecoderTestSimpleCanFdMessage )
 {
@@ -317,10 +317,10 @@ TEST( CANDecoderTest, CANDecoderTestSimpleCanFdMessage )
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 2, 3, 4 };
     ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 64, msgFormat, signalIDsToCollect, decodedSignals ) );
     ASSERT_EQ( decodedSignals.size(), 4 );
-    EXPECT_EQ( decodedSignals[0].mRawValue, 0x2301 );
-    EXPECT_EQ( decodedSignals[1].mRawValue, 0x70123456 );
-    EXPECT_EQ( decodedSignals[2].mRawValue, 0x456701 );
-    EXPECT_EQ( decodedSignals[3].mRawValue, 0x7012 );
+    EXPECT_EQ( decodedSignals[0].mPhysicalValue.signalValue.doubleVal, 0x2301 );
+    EXPECT_EQ( decodedSignals[1].mPhysicalValue.signalValue.doubleVal, 0x70123456 );
+    EXPECT_EQ( decodedSignals[2].mPhysicalValue.signalValue.doubleVal, 0x456701 );
+    EXPECT_EQ( decodedSignals[3].mPhysicalValue.signalValue.doubleVal, 0x7012 );
 }
 
 TEST( CANDecoderTest, CANDecoderTestOnlyDecodeSomeSignals )
@@ -374,8 +374,8 @@ TEST( CANDecoderTest, CANDecoderTestOnlyDecodeSomeSignals )
     std::unordered_set<SignalID> signalIDsToCollect = { 1, 3 };
     ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
     ASSERT_EQ( decodedSignals.size(), 2 );
-    EXPECT_EQ( decodedSignals[0].mRawValue, 0x2301 );
-    EXPECT_EQ( decodedSignals[1].mRawValue, 0x89AB );
+    EXPECT_EQ( decodedSignals[0].mPhysicalValue.signalValue.doubleVal, 0x2301 );
+    EXPECT_EQ( decodedSignals[1].mPhysicalValue.signalValue.doubleVal, 0x89AB );
 }
 
 TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage1 )
@@ -450,10 +450,10 @@ TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage1 )
     std::unordered_set<SignalID> signalIDsToCollect = { 50, 51, 52, 53 };
     ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
     ASSERT_EQ( decodedSignals.size(), 4 );
-    EXPECT_EQ( decodedSignals[0].mRawValue, 0x05 );
-    EXPECT_EQ( decodedSignals[1].mRawValue, 0x4B );
-    EXPECT_EQ( decodedSignals[2].mRawValue, 0x20B );
-    EXPECT_EQ( decodedSignals[3].mRawValue, 0xD3 );
+    EXPECT_EQ( decodedSignals[0].mPhysicalValue.signalValue.doubleVal, 0x05 );
+    EXPECT_EQ( decodedSignals[1].mPhysicalValue.signalValue.doubleVal, 0x4B );
+    EXPECT_EQ( decodedSignals[2].mPhysicalValue.signalValue.doubleVal, 0x20B );
+    EXPECT_EQ( decodedSignals[3].mPhysicalValue.signalValue.doubleVal, 0xD3 );
 }
 
 TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage2 )
@@ -542,10 +542,10 @@ TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage2 )
     std::unordered_set<SignalID> signalIDsToCollect = { 54, 55, 56, 57, 58 };
     ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
     ASSERT_EQ( decodedSignals.size(), 4 );
-    EXPECT_EQ( decodedSignals[0].mRawValue, 0x06 );
-    EXPECT_EQ( decodedSignals[1].mRawValue, 0x1B );
-    EXPECT_EQ( decodedSignals[2].mRawValue, 0x3EB );
-    EXPECT_EQ( decodedSignals[3].mRawValue, 0xE3B );
+    EXPECT_EQ( decodedSignals[0].mPhysicalValue.signalValue.doubleVal, 0x06 );
+    EXPECT_EQ( decodedSignals[1].mPhysicalValue.signalValue.doubleVal, 0x1B );
+    EXPECT_EQ( decodedSignals[2].mPhysicalValue.signalValue.doubleVal, 0x3EB );
+    EXPECT_EQ( decodedSignals[3].mPhysicalValue.signalValue.doubleVal, 0xE3B );
 }
 
 TEST( CANDecoderTest, CANDecoderTestInvalidSignalLayout )

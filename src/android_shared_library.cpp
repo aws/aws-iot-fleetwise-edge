@@ -5,9 +5,11 @@
 #include "IoTFleetWiseEngine.h"
 #include "IoTFleetWiseVersion.h"
 #include "LogLevel.h"
+#include "SignalTypes.h"
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
 #include <android/log.h>
+#include <boost/filesystem.hpp>
 #include <cstdlib>
 #include <exception>
 #include <jni.h>
@@ -134,7 +136,7 @@ Java_com_aws_iotfleetwise_Fwe_run( JNIEnv *env,
 
         mEngine = std::make_shared<Aws::IoTFleetWise::IoTFleetWiseEngine>();
         // Connect the Engine
-        if ( mEngine->connect( config ) && mEngine->start() )
+        if ( mEngine->connect( config, boost::filesystem::path( "" ) ) && mEngine->start() )
         {
             LOGI( std::string( "Started successfully" ) );
         }
@@ -228,7 +230,7 @@ Java_com_aws_iotfleetwise_Fwe_getVehiclePropertyInfo( JNIEnv *env, jobject me )
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_aws_iotfleetwise_Fwe_setVehicleProperty( JNIEnv *env, jobject me, jint signalId, jdouble value )
+Java_com_aws_iotfleetwise_Fwe_setVehicleProperty( JNIEnv *env, jobject me, jint signalId, jobject value )
 {
     static_cast<void>( env );
     static_cast<void>( me );
@@ -236,7 +238,30 @@ Java_com_aws_iotfleetwise_Fwe_setVehicleProperty( JNIEnv *env, jobject me, jint 
     {
         return;
     }
-    mEngine->setVehicleProperty( static_cast<uint32_t>( signalId ), value );
+
+    jclass doubleJClass = env->FindClass( "java/lang/Double" );
+    jclass longJClass = env->FindClass( "java/lang/Long" );
+
+    if ( env->IsInstanceOf( value, doubleJClass ) )
+    {
+        jmethodID doubleJMethodIdDoubleValue = env->GetMethodID( doubleJClass, "doubleValue", "()D" );
+        jdouble doubleValue = env->CallDoubleMethod( value, doubleJMethodIdDoubleValue );
+        mEngine->setVehicleProperty(
+            static_cast<uint32_t>( signalId ),
+            Aws::IoTFleetWise::DecodedSignalValue( doubleValue, Aws::IoTFleetWise::SignalType::DOUBLE ) );
+    }
+    else if ( env->IsInstanceOf( value, longJClass ) )
+    {
+        jmethodID longJMethodIdLongValue = env->GetMethodID( longJClass, "longValue", "()J" );
+        jlong longValue = env->CallLongMethod( value, longJMethodIdLongValue );
+        mEngine->setVehicleProperty(
+            static_cast<uint32_t>( signalId ),
+            Aws::IoTFleetWise::DecodedSignalValue( longValue, Aws::IoTFleetWise::SignalType::INT64 ) );
+    }
+    else
+    {
+        LOGE( std::string( "Unsupported value type" ) );
+    }
 }
 #endif
 

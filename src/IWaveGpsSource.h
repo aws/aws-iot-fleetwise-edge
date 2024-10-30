@@ -25,9 +25,9 @@ class IWaveGpsSource : public CustomDataSource
 {
 public:
     /**
-     *     @param signalBufferPtr the signal buffer is used pass extracted data
+     * @param signalBufferDistributor Signal buffer distributor
      */
-    IWaveGpsSource( SignalBufferPtr signalBufferPtr );
+    IWaveGpsSource( SignalBufferDistributorPtr signalBufferDistributor );
     /**
      * Initialize IWaveGpsSource and set filter for CustomDataSource
      *
@@ -61,6 +61,8 @@ protected:
 private:
     static bool validLatitude( double latitude );
     static bool validLongitude( double longitude );
+    static std::string getFileContents( const std::string &p );
+    static bool detectQuectelDevice();
 
     /**
      * The NMEA protocol provides the position in $GPGGA in the following format
@@ -82,7 +84,7 @@ private:
     uint16_t mLongitudeStartBit = 0;
 
     int mFileHandle = -1;
-    SignalBufferPtr mSignalBufferPtr;
+    SignalBufferDistributorPtr mSignalBufferDistributor;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     Timer mCyclicLoggingTimer;
     uint32_t mGpggaLineCounter = 0;

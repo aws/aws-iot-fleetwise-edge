@@ -97,8 +97,6 @@ TraceModule::getVariableName( TraceVariable variable )
         return "RFrames18_id18";
     case TraceVariable::READ_SOCKET_FRAMES_19:
         return "RFrames19_id19";
-    case TraceVariable::QUEUE_INSPECTION_TO_SENDER:
-        return "QStS_id40";
     case TraceVariable::MAX_SYSTEMTIME_KERNELTIME_DIFF:
         return "SysKerTimeDiff_id41";
     case TraceVariable::PM_MEMORY_NULL:
@@ -153,10 +151,16 @@ TraceModule::getVariableName( TraceVariable variable )
         return "RawElementsPerType";
     case TraceVariable::RAW_DATA_BUFFER_MANAGER_BYTES:
         return "RawBufferBytes";
+    case TraceVariable::QUEUED_S3_OBJECTS:
+        return "QueuedS3Objects";
     case TraceVariable::CE_PROCESSED_DATA_FRAMES:
         return "CEProcessedDataFrames";
     case TraceVariable::CE_PROCESSED_DTCS:
         return "CEProcessedDTCs";
+    case TraceVariable::DATA_FORWARD_BYTES:
+        return "DataForwardBytes";
+    case TraceVariable::VEHICLE_DATA_PUBLISH_COUNT:
+        return "VehicleDataPublishCount";
         // Intentionally omit default so that we can use compiler warnings to remind us about missing values
     }
     return nullptr;
@@ -179,6 +183,8 @@ TraceModule::getAtomicVariableName( TraceAtomicVariable variable )
         return "QueueConsumerToInspectionDataFrames";
     case TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS:
         return "QueueConsumerToInspectionDtcs";
+    case TraceAtomicVariable::QUEUE_INSPECTION_TO_SENDER:
+        return "QStS_id40";
     case TraceAtomicVariable::NOT_TIME_MONOTONIC_FRAMES:
         return "nTime_id2";
     case TraceAtomicVariable::SUBSCRIBE_ERROR:

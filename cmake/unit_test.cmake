@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
 function(add_unit_test TEST_NAME)
     add_test(
         NAME ${TEST_NAME}

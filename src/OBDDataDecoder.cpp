@@ -385,7 +385,7 @@ OBDDataDecoder::calculateValueFromFormula( PID pid,
                 static_cast<uint64_t>( static_cast<double>( rawData ) * formula.mFactor + formula.mOffset );
             TraceModule::get().incrementVariable( TraceVariable::OBD_POSSIBLE_PRECISION_LOSS_UINT64 );
         }
-        info.mPIDsToValues.emplace( formula.mSignalID, OBDSignal( calculatedValue, signalType ) );
+        info.mPIDsToValues.emplace( formula.mSignalID, DecodedSignalValue( calculatedValue, signalType ) );
         break;
     }
     case ( SignalType::INT64 ): {
@@ -401,7 +401,7 @@ OBDDataDecoder::calculateValueFromFormula( PID pid,
                 static_cast<int64_t>( static_cast<double>( rawData ) * formula.mFactor + formula.mOffset );
             TraceModule::get().incrementVariable( TraceVariable::OBD_POSSIBLE_PRECISION_LOSS_INT64 );
         }
-        info.mPIDsToValues.emplace( formula.mSignalID, OBDSignal( calculatedValue, signalType ) );
+        info.mPIDsToValues.emplace( formula.mSignalID, DecodedSignalValue( calculatedValue, signalType ) );
         break;
     }
     // For any other type, we can safely cast everything to double as only int64 and uint64 can't
@@ -409,7 +409,7 @@ OBDDataDecoder::calculateValueFromFormula( PID pid,
     default: {
         double calculatedValue =
             static_cast<double>( static_cast<int64_t>( rawData ) ) * formula.mFactor + formula.mOffset;
-        info.mPIDsToValues.emplace( formula.mSignalID, OBDSignal( calculatedValue, signalType ) );
+        info.mPIDsToValues.emplace( formula.mSignalID, DecodedSignalValue( calculatedValue, signalType ) );
     }
     }
 }
