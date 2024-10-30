@@ -2,26 +2,25 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-set -eo pipefail
+set -efo pipefail
 
 WITH_ROS2_SUPPORT="false"
-EXTRA_CTEST_ARGS=""
+EXTRA_GTEST_FILTER="*"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case $1 in
         --with-ros2-support)
             WITH_ROS2_SUPPORT="true"
-            shift
             ;;
-        --extra-ctest-args)
-            EXTRA_CTEST_ARGS=$2
+        --extra-gtest-filter)
+            EXTRA_GTEST_FILTER=$2
             shift
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --with-ros2-support  Test with ROS2 support"
-            echo "  --extra-ctest-args   Args to be passed to ctest eg. -E <tests to skip>"
+            echo "  --with-ros2-support    Test with ROS2 support"
+            echo "  --extra-gtest-filter   Regex to set for gtest filter eg. '-*<tests to skip>*' or '*<tests to execute>*'"
             exit 0
             ;;
         esac
@@ -37,4 +36,4 @@ if ${WITH_ROS2_SUPPORT}; then
 else
     cd build
 fi
-ctest -V ${EXTRA_CTEST_ARGS}
+GTEST_FILTER=${EXTRA_GTEST_FILTER} ctest -V
