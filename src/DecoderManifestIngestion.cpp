@@ -6,6 +6,7 @@
 #include "EnumUtility.h"
 #include "LoggingModule.h"
 #include "OBDDataTypes.h"
+#include <boost/none.hpp>
 #include <google/protobuf/message.h>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -23,13 +24,13 @@ DecoderManifestIngestion::~DecoderManifestIngestion()
     google::protobuf::ShutdownProtobufLibrary();
 }
 
-std::string
+SyncID
 DecoderManifestIngestion::getID() const
 {
     if ( !mReady )
     {
         // Return empty string
-        return std::string();
+        return SyncID();
     }
 
     return mProtoDecoderManifest.sync_id();
@@ -230,6 +231,10 @@ DecoderManifestIngestion::build()
         mSignalToCANRawFrameIDAndInterfaceIDDictionary.insert( std::make_pair(
             canSignal.signal_id(), std::make_pair( canSignal.message_id(), canSignal.interface_id() ) ) );
 
+        // For backward compatibility, default to double
+        auto signalType =
+            convertPrimitiveTypeToSignalType( canSignal.primitive_type() ).get_value_or( SignalType::DOUBLE );
+
         // Create a container to hold the InterfaceManagement::CANSignal we will build
         CANSignalFormat canSignalFormat;
 
@@ -240,14 +245,15 @@ DecoderManifestIngestion::build()
         canSignalFormat.mSizeInBits = static_cast<uint16_t>( canSignal.length() );
         canSignalFormat.mOffset = canSignal.offset();
         canSignalFormat.mFactor = canSignal.factor();
+        canSignalFormat.mSignalType = signalType;
 
-        // TODO :: Update the datatype from the DM after the schema update for the datatype support
-        mSignalIDToTypeMap[canSignal.signal_id()] = SignalType::DOUBLE; // using double as default
+        mSignalIDToTypeMap[canSignal.signal_id()] = signalType;
 
         canSignalFormat.mIsMultiplexorSignal = false;
         canSignalFormat.mMultiplexorValue = 0;
 
-        FWE_LOG_TRACE( "Adding CAN Signal Format for Signal ID: " + std::to_string( canSignalFormat.mSignalID ) );
+        FWE_LOG_TRACE( "Adding CAN Signal Format for Signal ID: " + std::to_string( canSignalFormat.mSignalID ) +
+                       " and message ID: " + std::to_string( canSignal.message_id() ) );
 
         // Each CANMessageFormat object contains an array of signal decoding rules for each signal it contains. Cloud
         // sends us a set of Signal IDs so we need to iterate through them and either create new CANMessageFormat
@@ -307,6 +313,9 @@ DecoderManifestIngestion::build()
             continue;
         }
         mSignalToVehicleDataSourceProtocol[pidSignal.signal_id()] = VehicleDataSourceProtocol::OBD;
+        // For backward compatibility, default to double
+        auto signalType =
+            convertPrimitiveTypeToSignalType( pidSignal.primitive_type() ).get_value_or( SignalType::DOUBLE );
         PIDSignalDecoderFormat obdPIDSignalDecoderFormat = PIDSignalDecoderFormat(
             pidSignal.pid_response_length(),
             // coverity[autosar_cpp14_a7_2_1_violation] The if-statement above checks the correct range
@@ -318,9 +327,9 @@ DecoderManifestIngestion::build()
             pidSignal.byte_length(),
             static_cast<uint8_t>( pidSignal.bit_right_shift() ),
             static_cast<uint8_t>( pidSignal.bit_mask_length() ) );
+        obdPIDSignalDecoderFormat.mSignalType = signalType;
         mSignalToPIDDictionary[pidSignal.signal_id()] = obdPIDSignalDecoderFormat;
-        // TODO :: Update the datatype from the DM after the schema update for the datatype support
-        mSignalIDToTypeMap[pidSignal.signal_id()] = SignalType::DOUBLE; // using double as default
+        mSignalIDToTypeMap[pidSignal.signal_id()] = signalType;
     }
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -346,7 +355,8 @@ DecoderManifestIngestion::build()
             auto scaling = primitiveData.scaling();
             scaling = ( scaling == 0.0 ? 1.0 : scaling ); // If scaling is not set in protobuf or set to invalid 0
                                                           // replace it by default scaling: 1
-            auto convertedType = convertPrimitiveTypeToSignalType( primitiveData.primitive_type() );
+            auto convertedType =
+                convertPrimitiveTypeToSignalType( primitiveData.primitive_type() ).get_value_or( SignalType::UINT8 );
             mComplexTypeMap[complexType.type_id()] =
                 ComplexDataElement( PrimitiveData{ convertedType, scaling, primitiveData.offset() } );
             FWE_LOG_TRACE( "Adding PrimitiveData with complex type id: " + std::to_string( complexType.type_id() ) +
@@ -375,22 +385,21 @@ DecoderManifestIngestion::build()
         else if ( complexType.variant_case() == Schemas::DecoderManifestMsg::ComplexType::kStringData )
         {
             auto &complexStringData = complexType.string_data();
-            if ( ( complexStringData.encoding() != Schemas::DecoderManifestMsg::StringEncoding::UTF_16 ) &&
-                 ( complexStringData.encoding() != Schemas::DecoderManifestMsg::StringEncoding::UTF_8 ) )
+            auto encoding = complexStringData.encoding();
+            if ( ( encoding != Schemas::DecoderManifestMsg::StringEncoding::UTF_16 ) &&
+                 ( encoding != Schemas::DecoderManifestMsg::StringEncoding::UTF_8 ) )
             {
                 FWE_LOG_WARN( "String data with type id " + std::to_string( complexType.type_id() ) +
-                              " has invalid encoding: " +
-                              std::to_string( static_cast<uint32_t>( complexStringData.encoding() ) ) );
+                              " has invalid encoding: " + std::to_string( static_cast<uint32_t>( encoding ) ) );
                 continue;
             }
-            ComplexDataTypeId characterType =
-                complexStringData.encoding() == Schemas::DecoderManifestMsg::StringEncoding::UTF_16
-                    ? RESERVED_UTF16_UINT32_TYPE_ID
-                    : RESERVED_UTF8_UINT8_TYPE_ID;
+            ComplexDataTypeId characterType = encoding == Schemas::DecoderManifestMsg::StringEncoding::UTF_16
+                                                  ? RESERVED_UTF16_UINT32_TYPE_ID
+                                                  : RESERVED_UTF8_UINT8_TYPE_ID;
             if ( mComplexTypeMap.find( characterType ) == mComplexTypeMap.end() )
             {
                 SignalType signalType =
-                    complexStringData.encoding() == Schemas::DecoderManifestMsg::StringEncoding::UTF_16
+                    encoding == Schemas::DecoderManifestMsg::StringEncoding::UTF_16
                         ? SignalType::UINT32 // ROS2 implementation uses uint32 for utf-16 (wstring) code units
                         : SignalType::UINT8;
                 mComplexTypeMap[characterType] = PrimitiveData{ signalType, 1.0, 0.0 };
@@ -418,7 +427,7 @@ DecoderManifestIngestion::build()
                 complexSignal.interface_id(), complexSignal.message_id(), complexSignal.root_type_id() };
 
             mSignalIDToTypeMap[complexSignal.signal_id()] =
-                SignalType::RAW_DATA_BUFFER_HANDLE; // handle top level signals always as raw data handles
+                SignalType::COMPLEX_SIGNAL; // handle top level signals always as raw data handles
             FWE_LOG_TRACE( "Adding complex signal with id: " + std::to_string( complexSignal.signal_id() ) +
                            " with interface ID: '" + complexSignal.interface_id() + "' message  ID: '" +
                            complexSignal.message_id() +
@@ -433,8 +442,7 @@ DecoderManifestIngestion::build()
     return true;
 }
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-SignalType
+boost::optional<SignalType>
 DecoderManifestIngestion::convertPrimitiveTypeToSignalType( Schemas::DecoderManifestMsg::PrimitiveType primitiveType )
 {
     switch ( primitiveType )
@@ -461,13 +469,14 @@ DecoderManifestIngestion::convertPrimitiveTypeToSignalType( Schemas::DecoderMani
         return SignalType::FLOAT;
     case Schemas::DecoderManifestMsg::PrimitiveType::FLOAT64:
         return SignalType::DOUBLE;
+    case Schemas::DecoderManifestMsg::PrimitiveType::NULL_:
+        return SignalType::DOUBLE;
     default:
         FWE_LOG_WARN( "Currently PrimitiveType " + std::to_string( primitiveType ) + " is not supported" );
         break;
     }
-    return SignalType::UINT8; // default to uint8
+    return boost::none;
 }
-#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

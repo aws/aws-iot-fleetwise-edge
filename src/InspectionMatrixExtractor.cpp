@@ -6,7 +6,7 @@
 #include "LoggingModule.h"
 #include <algorithm> // IWYU pragma: keep
 #include <cstddef>
-#include <stack>
+#include <cstdint>
 #include <string>
 #include <unordered_map> // IWYU pragma: keep
 #include <utility>
@@ -18,55 +18,57 @@ namespace IoTFleetWise
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 void
-CollectionSchemeManager::updateRawDataBufferConfig(
-    std::shared_ptr<Aws::IoTFleetWise::ComplexDataDecoderDictionary> complexDataDecoderDictionary )
+CollectionSchemeManager::updateRawDataBufferConfigComplexSignals(
+    std::shared_ptr<Aws::IoTFleetWise::ComplexDataDecoderDictionary> complexDataDecoderDictionary,
+    std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> &updatedSignals )
 {
-    std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> updatedSignals;
-    // Iterate through enabled collectionScheme lists to locate the signals and CAN frames to be collected
-    for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); ++it )
+    if ( ( mDecoderManifest != nullptr ) && isCollectionSchemesInSyncWithDm() )
     {
-        const auto &collectionSchemePtr = it->second;
-        // first iterate through the signalID lists
-        for ( const auto &signalInfo : collectionSchemePtr->getCollectSignals() )
+        // Iterate through enabled collectionScheme lists to locate the signals and CAN frames to be collected
+        for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); ++it )
         {
-            SignalID signalId = signalInfo.signalID;
-            if ( ( signalId & INTERNAL_SIGNAL_ID_BITMASK ) != 0 )
+            const auto &collectionSchemePtr = it->second;
+            // first iterate through the signalID lists
+            for ( const auto &signalInfo : collectionSchemePtr->getCollectSignals() )
             {
-                continue;
-            }
-
-            auto networkType = mDecoderManifest->getNetworkProtocol( signalId );
-            if ( networkType != VehicleDataSourceProtocol::COMPLEX_DATA )
-            {
-                continue;
-            }
-
-            RawData::SignalUpdateConfig signalConfig;
-            signalConfig.typeId = signalId;
-
-            auto complexSignalDecoderFormat = mDecoderManifest->getComplexSignalDecoderFormat( signalId );
-            signalConfig.interfaceId = complexSignalDecoderFormat.mInterfaceId;
-            if ( complexDataDecoderDictionary != nullptr )
-            {
-                auto interface = complexDataDecoderDictionary->complexMessageDecoderMethod.find(
-                    complexSignalDecoderFormat.mInterfaceId );
-                // Now try to find the messageId for this signal
-                if ( interface != complexDataDecoderDictionary->complexMessageDecoderMethod.end() )
+                SignalID signalId = signalInfo.signalID;
+                if ( ( signalId & INTERNAL_SIGNAL_ID_BITMASK ) != 0 )
                 {
-                    auto complexDataMessage = std::find_if(
-                        interface->second.begin(), interface->second.end(), [signalId]( const auto &pair ) -> bool {
-                            return pair.second.mSignalId == signalId;
-                        } );
-                    if ( complexDataMessage != interface->second.end() )
+                    continue;
+                }
+
+                auto networkType = mDecoderManifest->getNetworkProtocol( signalId );
+                if ( networkType != VehicleDataSourceProtocol::COMPLEX_DATA )
+                {
+                    continue;
+                }
+
+                RawData::SignalUpdateConfig signalConfig;
+                signalConfig.typeId = signalId;
+
+                auto complexSignalDecoderFormat = mDecoderManifest->getComplexSignalDecoderFormat( signalId );
+                signalConfig.interfaceId = complexSignalDecoderFormat.mInterfaceId;
+                if ( complexDataDecoderDictionary != nullptr )
+                {
+                    auto interface = complexDataDecoderDictionary->complexMessageDecoderMethod.find(
+                        complexSignalDecoderFormat.mInterfaceId );
+                    // Now try to find the messageId for this signal
+                    if ( interface != complexDataDecoderDictionary->complexMessageDecoderMethod.end() )
                     {
-                        signalConfig.messageId = complexDataMessage->first;
+                        auto complexDataMessage = std::find_if(
+                            interface->second.begin(), interface->second.end(), [signalId]( const auto &pair ) -> bool {
+                                return pair.second.mSignalId == signalId;
+                            } );
+                        if ( complexDataMessage != interface->second.end() )
+                        {
+                            signalConfig.messageId = complexDataMessage->first;
+                        }
                     }
                 }
+                updatedSignals[signalId] = signalConfig;
             }
-            updatedSignals[signalId] = signalConfig;
         }
     }
-    mRawDataBufferManager->updateConfig( updatedSignals );
 }
 #endif
 
@@ -74,10 +76,11 @@ void
 CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectionScheme,
                                            ConditionWithCollectedData &conditionData )
 {
-    conditionData.minimumPublishIntervalMs = collectionScheme->getMinimumPublishIntervalMs();
-    conditionData.afterDuration = collectionScheme->getAfterDurationMs();
-    conditionData.includeActiveDtcs = collectionScheme->isActiveDTCsIncluded();
-    conditionData.triggerOnlyOnRisingEdge = collectionScheme->isTriggerOnlyOnRisingEdge();
+    conditionData.metadata.compress = collectionScheme->isCompressionNeeded();
+    conditionData.metadata.persist = collectionScheme->isPersistNeeded();
+    conditionData.metadata.priority = collectionScheme->getPriority();
+    conditionData.metadata.decoderID = collectionScheme->getDecoderManifestID();
+    conditionData.metadata.collectionSchemeID = collectionScheme->getCollectionSchemeID();
 
     /*
      * use for loop to copy signalInfo and CANframe over to avoid error or memory issue
@@ -97,118 +100,151 @@ CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectio
         conditionData.signals.emplace_back( inspectionSignal );
     }
 
-    const std::vector<CanFrameCollectionInfo> &collectionCANFrames = collectionScheme->getCollectRawCanFrames();
-    for ( uint32_t i = 0; i < collectionCANFrames.size(); i++ )
     {
-        InspectionMatrixCanFrameCollectionInfo CANFrame = {};
-        CANFrame.frameID = collectionCANFrames[i].frameID;
-        CANFrame.channelID = mCANIDTranslator.getChannelNumericID( collectionCANFrames[i].interfaceID );
-        CANFrame.sampleBufferSize = collectionCANFrames[i].sampleBufferSize;
-        CANFrame.minimumSampleIntervalMs = collectionCANFrames[i].minimumSampleIntervalMs;
-        if ( CANFrame.channelID == INVALID_CAN_SOURCE_NUMERIC_ID )
+        const std::vector<CanFrameCollectionInfo> &collectionCANFrames = collectionScheme->getCollectRawCanFrames();
+        for ( uint32_t i = 0; i < collectionCANFrames.size(); i++ )
         {
-            FWE_LOG_WARN( "Invalid Interface ID provided: " + collectionCANFrames[i].interfaceID );
+            InspectionMatrixCanFrameCollectionInfo CANFrame = {};
+            CANFrame.frameID = collectionCANFrames[i].frameID;
+            CANFrame.channelID = mCANIDTranslator.getChannelNumericID( collectionCANFrames[i].interfaceID );
+            CANFrame.sampleBufferSize = collectionCANFrames[i].sampleBufferSize;
+            CANFrame.minimumSampleIntervalMs = collectionCANFrames[i].minimumSampleIntervalMs;
+            if ( CANFrame.channelID == INVALID_CAN_SOURCE_NUMERIC_ID )
+            {
+                FWE_LOG_WARN( "Invalid Interface ID provided: " + collectionCANFrames[i].interfaceID );
+            }
+            else
+            {
+                conditionData.canFrames.emplace_back( CANFrame );
+            }
         }
-        else
-        {
-            conditionData.canFrames.emplace_back( CANFrame );
-        }
+
+        conditionData.minimumPublishIntervalMs = collectionScheme->getMinimumPublishIntervalMs();
+        conditionData.afterDuration = collectionScheme->getAfterDurationMs();
+        conditionData.includeActiveDtcs = collectionScheme->isActiveDTCsIncluded();
+        conditionData.triggerOnlyOnRisingEdge = collectionScheme->isTriggerOnlyOnRisingEdge();
     }
-    // The rest
-    conditionData.metadata.compress = collectionScheme->isCompressionNeeded();
-    conditionData.metadata.persist = collectionScheme->isPersistNeeded();
-    conditionData.metadata.priority = collectionScheme->getPriority();
-    conditionData.metadata.decoderID = collectionScheme->getDecoderManifestID();
-    conditionData.metadata.collectionSchemeID = collectionScheme->getCollectionSchemeID();
+}
+
+static void
+buildExpressionNodeMapAndVector( const ExpressionNode *expressionNode,
+                                 std::map<const ExpressionNode *, uint32_t> &expressionNodeToIndexMap,
+                                 std::vector<const ExpressionNode *> &expressionNodes,
+                                 uint32_t &index,
+                                 bool &isStaticCondition,
+                                 bool &alwaysEvaluateCondition )
+{
+    if ( expressionNode == nullptr )
+    {
+        return;
+    }
+
+    expressionNodeToIndexMap[expressionNode] = index;
+    index++;
+    expressionNodes.push_back( expressionNode );
+
+    if ( expressionNode->nodeType == ExpressionNodeType::SIGNAL )
+    {
+        // If at least one of the nodes is a signal value, condition is not static
+        isStaticCondition = false;
+    }
+
+    buildExpressionNodeMapAndVector( expressionNode->left,
+                                     expressionNodeToIndexMap,
+                                     expressionNodes,
+                                     index,
+                                     isStaticCondition,
+                                     alwaysEvaluateCondition );
+    buildExpressionNodeMapAndVector( expressionNode->right,
+                                     expressionNodeToIndexMap,
+                                     expressionNodes,
+                                     index,
+                                     isStaticCondition,
+                                     alwaysEvaluateCondition );
 }
 
 void
-CollectionSchemeManager::inspectionMatrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix )
+CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix )
 {
-    std::stack<const ExpressionNode *> nodeStack;
-    std::map<const ExpressionNode *, uint32_t> nodeToIndexMap;
-    std::vector<const ExpressionNode *> nodes;
-    uint32_t index = 0;
-    const ExpressionNode *currNode = nullptr;
+    std::map<const ExpressionNode *, uint32_t> expressionNodeToIndexMap;
+    std::vector<const ExpressionNode *> expressionNodes;
+    uint32_t index = 0U;
 
-    for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); it++ )
+    if ( !isCollectionSchemesInSyncWithDm() )
     {
-        ICollectionSchemePtr collectionScheme = it->second;
-        ConditionWithCollectedData conditionData;
-        addConditionData( collectionScheme, conditionData );
-
-        currNode = collectionScheme->getCondition();
-        /* save the old root of this tree */
-        conditionData.condition = currNode;
-        inspectionMatrix->conditions.emplace_back( conditionData );
-
-        /*
-         * The following lines traverse each tree and pack the node addresses into a vector
-         * and build a map
-         * any order to traverse the tree is OK, here we use in-order.
-         */
-        while ( currNode != nullptr )
-        {
-            nodeStack.push( currNode );
-            currNode = currNode->left;
-        }
-        while ( !nodeStack.empty() )
-        {
-            currNode = nodeStack.top();
-            nodeStack.pop();
-            nodeToIndexMap[currNode] = index;
-            nodes.emplace_back( currNode );
-            index++;
-            if ( currNode->right != nullptr )
-            {
-                currNode = currNode->right;
-                while ( currNode != nullptr )
-                {
-                    nodeStack.push( currNode );
-                    currNode = currNode->left;
-                }
-            }
-        }
+        return;
     }
 
-    size_t count = nodes.size();
-    /* now we have the count of all nodes from all collectionSchemes, allocate a vector for the output */
-    inspectionMatrix->expressionNodeStorage.resize( count );
-    /* copy from the old tree node and update left and right children pointers */
-    for ( uint32_t i = 0; i < count; i++ )
+    for ( const auto &enabledCollectionScheme : mEnabledCollectionSchemeMap )
     {
-        inspectionMatrix->expressionNodeStorage[i].nodeType = nodes[i]->nodeType;
-        inspectionMatrix->expressionNodeStorage[i].floatingValue = nodes[i]->floatingValue;
-        inspectionMatrix->expressionNodeStorage[i].booleanValue = nodes[i]->booleanValue;
-        inspectionMatrix->expressionNodeStorage[i].signalID = nodes[i]->signalID;
-        inspectionMatrix->expressionNodeStorage[i].function = nodes[i]->function;
+        ICollectionSchemePtr collectionScheme = enabledCollectionScheme.second;
 
-        if ( nodes[i]->left != nullptr )
+        extractCondition( inspectionMatrix,
+                          collectionScheme,
+                          expressionNodes,
+                          expressionNodeToIndexMap,
+                          index,
+                          collectionScheme->getCondition() );
+    }
+
+    // re-build all ExpressionNodes (for storage) and set ExpressionNode pointer addresses appropriately
+    std::size_t expressionNodeCount = expressionNodes.size();
+
+    inspectionMatrix->expressionNodeStorage.resize( expressionNodeCount );
+
+    for ( std::size_t i = 0U; i < expressionNodeCount; i++ )
+    {
+        inspectionMatrix->expressionNodeStorage[i].nodeType = expressionNodes[i]->nodeType;
+        inspectionMatrix->expressionNodeStorage[i].floatingValue = expressionNodes[i]->floatingValue;
+        inspectionMatrix->expressionNodeStorage[i].booleanValue = expressionNodes[i]->booleanValue;
+        inspectionMatrix->expressionNodeStorage[i].signalID = expressionNodes[i]->signalID;
+        inspectionMatrix->expressionNodeStorage[i].function.windowFunction =
+            expressionNodes[i]->function.windowFunction;
+        if ( expressionNodes[i]->left != nullptr )
         {
-            uint32_t leftIndex = nodeToIndexMap[nodes[i]->left];
+            uint32_t leftIndex = expressionNodeToIndexMap[expressionNodes[i]->left];
             inspectionMatrix->expressionNodeStorage[i].left = &inspectionMatrix->expressionNodeStorage[leftIndex];
         }
-        else
-        {
-            inspectionMatrix->expressionNodeStorage[i].left = nullptr;
-        }
 
-        if ( nodes[i]->right != nullptr )
+        if ( expressionNodes[i]->right != nullptr )
         {
-            uint32_t rightIndex = nodeToIndexMap[nodes[i]->right];
+            uint32_t rightIndex = expressionNodeToIndexMap[expressionNodes[i]->right];
             inspectionMatrix->expressionNodeStorage[i].right = &inspectionMatrix->expressionNodeStorage[rightIndex];
         }
-        else
+    }
+
+    for ( auto &conditionWithCollectedData : inspectionMatrix->conditions )
+    {
+        if ( conditionWithCollectedData.condition != nullptr )
         {
-            inspectionMatrix->expressionNodeStorage[i].right = nullptr;
+            uint32_t conditionIndex = expressionNodeToIndexMap[conditionWithCollectedData.condition];
+
+            conditionWithCollectedData.condition = &inspectionMatrix->expressionNodeStorage[conditionIndex];
         }
     }
-    /* update the root of tree with new address */
-    for ( uint32_t i = 0; i < inspectionMatrix->conditions.size(); i++ )
-    {
-        uint32_t newIndex = nodeToIndexMap[inspectionMatrix->conditions[i].condition];
-        inspectionMatrix->conditions[i].condition = &inspectionMatrix->expressionNodeStorage[newIndex];
-    }
+}
+
+void
+CollectionSchemeManager::extractCondition( const std::shared_ptr<InspectionMatrix> &inspectionMatrix,
+                                           const ICollectionSchemePtr &collectionScheme,
+                                           std::vector<const ExpressionNode *> &nodes,
+                                           std::map<const ExpressionNode *, uint32_t> &nodeToIndexMap,
+                                           uint32_t &index,
+                                           const ExpressionNode *initialNode )
+{
+    ConditionWithCollectedData conditionData{};
+    addConditionData( collectionScheme, conditionData );
+    const ExpressionNode *currNode = initialNode;
+    /* save the old root of this tree */
+    conditionData.condition = currNode;
+
+    buildExpressionNodeMapAndVector( currNode,
+                                     nodeToIndexMap,
+                                     nodes,
+                                     index,
+                                     conditionData.isStaticCondition,
+                                     conditionData.alwaysEvaluateCondition );
+    inspectionMatrix->conditions.emplace_back( conditionData );
 }
 
 void

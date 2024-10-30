@@ -36,9 +36,7 @@ parse_args() {
 
 parse_args "$@"
 
-if [ -z "${FWE_ADDITIONAL_CMAKE_ARGS+x}" ]; then
-    FWE_ADDITIONAL_CMAKE_ARGS=""
-fi
+: ${FWE_ADDITIONAL_CMAKE_ARGS:=""}
 
 export PATH=/usr/local/android_sdk/cmake/${VERSION_CMAKE}/bin:${NATIVE_PREFIX}/bin:${PATH}
 mkdir -p build && cd build

@@ -58,7 +58,7 @@ public:
 
     /**
      * @brief Initializes the OBD Diagnostic Session.
-     * @param signalBufferPtr Signal Buffer shared pointer.
+     * @param signalBufferDistributor Signal buffer distributor
      * @param gatewayCanInterfaceName CAN IF Name where the OBD stack on the ECU
      * is running. Typically on the Gateway ECU.
      * @param pidRequestIntervalSeconds Interval in seconds used to schedule PID requests
@@ -67,7 +67,7 @@ public:
      * @return True if successful. False if both pidRequestIntervalSeconds
      * and dtcRequestIntervalSeconds are zero i.e. no collection
      */
-    bool init( SignalBufferPtr signalBufferPtr,
+    bool init( SignalBufferDistributorPtr signalBufferDistributor,
                const std::string &gatewayCanInterfaceName,
                uint32_t pidRequestIntervalSeconds,
                uint32_t dtcRequestIntervalSeconds,
@@ -98,17 +98,6 @@ public:
 
     // We need this to know whether DTCs should be requested or not
     void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix );
-
-    /**
-     * @brief Handle of the Signal Output Buffer. This buffer shared between Collection Engine
-     * Vehicle Data Consumer and OBDOverCANModule
-     * @return shared object pointer to the Signal buffer.
-     */
-    inline SignalBufferPtr
-    getSignalBufferPtr() const
-    {
-        return mSignalBufferPtr;
-    }
 
     /**
      * @brief Gets a list of PIDs to request externally
@@ -191,8 +180,7 @@ private:
     // Decoder Manifest and campaigns availability Signal
     Signal mDataAvailableWait;
 
-    // Signal Buffer shared pointer
-    SignalBufferPtr mSignalBufferPtr;
+    SignalBufferDistributorPtr mSignalBufferDistributor;
     uint32_t mPIDRequestIntervalSeconds{ 0 };
     uint32_t mDTCRequestIntervalSeconds{ 0 };
     bool mBroadcastRequests{ false };

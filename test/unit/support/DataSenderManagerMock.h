@@ -21,55 +21,39 @@ class DataSenderManagerMock : public DataSenderManager
 public:
     unsigned mCheckAndSendRetrievedDataCalls{ 0 };
 
-    DataSenderManagerMock( CANInterfaceIDTranslator &canIDTranslator )
-        : DataSenderManager( nullptr,
-                             nullptr,
-                             canIDTranslator,
-                             0
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                             ,
-                             nullptr,
-                             nullptr,
-                             ""
-#endif
-          )
+    DataSenderManagerMock()
+        : DataSenderManager( {}, nullptr, nullptr )
     {
     }
 
     void
-    processCollectedData( const TriggeredCollectionSchemeDataPtr triggeredCollectionSchemeDataPtr
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                          ,
-                          std::function<void( TriggeredCollectionSchemeDataPtr )> reportUploadCallback
-#endif
-                          ) override
+    processData( std::shared_ptr<const DataToSend> data ) override
     {
         std::lock_guard<std::mutex> lock( mProcessedDataMutex );
-        mProcessedData.push_back( triggeredCollectionSchemeDataPtr );
-        mockedProcessCollectedData( triggeredCollectionSchemeDataPtr
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                                    ,
-                                    reportUploadCallback
-#endif
-        );
+        mProcessedData.push_back( data );
+        mockedProcessData( data );
     }
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-    MOCK_METHOD( void,
-                 mockedProcessCollectedData,
-                 ( const TriggeredCollectionSchemeDataPtr triggeredCollectionSchemeDataPtr,
-                   std::function<void( TriggeredCollectionSchemeDataPtr )> reportUploadCallback ) );
-#else
-    MOCK_METHOD( void,
-                 mockedProcessCollectedData,
-                 ( const TriggeredCollectionSchemeDataPtr triggeredCollectionSchemeDataPtr ) );
-#endif
+    MOCK_METHOD( void, mockedProcessData, (std::shared_ptr<const DataToSend>));
 
-    std::vector<TriggeredCollectionSchemeDataPtr>
+    std::vector<std::shared_ptr<const DataToSend>>
     getProcessedData()
     {
         std::lock_guard<std::mutex> lock( mProcessedDataMutex );
         return mProcessedData;
+    }
+
+    template <typename T>
+    std::vector<std::shared_ptr<const T>>
+    getProcessedData()
+    {
+        std::lock_guard<std::mutex> lock( mProcessedDataMutex );
+        std::vector<std::shared_ptr<const T>> castedProcessedData;
+        for ( auto data : mProcessedData )
+        {
+            castedProcessedData.push_back( std::dynamic_pointer_cast<const T>( data ) );
+        }
+        return castedProcessedData;
     }
 
     void
@@ -78,19 +62,9 @@ public:
         mCheckAndSendRetrievedDataCalls++;
     }
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-    std::shared_ptr<const ActiveCollectionSchemes> mActiveCollectionSchemes;
-    void
-    onChangeCollectionSchemeList(
-        const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes ) override
-    {
-        mActiveCollectionSchemes = activeCollectionSchemes;
-    }
-#endif
-
 private:
     // Record the calls so that we can wait for asynchronous calls to happen.
-    std::vector<TriggeredCollectionSchemeDataPtr> mProcessedData;
+    std::vector<std::shared_ptr<const DataToSend>> mProcessedData;
     std::mutex mProcessedDataMutex;
 };
 

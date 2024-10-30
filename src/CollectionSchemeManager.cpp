@@ -5,7 +5,7 @@
 #include "ICollectionScheme.h"
 #include "LoggingModule.h"
 #include "TraceModule.h"
-#include <algorithm>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -16,18 +16,14 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-const std::string CollectionSchemeManager::CHECKIN = "Checkin";
-CollectionSchemeManager::CollectionSchemeManager( std::string dm_id )
-    : mCurrentDecoderManifestID( std::move( dm_id ) )
-{
-}
-
-CollectionSchemeManager::CollectionSchemeManager( std::string dm_id,
-                                                  std::map<std::string, ICollectionSchemePtr> mapEnabled,
-                                                  std::map<std::string, ICollectionSchemePtr> mapIdle )
-    : mIdleCollectionSchemeMap( std::move( mapIdle ) )
-    , mEnabledCollectionSchemeMap( std::move( mapEnabled ) )
-    , mCurrentDecoderManifestID( std::move( dm_id ) )
+CollectionSchemeManager::CollectionSchemeManager( std::shared_ptr<CacheAndPersist> schemaPersistencyPtr,
+                                                  CANInterfaceIDTranslator &canIDTranslator,
+                                                  std::shared_ptr<CheckinSender> checkinSender,
+                                                  std::shared_ptr<RawData::BufferManager> rawDataBufferManager )
+    : mCheckinSender( std::move( checkinSender ) )
+    , mRawDataBufferManager( std::move( rawDataBufferManager ) )
+    , mSchemaPersistency( std::move( schemaPersistencyPtr ) )
+    , mCANIDTranslator( canIDTranslator )
 {
 }
 
@@ -90,7 +86,7 @@ CollectionSchemeManager::shouldStop() const
 /* supporting functions for logging */
 void
 CollectionSchemeManager::printEventLogMsg( std::string &msg,
-                                           const std::string &id,
+                                           const SyncID &id,
                                            const Timestamp &startTime,
                                            const Timestamp &stopTime,
                                            const TimePoint &currTime )
@@ -124,59 +120,30 @@ CollectionSchemeManager::printWakeupStatus( std::string &wakeupStr ) const
 {
     wakeupStr = "Waking up to update the CollectionScheme: ";
     wakeupStr += mProcessCollectionScheme ? "Yes" : "No";
-    wakeupStr += " and the DecoderManifest: ";
+    wakeupStr += ", the DecoderManifest: ";
     wakeupStr += mProcessDecoderManifest ? "Yes" : "No";
-}
-
-// Clears both enabled collectionScheme map and idle collectionScheme map
-// removes all dataPair from mTimeLine except for CHECKIN
-void
-CollectionSchemeManager::cleanupCollectionSchemes()
-{
-    if ( mEnabledCollectionSchemeMap.empty() && mIdleCollectionSchemeMap.empty() )
-    {
-        // already cleaned up
-        return;
-    }
-    mEnabledCollectionSchemeMap.clear();
-    mIdleCollectionSchemeMap.clear();
-
-    // when cleaning up mTimeLine checkIn event needs to be preserved
-    TimeData saveTimeData = { { 0, 0 }, "" };
-    while ( !mTimeLine.empty() )
-    {
-        if ( mTimeLine.top().id == CHECKIN )
-        {
-            saveTimeData = mTimeLine.top();
-        }
-        mTimeLine.pop();
-    }
-    if ( saveTimeData.time.monotonicTimeMs != 0 )
-    {
-        mTimeLine.push( saveTimeData );
-    }
 }
 
 void
 CollectionSchemeManager::doWork( void *data )
 {
     CollectionSchemeManager *collectionSchemeManager = static_cast<CollectionSchemeManager *>( data );
-    bool enabledCollectionSchemeMapChanged = false;
 
-    // Set up timer for checkin messages
-    collectionSchemeManager->prepareCheckinTimer();
-    // Retrieve collectionSchemeList and decoderManifest from persistent storage
+    // Retrieve data from persistent storage
     static_cast<void>( collectionSchemeManager->retrieve( DataType::COLLECTION_SCHEME_LIST ) );
     static_cast<void>( collectionSchemeManager->retrieve( DataType::DECODER_MANIFEST ) );
+    bool initialCheckinDocumentsUpdate = true;
     while ( true )
     {
+        bool decoderManifestChanged = false;
+        bool enabledCollectionSchemeMapChanged = false;
         if ( collectionSchemeManager->mProcessDecoderManifest )
         {
             collectionSchemeManager->mProcessDecoderManifest = false;
             TraceModule::get().sectionBegin( TraceSection::MANAGER_DECODER_BUILD );
             if ( collectionSchemeManager->processDecoderManifest() )
             {
-                enabledCollectionSchemeMapChanged = true;
+                decoderManifestChanged = true;
             }
             TraceModule::get().sectionEnd( TraceSection::MANAGER_DECODER_BUILD );
         }
@@ -195,43 +162,51 @@ CollectionSchemeManager::doWork( void *data )
         {
             enabledCollectionSchemeMapChanged = true;
         }
-        if ( enabledCollectionSchemeMapChanged )
+
+        bool documentsChanged = decoderManifestChanged || enabledCollectionSchemeMapChanged;
+
+        if ( documentsChanged || initialCheckinDocumentsUpdate )
+        {
+            initialCheckinDocumentsUpdate = false;
+            collectionSchemeManager->updateCheckinDocuments();
+        }
+
+        if ( documentsChanged )
         {
             TraceModule::get().sectionBegin( TraceSection::MANAGER_EXTRACTION );
-            TraceModule::get().sectionBegin( TraceSection::COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA );
-            FWE_LOG_TRACE(
-
-                "Start extraction because of changed active collection schemes at system time " +
-                std::to_string( checkTime.systemTimeMs ) );
-            /*
-             * Extract InspectionMatrix from mEnabledCollectionSchemeMap
-             *
-             * input: mEnabledCollectionSchemeMap
-             * output: shared_ptr to InspectionMatrix
-             *
-             * Then, propagate inspection matrix to Inspection engine
-             */
-            enabledCollectionSchemeMapChanged = false;
+            FWE_LOG_TRACE( "Start extraction at system time " + std::to_string( checkTime.systemTimeMs ) );
             auto inspectionMatrixOutput = std::make_shared<InspectionMatrix>();
-            collectionSchemeManager->inspectionMatrixExtractor( inspectionMatrixOutput );
-            collectionSchemeManager->inspectionMatrixUpdater( inspectionMatrixOutput );
-            /*
-             * extract decoder dictionary
-             * input: mDecoderManifest
-             * output: shared_ptr to decoderDictionary
-             *
-             * the propagate the output to Vehicle Data Consumers
-             */
-            std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
-            collectionSchemeManager->decoderDictionaryExtractor( decoderDictionaryMap );
-            // Publish decoder dictionaries update to all listeners
-            collectionSchemeManager->decoderDictionaryUpdater( decoderDictionaryMap );
-            // coverity[check_return : SUPPRESS]
+            TraceModule::get().sectionBegin( TraceSection::COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA );
 
+            // Extract InspectionMatrix from mEnabledCollectionSchemeMap
+            collectionSchemeManager->updateActiveCollectionSchemeListeners();
+            collectionSchemeManager->matrixExtractor( inspectionMatrixOutput );
+            std::string enabled;
+            std::string idle;
+            collectionSchemeManager->printExistingCollectionSchemes( enabled, idle );
+            FWE_LOG_INFO( "FWE activated collection schemes:" + enabled + " using decoder manifest:" +
+                          collectionSchemeManager->mCurrentDecoderManifestID + " resulting in " +
+                          std::to_string( inspectionMatrixOutput->conditions.size() ) + " inspection conditions" );
+
+            // Extract decoder dictionary
+            std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
+            collectionSchemeManager->decoderDictionaryExtractor( decoderDictionaryMap
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                                                                 ,
+                                                                 inspectionMatrixOutput
+#endif
+            );
+
+            // Only notify the listeners after both have been extracted since the decoder dictionary
+            // extraction might have modified the inspection matrix.
+            collectionSchemeManager->decoderDictionaryUpdater( decoderDictionaryMap );
+            collectionSchemeManager->inspectionMatrixUpdater( inspectionMatrixOutput );
+
             // Update the Raw Buffer Config
             if ( collectionSchemeManager->mRawDataBufferManager != nullptr )
             {
+                std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> updatedSignals;
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
                 std::shared_ptr<ComplexDataDecoderDictionary> complexDataDictionary;
                 auto decoderDictionary = decoderDictionaryMap.find( VehicleDataSourceProtocol::COMPLEX_DATA );
                 if ( decoderDictionary != decoderDictionaryMap.end() && decoderDictionary->second != nullptr )
@@ -243,9 +218,13 @@ CollectionSchemeManager::doWork( void *data )
                         FWE_LOG_WARN( "Could not cast dictionary to ComplexDataDecoderDictionary" );
                     }
                 }
-                collectionSchemeManager->updateRawDataBufferConfig( complexDataDictionary );
-            }
+                collectionSchemeManager->updateRawDataBufferConfigComplexSignals( complexDataDictionary,
+                                                                                  updatedSignals );
 #endif
+                FWE_LOG_INFO( "Updating raw buffer configuration for " + std::to_string( updatedSignals.size() ) +
+                              " signals" );
+                collectionSchemeManager->mRawDataBufferManager->updateConfig( updatedSignals );
+            }
 
             auto canDecoderDictionaryPtr = std::dynamic_pointer_cast<CANDecoderDictionary>(
                 decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] );
@@ -273,19 +252,11 @@ CollectionSchemeManager::doWork( void *data )
                           collectionSchemeManager->mCurrentDecoderManifestID + " resulting in decoding rules for " +
                           std::to_string( decoderDictionaryMap.size() ) +
                           " protocols. Decoder CAN channels: " + decoderCanChannels + " and OBD PIDs:" + obdPids );
-            std::string enabled;
-            std::string idle;
-            collectionSchemeManager->printExistingCollectionSchemes( enabled, idle );
-            // coverity[check_return : SUPPRESS]
-            FWE_LOG_INFO( "FWE activated collection schemes:" + enabled + " using decoder manifest:" +
-                          collectionSchemeManager->mCurrentDecoderManifestID + " resulting in " +
-                          std::to_string( inspectionMatrixOutput->conditions.size() ) + " inspection conditions" );
             TraceModule::get().sectionEnd( TraceSection::MANAGER_EXTRACTION );
         }
         /*
          * get next timePoint from the minHeap top
          * check if it is a valid timePoint, it can be obsoleted if start Time or stop Time gets updated
-         * It should be always valid because Checkin is default to be running all the time
          */
         auto currentMonotonicTime = collectionSchemeManager->mClock->monotonicTimeSinceEpochMs();
         if ( collectionSchemeManager->mTimeLine.empty() )
@@ -313,6 +284,27 @@ CollectionSchemeManager::doWork( void *data )
             break;
         }
     }
+}
+
+void
+CollectionSchemeManager::updateCheckinDocuments()
+{
+    // Create a list of active collectionSchemes and the current decoder manifest and send it to cloud
+    std::vector<SyncID> checkinMsg;
+    for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); it++ )
+    {
+        checkinMsg.emplace_back( it->first );
+    }
+    for ( auto it = mIdleCollectionSchemeMap.begin(); it != mIdleCollectionSchemeMap.end(); it++ )
+    {
+        checkinMsg.emplace_back( it->first );
+    }
+    if ( !mCurrentDecoderManifestID.empty() )
+    {
+        checkinMsg.emplace_back( mCurrentDecoderManifestID );
+    }
+
+    mCheckinSender->onCheckinDocumentsChanged( checkinMsg );
 }
 
 /* callback function */
@@ -350,39 +342,6 @@ CollectionSchemeManager::updateAvailable()
         mProcessDecoderManifest = true;
     }
     mDecoderManifestAvailable = false;
-}
-
-/*
- * checkinIntervalMsec - checkin interval in ms
- * debounceIntervalMsec - debounce Interval in ms
- */
-bool
-CollectionSchemeManager::init( uint32_t checkinIntervalMsec,
-                               const std::shared_ptr<CacheAndPersist> &schemaPersistencyPtr,
-                               CANInterfaceIDTranslator &canIDTranslator
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                               ,
-                               std::shared_ptr<RawData::BufferManager> rawDataBufferManager
-#endif
-)
-{
-    mCANIDTranslator = canIDTranslator;
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-    mRawDataBufferManager = rawDataBufferManager;
-#endif
-    FWE_LOG_TRACE( "CollectionSchemeManager initialised with a checkin interval of: " +
-                   std::to_string( checkinIntervalMsec ) + " ms" );
-    if ( checkinIntervalMsec > 0 )
-    {
-        mCheckinIntervalInMsec = checkinIntervalMsec;
-    }
-    else
-    {
-        /* use default value when checkin interval is not set in configuration */
-        mCheckinIntervalInMsec = DEFAULT_CHECKIN_INTERVAL_IN_MILLISECOND;
-    }
-    mSchemaPersistency = schemaPersistencyPtr;
-    return true;
 }
 
 bool
@@ -440,18 +399,7 @@ CollectionSchemeManager::processDecoderManifest()
     // store the new DM, update mCurrentDecoderManifestID
     mCurrentDecoderManifestID = mDecoderManifest->getID();
     store( DataType::DECODER_MANIFEST );
-    // when DM changes, check if we have collectionScheme loaded
-    if ( isCollectionSchemeLoaded() )
-    {
-        // DM has changes, all existing collectionSchemes need to be cleared
-        cleanupCollectionSchemes();
-        return false;
-    }
-    else
-    {
-        // collectionScheme maps are empty
-        return rebuildMapsandTimeLine( mClock->timeSinceEpoch() );
-    }
+    return true;
 }
 
 /*
@@ -520,22 +468,9 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
     /* Separate collectionSchemes into Enabled and Idle bucket */
     for ( auto const &collectionScheme : collectionSchemeList )
     {
-        if ( collectionScheme->getDecoderManifestID() != mCurrentDecoderManifestID )
-        {
-            // Encounters a collectionScheme that does not have matching DM
-            // Rebuild has to bail out. Call cleanupCollectionSchemes() before exiting.
-            FWE_LOG_TRACE(
-                "CollectionScheme does not have matching DM ID. Current DM ID: " + mCurrentDecoderManifestID +
-                " but collection scheme " + collectionScheme->getCollectionSchemeID() + " needs " +
-                collectionScheme->getDecoderManifestID() );
-
-            cleanupCollectionSchemes();
-            return false;
-        }
-        // collectionScheme does not have matching DM, can't rebuild. Exit
-        Timestamp startTime = collectionScheme->getStartTime();
-        Timestamp stopTime = collectionScheme->getExpiryTime();
-        std::string id = collectionScheme->getCollectionSchemeID();
+        auto startTime = collectionScheme->getStartTime();
+        auto stopTime = collectionScheme->getExpiryTime();
+        auto id = collectionScheme->getCollectionSchemeID();
         if ( startTime > currTime.systemTimeMs )
         {
             /* for idleCollectionSchemes, push both startTime and stopTime to timeLine */
@@ -551,8 +486,6 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
             ret = true;
         }
     }
-    // Notify consumers of active collection schemes about new list
-    updateActiveSchemesListeners();
 
     std::string enableStr;
     std::string idleStr;
@@ -561,11 +494,11 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
     return ret;
 }
 
-std::vector<std::string>
+std::vector<SyncID>
 CollectionSchemeManager::getCollectionSchemeArns()
 {
     std::lock_guard<std::mutex> lock( mSchemaUpdateMutex );
-    std::vector<std::string> collectionSchemeArns;
+    std::vector<SyncID> collectionSchemeArns;
     if ( mCollectionSchemeList != nullptr )
     {
         for ( auto &collectionScheme : mCollectionSchemeList->getCollectionSchemes() )
@@ -590,7 +523,7 @@ bool
 CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
 {
     bool ret = false;
-    std::unordered_set<std::string> newCollectionSchemeIDs;
+    std::unordered_set<SyncID> newCollectionSchemeIDs;
     std::vector<ICollectionSchemePtr> collectionSchemeList;
 
     if ( mCollectionSchemeList == nullptr )
@@ -601,16 +534,6 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
     collectionSchemeList = mCollectionSchemeList->getCollectionSchemes();
     for ( auto const &collectionScheme : collectionSchemeList )
     {
-        if ( collectionScheme->getDecoderManifestID() != mCurrentDecoderManifestID )
-        {
-            // Encounters a collectionScheme that does not have matching DM
-            // Rebuild has to bail out. Call cleanupCollectionSchemes() before exiting.
-            FWE_LOG_TRACE( "CollectionScheme does not have matching DM ID: " + mCurrentDecoderManifestID + " " +
-                           collectionScheme->getDecoderManifestID() );
-
-            cleanupCollectionSchemes();
-            return false;
-        }
         /*
          * Once collectionScheme has a matching DM, try to locate the collectionScheme in existing maps
          * using collectionScheme ID.
@@ -628,7 +551,7 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
         Timestamp startTime = collectionScheme->getStartTime();
         Timestamp stopTime = collectionScheme->getExpiryTime();
 
-        std::string id = collectionScheme->getCollectionSchemeID();
+        auto id = collectionScheme->getCollectionSchemeID();
         newCollectionSchemeIDs.insert( id );
         auto itEnabled = mEnabledCollectionSchemeMap.find( id );
         auto itIdle = mIdleCollectionSchemeMap.find( id );
@@ -646,11 +569,20 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
                 printEventLogMsg( completedStr, id, startTime, stopTime, currTime );
                 FWE_LOG_TRACE( completedStr );
             }
-            else if ( stopTime != currCollectionScheme->getExpiryTime() )
+            else
             {
-                /* StopTime changes on that collectionScheme, update with new CollectionScheme */
-                mEnabledCollectionSchemeMap[id] = collectionScheme;
-                mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
+                if ( stopTime != currCollectionScheme->getExpiryTime() )
+                {
+                    /* StopTime changes on that collectionScheme, update with new CollectionScheme */
+                    mEnabledCollectionSchemeMap[id] = collectionScheme;
+                    mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
+                }
+
+                if ( *collectionScheme != *currCollectionScheme )
+                {
+                    mEnabledCollectionSchemeMap[id] = collectionScheme;
+                    ret = true;
+                }
             }
         }
         else if ( itIdle != mIdleCollectionSchemeMap.end() )
@@ -678,6 +610,10 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
                 mIdleCollectionSchemeMap[id] = collectionScheme;
                 mTimeLine.push( { calculateMonotonicTime( currTime, startTime ), id } );
                 mTimeLine.push( { calculateMonotonicTime( currTime, stopTime ), id } );
+            }
+            else
+            {
+                mIdleCollectionSchemeMap[id] = collectionScheme;
             }
         }
         else
@@ -738,8 +674,6 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
     {
         FWE_LOG_TRACE( "Removing collectionSchemes missing from PI updates: " + removeStr );
     }
-    // Notify consumers of active collection schemes about new list
-    updateActiveSchemesListeners();
 
     std::string enableStr;
     std::string idleStr;
@@ -755,7 +689,6 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
  * If not, simply exit, return false;
  * 2. Otherwise,
  *      get topTime and topCollectionSchemeID from top of MINheap,
- *      if it is checkin event, simply send out checkin, this is false case;
  *      if collectionScheme in Enabled Map, and stopTime equal to topTime, time to disable this collectionScheme, this
  * is a true case; else if CollectionScheme in idle map, and startTime equals to topTime, time to enable this
  * collectionScheme, this is a true case; for the rest of the cases, all false;
@@ -780,52 +713,9 @@ CollectionSchemeManager::checkTimeLine( const TimePoint &currTime )
     while ( !mTimeLine.empty() )
     {
         const auto &topPair = mTimeLine.top();
-        const std::string &topCollectionSchemeID = topPair.id;
-        const TimePoint &topTime = topPair.time;
-        if ( topCollectionSchemeID == CHECKIN )
-        {
-            // for checkin, we are about to
-            // either serve current checkin event, and move on to search for next timePoint to set up timer;
-            // or we find current checkin for setting up next timer, then we are done here;
-            if ( currTime.monotonicTimeMs < topTime.monotonicTimeMs )
-            {
-                // Successfully locate next checkin as timePoint to set up timer
-                // time to exit
-                break;
-            }
-            // Try to send the checkin message.
-            // If it succeeds, we will schedule the next checkin cycle using the provided interval.
-            // If it does not succeed ( e.g. no offboardconnectivity), we schedule for a retry immediately.
-            bool checkinSuccess = sendCheckin();
-            // Now schedule based on the return code
-            if ( checkinSuccess )
-            {
-                if ( mCheckinIntervalInMsec > 0 )
-                {
-                    TimePoint nextCheckinTime = { currTime.systemTimeMs + mCheckinIntervalInMsec,
-                                                  currTime.monotonicTimeMs + mCheckinIntervalInMsec };
-                    mTimeLine.push( { nextCheckinTime, CHECKIN } );
-                }
-                // else, no checkin message is scheduled.
-            }
-            else
-            {
-                // Schedule with for a quick retry
-                // Calculate the minimum retry interval
-                uint64_t minimumCheckinInterval =
-                    std::min( static_cast<uint64_t>( RETRY_CHECKIN_INTERVAL_IN_MILLISECOND ), mCheckinIntervalInMsec );
-                TimePoint nextCheckinTime = { currTime.systemTimeMs + minimumCheckinInterval,
-                                              currTime.monotonicTimeMs + minimumCheckinInterval };
-                mTimeLine.push( { nextCheckinTime, CHECKIN } );
-            }
+        const auto &topCollectionSchemeID = topPair.id;
+        const auto &topTime = topPair.time;
 
-            // after sending checkin, the work on this dataPair is done, move to next dataPair
-            // to look for next valid timePoint to set up timer
-            mTimeLine.pop();
-            continue;
-        }
-
-        // in case of non-checkin
         // first find topCollectionSchemeID in mEnabledCollectionSchemeMap then mIdleCollectionSchemeMap
         // if we find a match in collectionScheme ID, check further if topTime matches this collectionScheme's
         // start/stop time
@@ -929,15 +819,42 @@ CollectionSchemeManager::checkTimeLine( const TimePoint &currTime )
     return ret;
 }
 
+bool
+CollectionSchemeManager::isCollectionSchemesInSyncWithDm()
+{
+    for ( const auto &collectionScheme : mEnabledCollectionSchemeMap )
+    {
+        if ( collectionScheme.second->getDecoderManifestID() != mCurrentDecoderManifestID )
+        {
+            FWE_LOG_INFO( "Decoder manifest out of sync: " + collectionScheme.second->getDecoderManifestID() + " vs. " +
+                          mCurrentDecoderManifestID );
+            return false;
+        }
+    }
+    for ( const auto &collectionScheme : mIdleCollectionSchemeMap )
+    {
+        if ( collectionScheme.second->getDecoderManifestID() != mCurrentDecoderManifestID )
+        {
+            FWE_LOG_INFO( "Decoder manifest out of sync: " + collectionScheme.second->getDecoderManifestID() + " vs. " +
+                          mCurrentDecoderManifestID );
+            return false;
+        }
+    }
+    return true;
+}
+
 void
-CollectionSchemeManager::updateActiveSchemesListeners()
+CollectionSchemeManager::updateActiveCollectionSchemeListeners()
 {
     // Create vector of active collection schemes to notify interested components about new schemes
     auto activeCollectionSchemesOutput = std::make_shared<ActiveCollectionSchemes>();
 
-    for ( const auto &enabledCollectionScheme : mEnabledCollectionSchemeMap )
+    if ( isCollectionSchemesInSyncWithDm() )
     {
-        activeCollectionSchemesOutput->activeCollectionSchemes.push_back( enabledCollectionScheme.second );
+        for ( const auto &enabledCollectionScheme : mEnabledCollectionSchemeMap )
+        {
+            activeCollectionSchemesOutput->activeCollectionSchemes.push_back( enabledCollectionScheme.second );
+        }
     }
 
     mCollectionSchemeListChangeListeners.notify( activeCollectionSchemesOutput );

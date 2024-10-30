@@ -18,6 +18,8 @@ TEST( TraceModuleTest, TraceModulePrint )
     TraceModule::get().setVariable( TraceVariable::READ_SOCKET_FRAMES_0, 20 );
     TraceModule::get().setVariable( TraceVariable::READ_SOCKET_FRAMES_0, 15 );
 
+    TraceModule::get().setVariable( TraceVariable::DATA_FORWARD_BYTES, 5 );
+
     TraceModule::get().sectionBegin( TraceSection::BUILD_MQTT );
     std::this_thread::sleep_for( std::chrono::milliseconds( 4 ) );
     TraceModule::get().sectionEnd( TraceSection::BUILD_MQTT );

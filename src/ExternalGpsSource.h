@@ -23,9 +23,9 @@ class ExternalGpsSource : public CustomDataSource
 {
 public:
     /**
-     *     @param signalBufferPtr the signal buffer is used pass extracted data
+     * @param signalBufferDistributor Signal buffer distributor
      */
-    ExternalGpsSource( SignalBufferPtr signalBufferPtr );
+    ExternalGpsSource( SignalBufferDistributorPtr signalBufferDistributor );
     /**
      * Initialize ExternalGpsSource and set filter for CustomDataSource
      *
@@ -59,7 +59,7 @@ private:
     uint16_t mLatitudeStartBit = 0;
     uint16_t mLongitudeStartBit = 0;
 
-    SignalBufferPtr mSignalBufferPtr;
+    SignalBufferDistributorPtr mSignalBufferDistributor;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     CANChannelNumericID mCanChannel{ INVALID_CAN_SOURCE_NUMERIC_ID };
     CANRawFrameID mCanRawFrameId{ 0 };

@@ -44,7 +44,7 @@ public:
      * @param rxId CAN Receive ID
      * @param txId CAN Transmit ID
      * @param isExtendedId CAN ID is standard(11-bit) or extended(29-bit)
-     * @param signalBufferPtr Signal Buffer shared pointer
+     * @param signalBufferDistributor Signal buffer distributor
      * @param broadcastSocket Sending broadcast requests by using broadcast socket
      * @return True if initialization of ISO-TP is successful
      */
@@ -53,7 +53,7 @@ public:
                const uint32_t rxId,
                const uint32_t txId,
                bool isExtendedId,
-               SignalBufferPtr &signalBufferPtr,
+               SignalBufferDistributorPtr &signalBufferDistributor,
                int broadcastSocket );
 
     /**
@@ -84,12 +84,12 @@ public:
      *
      * @param info PID vaues to push
      * @param receptionTime Timestamp of reception
-     * @param signalBufferPtr Signal Buffer shared pointer
+     * @param signalBufferDistributor Signal buffer distributor
      * @param streamRxID CAN Receive ID
      */
     static void pushPIDs( const EmissionInfo &info,
                           Timestamp receptionTime,
-                          SignalBufferPtr &signalBufferPtr,
+                          SignalBufferDistributorPtr &signalBufferDistributor,
                           const std::string &streamRxID );
 
     /**
@@ -166,8 +166,7 @@ private:
     std::vector<uint8_t> mTxPDU;
     std::vector<uint8_t> mRxPDU;
     std::shared_ptr<OBDDataDecoder> mOBDDataDecoder;
-    // Signal Buffer shared pointer. This is a multiple producer single consumer queue
-    SignalBufferPtr mSignalBufferPtr;
+    SignalBufferDistributorPtr mSignalBufferDistributor;
     // The PIDs to request from ECU. This assignment would come from OBDOverCANModule
     std::unordered_map<SID, std::vector<PID>> mPIDsToRequest;
     // can iso-tp tranceiver

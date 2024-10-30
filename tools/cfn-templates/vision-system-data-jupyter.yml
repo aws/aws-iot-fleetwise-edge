@@ -340,22 +340,14 @@ Resources:
           - |
             #!/bin/bash
             set -euovx pipefail
-            # Wait for any existing package install to finish
-            i=0
-            while true; do
-              if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
-                i=0
-              else
-                i=`expr $i + 1`
-                if expr $i \>= 10 > /dev/null; then
-                  break
-                fi
-              fi
-              sleep 1
-            done
+
+            # Disable unattended upgrades
+            systemctl stop unattended-upgrades
+            systemctl disable unattended-upgrades
+
             # Upgrade system and reboot if required
-            apt update
-            apt upgrade -y
+            apt update -o DPkg::Lock::Timeout=120
+            apt upgrade -y -o DPkg::Lock::Timeout=120
             if [ -f /var/run/reboot-required ]; then
               # Delete the UserData info file so that we run again after reboot
               rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
@@ -364,8 +356,8 @@ Resources:
             fi
             # Install helper scripts:
             configsets=OnCreate
-            apt update
-            apt install -y python3-setuptools python3-pip git markdown
+            apt update -o DPkg::Lock::Timeout=120
+            apt install -y -o DPkg::Lock::Timeout=120 python3-setuptools python3-pip git markdown
             mkdir -p /opt/aws/bin
             wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
             python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
@@ -384,8 +376,8 @@ Resources:
             }
             trap error_handler ERR
             # Install packages
-            apt update
-            apt install -y ec2-instance-connect htop jq unzip zip
+            apt update -o DPkg::Lock::Timeout=120
+            apt install -y -o DPkg::Lock::Timeout=120 ec2-instance-connect htop jq unzip zip
             # Install AWS CLI:
             curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
             unzip -q awscliv2.zip

@@ -36,11 +36,17 @@ using InterfaceID = std::string;
 static const InterfaceID INVALID_INTERFACE_ID{};
 
 /**
+ * @brief The sync ID is a concatenation of the resource ARN, a slash '/', and a timestamp.
+ * This ID is used to uniquely identify and synchronize documents between the cloud and edge.
+ */
+using SyncID = std::string;
+
+/**
  * @brief Signal ID is either an ID provided by Cloud that is unique across all signals found in the vehicle regardless
- * of network bus or an internal ID see INTERNAL_SIGNAL_ID_BITMASK
+ * of network bus or an internal ID see INTERNAL_SIGNAL_ID_BITMASK. Cloud starts allocating signal IDs starting at 1.
  */
 using SignalID = uint32_t;
-static constexpr SignalID INVALID_SIGNAL_ID = 0xFFFFFFFF;
+static constexpr SignalID INVALID_SIGNAL_ID = 0;
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 /**
@@ -79,10 +85,56 @@ enum struct SignalType
     FLOAT = 8,
     DOUBLE = 9,
     BOOLEAN = 10,
+    UNKNOWN = 11,
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-    RAW_DATA_BUFFER_HANDLE = 11, // internal type RawData::BufferHandle is defined as uint32
+    COMPLEX_SIGNAL = 12, // internal type RawData::BufferHandle is defined as uint32
 #endif
 };
+
+/**
+ * @brief Converts SignalType to a string to be used in logs
+ *
+ * @param signalType The signal type to be converted.
+ * @return A string describing the signal type
+ */
+inline std::string
+signalTypeToString( SignalType signalType )
+{
+    // coverity[autosar_cpp14_m6_4_6_violation]
+    // coverity[misra_cpp_2008_rule_6_4_6_violation] compiler warning is preferred over a default-clause
+    switch ( signalType )
+    {
+    case SignalType::UINT8:
+        return "UINT8";
+    case SignalType::INT8:
+        return "INT8";
+    case SignalType::UINT16:
+        return "UINT16";
+    case SignalType::INT16:
+        return "INT16";
+    case SignalType::UINT32:
+        return "UINT32";
+    case SignalType::INT32:
+        return "INT32";
+    case SignalType::UINT64:
+        return "UINT64";
+    case SignalType::INT64:
+        return "INT64";
+    case SignalType::FLOAT:
+        return "FLOAT";
+    case SignalType::DOUBLE:
+        return "DOUBLE";
+    case SignalType::BOOLEAN:
+        return "BOOLEAN";
+    case SignalType::UNKNOWN:
+        return "UNKNOWN";
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    case SignalType::COMPLEX_SIGNAL:
+        return "COMPLEX_SIGNAL";
+#endif
+    }
+    return "UNREACHABLE";
+}
 
 /**
  * @brief Format that defines a CAN Signal Format
@@ -130,9 +182,9 @@ struct CANSignalFormat
     bool mIsMultiplexorSignal{ false };
 
     /**
-     * @brief The datatype of the signal. The default is double for backward compatibility
+     * @brief The datatype of the signal.
      */
-    SignalType mSignalType{ SignalType::DOUBLE };
+    SignalType mSignalType{ SignalType::UNKNOWN };
 
     /**
      * @brief If mIsMultiplexorSignal is true, this value will be the value e.g. m0. If false, the value will be maxbit8
@@ -176,7 +228,43 @@ struct CANSignalFormat
     }
 };
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+union DecodedSignalValueType {
+    double doubleVal;
+    uint64_t uint64Val;
+    int64_t int64Val;
+};
+
+/**
+ * @brief A signal value that was decoded by a data source
+ *
+ * The actual value can be of different types, but we don't consider all possible supported types
+ * here. To simplify the decoding only the largest types are used to avoid losing precision.
+ * Since this value is not intended to be stored for a long time, there is not much impact e.g. using
+ * a double for a uint8_t.
+ */
+struct DecodedSignalValue
+{
+    DecodedSignalValueType signalValue;
+    SignalType signalType;
+
+    template <typename T>
+    DecodedSignalValue( T val, SignalType type )
+        : signalType( type )
+    {
+        switch ( signalType )
+        {
+        case SignalType::UINT64:
+            signalValue.uint64Val = static_cast<uint64_t>( val );
+            break;
+        case SignalType::INT64:
+            signalValue.int64Val = static_cast<int64_t>( val );
+            break;
+        default:
+            signalValue.doubleVal = static_cast<double>( val );
+        }
+    }
+};
+
 namespace RawData
 {
 
@@ -184,7 +272,6 @@ using BufferHandle = uint32_t;
 static constexpr BufferHandle INVALID_BUFFER_HANDLE = 0;
 
 } // namespace RawData
-#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

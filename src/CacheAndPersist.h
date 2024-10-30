@@ -6,12 +6,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <json/json.h>
-#include <string>
-
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-#include <memory>
 #include <streambuf>
-#endif
+#include <string>
 
 // max buffer to be allocated for a read buffer
 // this matches the Max Send Size on the AWS IoT channel
@@ -41,7 +37,7 @@ enum class DataType
     PAYLOAD_METADATA,
     COLLECTION_SCHEME_LIST,
     DECODER_MANIFEST,
-    DEFAULT_DATA_TYPE
+    DEFAULT_DATA_TYPE,
 };
 
 /**
@@ -96,12 +92,11 @@ public:
                              DataType dataType,
                              const std::string &filename = std::string() );
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     /**
-     * @brief Writes to the non volatile memory(NVM) from stream to the Ion file.
+     * @brief Writes to the non volatile memory(NVM) from stream based on datatype and filename
      *
-     * @param streambuf     data stream to write the data from
-     * @param dataType   specifies if the data is an edge to cloud payload, collectionScheme list, etc.
+     * @param streambuf data stream to write the data from
+     * @param dataType specifies if the data is an edge to cloud payload, collectionScheme list, etc.
      * @param filename full name of the file to store
      *
      * @return ErrorCode   SUCCESS if the write is successful,
@@ -110,17 +105,14 @@ public:
      *                     INVALID_DATATYPE if filename is empty,
      *                     FILESYSTEM_ERROR in case of any file I/O errors.
      */
-    ErrorCode write( std::unique_ptr<std::streambuf> streambuf,
-                     DataType dataType,
-                     const std::string &filename = std::string() );
-#endif
+    ErrorCode write( std::streambuf &streambuf, DataType dataType, const std::string &filename = std::string() );
 
     /**
      * @brief Adds new file metadata to existing JSON object.
      *
      * @param metadata   JSON object of the file metadata to persist
      */
-    void addMetadata( Json::Value &metadata );
+    void addMetadata( const Json::Value &metadata );
 
     /**
      * @brief Gets the size of data based on the datatype.
@@ -157,6 +149,18 @@ public:
                             size_t size,
                             DataType dataType,
                             const std::string &filename = std::string() );
+
+    /**
+     * @brief Reads the persisted data of specified datatype in a file stream
+     *
+     * @param fileStream   the file stream that will point to the file being requested
+     * @param dataType     specifies if the data is an edge to cloud payload, collectionScheme list, etc.
+     * @param filename     specifies file for the data to read, only valid for edge to cloud payload
+     *
+     * @return ErrorCode   SUCCESS if the read is successful,
+     *                     INVALID_DATATYPE if provided datatype has no associated file,
+     */
+    virtual ErrorCode read( std::ifstream &fileStream, DataType dataType, const std::string &filename = std::string() );
 
     /**
      * @brief Deletes persisted data for the specified data type and filename.

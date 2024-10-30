@@ -1,13 +1,18 @@
 #!/bin/bash
-export VERSION_BOOST="1.78.0"
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+export VERSION_BOOST="1.84.0"
+# This should be a commit from https://github.com/moritz-wundke/Boost-for-Android that provides
+# support for the desired boost version.
+export VERSION_BOOST_FOR_ANDROID="83ba7174dea6e0595085dc30051eb17747e7260a"
 export VERSION_JSON_CPP="1.9.5"
 export VERSION_PROTOBUF="3.21.12"
 export VERSION_PROTOBUF_RELEASE="v21.12"
 export VERSION_CURL="7.86.0"
 export VERSION_CURL_RELEASE="curl-7_86_0"
-export VERSION_AWS_SDK_CPP="1.11.177"
+export VERSION_AWS_SDK_CPP="1.11.284"
 # MAKE SURE THE CRT VERSION IN AWS_SDK_CPP IS THE SAME AS IN AWS_IOT_SDK_CPP
-export VERSION_AWS_IOT_DEVICE_SDK_CPP_V2="v1.30.0"
+export VERSION_AWS_IOT_DEVICE_SDK_CPP_V2="v1.32.2"
 export VERSION_TINYXML2="6.0.0"
 export VERSION_FAST_CDR="v1.0.21"
 export VERSION_GOOGLE_TEST="release-1.10.0"

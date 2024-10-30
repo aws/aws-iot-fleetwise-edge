@@ -26,8 +26,8 @@ parse_args() {
 parse_args "$@"
 
 # Install Python 3 and pip
-apt update
-apt install -y python3 python3-pip
+apt update -o DPkg::Lock::Timeout=120
+apt install -y -o DPkg::Lock::Timeout=120 python3 python3-pip
 
 # Install pip packages
 pip3 install \

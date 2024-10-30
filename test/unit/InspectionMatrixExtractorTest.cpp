@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "CANInterfaceIDTranslator.h"
+#include "CheckinSender.h"
+#include "CollectionSchemeManagerMock.h"
 #include "CollectionSchemeManagerTest.h" // IWYU pragma: associated
 #include <cstdio>
+#include <functional>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <queue>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include "RawDataBufferManagerSpy.h"
@@ -22,41 +26,43 @@ using ::testing::_;
 using ::testing::NiceMock;
 
 /** @brief
- * This test aims to test PM's functionality to invoke Inspection Engine on Inspection Matrix Update
- * step1:
- * Two Inspection Engine registered as listener
- * step2: Invoke Inspection Matrix Update
- * check Both two Inspection Engines has Inspection Matrix Update
+ * This test aims to test PM's functionality to invoke Inspection Engine on Inspection Matrix update
+ * Step1: Register two Inspection Engines are listeners
+ * Step2: Invoke Matrix Updater and check if two Inspection Engines receive Inspection Matrix update
  */
-TEST( CollectionSchemeManagerTest, InspectionMatrixUpdaterTest )
+TEST( InspectionMatrixExtractorTest, MatrixUpdaterTest )
 {
-    auto testPtr = std::make_shared<CollectionSchemeManagerTest>();
     CANInterfaceIDTranslator canIDTranslator;
-    testPtr->init( 0, nullptr, canIDTranslator );
+    auto testPtr = std::make_shared<CollectionSchemeManagerWrapper>(
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ) );
 
     // Mock two Inspection Engine Mock
-    std::shared_ptr<CollectionInspectionWorkerThreadMock> InspectionEnginePtr;
+    std::shared_ptr<CollectionInspectionWorkerThreadMock> InspectionEnginePtr1;
     std::shared_ptr<CollectionInspectionWorkerThreadMock> InspectionEnginePtr2;
-    InspectionEnginePtr.reset( new CollectionInspectionWorkerThreadMock() );
+
+    InspectionEnginePtr1.reset( new CollectionInspectionWorkerThreadMock() );
     InspectionEnginePtr2.reset( new CollectionInspectionWorkerThreadMock() );
 
+    // Register two Inspection Engines as listeners to Inspection Matrix update
     testPtr->subscribeToInspectionMatrixChange(
         std::bind( &CollectionInspectionWorkerThreadMock::onChangeInspectionMatrix,
-                   InspectionEnginePtr.get(),
+                   InspectionEnginePtr1.get(),
                    std::placeholders::_1 ) );
     testPtr->subscribeToInspectionMatrixChange(
         std::bind( &CollectionInspectionWorkerThreadMock::onChangeInspectionMatrix,
                    InspectionEnginePtr2.get(),
                    std::placeholders::_1 ) );
 
-    // Clear updater flag. Note this flag only exist in mock class for testing purpose
-    InspectionEnginePtr->setUpdateFlag( false );
-    InspectionEnginePtr2->setUpdateFlag( false );
-    // Invoke the updater
+    // Clear Inspection Matrix update flag (this flag only exist in mock class for testing purpose)
+    InspectionEnginePtr1->setInspectionMatrixUpdateFlag( false );
+    InspectionEnginePtr2->setInspectionMatrixUpdateFlag( false );
+
+    // Invoke Inspection Matrix updater
     testPtr->inspectionMatrixUpdater( std::make_shared<InspectionMatrix>() );
-    // Check both two consumers has updater flag set
-    ASSERT_TRUE( InspectionEnginePtr->getUpdateFlag() );
-    ASSERT_TRUE( InspectionEnginePtr2->getUpdateFlag() );
+
+    // Check if both two consumers set Inspection Matrix update flag
+    ASSERT_TRUE( InspectionEnginePtr1->getInspectionMatrixUpdateFlag() );
+    ASSERT_TRUE( InspectionEnginePtr2->getInspectionMatrixUpdateFlag() );
 }
 
 ExpressionNode *
@@ -143,7 +149,7 @@ deleteTree( ExpressionNode *root )
 }
 /** @brief
  * This test mock 3 collectionSchemes, each with a binary tree of 20 nodes.
- * Calls function inspectionMatrixExtractor
+ * Calls function matrixExtractor
  * Exam the output: printout flatten trees as well as traverse each tree
  * using ConditionWithCollectedData.condition
  *
@@ -167,7 +173,8 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorTreeTest )
     list1.emplace_back( collectionScheme2 );
     list1.emplace_back( collectionScheme3 );
 
-    CollectionSchemeManagerTest test( "DM1" );
+    CANInterfaceIDTranslator canIDTranslator;
+    CollectionSchemeManagerWrapper test( nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM1" );
     IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
     ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DM1 );
@@ -175,7 +182,7 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorTreeTest )
     // All three polices are expected to be enabled
     ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
     std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
-    test.inspectionMatrixExtractor( output );
+    test.matrixExtractor( output );
 
     /* exam output */
     for ( uint32_t i = 0; i < output->expressionNodeStorage.size(); i++ )
@@ -215,10 +222,9 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorConditionDataTest )
         std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", 0, 10, testSignals, testCANFrames );
     std::vector<ICollectionSchemePtr> list1;
     list1.emplace_back( collectionScheme );
-    CollectionSchemeManagerTest test( "DM1" );
     CANInterfaceIDTranslator canIDTranslator;
     canIDTranslator.add( "102" );
-    test.init( 0, nullptr, canIDTranslator );
+    CollectionSchemeManagerWrapper test( nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM1" );
     IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
     ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DM1 );
@@ -226,7 +232,7 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorConditionDataTest )
 
     ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
     std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
-    test.inspectionMatrixExtractor( output );
+    test.matrixExtractor( output );
     for ( auto conditionData : output->conditions )
     {
         // Signals
@@ -252,7 +258,7 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorConditionDataTest )
 /** @brief
  * This test aims to test PM's functionality to create and update the RawBuffer Config on Inspection Matrix Update
  */
-TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterTest )
+TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterTest )
 {
     struct SignalCollectionInfo signal1;
     signal1.signalID = 0x20001; // in complex data range of decoder manifest mock;
@@ -280,9 +286,9 @@ TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterTest )
     auto rawDataBufferManager =
         std::make_shared<RawData::BufferManager>( RawData::BufferManagerConfig::create().get() );
 
-    CollectionSchemeManagerTest test( "DMBM1" );
     CANInterfaceIDTranslator canIDTranslator;
-    test.init( 0, nullptr, canIDTranslator, rawDataBufferManager );
+    CollectionSchemeManagerWrapper test(
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", rawDataBufferManager );
     IDecoderManifestPtr DMBM1 = std::make_shared<IDecoderManifestTest>( "DMBM1" );
     ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DMBM1 );
@@ -293,15 +299,17 @@ TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterTest )
 
     ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
     std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
-    test.updateRawDataBufferConfig( nullptr );
+    std::unordered_map<RawData::BufferTypeId, Aws::IoTFleetWise::RawData::SignalUpdateConfig> updatedSignals;
+    test.updateRawDataBufferConfigComplexSignals( nullptr, updatedSignals );
     // The Config should be updated and 3 Raw Data Buffer should be Allocated
+    rawDataBufferManager->updateConfig( updatedSignals );
     ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 3 );
 }
 
 /** @brief
  * This test aims to test PM's functionality when the updated fails for the RawBuffer Config on Inspection Matrix Update
  */
-TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterMemLowTest )
+TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterMemLowTest )
 {
     struct SignalCollectionInfo signal1;
     signal1.signalID = 0x20001; // in complex data range of decoder manifest mock;
@@ -332,9 +340,9 @@ TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterMemLowT
         RawData::BufferManagerConfig::create( maxBytes, reservedBytesPerSignal, {}, {}, {}, overridesPerSignal )
             .get() );
 
-    CollectionSchemeManagerTest test( "DMBM1" );
     CANInterfaceIDTranslator canIDTranslator;
-    test.init( 0, nullptr, canIDTranslator, rawDataBufferManager );
+    CollectionSchemeManagerWrapper test(
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", rawDataBufferManager );
     IDecoderManifestPtr DMBM1 = std::make_shared<IDecoderManifestTest>( "DMBM1" );
     ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DMBM1 );
@@ -345,12 +353,14 @@ TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterMemLowT
 
     ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
     std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
-    test.updateRawDataBufferConfig( nullptr );
+    std::unordered_map<RawData::BufferTypeId, Aws::IoTFleetWise::RawData::SignalUpdateConfig> updatedSignals;
+    test.updateRawDataBufferConfigComplexSignals( nullptr, updatedSignals );
+    rawDataBufferManager->updateConfig( updatedSignals );
     // The Config should be updated and have only 2 Raw Data Buffer due to limited memory
     ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 2 );
 }
 
-TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterWithComplexDataDictionary )
+TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithComplexDataDictionary )
 {
     struct SignalCollectionInfo signal1;
     signal1.signalID = 0x20001; // in complex data range of decoder manifest mock;
@@ -378,9 +388,9 @@ TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterWithCom
     auto rawDataBufferManager =
         std::make_shared<NiceMock<Testing::RawDataBufferManagerSpy>>( RawData::BufferManagerConfig::create().get() );
 
-    CollectionSchemeManagerTest test( "DMBM1" );
     CANInterfaceIDTranslator canIDTranslator;
-    test.init( 0, nullptr, canIDTranslator, rawDataBufferManager );
+    CollectionSchemeManagerWrapper test(
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", rawDataBufferManager );
 
     std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap;
     std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID;
@@ -421,7 +431,8 @@ TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterWithCom
         updatedSignals = arg;
         return RawData::BufferErrorCode::SUCCESSFUL;
     } );
-    test.updateRawDataBufferConfig( complexDataDictionary );
+    // Verify that the list of updatedSignals isn't overwritten
+    test.updateRawDataBufferConfigComplexSignals( complexDataDictionary, updatedSignals );
 
     ASSERT_EQ( updatedSignals.size(), 3 );
 
@@ -441,6 +452,8 @@ TEST( CollectionSchemeManagerTest, InspectionMatrixRawBufferConfigUpdaterWithCom
     // should be empty.
     ASSERT_EQ( updatedSignals[signal3.signalID].interfaceId, "" );
     ASSERT_EQ( updatedSignals[signal3.signalID].messageId, "" );
+
+    rawDataBufferManager->updateConfig( updatedSignals );
 
     // The Config should be updated and 3 Raw Data Buffer should be Allocated
     ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 3 );

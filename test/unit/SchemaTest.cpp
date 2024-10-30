@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "Schema.h"
-#include "AwsIotChannel.h"
 #include "AwsIotConnectivityModule.h"
+#include "AwsIotReceiver.h"
+#include "AwsIotSender.h"
 #include "Clock.h"
 #include "ClockHandler.h"
 #include "CollectionSchemeIngestion.h"
@@ -13,7 +14,6 @@
 #include "ICollectionSchemeList.h"
 #include "IConnectionTypes.h"
 #include "IDecoderManifest.h"
-#include "ISender.h"
 #include "MessageTypes.h"
 #include "MqttClientWrapper.h"
 #include "SenderMock.h"
@@ -24,10 +24,13 @@
 #include "collection_schemes.pb.h"
 #include "common_types.pb.h"
 #include "decoder_manifest.pb.h"
+#include <algorithm>
 #include <aws/crt/Types.h>
 #include <aws/crt/mqtt/Mqtt5Client.h>
 #include <aws/crt/mqtt/Mqtt5Packets.h>
+#include <aws/crt/mqtt/Mqtt5Types.h>
 #include <cstdint>
+#include <functional>
 #include <gmock/gmock.h>
 #include <google/protobuf/message.h>
 #include <gtest/gtest.h>
@@ -49,17 +52,19 @@ namespace IoTFleetWise
 
 using ::testing::_;
 using ::testing::Gt;
+using ::testing::InvokeArgument;
+using ::testing::MockFunction;
 using ::testing::Return;
 using ::testing::Sequence;
 using ::testing::StrictMock;
 
 static void
-assertCheckin( const std::string &data, const std::vector<std::string> &sampleDocList, Timestamp timeBeforeCheckin )
+assertCheckin( const std::string &data, const std::vector<SyncID> &sampleDocList, Timestamp timeBeforeCheckin )
 {
     std::shared_ptr<const Clock> clock = ClockHandler::getClock();
 
     // Create a multiset of ARNS documents we have in a checkin to compare against was was put in the checkin
-    std::multiset<std::string> documentSet( sampleDocList.begin(), sampleDocList.end() );
+    std::multiset<SyncID> documentSet( sampleDocList.begin(), sampleDocList.end() );
 
     // Deserialize the protobuf
     Schemas::CheckinMsg::Checkin sentCheckin;
@@ -95,15 +100,15 @@ protected:
 
         std::shared_ptr<MqttClientWrapper> nullMqttClient;
 
-        mChannelDecoderManifest =
-            std::make_shared<AwsIotChannel>( mAwsIotModule.get(), nullptr, nullMqttClient, "topic", false );
-        mChannelCollectionSchemeList =
-            std::make_shared<AwsIotChannel>( mAwsIotModule.get(), nullptr, nullMqttClient, "topic", false );
+        mReceiverDecoderManifest = std::make_shared<AwsIotReceiver>( mAwsIotModule.get(), nullMqttClient, "topic" );
+        mReceiverCollectionSchemeList =
+            std::make_shared<AwsIotReceiver>( mAwsIotModule.get(), nullMqttClient, "topic" );
 
         mCollectionSchemeIngestion = std::make_unique<Schema>(
-            mChannelDecoderManifest,
-            mChannelCollectionSchemeList,
-            std::make_shared<AwsIotChannel>( mAwsIotModule.get(), nullptr, nullMqttClient, "topic", false ) );
+            mReceiverDecoderManifest,
+            mReceiverCollectionSchemeList,
+            std::make_shared<AwsIotSender>(
+                mAwsIotModule.get(), nullMqttClient, "topic", Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE ) );
 
         mCollectionSchemeIngestion->subscribeToDecoderManifestUpdate(
             [&]( const IDecoderManifestPtr &decoderManifest ) {
@@ -116,7 +121,7 @@ protected:
     }
 
     static void
-    sendMessageToChannel( std::shared_ptr<AwsIotChannel> channel, google::protobuf::MessageLite &protoMsg )
+    sendMessageToReceiver( std::shared_ptr<AwsIotReceiver> receiver, google::protobuf::MessageLite &protoMsg )
     {
         std::string protoSerializedBuffer;
         ASSERT_TRUE( protoMsg.SerializeToString( &protoSerializedBuffer ) );
@@ -127,12 +132,12 @@ protected:
         publishPacket->WithPayload( Aws::Crt::ByteCursorFromArray(
             reinterpret_cast<const uint8_t *>( protoSerializedBuffer.data() ), protoSerializedBuffer.length() ) );
 
-        channel->onDataReceived( eventData );
+        receiver->onDataReceived( eventData );
     }
 
     std::unique_ptr<AwsIotConnectivityModule> mAwsIotModule;
-    std::shared_ptr<AwsIotChannel> mChannelDecoderManifest;
-    std::shared_ptr<AwsIotChannel> mChannelCollectionSchemeList;
+    std::shared_ptr<AwsIotReceiver> mReceiverDecoderManifest;
+    std::shared_ptr<AwsIotReceiver> mReceiverCollectionSchemeList;
     std::unique_ptr<Schema> mCollectionSchemeIngestion;
 
     IDecoderManifestPtr mReceivedDecoderManifest;
@@ -148,28 +153,30 @@ TEST_F( SchemaTest, Checkins )
     auto senderMock = std::make_shared<StrictMock<Testing::SenderMock>>();
 
     std::shared_ptr<MqttClientWrapper> nullMqttClient;
-    Schema collectionSchemeIngestion(
-        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, nullMqttClient, "topic", false ),
-        std::make_shared<AwsIotChannel>( awsIotModule.get(), nullptr, nullMqttClient, "topic", false ),
-        senderMock );
+    Schema collectionSchemeIngestion( std::make_shared<AwsIotReceiver>( awsIotModule.get(), nullMqttClient, "topic" ),
+                                      std::make_shared<AwsIotReceiver>( awsIotModule.get(), nullMqttClient, "topic" ),
+                                      senderMock );
 
     std::shared_ptr<const Clock> clock = ClockHandler::getClock();
     Timestamp timeBeforeCheckin = clock->systemTimeSinceEpochMs();
 
     // Create list of Arns
-    std::vector<std::string> sampleDocList;
+    std::vector<SyncID> sampleDocList;
 
     Sequence seq;
     EXPECT_CALL( *senderMock, mockedSendBuffer( _, Gt( 0 ), _ ) )
         .Times( 3 )
         .InSequence( seq )
-        .WillOnce( Return( ConnectivityError::Success ) );
+        .WillRepeatedly( InvokeArgument<2>( ConnectivityError::Success ) );
     EXPECT_CALL( *senderMock, mockedSendBuffer( _, Gt( 0 ), _ ) )
         .InSequence( seq )
-        .WillOnce( Return( ConnectivityError::NoConnection ) );
+        .WillOnce( InvokeArgument<2>( ConnectivityError::NoConnection ) );
+
+    MockFunction<void( bool success )> resultCallback;
 
     // Test an empty checkin
-    ASSERT_TRUE( collectionSchemeIngestion.sendCheckin( sampleDocList ) );
+    EXPECT_CALL( resultCallback, Call( true ) ).Times( 1 );
+    collectionSchemeIngestion.sendCheckin( sampleDocList, resultCallback.AsStdFunction() );
     ASSERT_EQ( senderMock->getSentBufferData().size(), 1 );
     ASSERT_NO_FATAL_FAILURE(
         assertCheckin( senderMock->getSentBufferData()[0].data, sampleDocList, timeBeforeCheckin ) );
@@ -181,14 +188,17 @@ TEST_F( SchemaTest, Checkins )
     sampleDocList.emplace_back( "DocArn4" );
 
     // Test the previous doc list
-    ASSERT_TRUE( collectionSchemeIngestion.sendCheckin( sampleDocList ) );
+    EXPECT_CALL( resultCallback, Call( true ) ).Times( 1 );
+    collectionSchemeIngestion.sendCheckin( sampleDocList, resultCallback.AsStdFunction() );
 
     // Test with duplicates - this shouldn't occur but make sure it works anyways
     sampleDocList.emplace_back( "DocArn4" );
-    ASSERT_TRUE( collectionSchemeIngestion.sendCheckin( sampleDocList ) );
+    EXPECT_CALL( resultCallback, Call( true ) ).Times( 1 );
+    collectionSchemeIngestion.sendCheckin( sampleDocList, resultCallback.AsStdFunction() );
 
     // Second call should simulate a offboardconnectivity issue, the checkin message should fail to send.
-    ASSERT_FALSE( collectionSchemeIngestion.sendCheckin( sampleDocList ) );
+    EXPECT_CALL( resultCallback, Call( false ) ).Times( 1 );
+    collectionSchemeIngestion.sendCheckin( sampleDocList, resultCallback.AsStdFunction() );
     ASSERT_EQ( senderMock->getSentBufferData().size(), 4 );
     ASSERT_NO_FATAL_FAILURE(
         assertCheckin( senderMock->getSentBufferData()[3].data, sampleDocList, timeBeforeCheckin ) );
@@ -234,6 +244,7 @@ TEST_F( SchemaTest, DecoderManifestIngestion )
     protoCANSignalB->set_offset( 100 );
     protoCANSignalB->set_factor( 10 );
     protoCANSignalB->set_length( 8 );
+    protoCANSignalB->set_primitive_type( Schemas::DecoderManifestMsg::PrimitiveType::BOOL );
 
     Schemas::DecoderManifestMsg::CANSignal *protoCANSignalC = protoDM.add_can_signals();
 
@@ -258,6 +269,7 @@ TEST_F( SchemaTest, DecoderManifestIngestion )
     protoOBDPIDSignalA->set_byte_length( 1 );
     protoOBDPIDSignalA->set_bit_right_shift( 2 );
     protoOBDPIDSignalA->set_bit_mask_length( 2 );
+    protoOBDPIDSignalA->set_primitive_type( Schemas::DecoderManifestMsg::PrimitiveType::INT16 );
 
     Schemas::DecoderManifestMsg::OBDPIDSignal *protoOBDPIDSignalB = protoDM.add_obd_pid_signals();
     protoOBDPIDSignalB->set_signal_id( 567 );
@@ -270,14 +282,15 @@ TEST_F( SchemaTest, DecoderManifestIngestion )
     protoOBDPIDSignalB->set_byte_length( 2 );
     protoOBDPIDSignalB->set_bit_right_shift( 0 );
     protoOBDPIDSignalB->set_bit_mask_length( 8 );
+    protoOBDPIDSignalB->set_primitive_type( Schemas::DecoderManifestMsg::PrimitiveType::UINT32 );
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelDecoderManifest, protoDM ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverDecoderManifest, protoDM ) );
 
     // This should be false because we just copied the data and it needs to be built first
     ASSERT_FALSE( mReceivedDecoderManifest->isReady() );
 
     // Assert that we get an empty string when we call getID on an object that's not yet built
-    ASSERT_EQ( mReceivedDecoderManifest->getID(), std::string() );
+    ASSERT_EQ( mReceivedDecoderManifest->getID(), SyncID() );
 
     ASSERT_TRUE( mReceivedDecoderManifest->build() );
     ASSERT_TRUE( mReceivedDecoderManifest->isReady() );
@@ -291,26 +304,29 @@ TEST_F( SchemaTest, DecoderManifestIngestion )
 
     // Search the CANMessageFormat signals to find the signal format that corresponds to a specific signal
     // Then make sure the data matches the proto DecoderManifest definition of that signal
-    int found = 0;
-    for ( auto &sigFormat : testCMF.mSignals )
-    {
-        if ( sigFormat.mSignalID == protoCANSignalA->signal_id() )
-        {
-            found++;
-            ASSERT_EQ( protoCANSignalA->interface_id(),
-                       mReceivedDecoderManifest->getCANFrameAndInterfaceID( sigFormat.mSignalID ).second );
-            ASSERT_EQ( protoCANSignalA->message_id(),
-                       mReceivedDecoderManifest->getCANFrameAndInterfaceID( sigFormat.mSignalID ).first );
-            ASSERT_EQ( protoCANSignalA->is_big_endian(), sigFormat.mIsBigEndian );
-            ASSERT_EQ( protoCANSignalA->is_signed(), sigFormat.mIsSigned );
-            ASSERT_EQ( protoCANSignalA->start_bit(), sigFormat.mFirstBitPosition );
-            ASSERT_EQ( protoCANSignalA->offset(), sigFormat.mOffset );
-            ASSERT_EQ( protoCANSignalA->factor(), sigFormat.mFactor );
-            ASSERT_EQ( protoCANSignalA->length(), sigFormat.mSizeInBits );
-        }
-    }
-    // Assert that the one signal was found
-    ASSERT_EQ( found, 1 );
+    auto sigFormat =
+        std::find_if( testCMF.mSignals.begin(), testCMF.mSignals.end(), [&]( const CANSignalFormat &format ) {
+            return format.mSignalID == protoCANSignalA->signal_id();
+        } );
+
+    ASSERT_NE( sigFormat, testCMF.mSignals.end() );
+    ASSERT_EQ( protoCANSignalA->interface_id(),
+               mReceivedDecoderManifest->getCANFrameAndInterfaceID( sigFormat->mSignalID ).second );
+    ASSERT_EQ( protoCANSignalA->message_id(),
+               mReceivedDecoderManifest->getCANFrameAndInterfaceID( sigFormat->mSignalID ).first );
+    ASSERT_EQ( protoCANSignalA->is_big_endian(), sigFormat->mIsBigEndian );
+    ASSERT_EQ( protoCANSignalA->is_signed(), sigFormat->mIsSigned );
+    ASSERT_EQ( protoCANSignalA->start_bit(), sigFormat->mFirstBitPosition );
+    ASSERT_EQ( protoCANSignalA->offset(), sigFormat->mOffset );
+    ASSERT_EQ( protoCANSignalA->factor(), sigFormat->mFactor );
+    ASSERT_EQ( protoCANSignalA->length(), sigFormat->mSizeInBits );
+    ASSERT_EQ( sigFormat->mSignalType, SignalType::DOUBLE );
+
+    sigFormat = std::find_if( testCMF.mSignals.begin(), testCMF.mSignals.end(), [&]( const CANSignalFormat &format ) {
+        return format.mSignalID == protoCANSignalB->signal_id();
+    } );
+    ASSERT_NE( sigFormat, testCMF.mSignals.end() );
+    ASSERT_EQ( sigFormat->mSignalType, SignalType::BOOLEAN );
 
     // Make sure we get a pair of Invalid CAN and Node Ids, for an signal that the the decoder manifest doesn't have
     ASSERT_EQ( mReceivedDecoderManifest->getCANFrameAndInterfaceID( 9999999 ),
@@ -329,6 +345,7 @@ TEST_F( SchemaTest, DecoderManifestIngestion )
     ASSERT_EQ( protoOBDPIDSignalA->byte_length(), obdPIDDecoderFormat.mByteLength );
     ASSERT_EQ( protoOBDPIDSignalA->bit_right_shift(), obdPIDDecoderFormat.mBitRightShift );
     ASSERT_EQ( protoOBDPIDSignalA->bit_mask_length(), obdPIDDecoderFormat.mBitMaskLength );
+    ASSERT_EQ( obdPIDDecoderFormat.mSignalType, SignalType::INT16 );
 
     obdPIDDecoderFormat = mReceivedDecoderManifest->getPIDSignalDecoderFormat( 567 );
     ASSERT_EQ( protoOBDPIDSignalB->pid_response_length(), obdPIDDecoderFormat.mPidResponseLength );
@@ -340,6 +357,7 @@ TEST_F( SchemaTest, DecoderManifestIngestion )
     ASSERT_EQ( protoOBDPIDSignalB->byte_length(), obdPIDDecoderFormat.mByteLength );
     ASSERT_EQ( protoOBDPIDSignalB->bit_right_shift(), obdPIDDecoderFormat.mBitRightShift );
     ASSERT_EQ( protoOBDPIDSignalB->bit_mask_length(), obdPIDDecoderFormat.mBitMaskLength );
+    ASSERT_EQ( obdPIDDecoderFormat.mSignalType, SignalType::UINT32 );
 
     // There's no signal ID 890, hence this function shall return an INVALID_PID_DECODER_FORMAT
     obdPIDDecoderFormat = mReceivedDecoderManifest->getPIDSignalDecoderFormat( 890 );
@@ -364,13 +382,13 @@ TEST_F( SchemaTest, SchemaInvalidDecoderManifestTest )
 
     protoDM.set_sync_id( "arn:aws:iam::123456789012:user/Development/product_1234/*" );
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelDecoderManifest, protoDM ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverDecoderManifest, protoDM ) );
 
     // This should be false because we just copied the data and it needs to be built first
     ASSERT_FALSE( mReceivedDecoderManifest->isReady() );
 
     // Assert that we get an empty string when we call getID on an unbuilt object
-    ASSERT_EQ( mReceivedDecoderManifest->getID(), std::string() );
+    ASSERT_EQ( mReceivedDecoderManifest->getID(), SyncID() );
 
     ASSERT_FALSE( mReceivedDecoderManifest->build() );
     ASSERT_FALSE( mReceivedDecoderManifest->isReady() );
@@ -408,13 +426,13 @@ TEST_F( SchemaTest, CollectionSchemeBasic )
     auto p3 = protoCollectionSchemesMsg.add_collection_schemes();
 
     // Make a list of collectionScheme ARNs
-    std::vector<std::string> collectionSchemeARNs = { "P1", "P2", "P3" };
+    std::vector<SyncID> collectionSchemeARNs = { "P1", "P2", "P3" };
 
     p1->set_campaign_sync_id( collectionSchemeARNs[0] );
     p2->set_campaign_sync_id( collectionSchemeARNs[1] );
     p3->set_campaign_sync_id( collectionSchemeARNs[2] );
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelCollectionSchemeList, protoCollectionSchemesMsg ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverCollectionSchemeList, protoCollectionSchemesMsg ) );
 
     // Try to build - this should succeed because we have real data
     ASSERT_TRUE( mReceivedCollectionSchemeList->build() );
@@ -428,14 +446,18 @@ TEST_F( SchemaTest, CollectionSchemeBasic )
 TEST_F( SchemaTest, EmptyCollectionSchemeIngestion )
 {
     // Now we have data to pack our DecoderManifestIngestion object with!
-    CollectionSchemeIngestion collectionSchemeTest;
+    CollectionSchemeIngestion collectionSchemeTest{
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        std::make_shared<CollectionSchemeIngestion::PartialSignalIDLookup>()
+#endif
+    };
 
     // isReady should evaluate to False
     ASSERT_TRUE( collectionSchemeTest.isReady() == false );
 
     // Confirm that Message Metadata is not ready as Build has not been called
-    ASSERT_FALSE( collectionSchemeTest.getCollectionSchemeID().compare( std::string() ) );
-    ASSERT_FALSE( collectionSchemeTest.getDecoderManifestID().compare( std::string() ) );
+    ASSERT_FALSE( collectionSchemeTest.getCollectionSchemeID().compare( SyncID() ) );
+    ASSERT_FALSE( collectionSchemeTest.getDecoderManifestID().compare( SyncID() ) );
     ASSERT_TRUE( collectionSchemeTest.getStartTime() == std::numeric_limits<uint64_t>::max() );
     ASSERT_TRUE( collectionSchemeTest.getExpiryTime() == std::numeric_limits<uint64_t>::max() );
     ASSERT_TRUE( collectionSchemeTest.getAfterDurationMs() == std::numeric_limits<uint32_t>::max() );
@@ -510,7 +532,7 @@ TEST_F( SchemaTest, CollectionSchemeIngestionHeartBeat )
     can2->set_sample_buffer_size( 10 );
     can2->set_minimum_sample_period_ms( 1000 );
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelCollectionSchemeList, protoCollectionSchemesMsg ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverCollectionSchemeList, protoCollectionSchemesMsg ) );
 
     ASSERT_TRUE( mReceivedCollectionSchemeList->build() );
     ASSERT_EQ( mReceivedCollectionSchemeList->getCollectionSchemes().size(), 1 );
@@ -595,6 +617,9 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
 
     //  Build the AST Tree:
     //----------
+    const SignalID SIGNAL_ID_1 = 19;
+    const SignalID SIGNAL_ID_2 = 17;
+    const SignalID SIGNAL_ID_3 = 3;
 
     auto *root = new Schemas::CommonTypesMsg::ConditionNode();
     message->set_allocated_condition_tree( root );
@@ -646,7 +671,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
 
     auto *left_left_left = new Schemas::CommonTypesMsg::ConditionNode();
     left_leftOp->set_allocated_left_child( left_left_left );
-    left_left_left->set_node_signal_id( 19 );
+    left_left_left->set_node_signal_id( SIGNAL_ID_1 );
 
     auto *left_left_right = new Schemas::CommonTypesMsg::ConditionNode();
     left_leftOp->set_allocated_right_child( left_left_right );
@@ -687,13 +712,13 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     right_rightOp->set_allocated_right_child( right_right_right );
     auto *right_right_rightOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     right_right_right->set_allocated_node_operator( right_right_rightOp );
-    right_right_rightOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_ARITHMETIC_MINUS );
+    right_right_rightOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_EQUAL );
 
     //----------
 
     auto *left_right_left_left = new Schemas::CommonTypesMsg::ConditionNode();
     left_right_leftOp->set_allocated_left_child( left_right_left_left );
-    left_right_left_left->set_node_signal_id( 19 );
+    left_right_left_left->set_node_signal_id( SIGNAL_ID_1 );
 
     auto *left_right_left_right = new Schemas::CommonTypesMsg::ConditionNode();
     left_right_leftOp->set_allocated_right_child( left_right_left_right );
@@ -701,7 +726,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
 
     auto *left_right_right_left = new Schemas::CommonTypesMsg::ConditionNode();
     left_right_rightOp->set_allocated_left_child( left_right_right_left );
-    left_right_right_left->set_node_signal_id( 19 );
+    left_right_right_left->set_node_signal_id( SIGNAL_ID_1 );
 
     auto *left_right_right_right = new Schemas::CommonTypesMsg::ConditionNode();
     left_right_rightOp->set_allocated_right_child( left_right_right_right );
@@ -709,11 +734,11 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
 
     auto *right_left_left_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_left_leftOp->set_allocated_left_child( right_left_left_left );
-    right_left_left_left->set_node_signal_id( 19 );
+    right_left_left_left->set_node_signal_id( SIGNAL_ID_1 );
 
     auto *right_left_right_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_left_rightOp->set_allocated_left_child( right_left_right_left );
-    right_left_right_left->set_node_signal_id( 19 );
+    right_left_right_left->set_node_signal_id( SIGNAL_ID_1 );
 
     auto *right_left_right_right = new Schemas::CommonTypesMsg::ConditionNode();
     right_left_rightOp->set_allocated_right_child( right_left_right_right );
@@ -721,7 +746,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
 
     auto *right_right_left_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_leftOp->set_allocated_left_child( right_right_left_left );
-    right_right_left_left->set_node_signal_id( 19 );
+    right_right_left_left->set_node_signal_id( SIGNAL_ID_1 );
 
     auto *right_right_left_right = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_leftOp->set_allocated_right_child( right_right_left_right );
@@ -729,7 +754,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
 
     auto *right_right_right_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_rightOp->set_allocated_left_child( right_right_right_left );
-    right_right_right_left->set_node_signal_id( 19 );
+    right_right_right_left->set_node_signal_id( SIGNAL_ID_1 );
 
     auto *right_right_right_right = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_rightOp->set_allocated_right_child( right_right_right_right );
@@ -745,21 +770,21 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
 
     // Add 3 Signals
     Schemas::CollectionSchemesMsg::SignalInformation *signal1 = collectionSchemeTestMessage->add_signal_information();
-    signal1->set_signal_id( 19 );
+    signal1->set_signal_id( SIGNAL_ID_1 );
     signal1->set_sample_buffer_size( 5 );
     signal1->set_minimum_sample_period_ms( 500 );
     signal1->set_fixed_window_period_ms( 600 );
     signal1->set_condition_only_signal( true );
 
     Schemas::CollectionSchemesMsg::SignalInformation *signal2 = collectionSchemeTestMessage->add_signal_information();
-    signal2->set_signal_id( 17 );
+    signal2->set_signal_id( SIGNAL_ID_2 );
     signal2->set_sample_buffer_size( 10000 );
     signal2->set_minimum_sample_period_ms( 1000 );
     signal2->set_fixed_window_period_ms( 1000 );
     signal2->set_condition_only_signal( false );
 
     Schemas::CollectionSchemesMsg::SignalInformation *signal3 = collectionSchemeTestMessage->add_signal_information();
-    signal3->set_signal_id( 3 );
+    signal3->set_signal_id( SIGNAL_ID_3 );
     signal3->set_sample_buffer_size( 1000 );
     signal3->set_minimum_sample_period_ms( 100 );
     signal3->set_fixed_window_period_ms( 100 );
@@ -781,7 +806,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     collectionSchemeTestMessage->set_allocated_s3_upload_metadata( s3_upload_metadata );
 #endif
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelCollectionSchemeList, protoCollectionSchemesMsg ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverCollectionSchemeList, protoCollectionSchemesMsg ) );
 
     ASSERT_TRUE( mReceivedCollectionSchemeList->build() );
     ASSERT_EQ( mReceivedCollectionSchemeList->getCollectionSchemes().size(), 1 );
@@ -801,19 +826,19 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     ASSERT_TRUE( collectionSchemeTest->isTriggerOnlyOnRisingEdge() == false );
     // Signals
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().size() == 3 );
-    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).signalID == 19 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).signalID == SIGNAL_ID_1 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).sampleBufferSize == 5 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).minimumSampleIntervalMs == 500 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).fixedWindowPeriod == 600 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).isConditionOnlySignal == true );
 
-    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).signalID == 17 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).signalID == SIGNAL_ID_2 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).sampleBufferSize == 10000 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).minimumSampleIntervalMs == 1000 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).fixedWindowPeriod == 1000 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).isConditionOnlySignal == false );
 
-    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).signalID == 3 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).signalID == SIGNAL_ID_3 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).sampleBufferSize == 1000 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).minimumSampleIntervalMs == 100 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).fixedWindowPeriod == 100 );
@@ -833,7 +858,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     ASSERT_TRUE( collectionSchemeTest->getMinimumPublishIntervalMs() == 650 );
 
     // Verify the AST
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().size(), 52 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().size(), 26 );
     //----------
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).nodeType,
                ExpressionNodeType::OPERATOR_LOGICAL_AND );
@@ -854,7 +879,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     //----------
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->left->left->nodeType,
                ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->left->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->left->left->signalID, SIGNAL_ID_1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->left->right->nodeType,
                ExpressionNodeType::FLOAT );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->left->right->floatingValue, 1 );
@@ -869,39 +894,39 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->left->nodeType,
                ExpressionNodeType::OPERATOR_ARITHMETIC_MINUS );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->nodeType,
-               ExpressionNodeType::OPERATOR_ARITHMETIC_MINUS );
+               ExpressionNodeType::OPERATOR_EQUAL );
     //----------
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->right->left->left->nodeType,
                ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->right->left->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->right->left->left->signalID, SIGNAL_ID_1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->right->left->right->nodeType,
                ExpressionNodeType::FLOAT );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->right->left->right->floatingValue, 1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->right->right->left->nodeType,
                ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->right->right->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->right->right->left->signalID, SIGNAL_ID_1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->right->right->right->nodeType,
                ExpressionNodeType::FLOAT );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->right->right->right->floatingValue, 1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->left->left->nodeType,
                ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->left->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->left->left->signalID, SIGNAL_ID_1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->left->right, nullptr );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->right->left->nodeType,
                ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->right->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->right->left->signalID, SIGNAL_ID_1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->right->right->nodeType,
                ExpressionNodeType::FLOAT );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->right->right->floatingValue, 1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->left->left->nodeType,
                ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->left->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->left->left->signalID, SIGNAL_ID_1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->left->right->nodeType,
                ExpressionNodeType::FLOAT );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->left->right->floatingValue, 1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->left->nodeType,
                ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->left->signalID, 19 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->left->signalID, SIGNAL_ID_1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->right->nodeType,
                ExpressionNodeType::FLOAT );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->right->floatingValue, 1 );
@@ -1007,13 +1032,13 @@ TEST_F( SchemaTest, SchemaCollectionWithComplexTypes )
 
     message->set_allocated_condition_tree( root );
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelCollectionSchemeList, protoCollectionSchemesMsg ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverCollectionSchemeList, protoCollectionSchemesMsg ) );
 
     ASSERT_TRUE( mReceivedCollectionSchemeList->build() );
     ASSERT_EQ( mReceivedCollectionSchemeList->getCollectionSchemes().size(), 1 );
     auto collectionSchemeTest = mReceivedCollectionSchemeList->getCollectionSchemes().at( 0 );
 
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().size(), 10 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().size(), 5 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).nodeType,
                ExpressionNodeType::OPERATOR_EQUAL ); // assume first node is top root node
 
@@ -1037,6 +1062,55 @@ TEST_F( SchemaTest, SchemaCollectionWithComplexTypes )
 
     ASSERT_NE( leftGeneratedSignalID, rightLeftGeneratedSignalId );
     ASSERT_EQ( leftGeneratedSignalID, rightRightGeneratedSignalId );
+}
+
+TEST_F( SchemaTest, SchemaCollectionWithSamePartialSignal )
+{
+    Schemas::CollectionSchemesMsg::CollectionSchemes protoCollectionSchemesMsg;
+
+    auto protoCollectionScheme1 = protoCollectionSchemesMsg.add_collection_schemes();
+    protoCollectionScheme1->set_campaign_sync_id( "campaign1" );
+    protoCollectionScheme1->set_decoder_manifest_sync_id( "dm1" );
+    protoCollectionScheme1->set_start_time_ms_epoch( 0 );
+    protoCollectionScheme1->set_expiry_time_ms_epoch( 9262144816000 );
+
+    Schemas::CollectionSchemesMsg::SignalInformation *signal1 = protoCollectionScheme1->add_signal_information();
+    signal1->set_signal_id( 200008 );
+    signal1->set_sample_buffer_size( 100 );
+    signal1->set_minimum_sample_period_ms( 1000 );
+    signal1->set_fixed_window_period_ms( 1000 );
+    signal1->set_condition_only_signal( false );
+
+    auto *signalPath1 = new Schemas::CommonTypesMsg::SignalPath();
+    signalPath1->add_signal_path( 34574325 );
+    signalPath1->add_signal_path( 5 );
+    signalPath1->add_signal_path( 0 );
+    signalPath1->add_signal_path( 42 );
+
+    signal1->set_allocated_signal_path( signalPath1 );
+
+    // Add another campaign with exactly the same config
+    auto protoCollectionScheme2 = protoCollectionSchemesMsg.add_collection_schemes();
+    protoCollectionScheme2->CopyFrom( *protoCollectionScheme1 );
+    protoCollectionScheme2->set_campaign_sync_id( "campaign2" );
+
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverCollectionSchemeList, protoCollectionSchemesMsg ) );
+
+    ASSERT_TRUE( mReceivedCollectionSchemeList->build() );
+    ASSERT_EQ( mReceivedCollectionSchemeList->getCollectionSchemes().size(), 2 );
+    auto collectionScheme1 = mReceivedCollectionSchemeList->getCollectionSchemes().at( 0 );
+    auto collectionScheme2 = mReceivedCollectionSchemeList->getCollectionSchemes().at( 1 );
+
+    ASSERT_EQ( collectionScheme1->getCollectSignals().size(), 1 );
+    ASSERT_EQ( collectionScheme2->getCollectSignals().size(), 1 );
+
+    // check its an internal generated ID
+    auto signalId1 = collectionScheme1->getCollectSignals().at( 0 ).signalID;
+    auto signalId2 = collectionScheme2->getCollectSignals().at( 0 ).signalID;
+    ASSERT_NE( signalId1 & INTERNAL_SIGNAL_ID_BITMASK, 0 );
+    ASSERT_NE( signalId2 & INTERNAL_SIGNAL_ID_BITMASK, 0 );
+    // Internal IDs should be reused across collection schemes if they refer to the same partial signal
+    ASSERT_EQ( signalId1, signalId2 );
 }
 
 TEST_F( SchemaTest, SchemaCollectionWithDifferentWayToSpecifySignalIDInExpression )
@@ -1117,13 +1191,13 @@ TEST_F( SchemaTest, SchemaCollectionWithDifferentWayToSpecifySignalIDInExpressio
 
     message->set_allocated_condition_tree( root );
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelCollectionSchemeList, protoCollectionSchemesMsg ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverCollectionSchemeList, protoCollectionSchemesMsg ) );
 
     ASSERT_TRUE( mReceivedCollectionSchemeList->build() );
     ASSERT_EQ( mReceivedCollectionSchemeList->getCollectionSchemes().size(), 1 );
     auto collectionSchemeTest = mReceivedCollectionSchemeList->getCollectionSchemes().at( 0 );
 
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().size(), 14 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().size(), 7 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).nodeType,
                ExpressionNodeType::OPERATOR_EQUAL ); // assume first node is top root node
 
@@ -1190,7 +1264,7 @@ TEST_F( SchemaTest, CollectionSchemeComplexHeartbeat )
     path1->add_signal_path( 5 );
     signal3->set_allocated_signal_path( path1 );
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelCollectionSchemeList, protoCollectionSchemesMsg ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverCollectionSchemeList, protoCollectionSchemesMsg ) );
 
     ASSERT_TRUE( mReceivedCollectionSchemeList->build() );
     ASSERT_EQ( mReceivedCollectionSchemeList->getCollectionSchemes().size(), 1 );
@@ -1308,7 +1382,7 @@ TEST_F( SchemaTest, DecoderManifestIngestionComplexSignals )
     protoComplexSignal->set_message_id( "/topic/for/ROS:/vehicle/msgs/test.msg" );
     protoComplexSignal->set_root_type_id( 20 );
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelDecoderManifest, protoDM ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverDecoderManifest, protoDM ) );
 
     ASSERT_TRUE( mReceivedDecoderManifest->getComplexSignalDecoderFormat( 123 ).mInterfaceId.empty() );
 
@@ -1411,7 +1485,7 @@ TEST_F( SchemaTest, DecoderManifestWrong )
     protoComplexSignal2->set_message_id( "/topic/for/ROS:/vehicle/msgs/test2.msg" );
     protoComplexSignal2->set_root_type_id( 10 );
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelDecoderManifest, protoDM ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverDecoderManifest, protoDM ) );
 
     ASSERT_TRUE( mReceivedDecoderManifest->build() );
     ASSERT_TRUE( mReceivedDecoderManifest->isReady() );
@@ -1477,7 +1551,7 @@ TEST_F( SchemaTest, DecoderManifestIngestionComplexStringAsArray )
     protoComplexSignal->set_message_id( "/topic/for/ROS:/vehicle/msgs/test.msg" );
     protoComplexSignal->set_root_type_id( 20 );
 
-    ASSERT_NO_FATAL_FAILURE( sendMessageToChannel( mChannelDecoderManifest, protoDM ) );
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverDecoderManifest, protoDM ) );
 
     ASSERT_TRUE( mReceivedDecoderManifest->getComplexSignalDecoderFormat( 123 ).mInterfaceId.empty() );
 

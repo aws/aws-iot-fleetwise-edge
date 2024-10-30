@@ -3,11 +3,13 @@
 
 #pragma once
 
-#include "AwsGGChannel.h"
-#include "IConnectivityChannel.h"
+#include "AwsGreengrassV2Receiver.h"
+#include "AwsGreengrassV2Sender.h"
 #include "IConnectivityModule.h"
+#include "IReceiver.h"
+#include "ISender.h"
+#include "Listener.h"
 #include "LoggingModule.h"
-#include "PayloadManager.h"
 #include <atomic>
 #include <aws/crt/io/Bootstrap.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
@@ -53,19 +55,19 @@ private:
 };
 
 /**
- * @brief bootstrap of the Aws GG connectivity module. Only one object of this should normally exist
+ * @brief bootstrap of the AWS IoT Greengrass connectivity module. Only one object of this should normally exist
  *
  */
-class AwsGGConnectivityModule : public IConnectivityModule
+class AwsGreengrassV2ConnectivityModule : public IConnectivityModule
 {
 public:
-    AwsGGConnectivityModule( Aws::Crt::Io::ClientBootstrap *clientBootstrap );
-    ~AwsGGConnectivityModule() override;
+    AwsGreengrassV2ConnectivityModule( Aws::Crt::Io::ClientBootstrap *clientBootstrap );
+    ~AwsGreengrassV2ConnectivityModule() override;
 
-    AwsGGConnectivityModule( const AwsGGConnectivityModule & ) = delete;
-    AwsGGConnectivityModule &operator=( const AwsGGConnectivityModule & ) = delete;
-    AwsGGConnectivityModule( AwsGGConnectivityModule && ) = delete;
-    AwsGGConnectivityModule &operator=( AwsGGConnectivityModule && ) = delete;
+    AwsGreengrassV2ConnectivityModule( const AwsGreengrassV2ConnectivityModule & ) = delete;
+    AwsGreengrassV2ConnectivityModule &operator=( const AwsGreengrassV2ConnectivityModule & ) = delete;
+    AwsGreengrassV2ConnectivityModule( AwsGreengrassV2ConnectivityModule && ) = delete;
+    AwsGreengrassV2ConnectivityModule &operator=( AwsGreengrassV2ConnectivityModule && ) = delete;
 
     bool connect() override;
 
@@ -77,27 +79,20 @@ public:
         return mConnected;
     };
 
-    /**
-     * @brief create a new channel sharing the connection of this module
-     * This call needs to be done before calling connect for all asynchronous subscribe channel
-     * @param payloadManager the payload manager used by the new channel,
-     * @param topicName the topic which this channel should subscribe/publish to
-     * @param subscription whether the channel should subscribe to the topic. Otherwise it will
-     * just publish to it.
-     *
-     * @return a pointer to the newly created channel. A reference to the newly created channel is also hold inside this
-     * module.
-     */
-    std::shared_ptr<IConnectivityChannel> createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager,
-                                                            const std::string &topicName,
-                                                            bool subscription = false ) override;
+    std::shared_ptr<ISender> createSender( const std::string &topicName, QoS publishQoS = QoS::AT_MOST_ONCE ) override;
+
+    std::shared_ptr<IReceiver> createReceiver( const std::string &topicName ) override;
+
+    void subscribeToConnectionEstablished( OnConnectionEstablishedCallback callback ) override;
 
 private:
     std::atomic<bool> mConnected;
     std::atomic<bool> mConnectionEstablished;
-    std::vector<std::shared_ptr<AwsGGChannel>> mChannels;
+    ThreadSafeListeners<OnConnectionEstablishedCallback> mConnectionEstablishedListeners;
+    std::vector<std::shared_ptr<AwsGreengrassV2Sender>> mSenders;
+    std::vector<std::shared_ptr<AwsGreengrassV2Receiver>> mReceivers;
     std::unique_ptr<IpcLifecycleHandler> mLifecycleHandler;
-    std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> mConnection;
+    std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> mGreengrassClient;
     Aws::Crt::Io::ClientBootstrap *mClientBootstrap;
 };
 

@@ -306,6 +306,18 @@
               "type": "string",
               "description": "The root CA certificate (optional)"
             },
+            "keepAliveIntervalSeconds": {
+              "type": "integer",
+              "description": "Only valid for 'iotCore' connection. The maximum time interval, in seconds, that is permitted to elapse between the point at which the client finishes transmitting one MQTT packet and the point it starts sending the next."
+            },
+            "pingTimeoutMs": {
+              "type": "integer",
+              "description": "Only valid for 'iotCore' connection. Time interval to wait after sending a PINGREQ for a PINGRESP to arrive. If one does not arrive, the client will close the current connection."
+            },
+            "sessionExpiryIntervalSeconds": {
+              "type": "integer",
+              "description": "Only valid for 'iotCore' connection. The duration of persistent sessions."
+            },
             "connectionType": {
               "type": "string",
               "enum": ["iotCore", "iotGreengrassV2"],

@@ -23,7 +23,7 @@ namespace IoTFleetWise
 class CANDataConsumer
 {
 public:
-    CANDataConsumer( SignalBufferPtr signalBufferPtr );
+    CANDataConsumer( SignalBufferDistributorPtr signalBufferDistributor );
     ~CANDataConsumer() = default;
 
     CANDataConsumer( const CANDataConsumer & ) = delete;
@@ -50,7 +50,7 @@ private:
                                    const CANDecoderDictionary::CANMsgDecoderMethodType &decoderMethod,
                                    CANMessageDecoderMethod &currentMessageDecoderMethod );
 
-    SignalBufferPtr mSignalBufferPtr;
+    SignalBufferDistributorPtr mSignalBufferDistributor;
 };
 
 } // namespace IoTFleetWise

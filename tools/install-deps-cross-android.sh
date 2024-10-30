@@ -43,8 +43,8 @@ parse_args() {
 
 parse_args "$@"
 
-apt update
-apt install -y \
+apt update -o DPkg::Lock::Timeout=1800
+apt install -y -o DPkg::Lock::Timeout=1800 \
     unzip \
     git \
     wget \
@@ -70,9 +70,7 @@ if [ ! -d ${SDK_PREFIX} ]; then
 fi
 export PATH=${SDK_PREFIX}/cmake/${VERSION_CMAKE}/bin/:${PATH}
 
-if [ -z "${NATIVE_PREFIX+x}" ]; then
-    NATIVE_PREFIX="/usr/local/`gcc -dumpmachine`"
-fi
+: ${NATIVE_PREFIX:="/usr/local/`gcc -dumpmachine`"}
 
 install_deps() {
     TARGET_ARCH="$1"
@@ -90,7 +88,7 @@ install_deps() {
         wget -q https://archives.boost.io/release/${VERSION_BOOST}/source/boost_${VERSION_BOOST//./_}.tar.bz2 -O Boost-for-Android/boost_${VERSION_BOOST//./_}.tar.bz2
     fi
     cd Boost-for-Android
-    git checkout 53e6c16ea80c7dcb2683fd548e0c7a09ddffbfc1
+    git checkout ${VERSION_BOOST_FOR_ANDROID}
     rm -rf build
     ./build-android.sh \
         ${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \
@@ -271,7 +269,6 @@ install_deps() {
         -DBUILD_SHARED_LIBS=OFF \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_ONLY='transfer;s3-crt;iot' \
-        -DAWS_CUSTOM_MEMORY_MANAGEMENT=ON \
         -DANDROID_ABI=${TARGET_ARCH} \
         -DANDROID_PLATFORM=android-${VERSION_ANDROID_API} \
         -DCMAKE_ANDROID_NDK=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \

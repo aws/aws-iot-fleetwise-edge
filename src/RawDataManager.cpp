@@ -146,7 +146,7 @@ BufferManager::updateConfig( const std::unordered_map<BufferTypeId, SignalUpdate
 }
 
 BufferHandle
-BufferManager::push( uint8_t *data, size_t size, Timestamp receiveTimestamp, BufferTypeId typeId )
+BufferManager::push( const uint8_t *data, size_t size, Timestamp receiveTimestamp, BufferTypeId typeId )
 {
     std::lock_guard<std::mutex> lock( mBufferManagerMutex );
 
@@ -664,9 +664,11 @@ BufferManager::Buffer::deleteUnusedData()
             TraceModule::get().incrementVariable( TraceVariable::RAW_DATA_OVERWRITTEN_DATA_WITH_USED_HANDLE );
         }
     }
+    // coverity[unchecked_value] The return value gives the status and does not need to be checked
     FWE_LOG_TRACE( "Deleting data for Signal ID " + std::to_string( mTypeID ) + " BufferHandle " +
                    std::to_string( unusedDataFrame->mHandleID ) +
-                   " with usage hints: " + std::to_string( unusedDataFrame->hasUsageHints() ) );
+                   " with usage hints: " + std::to_string( unusedDataFrame->hasUsageHints() ) +
+                   ", total bytes in use before deletion: " + std::to_string( mBytesInUse ) );
     auto deletedMemSize = unusedDataFrame->mRawData.size();
     mBytesInUse -= deletedMemSize;    // Subtract the memory
     mBuffer.erase( unusedDataFrame ); // Delete the data
@@ -679,7 +681,8 @@ size_t
 BufferManager::Buffer::deleteDataFromHandle( const BufferHandle handle )
 {
     FWE_LOG_TRACE( "Deleting data for Signal ID " + std::to_string( mTypeID ) + " BufferHandle " +
-                   std::to_string( handle ) );
+                   std::to_string( handle ) +
+                   ", total bytes in use before deletion: " + std::to_string( mBytesInUse ) );
     auto unusedDataFrame = std::find_if( mBuffer.cbegin(), mBuffer.cend(), [&]( const Frame &rawDataFrame ) -> bool {
         return rawDataFrame.mHandleID == handle;
     } );

@@ -6,8 +6,11 @@
 #include "CANDataTypes.h"
 #include "CollectionInspectionAPITypes.h"
 #include "IoTFleetWiseConfig.h"
+#include "QueueTypes.h"
+#include "SignalTypes.h"
 #include "WaitUntil.h"
 #include <array>
+#include <boost/filesystem.hpp>
 #include <cstdint>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -92,7 +95,7 @@ protected:
     {
         if ( !socketAvailable() )
         {
-            GTEST_SKIP() << "Skipping test fixture due to unavailability of socket";
+            GTEST_FAIL() << "Test failed due to unavailability of socket";
         }
 #ifdef FWE_FEATURE_IWAVE_GPS
         std::ofstream iWaveGpsFile( "/tmp/engineTestIWaveGPSfile.txt" );
@@ -127,7 +130,8 @@ protected:
 TEST_F( IoTFleetWiseEngineTest, InitAndStartEngine )
 {
     Json::Value config;
-    ASSERT_TRUE( IoTFleetWiseConfig::read( "static-config-ok.json", config ) );
+    std::string configFilePath = "static-config-ok.json";
+    ASSERT_TRUE( IoTFleetWiseConfig::read( configFilePath, config ) );
     IoTFleetWiseEngine engine;
 
     std::string keyPem;
@@ -140,7 +144,7 @@ TEST_F( IoTFleetWiseEngineTest, InitAndStartEngine )
     dummyCertificateFile << certPem;
     dummyCertificateFile.close();
 
-    ASSERT_TRUE( engine.connect( config ) );
+    ASSERT_TRUE( engine.connect( config, boost::filesystem::absolute( configFilePath ).parent_path() ) );
 
     ASSERT_TRUE( engine.start() );
     ASSERT_TRUE( engine.isAlive() );
@@ -151,7 +155,8 @@ TEST_F( IoTFleetWiseEngineTest, InitAndStartEngine )
 TEST_F( IoTFleetWiseEngineTest, InitAndStartEngineInlineCreds )
 {
     Json::Value config;
-    ASSERT_TRUE( IoTFleetWiseConfig::read( "static-config-inline-creds.json", config ) );
+    std::string configFilePath = "static-config-inline-creds.json";
+    ASSERT_TRUE( IoTFleetWiseConfig::read( configFilePath, config ) );
     IoTFleetWiseEngine engine;
 
     std::string keyPem;
@@ -161,7 +166,7 @@ TEST_F( IoTFleetWiseEngineTest, InitAndStartEngineInlineCreds )
     config["staticConfig"]["mqttConnection"]["privateKey"] = keyPem;
     config["staticConfig"]["mqttConnection"]["rootCA"] = certPem;
 
-    ASSERT_TRUE( engine.connect( config ) );
+    ASSERT_TRUE( engine.connect( config, boost::filesystem::absolute( configFilePath ).parent_path() ) );
 
     ASSERT_TRUE( engine.start() );
     ASSERT_TRUE( engine.isAlive() );
@@ -172,9 +177,10 @@ TEST_F( IoTFleetWiseEngineTest, InitAndStartEngineInlineCreds )
 TEST_F( IoTFleetWiseEngineTest, CheckPublishDataQueue )
 {
     Json::Value config;
-    ASSERT_TRUE( IoTFleetWiseConfig::read( "static-config-ok.json", config ) );
+    std::string configFilePath = "static-config-ok.json";
+    ASSERT_TRUE( IoTFleetWiseConfig::read( configFilePath, config ) );
     IoTFleetWiseEngine engine;
-    ASSERT_TRUE( engine.connect( config ) );
+    ASSERT_TRUE( engine.connect( config, boost::filesystem::absolute( configFilePath ).parent_path() ) );
 
     // Push to the publish data queue
     std::shared_ptr<TriggeredCollectionSchemeData> collectedDataPtr = std::make_shared<TriggeredCollectionSchemeData>();
@@ -182,11 +188,14 @@ TEST_F( IoTFleetWiseEngineTest, CheckPublishDataQueue )
     collectedDataPtr->metadata.decoderID = "456";
     collectedDataPtr->triggerTime = 800;
     {
-        CollectedSignal collectedSignalMsg1( 120 /*signalId*/, 800 /*receiveTime*/, 77.88 /*value*/ );
+        CollectedSignal collectedSignalMsg1(
+            120 /*signalId*/, 800 /*receiveTime*/, 77.88 /*value*/, SignalType::DOUBLE );
         collectedDataPtr->signals.push_back( collectedSignalMsg1 );
-        CollectedSignal collectedSignalMsg2( 10 /*signalId*/, 1000 /*receiveTime*/, 46.5 /*value*/ );
+        CollectedSignal collectedSignalMsg2(
+            10 /*signalId*/, 1000 /*receiveTime*/, 46.5 /*value*/, SignalType::DOUBLE );
         collectedDataPtr->signals.push_back( collectedSignalMsg2 );
-        CollectedSignal collectedSignalMsg3( 12 /*signalId*/, 1200 /*receiveTime*/, 98.9 /*value*/ );
+        CollectedSignal collectedSignalMsg3(
+            12 /*signalId*/, 1200 /*receiveTime*/, 98.9 /*value*/, SignalType::DOUBLE );
         collectedDataPtr->signals.push_back( collectedSignalMsg3 );
     }
     {
@@ -216,7 +225,7 @@ TEST_F( IoTFleetWiseEngineTest, InitAndFailToStartCorruptConfig )
     ASSERT_TRUE( IoTFleetWiseConfig::read( "static-config-corrupt.json", config ) );
     IoTFleetWiseEngine engine;
     // Connect should fail as the Config file has a non complete Bus definition
-    ASSERT_FALSE( engine.connect( config ) );
+    ASSERT_FALSE( engine.connect( config, "static-config-corrupt.json" ) );
 }
 
 } // namespace IoTFleetWise

@@ -4,12 +4,16 @@
 
 set -eo pipefail
 
+WITH_GREENGRASSV2_SUPPORT="false"
 WITH_IWAVE_GPS_SUPPORT="false"
 WITH_ROS2_SUPPORT="false"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
         case $1 in
+        --with-greengrassv2-support)
+            WITH_GREENGRASSV2_SUPPORT="true"
+            ;;
         --with-iwave-gps-support)
             WITH_IWAVE_GPS_SUPPORT="true"
             ;;
@@ -18,8 +22,9 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --with-ros2-support       Build with ROS2 support"
-            echo "  --with-iwave-gps-support  Build with iWave GPS support"
+            echo "  --with-greengrassv2-support  Build with Greengrass V2 support"
+            echo "  --with-iwave-gps-support     Build with iWave GPS support"
+            echo "  --with-ros2-support          Build with ROS2 support"
             exit 0
             ;;
         esac
@@ -38,6 +43,9 @@ CMAKE_OPTIONS="
     -DFWE_SECURITY_COMPILE_FLAGS=On
     -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
     -DBUILD_TESTING=Off"
+if ${WITH_GREENGRASSV2_SUPPORT}; then
+    CMAKE_OPTIONS="${CMAKE_OPTIONS} -DFWE_FEATURE_GREENGRASSV2=On"
+fi
 if ${WITH_IWAVE_GPS_SUPPORT}; then
     CMAKE_OPTIONS="${CMAKE_OPTIONS} -DFWE_FEATURE_IWAVE_GPS=On"
 fi

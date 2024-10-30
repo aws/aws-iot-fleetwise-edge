@@ -3,7 +3,7 @@
 
 #include "ROS2DataSource.h"
 #include "LoggingModule.h"
-#include "TraceModule.h"
+#include "QueueTypes.h"
 #include <boost/variant.hpp>
 #include <chrono>
 #include <exception>
@@ -117,10 +117,10 @@ ROS2DataSourceNode::subscribe( std::string topic,
 }
 
 ROS2DataSource::ROS2DataSource( ROS2DataSourceConfig config,
-                                SignalBufferPtr signalBufferPtr,
+                                SignalBufferDistributorPtr signalBufferDistributor,
                                 std::shared_ptr<RawData::BufferManager> rawDataBufferManager )
     : mConfig( std::move( config ) )
-    , mSignalBufferPtr( std::move( signalBufferPtr ) )
+    , mSignalBufferDistributor( std::move( signalBufferDistributor ) )
     , mRawBufferManager( std::move( rawDataBufferManager ) )
 {
     mNode = std::make_shared<ROS2DataSourceNode>();
@@ -150,7 +150,7 @@ ROS2DataSource::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dict
 // Name the executer threads the first time they process a callback. Until then they will have the name of the main
 // thread fwVNROS2main
 static thread_local bool gAlreadyNamedThread{ false }; // NOLINT Thread local thread named flag
-static std::atomic<int> gThreadCounter{ 0 };           // NOLINT Global atomic thread counter
+static std::atomic<int> gThreadCounter{ 1 };           // NOLINT Global atomic thread counter
 
 /*
  * called from multiple threads in parallel as callback group is Reentrant
@@ -243,24 +243,14 @@ ROS2DataSource::topicCallback( std::shared_ptr<rclcpp::SerializedMessage> msg, s
                     messageFormat.mSignalId,
                     bufferHandle,
                     RawData::BufferHandleUsageStage::COLLECTED_NOT_IN_HISTORY_BUFFER );
-                auto collectedSignal = CollectedSignal(
-                    messageFormat.mSignalId, timestamp, bufferHandle, SignalType::RAW_DATA_BUFFER_HANDLE );
+                auto collectedSignal =
+                    CollectedSignal( messageFormat.mSignalId, timestamp, bufferHandle, SignalType::COMPLEX_SIGNAL );
 
                 collectedSignalsGroup.push_back( collectedSignal );
             }
         }
     }
-    TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-    TraceModule::get().addToAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
-                                            collectedSignalsGroup.size() );
-    if ( !mSignalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) ) )
-    {
-        TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DATA_FRAMES );
-
-        TraceModule::get().subtractFromAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_SIGNALS,
-                                                       collectedSignalsGroup.size() );
-        FWE_LOG_WARN( "Signal Buffer Full" );
-    }
+    mSignalBufferDistributor->push( CollectedDataFrame( collectedSignalsGroup ) );
 }
 
 void
@@ -279,9 +269,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         bool b = false;
         // coverity[misra_cpp_2008_rule_14_8_2_violation] - FastCDR header defines both template and type overloads
         cdr >> b;
-        collectedSignal = CollectedSignal(
-            signalId, timestamp, b, SignalType::DOUBLE ); // TODO: replace DOUBLE with format.mPrimitiveType as soon as
-                                                          // collection inspection engine fully supports different types
+        collectedSignal = CollectedSignal( signalId, timestamp, b, format.mPrimitiveType );
     }
     break;
     case SignalType::UINT8: {
@@ -290,7 +278,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         cdr >> u8;
         u8 = static_cast<uint8_t>( static_cast<uint8_t>( format.mOffset ) +
                                    u8 * static_cast<uint8_t>( format.mScaling ) );
-        collectedSignal = CollectedSignal( signalId, timestamp, u8, SignalType::DOUBLE );
+        collectedSignal = CollectedSignal( signalId, timestamp, u8, format.mPrimitiveType );
     }
     break;
     case SignalType::UINT16: {
@@ -299,7 +287,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         cdr >> u16;
         u16 = static_cast<uint16_t>( static_cast<uint16_t>( format.mOffset ) +
                                      u16 * static_cast<uint16_t>( format.mScaling ) );
-        collectedSignal = CollectedSignal( signalId, timestamp, u16, SignalType::DOUBLE );
+        collectedSignal = CollectedSignal( signalId, timestamp, u16, format.mPrimitiveType );
     }
     break;
     case SignalType::UINT32: {
@@ -308,7 +296,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         cdr >> u32;
         u32 *= static_cast<uint32_t>( format.mScaling );
         u32 += static_cast<uint32_t>( format.mOffset );
-        collectedSignal = CollectedSignal( signalId, timestamp, u32, SignalType::DOUBLE );
+        collectedSignal = CollectedSignal( signalId, timestamp, u32, format.mPrimitiveType );
     }
     break;
     case SignalType::UINT64: {
@@ -317,7 +305,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         cdr >> u64;
         u64 *= static_cast<uint64_t>( format.mScaling );
         u64 += static_cast<uint64_t>( format.mOffset );
-        collectedSignal = CollectedSignal( signalId, timestamp, u64, SignalType::DOUBLE );
+        collectedSignal = CollectedSignal( signalId, timestamp, u64, format.mPrimitiveType );
     }
     break;
     case SignalType::INT8: {
@@ -325,7 +313,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         // coverity[misra_cpp_2008_rule_14_8_2_violation] - FastCDR header defines both template and type overloads
         cdr >> i8;
         i8 = static_cast<int8_t>( static_cast<int8_t>( format.mOffset ) + i8 * static_cast<int8_t>( format.mScaling ) );
-        collectedSignal = CollectedSignal( signalId, timestamp, i8, SignalType::DOUBLE );
+        collectedSignal = CollectedSignal( signalId, timestamp, i8, format.mPrimitiveType );
     }
     break;
     case SignalType::INT16: {
@@ -334,7 +322,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         cdr >> i16;
         i16 = static_cast<int16_t>( static_cast<int16_t>( format.mOffset ) +
                                     i16 * static_cast<int16_t>( format.mScaling ) );
-        collectedSignal = CollectedSignal( signalId, timestamp, i16, SignalType::DOUBLE );
+        collectedSignal = CollectedSignal( signalId, timestamp, i16, format.mPrimitiveType );
     }
     break;
     case SignalType::INT32: {
@@ -343,7 +331,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         cdr >> i32;
         i32 *= static_cast<int32_t>( format.mScaling );
         i32 += static_cast<int32_t>( format.mOffset );
-        collectedSignal = CollectedSignal( signalId, timestamp, i32, SignalType::DOUBLE );
+        collectedSignal = CollectedSignal( signalId, timestamp, i32, format.mPrimitiveType );
     }
     break;
     case SignalType::INT64: {
@@ -352,7 +340,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         cdr >> i64;
         i64 *= static_cast<int64_t>( format.mScaling );
         i64 += static_cast<int64_t>( format.mOffset );
-        collectedSignal = CollectedSignal( signalId, timestamp, i64, SignalType::DOUBLE );
+        collectedSignal = CollectedSignal( signalId, timestamp, i64, format.mPrimitiveType );
     }
     break;
     case SignalType::FLOAT: {
@@ -361,7 +349,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         cdr >> f;
         f *= static_cast<float>( format.mScaling );
         f += static_cast<float>( format.mOffset );
-        collectedSignal = CollectedSignal( signalId, timestamp, f, SignalType::DOUBLE );
+        collectedSignal = CollectedSignal( signalId, timestamp, f, format.mPrimitiveType );
     }
     break;
     case SignalType::DOUBLE: {
@@ -370,7 +358,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
         cdr >> d;
         d *= format.mScaling;
         d += format.mOffset;
-        collectedSignal = CollectedSignal( signalId, timestamp, d, SignalType::DOUBLE );
+        collectedSignal = CollectedSignal( signalId, timestamp, d, format.mPrimitiveType );
     }
     break;
     default:
@@ -1107,6 +1095,7 @@ ROS2DataSource::doWork( void *data )
             {
                 // coverity[autosar_cpp14_a15_5_2_violation] false positive - join is called to exit the previous thread
                 // coverity[cert_err50_cpp_violation] false positive - join is called to exit the previous thread
+                gThreadCounter = 1;
                 ros2DataSource->mExecutorSpinThread = std::thread( [ros2DataSource]() {
                     FWE_LOG_TRACE( "Executor start spinning" );
                     ros2DataSource->mROS2Executor->spin();

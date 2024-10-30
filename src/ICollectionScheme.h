@@ -9,7 +9,6 @@
 #include <climits>
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <vector>
 
 namespace Aws
@@ -81,8 +80,7 @@ struct CanFrameCollectionInfo
 enum class ExpressionNodeType
 {
     FLOAT = 0,
-    SIGNAL,         // Node_Signal_ID
-    WINDOWFUNCTION, // NodeFunction
+    SIGNAL, // Node_Signal_ID
     BOOLEAN,
     OPERATOR_SMALLER, // NodeOperator
     OPERATOR_BIGGER,
@@ -96,7 +94,9 @@ enum class ExpressionNodeType
     OPERATOR_ARITHMETIC_PLUS,
     OPERATOR_ARITHMETIC_MINUS,
     OPERATOR_ARITHMETIC_MULTIPLY,
-    OPERATOR_ARITHMETIC_DIVIDE
+    OPERATOR_ARITHMETIC_DIVIDE,
+    WINDOW_FUNCTION, // NodeFunction
+    NONE
 };
 
 enum class WindowFunction
@@ -112,6 +112,9 @@ enum class WindowFunction
 
 struct ExpressionFunction
 {
+    /**
+     * @brief   Specify which window function to be used (in case ExpressionNodeType is WINDOW_FUNCTION).
+     */
     WindowFunction windowFunction{ WindowFunction::NONE };
 };
 
@@ -245,18 +248,22 @@ public:
 #endif
 
     /**
-     * @brief Signals_t is a vector that represents the AST Expression Tree per collectionScheme provided.
+     * @brief ExpressionNode_t is a vector that represents the AST Expression Tree per collectionScheme provided.
      */
     using ExpressionNode_t = std::vector<ExpressionNode>;
-    const ExpressionNode_t INVALID_EXPRESSION_NODE = std::vector<ExpressionNode>();
+    const ExpressionNode_t INVALID_EXPRESSION_NODES = std::vector<ExpressionNode>();
 
     const uint64_t INVALID_COLLECTION_SCHEME_START_TIME = std::numeric_limits<uint64_t>::max();
     const uint64_t INVALID_COLLECTION_SCHEME_EXPIRY_TIME = std::numeric_limits<uint64_t>::max();
     const uint32_t INVALID_MINIMUM_PUBLISH_TIME = std::numeric_limits<uint32_t>::max();
     const uint32_t INVALID_AFTER_TRIGGER_DURATION = std::numeric_limits<uint32_t>::max();
     const uint32_t INVALID_PRIORITY_LEVEL = std::numeric_limits<uint32_t>::max();
-    const std::string INVALID_COLLECTION_SCHEME_ID = std::string();
-    const std::string INVALID_DECODER_MANIFEST_ID = std::string();
+    const SyncID INVALID_COLLECTION_SCHEME_ID = SyncID();
+    const SyncID INVALID_DECODER_MANIFEST_ID = SyncID();
+
+    virtual bool operator==( const ICollectionScheme &other ) const = 0;
+
+    virtual bool operator!=( const ICollectionScheme &other ) const = 0;
 
     /**
      * @brief indicates if the decoder manifest is prepared to be used for example by calling getters
@@ -277,14 +284,14 @@ public:
      *
      * @return A string containing the unique ID of this collectionScheme.
      */
-    virtual const std::string &getCollectionSchemeID() const = 0;
+    virtual const SyncID &getCollectionSchemeID() const = 0;
 
     /**
      * @brief Get the associated Decoder Manifest ID of this collectionScheme
      *
      * @return A string containing the unique Decoder Manifest of this collectionScheme.
      */
-    virtual const std::string &getDecoderManifestID() const = 0;
+    virtual const SyncID &getDecoderManifestID() const = 0;
 
     /**
      * @brief Get Activation timestamp of the collectionScheme

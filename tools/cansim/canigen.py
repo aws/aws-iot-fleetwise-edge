@@ -57,7 +57,7 @@ class Canigen:
         if output_filename is not None:
             self._output_file = open(output_filename, "w")
         else:
-            self._can_bus = can.interface.Bus(self._interface, bustype="socketcan", fd=fd)
+            self._can_bus = can.interface.Bus(self._interface, interface="socketcan", fd=fd)
         self._obd_config = {}
         self._pid_names = []
         self._dtc_names = []
@@ -271,7 +271,12 @@ class Canigen:
                 tx = [0x7F, sid, 0x11]  # NRC Service not supported
             # print(ecu['name']+' tx: '+str(tx))
             if len(tx) > 1:
-                isotp_socket_phys.send(bytearray(tx))
+                try:
+                    isotp_socket_phys.send(bytearray(tx))
+                except Exception:
+                    pass  # Ignore timeout errors
+        isotp_socket_phys.close()
+        isotp_socket_func.close()
 
     def get_sig_names(self):
         return self._sig_names

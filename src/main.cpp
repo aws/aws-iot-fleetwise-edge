@@ -6,6 +6,7 @@
 #include "IoTFleetWiseEngine.h"
 #include "IoTFleetWiseVersion.h"
 #include "LogLevel.h"
+#include <boost/filesystem.hpp>
 #include <csignal>
 #include <cstdlib>
 #include <exception>
@@ -111,9 +112,11 @@ main( int argc, char *argv[] )
         // Set system wide log level
         configureLogging( config );
 
+        auto configFileDirectoryPath = boost::filesystem::absolute( configFilename ).parent_path();
+
         Aws::IoTFleetWise::IoTFleetWiseEngine engine;
         // Connect the Engine
-        if ( engine.connect( config ) && engine.start() )
+        if ( engine.connect( config, configFileDirectoryPath ) && engine.start() )
         {
             std::cout << "Started successfully" << std::endl;
         }

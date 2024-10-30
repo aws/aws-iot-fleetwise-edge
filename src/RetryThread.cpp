@@ -5,6 +5,7 @@
 #include "LoggingModule.h"
 #include <algorithm>
 #include <string>
+#include <utility>
 
 namespace Aws
 {
@@ -13,15 +14,16 @@ namespace IoTFleetWise
 
 std::atomic<int> RetryThread::fInstanceCounter( 0 ); // NOLINT Global atomic instance counter
 
-RetryThread::RetryThread( IRetryable &retryable, uint32_t startBackoffMs, uint32_t maxBackoffMs )
-    : fRetryable( retryable )
-    // coverity[misra_cpp_2008_rule_5_2_10_violation] For std::atomic this must be performed in a single statement
-    // coverity[autosar_cpp14_m5_2_10_violation] For std::atomic this must be performed in a single statement
+// coverity[misra_cpp_2008_rule_5_2_10_violation] For std::atomic this must be performed in a single statement
+// coverity[autosar_cpp14_m5_2_10_violation] For std::atomic this must be performed in a single statement
+RetryThread::RetryThread( Retryable retryable, uint32_t startBackoffMs, uint32_t maxBackoffMs )
+    : fRetryable( std::move( retryable ) )
     , fInstance( fInstanceCounter++ )
     , fStartBackoffMs( startBackoffMs )
     , fMaxBackoffMs( maxBackoffMs )
     , fCurrentWaitTime( 0 )
     , fShouldStop( false )
+    , fRestart( false )
 {
 }
 
@@ -46,6 +48,13 @@ RetryThread::start()
     return fThread.isValid();
 }
 
+void
+RetryThread::restart()
+{
+    fRestart.store( true );
+    fWait.notify();
+}
+
 bool
 RetryThread::stop()
 {
@@ -68,23 +77,37 @@ RetryThread::doWork( void *data )
 {
     RetryThread *retryThread = static_cast<RetryThread *>( data );
     retryThread->fCurrentWaitTime = retryThread->fStartBackoffMs;
+    RetryStatus result = RetryStatus::RETRY;
     while ( !retryThread->fShouldStop )
     {
-        RetryStatus result = retryThread->fRetryable.attempt();
-        if ( result != RetryStatus::RETRY )
+        if ( ( result == RetryStatus::RETRY ) || retryThread->fRestart )
         {
-            FWE_LOG_TRACE( "Finished with code " + std::to_string( static_cast<int>( result ) ) );
-            retryThread->fRetryable.onFinished( result );
-            return;
+            if ( retryThread->fRestart )
+            {
+                retryThread->fCurrentWaitTime = retryThread->fStartBackoffMs;
+                retryThread->fRestart.store( false, std::memory_order_relaxed );
+            }
+
+            result = retryThread->fRetryable();
+            if ( result != RetryStatus::RETRY )
+            {
+                FWE_LOG_TRACE( "Finished with code " + std::to_string( static_cast<int>( result ) ) );
+                retryThread->fWait.wait( Signal::WaitWithPredicate );
+                continue;
+            }
+
+            FWE_LOG_TRACE( "Current retry time is: " + std::to_string( retryThread->fCurrentWaitTime ) );
+            retryThread->fWait.wait( retryThread->fCurrentWaitTime );
+            // exponential backoff
+            retryThread->fCurrentWaitTime = std::min( retryThread->fCurrentWaitTime * 2, retryThread->fMaxBackoffMs );
         }
-        FWE_LOG_TRACE( "Current retry time is: " + std::to_string( retryThread->fCurrentWaitTime ) );
-        retryThread->fWait.wait( retryThread->fCurrentWaitTime );
-        // exponential backoff
-        retryThread->fCurrentWaitTime = std::min( retryThread->fCurrentWaitTime * 2, retryThread->fMaxBackoffMs );
+        else
+        {
+            retryThread->fWait.wait( Signal::WaitWithPredicate );
+        }
     }
     // If thread is shutdown without succeeding signal abort
     FWE_LOG_TRACE( "Stop thread with ABORT" );
-    retryThread->fRetryable.onFinished( RetryStatus::ABORT );
 }
 
 } // namespace IoTFleetWise

@@ -12,11 +12,11 @@ entire log of all FWE instances running.
 - **`ConInt`** and **`ConRes`** enable you to monitor the the number of MQTT connection
   interruptions and connection resumptions. If and how long it takes to detect a connection loss
   depends on the kernel configuration parameters `/proc/sys/net/ipv4/tcp/keepalive*` and the compile
-  time constants of FWE: `MQTT_CONNECT_KEEP_ALIVE_SECONDS` and `MQTT_PING_TIMEOUT_MS`. If the values
-  of the metric `ConInt` are not null, the internet coverage in the tested environment might be
-  unreliable, or `MQTT_PING_TIMEOUT_MS`, which defaults to 3 seconds, needs to be increased because
-  there's high latency to the IoT Core endpoint. Changing the AWS Region can help to decrease
-  latency.
+  time constants of FWE: `MQTT_KEEP_ALIVE_INTERVAL_SECONDS` and `MQTT_PING_TIMEOUT_MS`. If the
+  values of the metric `ConInt` are not null, the internet coverage in the tested environment might
+  be unreliable, or `MQTT_PING_TIMEOUT_MS`, which defaults to 3 seconds, needs to be increased
+  because there's high latency to the IoT Core endpoint. Changing the AWS Region can help to
+  decrease latency.
 - **`CeTrgCnt`** is a monotonic counter that monitors the number of triggers (inspection rules)
   detected since the FWE process started. Triggers are detected if one or more data collection
   campaign conditions are true. If this counter is larger than zero, but no data appears in the
@@ -24,8 +24,8 @@ entire log of all FWE instances running.
   bus activity), or the data has been ingested to the cloud but there was an error processing it. To
   debug this,
   [enable cloud logs in AWS IoT Fleetwise settings](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/logging-cw.html).
-- **`QUEUE_CONSUMER_TO_INSPECTION_SIGNALS`** monitors the current count of signals in queue to the
-  signal history buffer. If this value is close to the value defined in the static config
+- **`QueueConsumerToInspectionDataFrames`** monitors the current count of data frames in queue to
+  the signal history buffer. If this value is close to the value defined in the static config
   `decodedSignalsBufferSize`, increase the static config, decrease `inspectionThreadIdleTimeMs`,
   reduce the bus load or reduce the amount of decoded signals in the decoder manifest in the cloud.
 - **`ConRej`** monitors the number of MQTT connection rejects. If this is not zero check the

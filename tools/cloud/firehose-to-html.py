@@ -55,10 +55,22 @@ def process_row(vehicle_name, row, data, s3_links, include_list, exclude_list):
         raise Exception("Unsupported format")
     if row["vehicleName"] != vehicle_name:
         return
-    if "measure_value_DOUBLE" in row and not math.isnan(row["measure_value_DOUBLE"]):
+    if "measure_value_BOOLEAN" in row:
+        if not is_included(row["measure_name"], include_list, exclude_list):
+            return
+        expanded_data[row["measure_name"]] = 1 if row["measure_value_BOOLEAN"] else 0
+    elif "measure_value_DOUBLE" in row and not math.isnan(row["measure_value_DOUBLE"]):
         if not is_included(row["measure_name"], include_list, exclude_list):
             return
         expanded_data[row["measure_name"]] = row["measure_value_DOUBLE"]
+    elif "measure_value_BIGINT" in row:
+        if not is_included(row["measure_name"], include_list, exclude_list):
+            return
+        expanded_data[row["measure_name"]] = row["measure_value_BIGINT"]
+    elif "measure_value_VARCHAR" in row:
+        if not is_included(row["measure_name"], include_list, exclude_list):
+            return
+        expanded_data[row["measure_name"]] = row["measure_value_VARCHAR"]
     elif "measure_value_STRUCT" in row and row["measure_value_STRUCT"] is not None:
         for struct_data in row["measure_value_STRUCT"].values():
             if struct_data is None:
@@ -73,7 +85,7 @@ def process_row(vehicle_name, row, data, s3_links, include_list, exclude_list):
             )
             break
     else:
-        raise Exception("Unsupported format")
+        raise Exception(f"Unsupported format: {row}")
     data.append(expanded_data)
 
 

@@ -76,10 +76,10 @@ sed -i -E "s#(archive|security).ubuntu.com/ubuntu#ports.ubuntu.com/ubuntu-ports#
 print_file "After patching" /etc/apt/sources.list.d/armhf.list
 
 dpkg --add-architecture armhf
-apt update
-apt install -y \
+apt update -o DPkg::Lock::Timeout=120
+apt install -y -o DPkg::Lock::Timeout=120 \
     build-essential
-apt install -y \
+apt install -y -o DPkg::Lock::Timeout=120 \
     cmake \
     crossbuild-essential-armhf \
     curl \
@@ -93,8 +93,8 @@ apt install -y \
 if ${WITH_ROS2_SUPPORT}; then
     wget -q https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O /usr/share/keyrings/ros-archive-keyring.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(source /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list
-    apt update
-    apt install -y \
+    apt update -o DPkg::Lock::Timeout=120
+    apt install -y -o DPkg::Lock::Timeout=120 \
         bison \
         python3-numpy \
         python3-lark \
@@ -102,7 +102,8 @@ if ${WITH_ROS2_SUPPORT}; then
         libacl1-dev:armhf \
         liblog4cxx-dev:armhf \
         libpython3-dev:armhf \
-        python3-colcon-common-extensions
+        python3-colcon-common-extensions \
+        ros-dev-tools
 fi
 
 if [ ! -f /usr/include/linux/can/isotp.h ]; then
@@ -114,9 +115,7 @@ if [ ! -f /usr/include/linux/can/isotp.h ]; then
     rm -rf can-isotp
 fi
 
-if [ -z "${NATIVE_PREFIX+x}" ]; then
-    NATIVE_PREFIX="/usr/local/`gcc -dumpmachine`"
-fi
+: ${NATIVE_PREFIX:="/usr/local/`gcc -dumpmachine`"}
 
 if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_PREFIX} ]; then
     mkdir -p /usr/local/arm-linux-gnueabihf/lib/cmake/
@@ -274,7 +273,6 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_ONLY='transfer;s3-crt;iot' \
-        -DAWS_CUSTOM_MEMORY_MANAGEMENT=ON \
         ${AWS_SDK_CPP_OPTIONS} \
         -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
         -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
@@ -311,8 +309,6 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         make install -j`nproc`
         cd ../..
 
-        apt install -y \
-            ros-dev-tools
         git clone -b 0.8.0 https://github.com/eclipse-cyclonedds/cyclonedds.git
         cd cyclonedds
         mkdir build && cd build

@@ -4,6 +4,7 @@
 #include "CollectionInspectionAPITypes.h"
 #include "IDecoderDictionary.h"
 #include "MessageTypes.h"
+#include "QueueTypes.h"
 #include "RawDataManager.h"
 #include "SignalTypes.h"
 #include "TimeTypes.h"
@@ -75,7 +76,7 @@ public:
     // NOLINTNEXTLINE
     MOCK_METHOD( RawData::BufferHandle,
                  push,
-                 ( uint8_t * data, size_t size, Timestamp receiveTimestamp, RawData::BufferTypeId typeId ),
+                 ( const uint8_t *data, size_t size, Timestamp receiveTimestamp, RawData::BufferTypeId typeId ),
                  ( override ) );
 };
 
@@ -88,6 +89,7 @@ protected:
         rclcpp::multiThreadedExecutorMock = &multiThreadedExecutorMock;
         rclcpp::nodeMock = &nodeMock;
         rclcpp::typeSupportMock = &typeSupportMock;
+        signalBufferDistributor->registerQueue( signalBuffer );
     }
 
     void
@@ -348,7 +350,8 @@ protected:
     std::shared_ptr<NiceMock<RawBufferManagerMock>> rawBufferManagerMock =
         std::make_shared<NiceMock<RawBufferManagerMock>>();
     const int MINIMUM_WAIT_TIME_ONE_CYCLE_MS = 300;
-    SignalBufferPtr signalBufferPtr = std::make_shared<SignalBuffer>( 100 );
+    SignalBufferPtr signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
+    SignalBufferDistributorPtr signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
 
 public:
     std::atomic<int> subscribeCallsCounter{ 0 };
@@ -388,7 +391,7 @@ TEST_F( ROS2DataSourceTest, NodeTest )
                    "topictest", "typetest", []( std::shared_ptr<rclcpp::SerializedMessage> ) {}, 100 ),
                false );
     ROS2DataSourceConfig config{
-        std::string( "interface1" ), 50, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
+        InterfaceID( "interface1" ), 50, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
 
     EXPECT_CALL( nodeMock, create_generic_subscription ).WillRepeatedly( Throw( std::exception() ) );
     ASSERT_EQ( ros2Node.subscribe(
@@ -404,9 +407,9 @@ TEST_F( ROS2DataSourceTest, NodeTest )
 
 TEST_F( ROS2DataSourceTest, SpinOnlyWithAvailableDictionary )
 {
-    ROS2DataSourceConfig config{ std::string( "interface1" ), 2, CompareToIntrospection::WARN_ON_DIFFERENCE, 100 };
+    ROS2DataSourceConfig config{ InterfaceID( "interface1" ), 2, CompareToIntrospection::WARN_ON_DIFFERENCE, 100 };
     EXPECT_CALL( multiThreadedExecutorMock, spin ).Times( 0 );
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     // Make sure thread does not start spinning so sleep for some time
     std::this_thread::sleep_for( 2 * std::chrono::milliseconds( MINIMUM_WAIT_TIME_ONE_CYCLE_MS ) );
@@ -426,8 +429,8 @@ TEST_F( ROS2DataSourceTest, FailedSanityCheckWithCompareOptionWarn )
         .Times( 1 )
         .WillRepeatedly( Return( nullptr ) );
 
-    ROS2DataSourceConfig config{ std::string( "interface1" ), 2, CompareToIntrospection::WARN_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+    ROS2DataSourceConfig config{ InterfaceID( "interface1" ), 2, CompareToIntrospection::WARN_ON_DIFFERENCE, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     dictionary->complexMessageDecoderMethod["interface1"]["messageIdTopicTest:messageIdTypeTest"].mCollectRaw = true;
@@ -446,8 +449,8 @@ TEST_F( ROS2DataSourceTest, FailedSanityCheckWithCompareOptionError )
         .WillRepeatedly( Return( nullptr ) );
 
     ROS2DataSourceConfig config{
-        std::string( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+        InterfaceID( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     dictionary->complexMessageDecoderMethod["interface1"]["messageIdTopicTest:messageIdTypeTest"].mCollectRaw = true;
@@ -464,8 +467,8 @@ TEST_F( ROS2DataSourceTest, FailedSanityCheckWithCompareOptionIgnore )
     EXPECT_CALL( nodeMock, create_generic_subscription ).Times( 1 ).WillRepeatedly( Return( subscription ) );
     EXPECT_CALL( typeSupportMock, get_typesupport_library( std::string( "messageIdTypeTest" ), _ ) ).Times( 0 );
 
-    ROS2DataSourceConfig config{ std::string( "interface1" ), 2, CompareToIntrospection::NO_CHECK, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+    ROS2DataSourceConfig config{ InterfaceID( "interface1" ), 2, CompareToIntrospection::NO_CHECK, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     dictionary->complexMessageDecoderMethod["interface1"]["messageIdTopicTest:messageIdTypeTest"].mCollectRaw = true;
@@ -483,8 +486,8 @@ TEST_F( ROS2DataSourceTest, MessageIdWithColon )
         .Times( 1 )
         .WillRepeatedly( Return( subscription ) );
 
-    ROS2DataSourceConfig config{ std::string( "interface1" ), 2, CompareToIntrospection::WARN_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+    ROS2DataSourceConfig config{ InterfaceID( "interface1" ), 2, CompareToIntrospection::WARN_ON_DIFFERENCE, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     dictionary->complexMessageDecoderMethod["interface1"]["messageIdTopicTest:messageIdTypeTest"].mCollectRaw = true;
@@ -502,8 +505,8 @@ TEST_F( ROS2DataSourceTest, MessageIdWithoutTypeTryUntilTypeFound )
 {
     auto subscription = std::make_shared<rclcpp::GenericSubscription>();
 
-    ROS2DataSourceConfig config{ std::string( "interface1" ), 2, CompareToIntrospection::NO_CHECK, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+    ROS2DataSourceConfig config{ InterfaceID( "interface1" ), 2, CompareToIntrospection::NO_CHECK, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     dictionary->complexMessageDecoderMethod["interface1"]["messageIdTopicTest"].mCollectRaw = true;
@@ -539,8 +542,8 @@ TEST_F( ROS2DataSourceTest, FailIntrospectionCompareDifferentStructMemberCounts 
     EXPECT_CALL( nodeMock, create_generic_subscription( _, _, _, _, _ ) ).Times( 0 );
 
     ROS2DataSourceConfig config{
-        std::string( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+        InterfaceID( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     fillDefaultMessageType();
@@ -563,8 +566,8 @@ TEST_F( ROS2DataSourceTest, FailIntrospectionCompareUnknownComplexType )
     EXPECT_CALL( nodeMock, create_generic_subscription( _, _, _, _, _ ) ).Times( 0 );
 
     ROS2DataSourceConfig config{
-        std::string( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+        InterfaceID( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     fillDefaultMessageType();
@@ -586,8 +589,8 @@ TEST_F( ROS2DataSourceTest, FailIntrospectionCompareNoStructInDecodingInformatio
     EXPECT_CALL( nodeMock, create_generic_subscription( _, _, _, _, _ ) ).Times( 0 );
 
     ROS2DataSourceConfig config{
-        std::string( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+        InterfaceID( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     fillDefaultMessageType();
@@ -610,8 +613,8 @@ TEST_F( ROS2DataSourceTest, FailIntrospectionCompareNullptr )
     EXPECT_CALL( nodeMock, create_generic_subscription( _, _, _, _, _ ) ).Times( 0 );
 
     ROS2DataSourceConfig config{
-        std::string( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+        InterfaceID( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     fillDefaultMessageType();
@@ -633,8 +636,8 @@ TEST_F( ROS2DataSourceTest, FailIntrospectionCompareDifferentStringPrimitiveType
     EXPECT_CALL( nodeMock, create_generic_subscription( _, _, _, _, _ ) ).Times( 0 );
 
     ROS2DataSourceConfig config{
-        std::string( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+        InterfaceID( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     fillDefaultMessageType();
@@ -657,8 +660,8 @@ TEST_F( ROS2DataSourceTest, FailIntrospectionCompareDifferentStringLength )
     EXPECT_CALL( nodeMock, create_generic_subscription( _, _, _, _, _ ) ).Times( 0 );
 
     ROS2DataSourceConfig config{
-        std::string( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr );
+        InterfaceID( "interface1" ), 2, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
     fillDefaultMessageType();
@@ -679,8 +682,8 @@ TEST_F( ROS2DataSourceTest, FailIntrospectionCompareDifferentStringLength )
 TEST_F( ROS2DataSourceTest, SuccessfullyDecodeComplexMessage )
 {
     ROS2DataSourceConfig config{
-        std::string( "interface1" ), 50, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferPtr, rawBufferManagerMock );
+        InterfaceID( "interface1" ), 50, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor, rawBufferManagerMock );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
 
@@ -693,7 +696,7 @@ TEST_F( ROS2DataSourceTest, SuccessfullyDecodeComplexMessage )
     std::vector<std::pair<SignalID, size_t>> dataElements;
     EXPECT_CALL( *rawBufferManagerMock, push( _, _, _, _ ) )
         .Times( AtLeast( 1 ) )
-        .WillRepeatedly( ( [&dataElements]( uint8_t *data,
+        .WillRepeatedly( ( [&dataElements]( const uint8_t *data,
                                             size_t size,
                                             Timestamp receiveTimestamp,
                                             RawData::BufferTypeId typeId ) -> RawData::BufferHandle {
@@ -713,7 +716,7 @@ TEST_F( ROS2DataSourceTest, SuccessfullyDecodeComplexMessage )
     ASSERT_EQ( dataElements.back().first, 123 );
 
     CollectedDataFrame dataFrame;
-    WAIT_ASSERT_TRUE( signalBufferPtr->pop( dataFrame ) );
+    WAIT_ASSERT_TRUE( signalBuffer->pop( dataFrame ) );
 
     auto signalGroup = dataFrame.mCollectedSignals;
     auto signal1 = signalGroup[0];
@@ -721,18 +724,22 @@ TEST_F( ROS2DataSourceTest, SuccessfullyDecodeComplexMessage )
 
     auto signal2 = signalGroup[1];
     ASSERT_EQ( signal2.signalID, 0x80001112 );
-    ASSERT_EQ( signal2.getValue().value.doubleVal, static_cast<double>( 5 ) );
+    ASSERT_EQ( signal2.getType(), SignalType::INT32 );
+    ASSERT_EQ( signal2.getValue().value.int32Val, 5 );
 
     auto signal3 = signalGroup[2];
     ASSERT_EQ( signal3.signalID, 0x80001113 );
-    ASSERT_EQ( signal3.getValue().value.doubleVal, static_cast<double>( 10 ) );
+    ASSERT_EQ( signal3.getType(), SignalType::INT32 );
+    ASSERT_EQ( signal3.getValue().value.int32Val, 10 );
 
     auto signal4 = signalGroup[3];
     ASSERT_EQ( signal4.signalID, 0x80001114 );
-    ASSERT_EQ( signal4.getValue().value.doubleVal, static_cast<double>( 'u' ) );
+    ASSERT_EQ( signal4.getType(), SignalType::UINT8 );
+    ASSERT_EQ( signal4.getValue().value.uint8Val, 'u' );
 
     auto signal5 = signalGroup[4];
     ASSERT_EQ( signal5.signalID, 123 ); // first the raw buffer handle
+    ASSERT_EQ( signal5.getType(), SignalType::COMPLEX_SIGNAL );
     ASSERT_EQ( signal5.getValue().value.uint32Val, 7890 );
 
     ros2DataSource.disconnect();

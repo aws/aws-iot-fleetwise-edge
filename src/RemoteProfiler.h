@@ -40,8 +40,8 @@ public:
     /**
      * @brief Construct the RemoteProfiler which can upload metrics and logs over MQTT
      *
-     * @param metricsSender the channel that should be used to upload metrics
-     * @param logSender the channel that should be used to upload logs
+     * @param metricsSender the sender that should be used to upload metrics
+     * @param logSender the sender that should be used to upload logs
      * @param initialMetricsUploadInterval the interval used between two metrics uploads
      * @param initialLogMaxInterval the max interval that logs can be cached before uploading
      * @param initialLogLevelThresholdToSend all logs below this threshold will be ignored

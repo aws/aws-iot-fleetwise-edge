@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.10.2)
 
-project(iotfleetwise VERSION 1.1.1)
+project(iotfleetwise VERSION 1.1.2)
 
 # FWE uses C++14 for compatibility reasons with Automotive middlewares (Adaptive AUTOSAR, ROS2)
 # Note: When built with FWE_FEATURE_ROS2, colcon will override these settings
@@ -29,7 +29,8 @@ option(FWE_FEATURE_CUSTOM_DATA_SOURCE "Include the custom data source interface,
 option(FWE_FEATURE_IWAVE_GPS "Include the IWave GPS example for a custom data source (implies FWE_FEATURE_CUSTOM_DATA_SOURCE)" OFF)
 option(FWE_FEATURE_EXTERNAL_GPS "Include the external GPS example for a custom data source (implies FWE_FEATURE_CUSTOM_DATA_SOURCE)" OFF)
 option(FWE_FEATURE_AAOS_VHAL "Include the Android Automotive VHAL example for a custom data source (implies FWE_FEATURE_CUSTOM_DATA_SOURCE)" OFF)
-option(FWE_FEATURE_VISION_SYSTEM_DATA "Include support for vision-system-data sources" OFF)
+option(FWE_FEATURE_S3 "Internal option, not useful on its own. Enables usage of AWS credential provider, and uploading and downloading from S3." OFF)
+option(FWE_FEATURE_VISION_SYSTEM_DATA "Include support for vision-system-data sources. Implies FWE_FEATURE_S3." OFF)
 option(FWE_FEATURE_ROS2 "Include support for ROS2 as a vision-system-data source. Implies FWE_FEATURE_VISION_SYSTEM_DATA." OFF)
 option(FWE_BUILD_EXECUTABLE "Build the executable, otherwise build a library" ON)
 option(FWE_BUILD_ANDROID_SHARED_LIBRARY "Build the android shared library" OFF)
@@ -57,7 +58,11 @@ if(FWE_FEATURE_ROS2)
   ament_package()
 endif()
 if(FWE_FEATURE_VISION_SYSTEM_DATA)
+  set(FWE_FEATURE_S3 ON FORCE)
   add_compile_options("-DFWE_FEATURE_VISION_SYSTEM_DATA;-DDECNUMDIGITS=34")
+endif()
+if(FWE_FEATURE_S3)
+  add_compile_options("-DFWE_FEATURE_S3")
 endif()
 
 # Define the default build type
@@ -116,8 +121,9 @@ set_source_files_properties(${PROTO_SRCS} PROPERTIES COMPILE_FLAGS "-Wno-convers
 set(HEADER_FILES
   src/Assert.h
   src/AwsBootstrap.h
-  src/AwsIotChannel.h
   src/AwsIotConnectivityModule.h
+  src/AwsIotReceiver.h
+  src/AwsIotSender.h
   src/AwsSDKMemoryManager.h
   src/CacheAndPersist.h
   src/CANDataConsumer.h
@@ -125,6 +131,7 @@ set(HEADER_FILES
   src/CANDataTypes.h
   src/CANDecoder.h
   src/CANInterfaceIDTranslator.h
+  src/CheckinSender.h
   src/Clock.h
   src/ClockHandler.h
   src/CollectionInspectionAPITypes.h
@@ -138,15 +145,14 @@ set(HEADER_FILES
   src/DataSenderManager.h
   src/DataSenderManagerWorkerThread.h
   src/DataSenderProtoWriter.h
+  src/DataSenderTypes.h
   src/DecoderManifestIngestion.h
   src/EnumUtility.h
   src/EventTypes.h
   src/ExternalCANDataSource.h
   src/ICollectionScheme.h
   src/ICollectionSchemeList.h
-  src/ICollectionSchemeManager.h
   src/IConnectionTypes.h
-  src/IConnectivityChannel.h
   src/IConnectivityModule.h
   src/IDecoderDictionary.h
   src/IDecoderManifest.h
@@ -161,6 +167,7 @@ set(HEADER_FILES
   src/ISOTPOverCANSender.h
   src/ISOTPOverCANSenderReceiver.h
   src/Listener.h
+  src/QueueTypes.h
   src/LoggingModule.h
   src/LogLevel.h
   src/MemoryUsageInfo.h
@@ -171,6 +178,8 @@ set(HEADER_FILES
   src/OBDOverCANECU.h
   src/OBDOverCANModule.h
   src/PayloadManager.h
+  src/QueueTypes.h
+  src/RawDataManager.h
   src/RemoteProfiler.h
   src/RetryThread.h
   src/Schema.h
@@ -178,6 +187,7 @@ set(HEADER_FILES
   src/Signal.h
   src/SignalTypes.h
   src/StreambufBuilder.h
+  src/TelemetryDataSender.h
   src/Thread.h
   src/Timer.h
   src/TimeTypes.h
@@ -188,14 +198,15 @@ set(HEADER_FILES
 # Source files
 set(SRC_FILES
   src/AwsBootstrap.cpp
-  src/AwsIotChannel.cpp
+  src/AwsIotReceiver.cpp
+  src/AwsIotSender.cpp
   src/AwsIotConnectivityModule.cpp
   src/AwsSDKMemoryManager.cpp
   src/CacheAndPersist.cpp
   src/CANDataConsumer.cpp
   src/CANDataSource.cpp
   src/CANDecoder.cpp
-  src/CheckinAndPersistency.cpp
+  src/CheckinSender.cpp
   src/ClockHandler.cpp
   src/CollectionInspectionEngine.cpp
   src/CollectionInspectionWorkerThread.cpp
@@ -222,9 +233,12 @@ set(SRC_FILES
   src/OBDOverCANECU.cpp
   src/OBDOverCANModule.cpp
   src/PayloadManager.cpp
+  src/Persistency.cpp
+  src/RawDataManager.cpp
   src/RemoteProfiler.cpp
   src/RetryThread.cpp
   src/Schema.cpp
+  src/TelemetryDataSender.cpp
   src/Thread.cpp
   src/TraceModule.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/IoTFleetWiseVersion.cpp
@@ -237,7 +251,6 @@ set(TEST_FILES
   test/unit/CacheAndPersistTest.cpp
   test/unit/CANDataSourceTest.cpp
   test/unit/CANDecoderTest.cpp
-  test/unit/CheckinAndPersistencyTest.cpp
   test/unit/ClockHandlerTest.cpp
   test/unit/CollectionInspectionEngineTest.cpp
   test/unit/CollectionInspectionWorkerThreadTest.cpp
@@ -258,6 +271,8 @@ set(TEST_FILES
   test/unit/OBDDataDecoderTest.cpp
   test/unit/OBDOverCANModuleTest.cpp
   test/unit/PayloadManagerTest.cpp
+  test/unit/PersistencyTest.cpp
+  test/unit/RawDataManagerTest.cpp
   test/unit/RemoteProfilerTest.cpp
   test/unit/SchemaTest.cpp
   test/unit/ThreadTest.cpp
@@ -292,28 +307,39 @@ if(FWE_FEATURE_CUSTOM_DATA_SOURCE)
   set(HEADER_FILES ${HEADER_FILES} src/CustomDataSource.h)
 endif()
 if(FWE_FEATURE_GREENGRASSV2)
-  set(SRC_FILES ${SRC_FILES} src/AwsGGConnectivityModule.cpp src/AwsGGChannel.cpp)
-  set(HEADER_FILES ${HEADER_FILES} src/AwsGGChannel.h src/AwsGGConnectivityModule.h)
+  set(SRC_FILES ${SRC_FILES}
+    src/AwsGreengrassV2ConnectivityModule.cpp
+    src/AwsGreengrassV2Receiver.cpp
+    src/AwsGreengrassV2Sender.cpp
+  )
+  set(HEADER_FILES ${HEADER_FILES}
+    src/AwsGreengrassV2ConnectivityModule.h
+    src/AwsGreengrassV2Receiver.h
+    src/AwsGreengrassV2Sender.h
+)
+endif()
+if(FWE_FEATURE_S3)
+  set(SRC_FILES ${SRC_FILES} src/Credentials.cpp)
+  set(TEST_FILES ${TEST_FILES} test/unit/CredentialsTest.cpp)
+  set(HEADER_FILES ${HEADER_FILES}
+    src/Credentials.h
+    src/TransferManagerWrapper.h
+  )
 endif()
 if(FWE_FEATURE_VISION_SYSTEM_DATA)
   set(SRC_FILES ${SRC_FILES}
-    src/Credentials.cpp
     src/DataSenderIonWriter.cpp
-    src/RawDataManager.cpp
     src/S3Sender.cpp
+    src/VisionSystemDataSender.cpp
   )
   set(TEST_FILES ${TEST_FILES}
-    test/unit/CredentialsTest.cpp
     test/unit/DataSenderIonWriterTest.cpp
-    test/unit/RawDataManagerTest.cpp
     test/unit/S3SenderTest.cpp
   )
   set(HEADER_FILES ${HEADER_FILES}
-    src/Credentials.h
     src/DataSenderIonWriter.h
-    src/RawDataManager.h
     src/S3Sender.h
-    src/TransferManagerWrapper.h
+    src/VisionSystemDataSender.h
   )
 endif()
 if(FWE_FEATURE_ROS2)
@@ -357,7 +383,7 @@ endif()
 separate_arguments(FWE_AWS_SDK_EXTRA_LIBS)
 
 set(REQUIRED_AWS_SDK_COMPONENTS "core")
-if(FWE_FEATURE_VISION_SYSTEM_DATA)
+if(FWE_FEATURE_S3)
   set(REQUIRED_AWS_SDK_COMPONENTS "transfer;s3-crt;${REQUIRED_AWS_SDK_COMPONENTS}")
 endif()
 set(OLD_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
@@ -546,10 +572,10 @@ if(${BUILD_TESTING})
     add_executable(ROS2DataSourceTest
       test/unit/ROS2DataSourceTest.cpp
       src/ROS2DataSource.cpp
+      src/RawDataManager.cpp
       src/Thread.cpp
       src/LoggingModule.cpp
       src/ClockHandler.cpp
-      src/RawDataManager.cpp
       src/ConsoleLogger.cpp
       src/IoTFleetWiseConfig.cpp
       test/unit/support/main.cpp

@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include "CacheAndPersist.h"
 #include "CollectionInspectionAPITypes.h"
 #include "SignalTypes.h"
 #include "TimeTypes.h"
+#include <boost/filesystem.hpp>
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
@@ -209,36 +211,10 @@ assertSignalValue( const SignalValueWrapper &signalValueWrapper,
  * @return A string that can be used as the parameter name
  */
 inline std::string
-signalTypeToString( const testing::TestParamInfo<SignalType> &info )
+signalTypeParamInfoToString( const testing::TestParamInfo<SignalType> &info )
 {
     SignalType signalType = info.param;
-    switch ( signalType )
-    {
-    case SignalType::UINT8:
-        return "UINT8";
-    case SignalType::INT8:
-        return "INT8";
-    case SignalType::UINT16:
-        return "UINT16";
-    case SignalType::INT16:
-        return "INT16";
-    case SignalType::UINT32:
-        return "UINT32";
-    case SignalType::INT32:
-        return "INT32";
-    case SignalType::UINT64:
-        return "UINT64";
-    case SignalType::INT64:
-        return "INT64";
-    case SignalType::FLOAT:
-        return "FLOAT";
-    case SignalType::DOUBLE:
-        return "DOUBLE";
-    case SignalType::BOOLEAN:
-        return "BOOLEAN";
-    default:
-        throw std::invalid_argument( "Unsupported signal type" );
-    }
+    return signalTypeToString( signalType );
 }
 
 constexpr inline std::size_t operator""_KiB( unsigned long long sizeBytes )
@@ -254,6 +230,28 @@ constexpr inline std::size_t operator""_MiB( unsigned long long sizeBytes )
 constexpr inline std::size_t operator""_GiB( unsigned long long sizeBytes )
 {
     return static_cast<size_t>( sizeBytes * 1024 * 1024 * 1024 );
+}
+
+inline boost::filesystem::path
+getTempDir()
+{
+    auto testInfo = ::testing::UnitTest::GetInstance()->current_test_info();
+    auto testDir = boost::filesystem::current_path() / "unit_tests_tmp" / testInfo->test_case_name() / testInfo->name();
+    boost::filesystem::create_directories( testDir );
+    return testDir;
+}
+
+inline std::shared_ptr<CacheAndPersist>
+createCacheAndPersist()
+{
+    auto cacheAndPersist = std::make_shared<CacheAndPersist>( getTempDir().string(), 131072 );
+    if ( !cacheAndPersist->init() )
+    {
+        // throw instead of using ASSERT_TRUE because the caller would have to use ASSERT_NO_FATAL_FAILURE
+        // in order for the assert to work.
+        throw std::runtime_error( "Failed to initialize persistency" );
+    }
+    return cacheAndPersist;
 }
 
 } // namespace IoTFleetWise

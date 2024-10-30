@@ -110,9 +110,9 @@ struct PIDSignalDecoderFormat
     uint8_t mBitMaskLength{ 0 };
 
     /**
-     * @brief The datatype of the signal. The default is double for backward compatibility
+     * @brief The datatype of the signal.
      */
-    SignalType mSignalType{ SignalType::DOUBLE };
+    SignalType mSignalType{ SignalType::UNKNOWN };
 
 public:
     /**
@@ -194,7 +194,7 @@ public:
      *
      * @return String ID of the decoder manifest. Empty string if error.
      */
-    virtual std::string getID() const = 0;
+    virtual SyncID getID() const = 0;
 
     /**
      * @brief get CAN Message format to decode.

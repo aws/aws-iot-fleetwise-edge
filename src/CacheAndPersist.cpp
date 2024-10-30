@@ -22,11 +22,11 @@ CacheAndPersist::CacheAndPersist( const std::string &partitionPath, size_t maxPa
     , mPersistencyWorkspace{ partitionPath +
                              ( ( ( partitionPath.empty() ) || ( partitionPath.back() == '/' ) ) ? "" : "/" ) +
                              PERSISTENCY_WORKSPACE }
-    , mDecoderManifestFile{ mPersistencyWorkspace + DECODER_MANIFEST_FILE }
-    , mCollectionSchemeListFile{ mPersistencyWorkspace + COLLECTION_SCHEME_LIST_FILE }
-    , mPayloadMetadataFile{ mPersistencyWorkspace + PAYLOAD_METADATA_FILE }
-    , mCollectedDataPath{ mPersistencyWorkspace + COLLECTED_DATA_FOLDER }
-    , mMaxPersistencePartitionSize{ maxPartitionSize }
+    , mDecoderManifestFile( mPersistencyWorkspace + DECODER_MANIFEST_FILE )
+    , mCollectionSchemeListFile( mPersistencyWorkspace + COLLECTION_SCHEME_LIST_FILE )
+    , mPayloadMetadataFile( mPersistencyWorkspace + PAYLOAD_METADATA_FILE )
+    , mCollectedDataPath( mPersistencyWorkspace + COLLECTED_DATA_FOLDER )
+    , mMaxPersistencePartitionSize( maxPartitionSize )
 {
 }
 
@@ -92,6 +92,8 @@ CacheAndPersist::init()
 
     // Clean directory from files without metadata at startup
     cleanupPersistedData();
+    // Write the metadata to ensure the file is created in case it doesn't exist yet
+    writeMetadata( mPersistedMetadata );
 
     FWE_LOG_INFO( "Persistency library successfully initialised" );
     return true;
@@ -147,18 +149,9 @@ CacheAndPersist::write( const uint8_t *bufPtr, size_t size, std::string &path )
     return ErrorCode::SUCCESS;
 }
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-/// @cond Ignore due to Doxygen bug. Even though ENABLE_PREPROCESSING is enabled, Doxygen warns
-//        about this overload not being declared when FWE_FEATURE_VISION_SYSTEM_DATA is disabled.
 ErrorCode
-CacheAndPersist::write( std::unique_ptr<std::streambuf> streambuf, DataType dataType, const std::string &filename )
+CacheAndPersist::write( std::streambuf &streambuf, DataType dataType, const std::string &filename )
 {
-    if ( streambuf == nullptr )
-    {
-        FWE_LOG_ERROR( "Failed to persist data: stream is empty" );
-        return ErrorCode::INVALID_DATA;
-    }
-
     if ( filename.empty() )
     {
         FWE_LOG_ERROR( "Failed to persist data: filename is empty" );
@@ -191,7 +184,7 @@ CacheAndPersist::write( std::unique_ptr<std::streambuf> streambuf, DataType data
     }
 
     std::ofstream file( mCollectedDataPath + filename, std::ios::binary );
-    file << &( *streambuf );
+    file << &streambuf;
     file.close();
 
     if ( !file.good() )
@@ -202,11 +195,9 @@ CacheAndPersist::write( std::unique_ptr<std::streambuf> streambuf, DataType data
 
     return ErrorCode::SUCCESS;
 }
-/// @endcond
-#endif
 
 void
-CacheAndPersist::addMetadata( Json::Value &metadata )
+CacheAndPersist::addMetadata( const Json::Value &metadata )
 {
     mPersistedMetadata["files"].append( metadata );
 }
@@ -283,6 +274,33 @@ CacheAndPersist::read( uint8_t *const readBufPtr, size_t size, DataType dataType
     }
 
     return read( readBufPtr, size, path );
+}
+
+ErrorCode
+CacheAndPersist::read( std::ifstream &fileStream, DataType dataType, const std::string &filename )
+{
+    std::string path = getFileName( dataType );
+    if ( dataType == DataType::EDGE_TO_CLOUD_PAYLOAD )
+    {
+        if ( filename.empty() )
+        {
+            FWE_LOG_ERROR( "Failed to read persisted data: filename for the payload is empty " );
+            return ErrorCode::INVALID_DATATYPE;
+        }
+        else
+        {
+            path += filename;
+        }
+    }
+
+    fileStream.open( path, std::ios::in | std::ios::binary );
+    if ( !fileStream.is_open() )
+    {
+        FWE_LOG_ERROR( "Could not open file stream for file " + path )
+        return ErrorCode::FILESYSTEM_ERROR;
+    }
+
+    return ErrorCode::SUCCESS;
 }
 
 ErrorCode
@@ -487,7 +505,10 @@ CacheAndPersist::cleanupPersistedData()
     std::vector<std::string> filenames;
     for ( const auto &file : mPersistedMetadata["files"] )
     {
-        filenames.push_back( mCollectedDataPath + file["filename"].asString() );
+        // Handle the legacy metadata. file["filename"] is the old one and file["payload"]["filename"] the new one
+        auto filename =
+            file["filename"].asString().empty() ? file["payload"]["filename"].asString() : file["filename"].asString();
+        filenames.push_back( mCollectedDataPath + filename );
     }
     // coverity[misra_cpp_2008_rule_14_8_2_violation] - boost filesystem path header defines both template and and
     // non-template function
@@ -517,7 +538,7 @@ CacheAndPersist::cleanupPersistedData()
                     // TODO: do not skip ion files but add the metadata for them so they don't get deleted
                     // coverity[misra_cpp_2008_rule_14_8_2_violation] - boost filesystem path header defines both
                     // template and and non-template function
-                    if ( boost::filesystem::extension( filename ) != ".10n" ) // skip ion files
+                    if ( it->path().extension() != ".10n" ) // skip ion files
                     {
                         filesToDelete.push_back( filename );
                     }
@@ -533,6 +554,7 @@ CacheAndPersist::cleanupPersistedData()
 
     for ( auto &fileToDelete : filesToDelete )
     {
+        FWE_LOG_TRACE( "Deleting file " + fileToDelete );
         static_cast<void>( erase( fileToDelete ) );
     }
 

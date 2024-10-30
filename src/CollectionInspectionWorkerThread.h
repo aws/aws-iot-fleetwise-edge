@@ -7,19 +7,15 @@
 #include "ClockHandler.h"
 #include "CollectionInspectionAPITypes.h"
 #include "CollectionInspectionEngine.h"
-#include "Listener.h"
+#include "DataSenderTypes.h"
+#include "RawDataManager.h"
 #include "Signal.h"
 #include "Thread.h"
 #include "TimeTypes.h"
 #include <atomic>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <mutex>
-
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-#include "RawDataManager.h"
-#endif
 
 namespace Aws
 {
@@ -29,9 +25,8 @@ namespace IoTFleetWise
 class CollectionInspectionWorkerThread
 {
 public:
-    using OnDataReadyToPublishCallback = std::function<void()>;
-
-    CollectionInspectionWorkerThread() = default;
+    CollectionInspectionWorkerThread( CollectionInspectionEngine &collectionInspectionEngine )
+        : mCollectionInspectionEngine( collectionInspectionEngine ){};
     ~CollectionInspectionWorkerThread();
 
     CollectionInspectionWorkerThread( const CollectionInspectionWorkerThread & ) = delete;
@@ -40,15 +35,6 @@ public:
     CollectionInspectionWorkerThread &operator=( CollectionInspectionWorkerThread && ) = delete;
 
     void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix );
-
-    /**
-     * @brief Register a callback to be called when data is ready to be published to the cloud
-     * */
-    void
-    subscribeToDataReadyToPublish( OnDataReadyToPublishCallback callback )
-    {
-        mDataReadyListeners.subscribe( callback );
-    }
 
     /**
      * @brief As soon as new data is available in any input queue call this to wakeup the thread
@@ -62,14 +48,11 @@ public:
      * */
     bool init( const std::shared_ptr<SignalBuffer> &inputSignalBuffer, /**< IVehicleDataSourceConsumer instances will
                                                                           put relevant signals in this queue */
-               const std::shared_ptr<CollectedDataReadyToPublish>
+               const std::shared_ptr<DataSenderQueue>
                    &outputCollectedData, /**< this thread will put data that should be sent to cloud into this queue */
-               uint32_t idleTimeMs       /**< if no new data is available sleep for this amount of milliseconds */
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-               ,
+               uint32_t idleTimeMs,      /**< if no new data is available sleep for this amount of milliseconds */
                std::shared_ptr<RawData::BufferManager> rawBufferManager =
                    nullptr /**< the raw buffer manager which is informed what data is used */
-#endif
     );
 
     /**
@@ -109,23 +92,20 @@ private:
      */
     uint32_t collectDataAndUpload();
 
-    CollectionInspectionEngine fCollectionInspectionEngine;
+    CollectionInspectionEngine &mCollectionInspectionEngine;
 
-    std::shared_ptr<SignalBuffer> fInputSignalBuffer;
-    std::shared_ptr<CollectedDataReadyToPublish> fOutputCollectedData;
-    Thread fThread;
-    std::atomic<bool> fShouldStop{ false };
-    std::atomic<bool> fUpdatedInspectionMatrixAvailable{ false };
-    std::shared_ptr<const InspectionMatrix> fUpdatedInspectionMatrix;
-    std::mutex fInspectionMatrixMutex;
-    std::mutex fThreadMutex;
-    Signal fWait;
-    uint32_t fIdleTimeMs{ DEFAULT_THREAD_IDLE_TIME_MS };
-    std::shared_ptr<const Clock> fClock = ClockHandler::getClock();
-    ThreadSafeListeners<OnDataReadyToPublishCallback> mDataReadyListeners;
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    std::shared_ptr<SignalBuffer> mInputSignalBuffer;
+    std::shared_ptr<DataSenderQueue> mOutputCollectedData;
+    Thread mThread;
+    std::atomic<bool> mShouldStop{ false };
+    std::atomic<bool> mUpdatedInspectionMatrixAvailable{ false };
+    std::shared_ptr<const InspectionMatrix> mUpdatedInspectionMatrix;
+    std::mutex mInspectionMatrixMutex;
+    std::mutex mThreadMutex;
+    Signal mWait;
+    uint32_t mIdleTimeMs{ DEFAULT_THREAD_IDLE_TIME_MS };
+    std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     std::shared_ptr<RawData::BufferManager> mRawBufferManager{ nullptr };
-#endif
 };
 
 } // namespace IoTFleetWise

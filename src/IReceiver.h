@@ -14,8 +14,19 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-struct ReceivedChannelMessage
+struct ReceivedConnectivityMessage
 {
+public:
+    ReceivedConnectivityMessage( const std::uint8_t *bufIn,
+                                 size_t sizeIn,
+                                 Timestamp receivedMonotonicTimeMsIn,
+                                 std::string mqttTopicIn )
+        : buf( bufIn )
+        , size( sizeIn )
+        , receivedMonotonicTimeMs( receivedMonotonicTimeMsIn )
+        , mqttTopic( std::move( mqttTopicIn ) )
+    {
+    }
     /*
      * Pointer to raw received data that will be at least size long.
      * The function does not care if the data is a c string, a json or a binary
@@ -29,14 +40,14 @@ struct ReceivedChannelMessage
     size_t size{ 0 };
 
     /*
-     * Key/value pairs that were received together with the data. It might be empty.
+     * Time when this message was received. The monotonic clock is used (which is not necessarily a Unix timestamp)
      */
-    const std::unordered_map<std::string, std::string> &properties;
+    Timestamp receivedMonotonicTimeMs{ 0 };
 
     /*
-     * Absolute MQTT message expiry time since epoch from a monotonic clock.
+     * MQTT topic name
      */
-    Timestamp messageExpiryMonotonicTimeSinceEpochMs{ 0 };
+    std::string mqttTopic;
 };
 
 /**
@@ -47,36 +58,19 @@ struct ReceivedChannelMessage
  * The function behind onDataReceived must be fast (<1ms) and the pointer buf will get
  * invalid after returning from the callback.
  *
- * @param receivedChannelMessage struct containing message data and metadata
+ * @param receivedMessage struct containing message data and metadata
  */
-using OnDataReceivedCallback = std::function<void( const ReceivedChannelMessage &receivedChannelMessage )>;
-
-// Define some common property names to make it easier for subscribers to extract the properties they
-// are interested in when the callback is called.
-constexpr auto PROPERTY_NAME_CORRELATION_DATA = "correlation-data";
+using OnDataReceivedCallback = std::function<void( const ReceivedConnectivityMessage &receivedMessage )>;
 
 /**
  * @brief This interface will be used by all objects receiving data from the cloud
- *
- * The configuration will done by the bootstrap with the implementing class.
- * To register an IReceiverCallback use the subscribeToDataReceived method.
- *  \code{.cpp}
- *  class ExampleReceiver:IReceiverCallback {
- *    startReceiving(IReceiver &r) {
- *        r.subscribeToDataReceived(this);
- *    }
- *    onDataReceived( std::uint8_t *buf, size_t size ) {
- *    // copy buf if needed
- *    }
- *   };
- *  \endcode
- * @see IReceiverCallback
  */
 class IReceiver
 {
 
 public:
-    ~IReceiver() = default;
+    virtual ~IReceiver() = default;
+
     /**
      * @brief indicates if the connection is established and authenticated
      *

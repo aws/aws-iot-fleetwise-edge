@@ -2,12 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "CANInterfaceIDTranslator.h"
+#include "CheckinSender.h"
 #include "Clock.h"
 #include "ClockHandler.h"
+#include "CollectionSchemeManagerMock.h"
 #include "CollectionSchemeManagerTest.h" // IWYU pragma: associated
 #include "OBDDataTypes.h"
 #include "Testing.h"
+#include "TimeTypes.h"
 #include <gtest/gtest.h>
+#include <map>
 #include <unordered_set>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -89,15 +93,13 @@ namespace IoTFleetWise
  * CollectionScheme3 is interested in signal 25 at Node 20
  * CollectionScheme1 and CollectionScheme2 will be enabled at beginning. Later on CollectionScheme3 will be enabled.
  */
-TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
+TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
 {
-
-    CollectionSchemeManagerTest test( "DM1" );
     CANInterfaceIDTranslator canIDTranslator;
     canIDTranslator.add( "10" );
     canIDTranslator.add( "20" );
+    CollectionSchemeManagerWrapper test( nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM1" );
     ASSERT_NE( canIDTranslator.getChannelNumericID( "10" ), canIDTranslator.getChannelNumericID( "20" ) );
-    test.init( 0, nullptr, canIDTranslator );
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */
     TimePoint currTime = testClock->timeSinceEpoch();
@@ -122,7 +124,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     ICollectionScheme::Signals_t signalInfo1 = ICollectionScheme::Signals_t();
 
     // Generate 8 signals to be decoded and collected
-    for ( int i = 0; i < 8; ++i )
+    for ( int i = 1; i < 9; ++i )
     {
         SignalCollectionInfo signal;
         signal.signalID = i;
@@ -141,17 +143,17 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
 
     // This is CAN Frame 0x110 at Node 10 decoding format. It's part of decoder manifest
     struct CANMessageFormat canMessageFormat0x110;
-    // Signal 8 will be part of CAN Frame 0x110 at Node 10
-    SignalCollectionInfo signal8;
-    signal8.signalID = 8;
-    signalInfo1.emplace_back( signal8 );
+    // Signal 9 will be part of CAN Frame 0x110 at Node 10
+    SignalCollectionInfo signal9;
+    signal9.signalID = 9;
+    signalInfo1.emplace_back( signal9 );
     // CAN Frame 0x110 will only be decoded, its raw frame will not be collected
-    signalToFrameAndNodeID[signal8.signalID] = { 0x110, "10" };
+    signalToFrameAndNodeID[signal9.signalID] = { 0x110, "10" };
     canMessageFormat0x110.mMessageID = 0x101;
     canMessageFormat0x110.mSizeInBytes = 8;
     canMessageFormat0x110.mIsMultiplexed = false;
     CANSignalFormat sigFormat;
-    sigFormat.mSignalID = 8;
+    sigFormat.mSignalID = 9;
     canMessageFormat0x110.mSignals = { sigFormat };
 
     // This vector defines a list of raw CAN Frame CollectionScheme1 wants to collect
@@ -256,7 +258,6 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     inValidSignal.signalID = 0x10000;
     signalInfo2.emplace_back( inValidSignal );
 
-    // Two collectionSchemes.
     ICollectionSchemePtr collectionScheme1 = std::make_shared<ICollectionSchemeTest>(
         "COLLECTIONSCHEME1", "DM1", startTime1, stopTime1, signalInfo1, canFrameInfo1 );
     ICollectionSchemePtr collectionScheme2 = std::make_shared<ICollectionSchemeTest>(
@@ -300,9 +301,9 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
         ASSERT_EQ( decoderMethod.collectType, CANMessageCollectType::RAW_AND_DECODE );
         // It shall contains Eight signal decoding formats.
         ASSERT_EQ( decoderMethod.format.mSignals.size(), 8 );
-        for ( int signalID = 0; signalID < 8; ++signalID )
+        for ( int i = 0; i < 8; ++i )
         {
-            ASSERT_EQ( signalID, decoderMethod.format.mSignals[signalID].mSignalID );
+            ASSERT_EQ( i + 1, decoderMethod.format.mSignals[i].mSignalID );
         }
     }
     // Although 0x101 exit in Decoder Manifest but no CollectionScheme is interested in 0x101, hence decoder dictionary
@@ -315,14 +316,14 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
         auto decoderMethod = decoderDictionary->canMessageDecoderMethod[firstChannelId][0x200];
         ASSERT_EQ( decoderMethod.collectType, CANMessageCollectType::RAW );
     }
-    // CAN Frame 0x110 at Node 10 shall only have Signal 8 decoded.
+    // CAN Frame 0x110 at Node 10 shall only have Signal 9 decoded.
     ASSERT_EQ( decoderDictionary->canMessageDecoderMethod[firstChannelId].count( 0x110 ), 1 );
     if ( decoderDictionary->canMessageDecoderMethod[firstChannelId].count( 0x110 ) == 1 )
     {
         auto decoderMethod = decoderDictionary->canMessageDecoderMethod[firstChannelId][0x110];
         ASSERT_EQ( decoderMethod.collectType, CANMessageCollectType::DECODE );
         ASSERT_EQ( decoderMethod.format.mSignals.size(), 1 );
-        ASSERT_EQ( decoderMethod.format.mSignals[0].mSignalID, 8 );
+        ASSERT_EQ( decoderMethod.format.mSignals[0].mSignalID, 9 );
     }
     // CAN Frame 0x200 at Node 20 shall have raw bytes collected and signal decoded. It contains signal 10 and 17
     ASSERT_EQ( decoderDictionary->canMessageDecoderMethod[secondChannelId].count( 0x200 ), 1 );
@@ -425,8 +426,7 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
     // The following code validates that when we have first the OBD signals in the decoder manifest
     // and then the CAN signals, the extraction still functions. The above code starts processing
     // always the CAN Signals first as the first network type is CAN.
-    CollectionSchemeManagerTest test2( "DM2" );
-    test2.init( 0, nullptr, canIDTranslator );
+    CollectionSchemeManagerWrapper test2( nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM2" );
     std::vector<ICollectionSchemePtr> list2;
     // Two collectionSchemes with 5 seconds expiry/
     // Timing is a problem on the target, making sure that we have a 100 ms of buffer
@@ -459,12 +459,11 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorTest )
  * This test aims to test CollectionScheme Manager's Decoder Dictionary Extractor functionality
  * when only a raw can frame is provided and no signals
  */
-TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorNoSignalsTest )
+TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorNoSignalsTest )
 {
 
-    CollectionSchemeManagerTest test( "DM1" );
     CANInterfaceIDTranslator canIDTranslator;
-    test.init( 0, nullptr, canIDTranslator );
+    CollectionSchemeManagerWrapper test( nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM1" );
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */
     TimePoint currTime = testClock->timeSinceEpoch();
@@ -517,13 +516,12 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorNoSignalsTest )
  * This test aims to test CollectionScheme Manager's Dececoder Dictionary Extractor functionality
  * when first a raw can frame is collected and then from the same frame a signal
  */
-TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorFirstRawFrameThenSignal )
+TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorFirstRawFrameThenSignal )
 {
 
-    CollectionSchemeManagerTest test( "DM1" );
     CANInterfaceIDTranslator canIDTranslator;
     canIDTranslator.add( "10" );
-    test.init( 0, nullptr, canIDTranslator );
+    CollectionSchemeManagerWrapper test( nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM1" );
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */
     TimePoint currTime = testClock->timeSinceEpoch();
@@ -610,12 +608,10 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryExtractorFirstRawFrameThenSi
 }
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-TEST( CollectionSchemeManagerTest, DecoderDictionaryComplexDataExtractor )
+TEST( DecoderDictionaryExtractorTest, DecoderDictionaryComplexDataExtractor )
 {
-
-    CollectionSchemeManagerTest test( "DM1" );
     CANInterfaceIDTranslator canIDTranslator;
-    test.init( 0, nullptr, canIDTranslator );
+    CollectionSchemeManagerWrapper test( nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM1" );
 
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */
@@ -690,9 +686,12 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryComplexDataExtractor )
     test.setCollectionSchemeList( PL1 );
     // Both collectionScheme1 and collectionScheme2 are expected to be enabled
     ASSERT_TRUE( test.updateMapsandTimeLine( currTime ) );
+
+    auto inspectionMatrixOutput = std::make_shared<InspectionMatrix>();
+    test.matrixExtractor( inspectionMatrixOutput );
     // Invoke Decoder Dictionary Extractor function
     std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
-    test.decoderDictionaryExtractor( decoderDictionaryMap );
+    test.decoderDictionaryExtractor( decoderDictionaryMap, inspectionMatrixOutput );
 
     auto dict = decoderDictionaryMap.find( VehicleDataSourceProtocol::COMPLEX_DATA );
     ASSERT_NE( dict, decoderDictionaryMap.end() );
@@ -727,14 +726,35 @@ TEST( CollectionSchemeManagerTest, DecoderDictionaryComplexDataExtractor )
     ASSERT_EQ( decodedPrimitive.mPrimitiveType, SignalType::UINT64 );
     ASSERT_EQ( decodedPrimitive.mScaling, 1.0 );
     ASSERT_EQ( decodedPrimitive.mOffset, 0.0 );
+
+    ASSERT_EQ( inspectionMatrixOutput->conditions.size(), 1 );
+    ASSERT_EQ( inspectionMatrixOutput->conditions.at( 0 ).signals.size(), 6 );
+
+    auto &signals = inspectionMatrixOutput->conditions.at( 0 ).signals;
+    ASSERT_EQ( signals.at( 0 ).signalID, signal1.signalID );
+    ASSERT_EQ( signals.at( 0 ).signalType, SignalType::UINT64 );
+
+    ASSERT_EQ( signals.at( 1 ).signalID, signal2.signalID );
+    ASSERT_EQ( signals.at( 1 ).signalType, SignalType::UINT64 );
+
+    ASSERT_EQ( signals.at( 2 ).signalID, signal6.signalID );
+    ASSERT_EQ( signals.at( 2 ).signalType, SignalType::UINT64 );
+
+    ASSERT_EQ( signals.at( 3 ).signalID, signal4.signalID );
+    ASSERT_EQ( signals.at( 3 ).signalType, SignalType::UNKNOWN );
+
+    ASSERT_EQ( signals.at( 4 ).signalID, signal3.signalID );
+    ASSERT_EQ( signals.at( 4 ).signalType, SignalType::UNKNOWN );
+
+    ASSERT_EQ( signals.at( 5 ).signalID, signal5.signalID );
+    ASSERT_EQ( signals.at( 5 ).signalType, SignalType::UINT64 );
 }
 
-TEST( CollectionSchemeManagerTest, DecoderDictionaryInvalidPartialSignalIDAndInvalidComplexType )
+TEST( DecoderDictionaryExtractorTest, DecoderDictionaryInvalidPartialSignalIDAndInvalidComplexType )
 {
 
-    CollectionSchemeManagerTest test( "DM1" );
     CANInterfaceIDTranslator canIDTranslator;
-    test.init( 0, nullptr, canIDTranslator );
+    CollectionSchemeManagerWrapper test( nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM1" );
 
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     /* mock currTime, and 3 collectionSchemes */

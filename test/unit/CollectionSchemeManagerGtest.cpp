@@ -2,14 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "CANInterfaceIDTranslator.h"
+#include "CheckinSender.h"
 #include "Clock.h"
 #include "ClockHandler.h"
+#include "CollectionSchemeManager.h"
 #include "CollectionSchemeManagerMock.h"
 #include "CollectionSchemeManagerTest.h" // IWYU pragma: associated
 #include "Testing.h"
+#include "TimeTypes.h"
+#include <functional>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <iostream>
+#include <map>
+#include <queue>
 
 namespace Aws
 {
@@ -29,10 +35,10 @@ TEST( CollectionSchemeManagerGtest, RebuildUpdateAndTimeLineTest )
 {
 
     // prepare input
-    std::string strDecoderManifestID1 = "DM1";
-    std::string strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
-    std::string strDecoderManifestIDCollectionScheme1 = "DM1";
-    std::string strDecoderManifestIDCollectionScheme2 = "DM2";
+    SyncID strDecoderManifestID1 = "DM1";
+    SyncID strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
+    SyncID strDecoderManifestIDCollectionScheme1 = "DM1";
+    SyncID strDecoderManifestIDCollectionScheme2 = "DM2";
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     TimePoint currTime = testClock->timeSinceEpoch();
     Timestamp startIdleTime = currTime.systemTimeMs + 10;
@@ -47,21 +53,15 @@ TEST( CollectionSchemeManagerGtest, RebuildUpdateAndTimeLineTest )
     std::shared_ptr<mockCollectionSchemeList> testPL = std::make_shared<mockCollectionSchemeList>();
     std::vector<ICollectionSchemePtr> testCP, emptyCP;
     testCP.emplace_back( collectionScheme1 );
-    NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1 );
+    CANInterfaceIDTranslator canIDTranslator;
+    CollectionSchemeManagerWrapper gmocktest(
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), strDecoderManifestID1 );
 
     EXPECT_CALL( *testPL, getCollectionSchemes() )
         .WillOnce( ReturnRef( emptyCP ) )
         .WillOnce( ReturnRef( testCP ) )
         .WillOnce( ReturnRef( testCP ) )
-        .WillOnce( ReturnRef( testCP ) )
         .WillOnce( ReturnRef( testCP ) );
-
-    EXPECT_CALL( *collectionScheme1, getDecoderManifestID() )
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme2 ) )
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme2 ) )
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) )
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) )
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) );
 
     EXPECT_CALL( *collectionScheme1, getStartTime() )
         .WillOnce( Return( startIdleTime ) )
@@ -81,27 +81,17 @@ TEST( CollectionSchemeManagerGtest, RebuildUpdateAndTimeLineTest )
     std::cout << COUT_GTEST_MGT << "1. Empty ICollectionCollectionScheme." << ANSI_TXT_DFT << std::endl;
     gmocktest.setCollectionSchemeList( testPL );
     ASSERT_FALSE( gmocktest.rebuildMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
-    // 2. collectionScheme does not match currDMID
-    std::cout << COUT_GTEST_MGT << "2. CollectionScheme does not match current DM id." << ANSI_TXT_DFT << std::endl;
+    // 2. start time > currTime, add idle collectionScheme
+    std::cout << COUT_GTEST_MGT << " 3. start time > currTime, add idle collectionScheme" << ANSI_TXT_DFT << std::endl;
     ASSERT_FALSE( gmocktest.rebuildMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
-    // 3. DM matches, start time > currTime, add idle collectionScheme
-    std::cout << COUT_GTEST_MGT << " 3. DM matches, start time > currTime, add idle collectionScheme" << ANSI_TXT_DFT
-              << std::endl;
-    ASSERT_FALSE( gmocktest.rebuildMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
-    // 4. DM matches, start time <= currTime && stop time > currTime add enable collectionScheme
-    std::cout << COUT_GTEST_MGT
-              << "4. DM matches, start time <= currTime && stop time > currTime add enable collectionScheme"
+    // 3. start time <= currTime && stop time > currTime add enable collectionScheme
+    std::cout << COUT_GTEST_MGT << "4. start time <= currTime && stop time > currTime add enable collectionScheme"
               << ANSI_TXT_DFT << std::endl;
     ASSERT_TRUE( gmocktest.rebuildMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
-    // 5. DM matches, stop time < currTime already expired
-    std::cout << COUT_GTEST_MGT << "5. DM matches, stop time < currTime CollectionScheme already expired"
-              << ANSI_TXT_DFT << std::endl;
+    // 4. stop time < currTime already expired
+    std::cout << COUT_GTEST_MGT << "5. stop time < currTime CollectionScheme already expired" << ANSI_TXT_DFT
+              << std::endl;
     ASSERT_FALSE( gmocktest.rebuildMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
 }
 
 /** @brief
@@ -111,13 +101,13 @@ TEST( CollectionSchemeManagerGtest, RebuildUpdateAndTimeLineTest )
 TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_ADD_DELETE )
 {
     // prepare input
-    std::string strDecoderManifestID1 = "DM1";
-    std::string strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
-    std::string strCollectionSchemeIDCollectionScheme2 = "COLLECTIONSCHEME2";
-    std::string strCollectionSchemeIDCollectionScheme3 = "COLLECTIONSCHEME3";
+    SyncID strDecoderManifestID1 = "DM1";
+    SyncID strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
+    SyncID strCollectionSchemeIDCollectionScheme2 = "COLLECTIONSCHEME2";
+    SyncID strCollectionSchemeIDCollectionScheme3 = "COLLECTIONSCHEME3";
 
-    std::string strDecoderManifestIDCollectionScheme1 = "DM1";
-    std::string strDecoderManifestIDCollectionScheme2 = "DM2";
+    SyncID strDecoderManifestIDCollectionScheme1 = "DM1";
+    SyncID strDecoderManifestIDCollectionScheme2 = "DM2";
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     TimePoint currTime = testClock->timeSinceEpoch();
     Timestamp startIdleTime = currTime.systemTimeMs + 10;
@@ -138,30 +128,16 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_ADD_DELETE )
     testCP.emplace_back( collectionScheme1 );
     testCP.emplace_back( collectionScheme1 );
 
-    NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1 );
+    CANInterfaceIDTranslator canIDTranslator;
+    CollectionSchemeManagerWrapper gmocktest(
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), strDecoderManifestID1 );
 
     EXPECT_CALL( *testPL, getCollectionSchemes() )
         .WillOnce( ReturnRef( emptyCP ) )
-        // addition DM does not match
-        .WillOnce( ReturnRef( testCP ) )
-        // addition DM  matches
+        // addition
         .WillOnce( ReturnRef( testCP ) )
         // deletion
         .WillOnce( ReturnRef( emptyCP ) );
-
-    EXPECT_CALL( *collectionScheme1, getDecoderManifestID() )
-        // DM does not match
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme2 ) )
-        // DM print for mismatch case
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme2 ) )
-        // addition DM matches collectionScheme 1
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) )
-
-        // addition DM matches collectionScheme 2
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) )
-
-        // addition DM matches collectionScheme3
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) );
 
     EXPECT_CALL( *collectionScheme1, getStartTime() )
         // addition add idle collectionScheme
@@ -193,21 +169,13 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_ADD_DELETE )
     std::cout << COUT_GTEST_MGT << "1. Empty ICollectionScheme." << ANSI_TXT_DFT << std::endl;
     gmocktest.setCollectionSchemeList( testPL );
     ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
-    // 2. collectionScheme does not match currDMID
-    std::cout << COUT_GTEST_MGT << "2. CollectionScheme does not match current DM id." << ANSI_TXT_DFT << std::endl;
-    ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
-    // 3. DM matches, add all collectionSchemes and drop the collectionScheme with bad setting
-    std::cout << COUT_GTEST_MGT
-              << " 3. DM matches, add all collectionSchemes and drop the collectionScheme with bad setting"
+    // 2. add all collectionSchemes and drop the collectionScheme with bad setting
+    std::cout << COUT_GTEST_MGT << " 3. add all collectionSchemes and drop the collectionScheme with bad setting"
               << ANSI_TXT_DFT << std::endl;
     ASSERT_TRUE( gmocktest.updateMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
-    // 4. deletion
+    // 3. deletion
     std::cout << COUT_GTEST_MGT << "4. Delete all" << ANSI_TXT_DFT << std::endl;
     ASSERT_TRUE( gmocktest.updateMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
 }
 
 /** @brief
@@ -216,11 +184,6 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_ADD_DELETE )
  */
 TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_IDLE_BRANCHES )
 {
-    // prepare input
-    std::string strDecoderManifestID1 = "DM1";
-    std::string strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
-
-    std::string strDecoderManifestIDCollectionScheme1 = "DM1";
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     TimePoint currTime = testClock->timeSinceEpoch();
     Timestamp startIdleTime = currTime.systemTimeMs + 10;
@@ -235,82 +198,31 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_IDLE_BRANCHES )
     Timestamp start2Time = currTime.systemTimeMs - 50;
     Timestamp stop2Time = currTime.systemTimeMs - 10;
 
-    // build decodermanifest, collectionScheme, collectionSchemeList
-    std::shared_ptr<mockDecoderManifest> testDM1 = std::make_shared<mockDecoderManifest>();
-    std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
-    std::shared_ptr<mockCollectionSchemeList> testPL = std::make_shared<mockCollectionSchemeList>();
-    std::vector<ICollectionSchemePtr> testCP;
-    // 3 collectionSchemes on the list, same collectionScheme but different update
-    // idle->enabled, idle update and bad
-    testCP.emplace_back( collectionScheme1 );
-    testCP.emplace_back( collectionScheme1 );
-    testCP.emplace_back( collectionScheme1 );
-
-    // create a collectionScheme map
-    std::shared_ptr<mockCollectionScheme> collectionSchemeIdle = std::make_shared<mockCollectionScheme>();
-    std::map<std::string, ICollectionSchemePtr> map1 = {
-        { strCollectionSchemeIDCollectionScheme1, collectionSchemeIdle } };
-    std::map<std::string, ICollectionSchemePtr> mapEmpty;
-    // setup idleMap
-    NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1, mapEmpty, map1 );
-
-    EXPECT_CALL( *testPL, getCollectionSchemes() )
-        //  update Idle collectionScheme DM  matches
-        .WillOnce( ReturnRef( testCP ) );
-
-    EXPECT_CALL( *collectionScheme1, getDecoderManifestID() )
-        // DM matches 3 collectionSchemes
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) )
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) )
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) );
-
-    EXPECT_CALL( *collectionSchemeIdle, getStartTime() )
-        // update bad setting
-        .WillRepeatedly( Return( startIdleTime ) );
-    EXPECT_CALL( *collectionSchemeIdle, getExpiryTime() )
-        // update bad setting
-        .WillRepeatedly( Return( stopIdleTime ) );
-    using ::testing::InSequence;
-    {
-        InSequence s1;
-        // 1st update bad setting
-        EXPECT_CALL( *collectionScheme1, getStartTime() )
-            // update bad setting
-            .WillOnce( Return( start2Time ) );
-        EXPECT_CALL( *collectionScheme1, getExpiryTime() )
-            // update bad setting
-            .WillOnce( Return( stop2Time ) );
-
-        // 2nd update new idle time
-        EXPECT_CALL( *collectionScheme1, getStartTime() )
-            // update bad setting
-            .WillOnce( Return( start1Time ) );
-        EXPECT_CALL( *collectionScheme1, getExpiryTime() )
-            // update bad setting
-            .WillOnce( Return( stop1Time ) );
-
-        // 3rd update move to enable
-        EXPECT_CALL( *collectionScheme1, getStartTime() )
-            // update bad setting
-            .WillOnce( Return( startEnableTime ) );
-        EXPECT_CALL( *collectionScheme1, getExpiryTime() )
-            // update bad setting
-            .WillOnce( Return( stopEnableTime ) );
-    }
-
-    EXPECT_CALL( *collectionScheme1, getCollectionSchemeID() )
-        // addition
-        .WillOnce( ReturnRef( strCollectionSchemeIDCollectionScheme1 ) )
-        .WillOnce( ReturnRef( strCollectionSchemeIDCollectionScheme1 ) )
-        .WillOnce( ReturnRef( strCollectionSchemeIDCollectionScheme1 ) )
-        // printExistingCollectionSchemes
-        .WillOnce( ReturnRef( strCollectionSchemeIDCollectionScheme1 ) );
+    CANInterfaceIDTranslator canIDTranslator;
+    CollectionSchemeManagerWrapper gmocktest(
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM1" );
+    auto idleCollectionScheme =
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startIdleTime, stopIdleTime );
 
     // test code
-    gmocktest.setCollectionSchemeList( testPL );
-    gmocktest.sendCheckin();
+    gmocktest.setCollectionSchemeList(
+        std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{ idleCollectionScheme } ) );
+    ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
+
+    // 1st update bad setting
+    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start2Time, stop2Time ) } ) );
+    ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
+
+    // 2nd update new idle time
+    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start1Time, stop1Time ) } ) );
+    ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
+
+    // 3rd update move to enable
+    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startEnableTime, stopEnableTime ) } ) );
     ASSERT_TRUE( gmocktest.updateMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
 }
 
 /** @brief
@@ -333,11 +245,6 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_ENABLED_BRANCHES )
      *
      */
 
-    // prepare input
-    std::string strDecoderManifestID1 = "DM1";
-    std::string strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
-
-    std::string strDecoderManifestIDCollectionScheme1 = "DM1";
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     TimePoint currTime = testClock->timeSinceEpoch();
     Timestamp startExpTime = currTime.systemTimeMs + 10;
@@ -352,125 +259,31 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_ENABLED_BRANCHES )
     Timestamp start2Time = currTime.systemTimeMs - 50;
     Timestamp stop2Time = currTime.systemTimeMs + 100;
 
-    // build decodermanifest, collectionScheme, collectionSchemeList
-    std::shared_ptr<mockDecoderManifest> testDM1 = std::make_shared<mockDecoderManifest>();
-    std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
-    std::shared_ptr<mockCollectionSchemeList> testPL = std::make_shared<mockCollectionSchemeList>();
-    std::vector<ICollectionSchemePtr> testCP;
-    // 3 collectionSchemes on the list, same collectionScheme but different update
-    // idle->enabled, idle update and bad
-    testCP.emplace_back( collectionScheme1 );
-    testCP.emplace_back( collectionScheme1 );
-    testCP.emplace_back( collectionScheme1 );
-
-    // create a collectionScheme map
-    std::shared_ptr<mockCollectionScheme> collectionSchemeEnabled = std::make_shared<mockCollectionScheme>();
-    std::map<std::string, ICollectionSchemePtr> map1 = {
-        { strCollectionSchemeIDCollectionScheme1, collectionSchemeEnabled } };
-    std::map<std::string, ICollectionSchemePtr> mapEmpty;
-    // setup idleMap
-    NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1, map1, mapEmpty );
-
-    EXPECT_CALL( *testPL, getCollectionSchemes() )
-        //  update Idle collectionScheme DM  matches
-        .WillOnce( ReturnRef( testCP ) );
-
-    EXPECT_CALL( *collectionScheme1, getDecoderManifestID() )
-        // DM matches 3 collectionSchemes
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) )
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) )
-        .WillOnce( ReturnRef( strDecoderManifestIDCollectionScheme1 ) );
-
-    EXPECT_CALL( *collectionSchemeEnabled, getStartTime() )
-        // update bad setting
-        .WillRepeatedly( Return( startEnableTime ) );
-    EXPECT_CALL( *collectionSchemeEnabled, getExpiryTime() )
-        // update bad setting
-        .WillRepeatedly( Return( stopEnableTime ) );
-    using ::testing::InSequence;
-    {
-        InSequence s1;
-        // 1st update bad setting
-        EXPECT_CALL( *collectionScheme1, getStartTime() )
-            // update bad setting
-            .WillOnce( Return( start1Time ) );
-        EXPECT_CALL( *collectionScheme1, getExpiryTime() )
-            // update bad setting
-            .WillOnce( Return( stop1Time ) );
-
-        // 2nd update new idle time
-        EXPECT_CALL( *collectionScheme1, getStartTime() )
-            // update bad setting
-            .WillOnce( Return( start2Time ) );
-        EXPECT_CALL( *collectionScheme1, getExpiryTime() )
-            // update bad setting
-            .WillOnce( Return( stop2Time ) );
-
-        // 3rd update move to enable
-        EXPECT_CALL( *collectionScheme1, getStartTime() )
-            // update bad setting
-            .WillOnce( Return( startExpTime ) );
-        EXPECT_CALL( *collectionScheme1, getExpiryTime() )
-            // update bad setting
-            .WillOnce( Return( stopExpTime ) );
-    }
-
-    EXPECT_CALL( *collectionScheme1, getCollectionSchemeID() )
-        // addition
-        .WillOnce( ReturnRef( strCollectionSchemeIDCollectionScheme1 ) )
-        .WillOnce( ReturnRef( strCollectionSchemeIDCollectionScheme1 ) )
-        .WillOnce( ReturnRef( strCollectionSchemeIDCollectionScheme1 ) );
-
-    // test code
-    gmocktest.setCollectionSchemeList( testPL );
-    gmocktest.sendCheckin();
-    ASSERT_TRUE( gmocktest.updateMapsandTimeLine( currTime ) );
-    gmocktest.sendCheckin();
-}
-
-/** @brief
- * This test validates the checkin interval when no active collection scheme is in the system
- */
-TEST( CollectionSchemeManagerGtest, checkTimeLineTest_CHECKIN_UNFOUNDCOLLECTIONSCHEME )
-{
-    // prepare input
-    std::string strDecoderManifestID1 = "DM1";
-    std::string strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
-    std::string strCollectionSchemeIDCollectionScheme2 = "COLLECTIONSCHEME2";
-
-    std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
-    TimePoint currTime = testClock->timeSinceEpoch();
-
-    // create empty collectionScheme map
-    std::map<std::string, ICollectionSchemePtr> mapEmpty;
-    std::shared_ptr<mockCollectionScheme> collectionScheme2 = std::make_shared<mockCollectionScheme>();
-    std::map<std::string, ICollectionSchemePtr> mapIdle = {
-        { strCollectionSchemeIDCollectionScheme2, collectionScheme2 } };
-
-    // setup maps
-    NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1, mapEmpty, mapIdle );
-    EXPECT_CALL( *collectionScheme2, getStartTime() ).WillOnce( Return( currTime.systemTimeMs + 20 ) );
-
-    // create mTimeLine
-    std::priority_queue<TimeData, std::vector<TimeData>, std::greater<TimeData>> testTimeLine;
-    TimeData dataPair = { currTime, "Checkin" };
-    testTimeLine.push( dataPair );
-    dataPair = { currTime, strCollectionSchemeIDCollectionScheme1 };
-    testTimeLine.push( dataPair );
-    dataPair = { currTime, strCollectionSchemeIDCollectionScheme2 };
-    testTimeLine.push( dataPair );
-
-    // test code
     CANInterfaceIDTranslator canIDTranslator;
-    gmocktest.init( 200, nullptr, canIDTranslator );
-    gmocktest.setTimeLine( testTimeLine );
-    gmocktest.sendCheckin();
-    // first case collectionScheme1 not found
-    ASSERT_FALSE( gmocktest.checkTimeLine( currTime ) );
-    // second case collectionScheme2 does not have time matched
-    ASSERT_FALSE( gmocktest.checkTimeLine( currTime + 200 ) );
-    // branch out startTime > currTime
-    ASSERT_FALSE( gmocktest.checkTimeLine( currTime + 200 ) );
+    CollectionSchemeManagerWrapper gmocktest(
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "COLLECTIONSCHEME1" );
+    auto enabledCollectionScheme =
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startEnableTime, stopEnableTime );
+
+    // test code
+    gmocktest.setCollectionSchemeList(
+        std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{ enabledCollectionScheme } ) );
+    ASSERT_TRUE( gmocktest.updateMapsandTimeLine( currTime ) );
+
+    // 2nd update new idle time
+    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start1Time, stop1Time ) } ) );
+    ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
+
+    // 1st update bad setting
+    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start2Time, stop2Time ) } ) );
+    ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
+
+    // 3rd update move to enable
+    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
+        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startExpTime, stopExpTime ) } ) );
+    ASSERT_TRUE( gmocktest.updateMapsandTimeLine( currTime ) );
 }
 
 /** @brief
@@ -479,9 +292,9 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_CHECKIN_UNFOUNDCOLLECTIONS
 TEST( CollectionSchemeManagerGtest, checkTimeLineTest_IDLE_BRANCHES )
 {
     // prepare input
-    std::string strDecoderManifestID1 = "DM1";
-    std::string strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
-    std::string strCollectionSchemeIDCollectionScheme2 = "COLLECTIONSCHEME2";
+    SyncID strDecoderManifestID1 = "DM1";
+    SyncID strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
+    SyncID strCollectionSchemeIDCollectionScheme2 = "COLLECTIONSCHEME2";
 
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     TimePoint currTime = testClock->timeSinceEpoch();
@@ -489,13 +302,18 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_IDLE_BRANCHES )
     // create empty collectionScheme map
     std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
     std::shared_ptr<mockCollectionScheme> collectionScheme2 = std::make_shared<mockCollectionScheme>();
-    std::map<std::string, ICollectionSchemePtr> mapEmpty;
-    std::map<std::string, ICollectionSchemePtr> mapIdle = {
-        { strCollectionSchemeIDCollectionScheme1, collectionScheme1 },
-        { strCollectionSchemeIDCollectionScheme2, collectionScheme2 } };
+    std::map<SyncID, ICollectionSchemePtr> mapEmpty;
+    std::map<SyncID, ICollectionSchemePtr> mapIdle = { { strCollectionSchemeIDCollectionScheme1, collectionScheme1 },
+                                                       { strCollectionSchemeIDCollectionScheme2, collectionScheme2 } };
 
     // setup maps
-    NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1, mapEmpty, mapIdle );
+    CANInterfaceIDTranslator canIDTranslator;
+    CollectionSchemeManagerWrapper gmocktest( nullptr,
+                                              canIDTranslator,
+                                              std::make_shared<CheckinSender>( nullptr ),
+                                              strDecoderManifestID1,
+                                              mapEmpty,
+                                              mapIdle );
     EXPECT_CALL( *collectionScheme1, getStartTime() )
         .WillOnce( Return( currTime.systemTimeMs ) )
         .WillOnce( Return( currTime.systemTimeMs ) );
@@ -520,10 +338,7 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_IDLE_BRANCHES )
     testTimeLine.push( dataPair );
 
     // test code
-    CANInterfaceIDTranslator canIDTranslator;
-    gmocktest.init( 200, nullptr, canIDTranslator );
     gmocktest.setTimeLine( testTimeLine );
-    gmocktest.sendCheckin();
     ASSERT_TRUE( gmocktest.checkTimeLine( currTime ) );
     ASSERT_TRUE( gmocktest.checkTimeLine( currTime + 20 ) );
     // branch out startTime > currTime
@@ -536,9 +351,9 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_IDLE_BRANCHES )
 TEST( CollectionSchemeManagerGtest, checkTimeLineTest_ENABLED_BRANCHES )
 {
     // prepare input
-    std::string strDecoderManifestID1 = "DM1";
-    std::string strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
-    std::string strCollectionSchemeIDCollectionScheme2 = "COLLECTIONSCHEME2";
+    SyncID strDecoderManifestID1 = "DM1";
+    SyncID strCollectionSchemeIDCollectionScheme1 = "COLLECTIONSCHEME1";
+    SyncID strCollectionSchemeIDCollectionScheme2 = "COLLECTIONSCHEME2";
 
     std::shared_ptr<const Clock> testClock = ClockHandler::getClock();
     TimePoint currTime = testClock->timeSinceEpoch();
@@ -546,13 +361,19 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_ENABLED_BRANCHES )
     // create empty collectionScheme map
     std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
     std::shared_ptr<mockCollectionScheme> collectionScheme2 = std::make_shared<mockCollectionScheme>();
-    std::map<std::string, ICollectionSchemePtr> mapEmpty;
-    std::map<std::string, ICollectionSchemePtr> mapEnable = {
+    std::map<SyncID, ICollectionSchemePtr> mapEmpty;
+    std::map<SyncID, ICollectionSchemePtr> mapEnable = {
         { strCollectionSchemeIDCollectionScheme1, collectionScheme1 },
         { strCollectionSchemeIDCollectionScheme2, collectionScheme2 } };
 
     // setup maps
-    NiceMock<mockCollectionSchemeManagerTest> gmocktest( strDecoderManifestID1, mapEnable, mapEmpty );
+    CANInterfaceIDTranslator canIDTranslator;
+    CollectionSchemeManagerWrapper gmocktest( nullptr,
+                                              canIDTranslator,
+                                              std::make_shared<CheckinSender>( nullptr ),
+                                              strDecoderManifestID1,
+                                              mapEnable,
+                                              mapEmpty );
     EXPECT_CALL( *collectionScheme1, getExpiryTime() )
         .WillOnce( Return( currTime.systemTimeMs ) )
         .WillOnce( Return( currTime.systemTimeMs ) );
@@ -577,10 +398,7 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_ENABLED_BRANCHES )
     testTimeLine.push( dataPair );
 
     // test code
-    CANInterfaceIDTranslator canIDTranslator;
-    gmocktest.init( 200, nullptr, canIDTranslator );
     gmocktest.setTimeLine( testTimeLine );
-    gmocktest.sendCheckin();
     ASSERT_TRUE( gmocktest.checkTimeLine( currTime ) );
     ASSERT_TRUE( gmocktest.checkTimeLine( currTime + 20 ) );
     // branch out startTime > currTime

@@ -44,9 +44,9 @@ public:
     MOCK_METHOD( bool,
                  GetCredentials,
                  ( const Aws::Crt::Auth::OnCredentialsResolved &onCredentialsResolved ),
-                 ( const ) );
-    MOCK_METHOD( aws_credentials_provider *, GetUnderlyingHandle, (), ( const, noexcept ) );
-    MOCK_METHOD( bool, IsValid, (), ( const, noexcept ) );
+                 ( const, override ) );
+    MOCK_METHOD( aws_credentials_provider *, GetUnderlyingHandle, (), ( const, noexcept, override ) );
+    MOCK_METHOD( bool, IsValid, (), ( const, noexcept, override ) );
 };
 
 class CredentialsTest : public ::testing::Test

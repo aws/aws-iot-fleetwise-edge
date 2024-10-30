@@ -59,10 +59,9 @@ public:
     /**
      * @brief Starts a new set of data and a fresh stream
      *
-     * @param triggeredCollectionSchemeData     pointer to the collected data and metadata
-     *                                 to be sent to cloud
+     * @param triggeredVisionSystemData pointer to the collected data and metadata to be sent to cloud
      */
-    virtual void setupVehicleData( const TriggeredCollectionSchemeDataPtr &triggeredCollectionSchemeData );
+    virtual void setupVehicleData( std::shared_ptr<const TriggeredVisionSystemData> triggeredVisionSystemData );
 
     /**
      * @brief Hand over stream builder. After this to start a new stream setupVehicleData has to be called.
@@ -78,7 +77,7 @@ public:
     /**
      * @brief Appends the decoded raw frame handle to the stream generator
      *
-     *  @param signal  only type SignalType::RAW_DATA_BUFFER_HANDLE will be accepted
+     *  @param signal  only type SignalType::COMPLEX_SIGNAL will be accepted
      */
     virtual void append( const CollectedSignal &signal );
 

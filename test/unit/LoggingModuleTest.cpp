@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "LoggingModule.h"
+#include "ConsoleLogger.h"
 #include <cstdio>
 #include <gtest/gtest.h>
 
@@ -17,6 +18,18 @@ TEST( LoggingModuleTest, GetErrnoString )
     FILE *fp = fopen( "/tmp/fwe_strerror_test/2f1d6e5e5ab1", "rb" );
     (void)fp;
     ASSERT_NE( getErrnoString(), "" );
+}
+
+TEST( LoggingModuleTest, stringToLogColorOption )
+{
+    LogColorOption outLogColorOption;
+    EXPECT_TRUE( stringToLogColorOption( "Auto", outLogColorOption ) );
+    EXPECT_EQ( outLogColorOption, LogColorOption::Auto );
+    EXPECT_TRUE( stringToLogColorOption( "Yes", outLogColorOption ) );
+    EXPECT_EQ( outLogColorOption, LogColorOption::Yes );
+    EXPECT_TRUE( stringToLogColorOption( "No", outLogColorOption ) );
+    EXPECT_EQ( outLogColorOption, LogColorOption::No );
+    EXPECT_FALSE( stringToLogColorOption( "Invalid", outLogColorOption ) );
 }
 
 } // namespace IoTFleetWise

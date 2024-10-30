@@ -7,60 +7,13 @@
 #include "EnumUtility.h"
 #include "LoggingModule.h"
 #include <cstddef>
+#include <cstdint>
 #include <string>
-#include <utility>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
-
-void
-CollectionSchemeManager::prepareCheckinTimer()
-{
-    auto currTime = mClock->timeSinceEpoch();
-    TimeData checkinData = TimeData{ currTime, CHECKIN };
-    mTimeLine.push( checkinData );
-}
-
-bool
-CollectionSchemeManager::sendCheckin()
-{
-    // Create a list of active collectionSchemes and the current decoder manifest and send it to cloud
-    std::vector<std::string> checkinMsg;
-    for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); it++ )
-    {
-        checkinMsg.emplace_back( it->first );
-    }
-    for ( auto it = mIdleCollectionSchemeMap.begin(); it != mIdleCollectionSchemeMap.end(); it++ )
-    {
-        checkinMsg.emplace_back( it->first );
-    }
-    if ( !mCurrentDecoderManifestID.empty() )
-    {
-        checkinMsg.emplace_back( mCurrentDecoderManifestID );
-    }
-    std::string checkinLogStr;
-    for ( size_t i = 0; i < checkinMsg.size(); i++ )
-    {
-        if ( i > 0 )
-        {
-            checkinLogStr += ", ";
-        }
-        checkinLogStr += checkinMsg[i];
-    }
-    FWE_LOG_TRACE( "CHECKIN: " + checkinLogStr );
-
-    if ( mSchemaListenerPtr == nullptr )
-    {
-        FWE_LOG_ERROR( "Cannot set the checkin message" );
-        return false;
-    }
-    else
-    {
-        return mSchemaListenerPtr->sendCheckin( checkinMsg );
-    }
-}
 
 bool
 CollectionSchemeManager::retrieve( DataType retrieveType )
@@ -73,7 +26,7 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
 
     if ( mSchemaPersistency == nullptr )
     {
-        FWE_LOG_ERROR( "Failed to acquire a valid handle on the scheme local persistency module" );
+        FWE_LOG_INFO( "Persistency module not available" );
         return false;
     }
     switch ( retrieveType )
@@ -87,7 +40,7 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
         errStr = "Failed to retrieve the DecoderManifest from the persistency module due to an error: ";
         break;
     default:
-        FWE_LOG_ERROR( "Unknown error: " + std::to_string( toUType( retrieveType ) ) );
+        FWE_LOG_ERROR( "Unknown data type: " + std::to_string( toUType( retrieveType ) ) );
         return false;
     }
 
@@ -117,11 +70,8 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
         mCollectionSchemeList->copyData( protoOutput.data(), protoSize );
         mProcessCollectionScheme = true;
     }
-    // currently this if will be always true as it can be only DECODER_MANIFEST or COLLECTION_SCHEME_LIST but for
-    // readability leave it as else if instead of else
-    // coverity[autosar_cpp14_m0_1_2_violation]
-    // coverity[autosar_cpp14_m0_1_9_violation]
-    // coverity[misra_cpp_2008_rule_0_1_9_violation]
+    // coverity[autosar_cpp14_m0_1_9_violation] - Second if-statement always follows same path as first
+    // coverity[misra_cpp_2008_rule_0_1_9_violation] - Second if-statement always follows same path as first
     else if ( retrieveType == DataType::DECODER_MANIFEST )
     {
         // updating mDecoderManifest
@@ -144,7 +94,7 @@ CollectionSchemeManager::store( DataType storeType )
 
     if ( mSchemaPersistency == nullptr )
     {
-        FWE_LOG_ERROR( "Failed to acquire a valid handle on the scheme local persistency module" );
+        FWE_LOG_INFO( "Persistency module not available" );
         return;
     }
     if ( ( storeType == DataType::COLLECTION_SCHEME_LIST ) && ( mCollectionSchemeList == nullptr ) )

@@ -17,25 +17,29 @@ namespace Testing
 class ConnectivityModuleMock : public IConnectivityModule
 {
 public:
-    MOCK_METHOD( bool, isAlive, (), ( const override ) );
+    MOCK_METHOD( bool, isAlive, (), ( const, override ) );
 
-    std::shared_ptr<IConnectivityChannel>
-    createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager,
-                      const std::string &topicName,
-                      bool subscription = false ) override
+    std::shared_ptr<ISender>
+    createSender( const std::string &topicName, QoS publishQoS = QoS::AT_MOST_ONCE ) override
     {
-        return mockedCreateNewChannel( payloadManager, topicName, subscription );
+        return mockedCreateSender( topicName, publishQoS );
     };
 
-    MOCK_METHOD( std::shared_ptr<IConnectivityChannel>,
-                 mockedCreateNewChannel,
-                 ( const std::shared_ptr<PayloadManager> &payloadManager,
-                   const std::string &topicName,
-                   bool subscription ) );
+    MOCK_METHOD( std::shared_ptr<ISender>, mockedCreateSender, ( const std::string &topicName, QoS publishQoS ) );
+
+    std::shared_ptr<IReceiver>
+    createReceiver( const std::string &topicName ) override
+    {
+        return mockedCreateReceiver( topicName );
+    };
+
+    MOCK_METHOD( std::shared_ptr<IReceiver>, mockedCreateReceiver, ( const std::string &topicName ) );
 
     MOCK_METHOD( bool, disconnect, (), ( override ) );
 
     MOCK_METHOD( bool, connect, (), ( override ) );
+
+    MOCK_METHOD( void, subscribeToConnectionEstablished, ( OnConnectionEstablishedCallback callback ), ( override ) );
 };
 
 } // namespace Testing

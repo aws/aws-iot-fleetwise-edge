@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 default_language_version:
@@ -121,10 +123,17 @@ repos:
         verbose: true
       - id: validate-build-files
         name: validate-build-files
-        entry:
-          bash -e -c 'FILE_MISSING=false; for FILE in "$@"; do if ! grep -q "${FILE}"
-          CMakeLists.txt; then echo "${FILE} is missing from CMakeLists.txt"; FILE_MISSING=true; fi;
-          done; if ${FILE_MISSING}; then exit -1; fi' --
+        entry: |
+          bash -e -c '
+            VIOLATION=false
+            for FILE in "$@"; do
+              if ! grep -q "${FILE}" CMakeLists.txt; then
+                echo "${FILE} is missing from CMakeLists.txt"
+                VIOLATION=true
+              fi
+            done
+            if ${VIOLATION}; then exit -1; fi
+          ' --
         language: python
         files: "^src|^test/unit"
         exclude: "^test/unit/support"
@@ -141,3 +150,20 @@ repos:
         language: pygrep
         entry: "[\\x80-\\xFF]"
         types: [text]
+      - id: ensure-copyright-header
+        name: ensure-copyright-header
+        entry: |
+          bash -e -c '
+            VIOLATION=false
+            for FILE in "$@"; do
+              if ! head -n2 "${FILE}" | grep -q "Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved."; then
+                echo "${FILE} is missing copyright headers"
+                VIOLATION=true
+              fi
+            done
+            if ${VIOLATION}; then exit -1; fi
+          ' --
+        language: python
+        types_or: [c++, python, yaml, cmake, proto, shell]
+        exclude: "gradlew|.prettierrc.yaml|.clang-format|.clang-tidy|create_avd_config.sh"
+        verbose: true

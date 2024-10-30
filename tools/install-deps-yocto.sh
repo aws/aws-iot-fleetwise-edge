@@ -6,8 +6,8 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND="noninteractive"
 
-apt update
-apt install -y \
+apt update -o DPkg::Lock::Timeout=120
+apt install -y -o DPkg::Lock::Timeout=120 \
     gawk wget git-core diffstat unzip texinfo \
     build-essential chrpath socat cpio python3 python3-pip python3-pexpect \
     xz-utils debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev \
@@ -15,7 +15,7 @@ apt install -y \
     zstd lz4
 
 if [ `dpkg --print-architecture` == "amd64" ]; then
-    apt install -y gcc-multilib
+    apt install -y -o DPkg::Lock::Timeout=120 gcc-multilib
 fi
 
 # Google 'repo' tool, see https://source.android.com/setup/develop/repo

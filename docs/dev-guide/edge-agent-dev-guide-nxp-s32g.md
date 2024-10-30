@@ -162,7 +162,12 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
-   && ./demo.sh --vehicle-name fwdemo-s32g --campaign-file campaign-obd-heartbeat.json
+   && ./demo.sh \
+      --vehicle-name fwdemo-s32g \
+      --node-file obd-nodes.json \
+      --decoder-file obd-decoders.json \
+      --network-interface-file network-interface-obd.json \
+      --campaign-file campaign-obd-heartbeat.json
    ```
 
 ## Clean up

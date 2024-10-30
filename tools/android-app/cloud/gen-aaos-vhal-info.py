@@ -7,8 +7,6 @@ import re
 # Before running this script to generate the output files, firstly create a file called
 # aaos-vhal-types.h with the content from:
 # https://cs.android.com/android/platform/superproject/main/+/main:prebuilts/vndk/v30/x86/include/generated-headers/hardware/interfaces/automotive/vehicle/2.0/android.hardware.automotive.vehicle@2.0_genc++_headers/gen/android/hardware/automotive/vehicle/2.0/types.h
-# The output in aaos-vhal-props-table.txt can then be copied to
-# `tools/android-app/app/src/main/java/com/aws/iotfleetwise/AaosVehicleProperties.java`
 
 with open("aaos-vhal-types.h") as fp:
     text = fp.read()

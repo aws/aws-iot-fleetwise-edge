@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include "CacheAndPersist.h"
 #include "CollectionInspectionAPITypes.h"
+#include "CollectionInspectionEngine.h"
 #include "CollectionInspectionWorkerThread.h"
 #include "CollectionSchemeIngestion.h"
 #include "CollectionSchemeIngestionList.h"
-#include "CollectionSchemeManager.h"
 #include "DecoderManifestIngestion.h"
 #include "ICollectionScheme.h"
 #include "ICollectionSchemeList.h"
@@ -16,14 +15,10 @@
 #include "MessageTypes.h"
 #include "OBDOverCANModule.h"
 #include "SignalTypes.h"
-#include "TimeTypes.h"
 #include "VehicleDataSourceTypes.h"
 #include <algorithm> // IWYU pragma: keep
 #include <cstdint>
-#include <functional>
-#include <map>
 #include <memory>
-#include <queue>
 #include <sstream> // IWYU pragma: keep
 #include <string>
 #include <unordered_map>
@@ -49,12 +44,12 @@ namespace IoTFleetWise
 class IDecoderManifestTest : public DecoderManifestIngestion
 {
 public:
-    IDecoderManifestTest( std::string id )
+    IDecoderManifestTest( SyncID id )
         : ID( id )
     {
     }
     IDecoderManifestTest(
-        std::string id,
+        SyncID id,
         std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap,
         std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID,
         std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat
@@ -78,7 +73,7 @@ public:
     {
     }
 
-    std::string
+    SyncID
     getID() const
     {
         return ID;
@@ -102,7 +97,11 @@ public:
     getNetworkProtocol( SignalID signalID ) const override
     {
         // a simple logic to assign network protocol type to signalID for testing purpose.
-        if ( signalID < 0x1000 )
+        if ( signalID == INVALID_SIGNAL_ID )
+        {
+            return VehicleDataSourceProtocol::INVALID_PROTOCOL;
+        }
+        else if ( signalID < 0x1000 )
         {
             return VehicleDataSourceProtocol::RAW_SOCKET;
         }
@@ -131,6 +130,20 @@ public:
         return NOT_FOUND_PID_DECODER_FORMAT;
     }
 
+    SignalType
+    getSignalType( SignalID signalID ) const override
+    {
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        if ( getNetworkProtocol( signalID ) == VehicleDataSourceProtocol::COMPLEX_DATA )
+        {
+            return SignalType::UNKNOWN;
+        }
+#else
+        static_cast<void>( signalID );
+#endif
+        return SignalType::DOUBLE;
+    }
+
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     ComplexSignalDecoderFormat
     getComplexSignalDecoderFormat( SignalID signalID ) const override
@@ -156,7 +169,7 @@ public:
 #endif
 
 private:
-    std::string ID;
+    SyncID ID;
     std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> mFormatMap;
     std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> mSignalToFrameAndNodeID;
     std::unordered_map<SignalID, PIDSignalDecoderFormat> mSignalIDToPIDDecoderFormat;
@@ -168,18 +181,23 @@ private:
 class ICollectionSchemeTest : public CollectionSchemeIngestion
 {
 public:
-    ICollectionSchemeTest( std::string collectionSchemeID,
-                           std::string DMID,
+    ICollectionSchemeTest( SyncID collectionSchemeID,
+                           SyncID DMID,
                            uint64_t start,
                            uint64_t stop,
-                           Signals_t signalsIn,
-                           RawCanFrames_t rawCanFrmsIn
+                           const Signals_t &signalsIn,
+                           const RawCanFrames_t &rawCanFrmsIn
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
                            ,
-                           PartialSignalIDLookup partialSignalLookup = PartialSignalIDLookup()
+                           const PartialSignalIDLookup &partialSignalLookup = PartialSignalIDLookup()
 #endif
                                )
-        : collectionSchemeID( collectionSchemeID )
+        : CollectionSchemeIngestion(
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+              std::make_shared<CollectionSchemeIngestion::PartialSignalIDLookup>()
+#endif
+                  )
+        , collectionSchemeID( collectionSchemeID )
         , decoderManifestID( DMID )
         , startTime( start )
         , expiryTime( stop )
@@ -191,8 +209,8 @@ public:
         , root( nullptr )
     {
     }
-    ICollectionSchemeTest( std::string collectionSchemeID,
-                           std::string DMID,
+    ICollectionSchemeTest( SyncID collectionSchemeID,
+                           SyncID DMID,
                            uint64_t start,
                            uint64_t stop
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -200,7 +218,12 @@ public:
                            S3UploadMetadata s3UploadMetadata = S3UploadMetadata()
 #endif
                                )
-        : collectionSchemeID( collectionSchemeID )
+        : CollectionSchemeIngestion(
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+              std::make_shared<CollectionSchemeIngestion::PartialSignalIDLookup>()
+#endif
+                  )
+        , collectionSchemeID( collectionSchemeID )
         , decoderManifestID( DMID )
         , startTime( start )
         , expiryTime( stop )
@@ -210,21 +233,25 @@ public:
         , root( nullptr )
     {
     }
-    ICollectionSchemeTest(
-        std::string collectionSchemeID, std::string DMID, uint64_t start, uint64_t stop, ExpressionNode *root )
-        : collectionSchemeID( collectionSchemeID )
+    ICollectionSchemeTest( SyncID collectionSchemeID, SyncID DMID, uint64_t start, uint64_t stop, ExpressionNode *root )
+        : CollectionSchemeIngestion(
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+              std::make_shared<CollectionSchemeIngestion::PartialSignalIDLookup>()
+#endif
+                  )
+        , collectionSchemeID( collectionSchemeID )
         , decoderManifestID( DMID )
         , startTime( start )
         , expiryTime( stop )
         , root( root )
     {
     }
-    const std::string &
+    const SyncID &
     getCollectionSchemeID() const
     {
         return collectionSchemeID;
     }
-    const std::string &
+    const SyncID &
     getDecoderManifestID() const
     {
         return decoderManifestID;
@@ -260,6 +287,12 @@ public:
         return true;
     }
 
+    bool
+    isReady() const override
+    {
+        return true;
+    }
+
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     const PartialSignalIDLookup &
     getPartialSignalIdToSignalPathLookupTable() const override
@@ -274,8 +307,8 @@ public:
 #endif
 
 private:
-    std::string collectionSchemeID;
-    std::string decoderManifestID;
+    SyncID collectionSchemeID;
+    SyncID decoderManifestID;
     uint64_t startTime;
     uint64_t expiryTime;
     Signals_t signals;
@@ -290,7 +323,7 @@ private:
 class ICollectionSchemeListTest : public CollectionSchemeIngestionList
 {
 public:
-    ICollectionSchemeListTest( std::vector<ICollectionSchemePtr> &list )
+    ICollectionSchemeListTest( const std::vector<ICollectionSchemePtr> &list )
         : mCollectionSchemeTest( list )
     {
     }
@@ -301,6 +334,12 @@ public:
     }
     bool
     build() override
+    {
+        return true;
+    }
+
+    bool
+    isReady() const override
     {
         return true;
     }
@@ -347,7 +386,8 @@ class CollectionInspectionWorkerThreadMock : public CollectionInspectionWorkerTh
 {
 public:
     CollectionInspectionWorkerThreadMock()
-        : mUpdateFlag( false )
+        : CollectionInspectionWorkerThread( mEngine )
+        , mInspectionMatrixUpdateFlag( false )
     {
     }
     ~CollectionInspectionWorkerThreadMock()
@@ -357,180 +397,23 @@ public:
     onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
     {
         CollectionInspectionWorkerThread::onChangeInspectionMatrix( inspectionMatrix );
-        mUpdateFlag = true;
+        mInspectionMatrixUpdateFlag = true;
     }
     void
-    setUpdateFlag( bool flag )
+    setInspectionMatrixUpdateFlag( bool flag )
     {
-        mUpdateFlag = flag;
+        mInspectionMatrixUpdateFlag = flag;
     }
     bool
-    getUpdateFlag()
+    getInspectionMatrixUpdateFlag()
     {
-        return mUpdateFlag;
+        return mInspectionMatrixUpdateFlag;
     }
 
 private:
-    // This flag is used for testing whether the listener received the update
-    bool mUpdateFlag;
-};
-
-class CollectionSchemeManagerTest : public CollectionSchemeManager
-{
-public:
-    CollectionSchemeManagerTest()
-    {
-    }
-    CollectionSchemeManagerTest( std::string dm_id )
-        : CollectionSchemeManager( dm_id )
-    {
-    }
-
-    void
-    myInvokeCollectionScheme()
-    {
-        this->onCollectionSchemeUpdate( mPlTest );
-    }
-    void
-    myInvokeDecoderManifest()
-    {
-        this->onDecoderManifestUpdate( mDmTest );
-    }
-    void
-    updateAvailable()
-    {
-        CollectionSchemeManager::updateAvailable();
-    }
-    bool
-    rebuildMapsandTimeLine( const TimePoint &currTime )
-    {
-        return ( CollectionSchemeManager::rebuildMapsandTimeLine( currTime ) );
-    }
-    bool
-    updateMapsandTimeLine( const TimePoint &currTime )
-    {
-        return CollectionSchemeManager::updateMapsandTimeLine( currTime );
-    }
-    bool
-    checkTimeLine( const TimePoint &currTime )
-    {
-        return ( CollectionSchemeManager::checkTimeLine( currTime ) );
-    }
-    void
-    decoderDictionaryExtractor(
-        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap )
-    {
-        return CollectionSchemeManager::decoderDictionaryExtractor( decoderDictionaryMap );
-    }
-    void
-    decoderDictionaryUpdater(
-        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap )
-    {
-        return CollectionSchemeManager::decoderDictionaryUpdater( decoderDictionaryMap );
-    }
-    const std::priority_queue<TimeData, std::vector<TimeData>, std::greater<TimeData>> &
-    getTimeLine()
-    {
-        return CollectionSchemeManager::mTimeLine;
-    }
-    void
-    setDecoderManifest( IDecoderManifestPtr dm )
-    {
-        CollectionSchemeManager::mDecoderManifest = dm;
-    }
-    void
-    setCollectionSchemeList( ICollectionSchemeListPtr pl )
-    {
-        CollectionSchemeManager::mCollectionSchemeList = pl;
-    }
-    void
-    setCollectionSchemePersistency( std::shared_ptr<CacheAndPersist> pp )
-    {
-        CollectionSchemeManager::mSchemaPersistency = pp;
-    }
-    void
-    inspectionMatrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix )
-    {
-        CollectionSchemeManager::inspectionMatrixExtractor( inspectionMatrix );
-    }
-
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-    void
-    updateRawDataBufferConfig(
-        std::shared_ptr<Aws::IoTFleetWise::ComplexDataDecoderDictionary> complexDataDecoderDictionary )
-    {
-        CollectionSchemeManager::updateRawDataBufferConfig( complexDataDecoderDictionary );
-    }
-#endif
-
-    void
-    inspectionMatrixUpdater( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
-    {
-        CollectionSchemeManager::inspectionMatrixUpdater( inspectionMatrix );
-    }
-    bool
-    retrieve( DataType retrieveType )
-    {
-        return CollectionSchemeManager::retrieve( retrieveType );
-    }
-
-    void
-    store( DataType storeType )
-    {
-        CollectionSchemeManager::store( storeType );
-    }
-
-    void
-    setmCollectionSchemeAvailable( bool val )
-    {
-        mCollectionSchemeAvailable = val;
-    }
-    bool
-    getmCollectionSchemeAvailable()
-    {
-        return mCollectionSchemeAvailable;
-    }
-
-    void
-    setmDecoderManifestAvailable( bool val )
-    {
-        mDecoderManifestAvailable = val;
-    }
-
-    bool
-    getmDecoderManifestAvailable()
-    {
-        return mDecoderManifestAvailable;
-    }
-
-    void
-    setmProcessCollectionScheme( bool val )
-    {
-        mProcessCollectionScheme = val;
-    }
-
-    bool
-    getmProcessCollectionScheme()
-    {
-        return mProcessCollectionScheme;
-    }
-
-    void
-    setmProcessDecoderManifest( bool val )
-    {
-        mProcessDecoderManifest = val;
-    }
-    bool
-    getmProcessDecoderManifest()
-    {
-        return mProcessDecoderManifest;
-    }
-
-public:
-    IDecoderManifestPtr mDmTest;
-    std::shared_ptr<ICollectionSchemeListTest> mPlTest;
-
-protected:
+    CollectionInspectionEngine mEngine;
+    // This flag is used for testing whether the listener received the Inspection Matrix update
+    bool mInspectionMatrixUpdateFlag;
 };
 
 } // namespace IoTFleetWise

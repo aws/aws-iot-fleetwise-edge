@@ -25,7 +25,7 @@ public:
     ThreadSafeListeners() = default;
     virtual ~ThreadSafeListeners()
     {
-        MutexLock lock( mMutex );
+        std::lock_guard<std::mutex> lock( mMutex );
         mContainer.clear();
     }
     ThreadSafeListeners( const ThreadSafeListeners & ) = delete;
@@ -40,7 +40,7 @@ public:
     void
     subscribe( T callback )
     {
-        MutexLock lock( mMutex );
+        std::lock_guard<std::mutex> lock( mMutex );
 
         CallbackContainer &container = getContainer();
         container.emplace_back( callback );
@@ -54,7 +54,7 @@ public:
     void
     notify( Args... args ) const
     {
-        MutexLock lock( mMutex );
+        std::lock_guard<std::mutex> lock( mMutex );
 
         ContainerInvocationState state( this );
 
@@ -67,8 +67,6 @@ public:
 private:
     // Container to store the list of listeners to this thread
     using CallbackContainer = std::vector<T>;
-    // Mutex to protect the storage from concurrent reads and writes
-    using MutexLock = std::lock_guard<std::mutex>;
     // Container for all listeners registered.
     mutable CallbackContainer mContainer;
     // Temporary container used during modification via subscribe/unsubscribe

@@ -37,6 +37,7 @@ jobs:
         with:
           build-arch: "native"
           upload-arch: "amd64"
+          extra-options: "--with-greengrassv2-support"
           dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/x86_64-linux-gnu
           dist-files: build/aws-iot-fleetwise-edge:.
@@ -49,6 +50,7 @@ jobs:
         with:
           build-arch: "cross-arm64"
           upload-arch: "arm64"
+          extra-options: "--with-greengrassv2-support"
           dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/aarch64-linux-gnu:/usr/local/x86_64-linux-gnu
           dist-files: build/aws-iot-fleetwise-edge:.
@@ -61,7 +63,7 @@ jobs:
         with:
           build-arch: "cross-armhf"
           upload-arch: "armhf"
-          extra-options: "--with-iwave-gps-support"
+          extra-options: "--with-greengrassv2-support --with-iwave-gps-support"
           dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/arm-linux-gnueabihf:/usr/local/x86_64-linux-gnu
           dist-files: build/aws-iot-fleetwise-edge:.
@@ -74,7 +76,7 @@ jobs:
         with:
           build-arch: "native"
           upload-arch: "amd64"
-          extra-options: "--with-ros2-support"
+          extra-options: "--with-greengrassv2-support --with-ros2-support"
           dist-name: "aws-iot-fleetwise-edge-ros2"
           cache-paths: /usr/local/x86_64-linux-gnu:/opt/ros
           dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
@@ -87,7 +89,7 @@ jobs:
         with:
           build-arch: "cross-arm64"
           upload-arch: "arm64"
-          extra-options: "--with-ros2-support"
+          extra-options: "--with-greengrassv2-support --with-ros2-support"
           dist-name: "aws-iot-fleetwise-edge-ros2"
           cache-paths: /usr/local/aarch64-linux-gnu:/usr/local/x86_64-linux-gnu:/opt/ros
           dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
@@ -100,7 +102,7 @@ jobs:
         with:
           build-arch: "cross-armhf"
           upload-arch: "armhf"
-          extra-options: "--with-ros2-support"
+          extra-options: "--with-greengrassv2-support --with-ros2-support"
           dist-name: "aws-iot-fleetwise-edge-ros2"
           cache-paths: /usr/local/arm-linux-gnueabihf:/usr/local/x86_64-linux-gnu:/opt/ros
           dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.

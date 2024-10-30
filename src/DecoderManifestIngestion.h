@@ -9,6 +9,7 @@
 #include "SignalTypes.h"
 #include "VehicleDataSourceTypes.h"
 #include "decoder_manifest.pb.h"
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -52,7 +53,7 @@ public:
 
     bool build() override;
 
-    std::string getID() const override;
+    SyncID getID() const override;
 
     const CANMessageFormat &getCANMessageFormat( CANRawFrameID canID, InterfaceID interfaceID ) const override;
 
@@ -82,8 +83,8 @@ public:
         if ( mSignalIDToTypeMap.find( signalID ) == mSignalIDToTypeMap.end() )
         {
             FWE_LOG_WARN( "Signal Type not found for requested SignalID:" + std::to_string( signalID ) +
-                          ", using type as double" );
-            return SignalType::DOUBLE;
+                          ", using type as unknown" );
+            return SignalType::UNKNOWN;
         }
         return mSignalIDToTypeMap.at( signalID );
     }
@@ -143,6 +144,7 @@ private:
      * that can be looked up again in this map.
      */
     std::unordered_map<ComplexDataTypeId, ComplexDataElement> mComplexTypeMap;
+#endif
 
     /**
      * @brief In the protobuf a different enum if used to represent the different types like uint8, uint16 etc.
@@ -150,8 +152,8 @@ private:
      *
      * @return the type C++ enum used by the DecoderDictionary
      */
-    static SignalType convertPrimitiveTypeToSignalType( Schemas::DecoderManifestMsg::PrimitiveType primitiveType );
-#endif
+    static boost::optional<SignalType> convertPrimitiveTypeToSignalType(
+        Schemas::DecoderManifestMsg::PrimitiveType primitiveType );
 };
 
 } // namespace IoTFleetWise

@@ -139,25 +139,36 @@ collect data from it.
 
    The above command installs the following PIP packages: `wrapt plotly pandas cantools pyarrow`
 
-1. If you are using the AWS CLI with a version lower than v2.11.24, update the CLI by running:
+1. Run the following command to generate 'node' and 'decoder' JSON files from the input DBC file:
 
    ```bash
-   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
-   && unzip -q awscliv2.zip \
-   && sudo ./aws/install --update \
-   && rm -rf ./aws*
+   python3 dbc-to-nodes.py hscan.dbc can-nodes.json \
+   && python3 dbc-to-decoders.py hscan.dbc can-decoders.json
    ```
 
 1. Run the demo script:
 
    ```bash
-   ./demo.sh --vehicle-name fwdemo
+   ./demo.sh \
+      --vehicle-name fwdemo \
+      --node-file can-nodes.json \
+      --decoder-file can-decoders.json \
+      --network-interface-file network-interface-can.json \
+      --campaign-file campaign-brake-event.json
    ```
 
-   - (Optional) To enable S3 upload, append the option `--enable-s3-upload`
+   - (Optional) To enable S3 upload, append the option `--data-destination S3`. By default the
+     upload format will be JSON. You can change this to Parquet format for S3 by passing
+     `--s3-format PARQUET`.
 
      ```bash
-     ./demo.sh --vehicle-name fwdemo --enable-s3-upload
+     ./demo.sh \
+        --vehicle-name fwdemo \
+        --node-file can-nodes.json \
+        --decoder-file can-decoders.json \
+        --network-interface-file network-interface-can.json \
+        --campaign-file campaign-brake-event.json \
+        --data-destination S3
      ```
 
    - (Optional) If you selected a `FleetSize` of greater than one above, append the option
@@ -171,7 +182,14 @@ collect data from it.
      `myfwdemo`, you must pass those values when calling `demo.sh`:
 
      ```bash
-     ./demo.sh --vehicle-name myfwdemo --fleet-size 2 --region eu-central-1
+     ./demo.sh \
+        --vehicle-name myfwdemo \
+        --node-file can-nodes.json \
+        --decoder-file can-decoders.json \
+        --network-interface-file network-interface-can.json \
+        --campaign-file campaign-brake-event.json \
+        --fleet-size 2 \
+        --region eu-central-1
      ```
 
    The demo script:
@@ -179,14 +197,11 @@ collect data from it.
    1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
    1. Creates an Amazon Timestream database and table.
    1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
-   1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and
-      secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list.
-   1. Creates a model manifest that references the signal catalog with all of the OBD and DBC
-      signals.
+   1. Creates a signal catalog based on `can-nodes.json`.
+   1. Creates a model manifest that references the signal catalog with all of the CAN signals.
    1. Activates the model manifest.
-   1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for decoding
-      OBD signals from the network interfaces defined in `network-interfaces.json`.
-   1. Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest.
+   1. Creates a decoder manifest linked to the model manifest using `can-decoders.json` for decoding
+      signals from the network interfaces defined in `network-interfaces-can.json`.
    1. Updates the decoder manifest to set the status as `ACTIVE`.
    1. Creates a vehicle with a name equal to `fwdemo` which is the same as the name given to the
       CloudFormation Stack name in the previous section.
@@ -205,8 +220,8 @@ collect data from it.
 
    1. Create an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
       bucket.
-   1. Creates 2 additional campaigns from `campaign-brake-event.json`. One campaign will upload data
-      to to S3 in JSON format, one to S3 in parquet format.
+   1. Creates an additional campaign from `campaign-brake-event.json` to upload the data to S3 in
+      JSON format, or Parquet format if the `--s3-format PARQUET` option is passed.
    1. Wait 20 minutes for the data to propagate to S3 and then download it.
    1. Save the data to an HTML file.
 
@@ -418,31 +433,42 @@ collect data from it.
    The above command installs the following Ubuntu packages: `python3 python3-pip`. It then installs
    the following PIP packages: `wrapt plotly pandas cantools pyarrow`
 
-1. If you are using the AWS CLI with a version lower than v2.11.24, update the CLI by running:
-
-   ```bash
-   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
-   && unzip -q awscliv2.zip \
-   && sudo ./aws/install --update \
-   && rm -rf ./aws*
-   ```
-
 1. Run the following to explore the AWS IoT FleetWise CLI:
 
    ```bash
    aws iotfleetwise help
    ```
 
+1. Run the following command to generate 'node' and 'decoder' JSON files from the input DBC file.
+
+   ```bash
+   python3 dbc-to-nodes.py hscan.dbc can-nodes.json \
+   && python3 dbc-to-decoders.py hscan.dbc can-decoders.json
+   ```
+
 1. Run the demo script:
 
    ```bash
-   ./demo.sh --vehicle-name fwdemo-ec2
+   ./demo.sh \
+      --vehicle-name fwdemo-ec2 \
+      --node-file can-nodes.json \
+      --decoder-file can-decoders.json \
+      --network-interface-file network-interface-can.json \
+      --campaign-file campaign-brake-event.json
    ```
 
-   - (Optional) To enable S3 upload, append the option `--enable-s3-upload`
+   - (Optional) To enable S3 upload, append the option `--data-destination S3`. By default the
+     upload format will be JSON. You can change this to Parquet format by passing
+     `--s3-format PARQUET`.
 
      ```bash
-     ./demo.sh --vehicle-name fwdemo-ec2 --enable-s3-upload
+     ./demo.sh \
+        --vehicle-name fwdemo-ec2 \
+        --node-file can-nodes.json \
+        --decoder-file can-decoders.json \
+        --network-interface-file network-interface-can.json \
+        --campaign-file campaign-brake-event.json \
+        --data-destination S3
      ```
 
    - (Optional) If you changed the `--region` option to `provision.sh` above, append the option
@@ -451,7 +477,13 @@ collect data from it.
      in the demo.sh file.
 
      ```bash
-     ./demo.sh --vehicle-name fwdemo-ec2 --region eu-central-1
+     ./demo.sh \
+        --vehicle-name fwdemo-ec2 \
+        --node-file can-nodes.json \
+        --decoder-file can-decoders.json \
+        --network-interface-file network-interface-can.json \
+        --campaign-file campaign-brake-event.json \
+        --region eu-central-1
      ```
 
    The demo script:
@@ -459,14 +491,11 @@ collect data from it.
    1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
    1. Creates an Amazon Timestream database and table.
    1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
-   1. Creates a signal catalog, firstly based on `obd-nodes.json` to add standard OBD signals, and
-      secondly based on the DBC file `hscan.dbc` to add CAN signals in a flat signal list.
-   1. Creates a model manifest that references the signal catalog with all of the OBD and DBC
-      signals.
+   1. Creates a signal catalog based on `can-nodes.json`.
+   1. Creates a model manifest that references the signal catalog with all of the CAN signals.
    1. Activates the model manifest.
-   1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for decoding
-      OBD signals from the network interfaces defined in `network-interfaces.json`.
-   1. Imports the CAN signal decoding information from `hscan.dbc` to the decoder manifest.
+   1. Creates a decoder manifest linked to the model manifest using `can-decoders.json` for decoding
+      signals from the network interfaces defined in `network-interfaces-can.json`.
    1. Updates the decoder manifest to set the status as `ACTIVE`.
    1. Creates a vehicle with a name equal to `fwdemo-ec2`, the same as the name passed to
       `provision.sh`.
@@ -485,8 +514,8 @@ collect data from it.
 
    1. Create an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
       bucket.
-   1. Creates 2 additional campaigns from `campaign-brake-event.json`. One campaign will upload data
-      to to S3 in JSON format, one to S3 in parquet format.
+   1. Creates an additional campaign from `campaign-brake-event.json` to upload the data to S3 in
+      JSON format, or Parquet format if the `--s3-format PARQUET` option is passed.
    1. Wait 20 minutes for the data to propagate to S3 and then download it.
    1. Save the data to an HTML file.
 
@@ -512,14 +541,12 @@ collect data from it.
    data from the vehicle. Repeat the process above to view the collected data.
 
    ```bash
-   ./demo.sh --vehicle-name fwdemo-ec2 --campaign-file campaign-obd-heartbeat.json
-   ```
-
-   Similarly, if you chose to deploy the 'heartbeat' campaign that collects OBD data from an AWS IoT
-   thing created in in Europe (Frankfurt), you must configure `--region`:
-
-   ```bash
-   ./demo.sh --vehicle-name fwdemo-ec2 --campaign-file campaign-obd-heartbeat.json --region eu-central-1
+   ./demo.sh \
+      --vehicle-name fwdemo-ec2 \
+      --node-file obd-nodes.json \
+      --decoder-file obd-decoders.json \
+      --network-interface-file network-interface-obd.json \
+      --campaign-file campaign-obd-heartbeat.json
    ```
 
 1. Run the following _on the development machine_ to import your custom DBC file. You also have to
@@ -527,14 +554,14 @@ collect data from it.
    have to test data collection with the real vehicle or custom simulator.
 
    ```bash
-   ./demo.sh --vehicle-name fwdemo-ec2 --dbc-file <DBC_FILE> --campaign-file <CAMPAIGN_FILE>
-   ```
-
-   Similarly, if you chose to deploy the 'heartbeat' campaign that collects OBD data from an AWS IoT
-   thing created in in Europe (Frankfurt), you must configure `--region`:
-
-   ```bash
-   ./demo.sh --vehicle-name fwdemo-ec2 --dbc-file <DBC_FILE> --campaign-file <CAMPAIGN_FILE> --region eu-central-1
+   python3 dbc-to-nodes.py <DBC_FILE> can-nodes.json \
+   && python3 dbc-to-decoders.py <DBC_FILE> can-decoders.json \
+   && ./demo.sh \
+      --vehicle-name fwdemo-ec2 \
+      --node-file can-nodes.json \
+      --decoder-file can-decoders.json \
+      --network-interface-file network-interface-can.json \
+      --campaign-file <CAMPAIGN_FILE>
    ```
 
 ### Clean up
@@ -720,7 +747,7 @@ The code base of the Reference Implementation consists of C++ modules that imple
 functionalities of the layers described above. All these modules are compiled into a POSIX user
 space application running a single process.
 
-**BSP Modules**
+#### BSP Modules
 
 ```
 CacheAndPersist
@@ -744,7 +771,7 @@ These modules include a set of APIs and utility functions that the rest of the s
 
 These modules are used uniformly by all the other modules in the application.
 
-**Vehicle Network / Middleware Management Modules**
+#### Vehicle Network / Middleware Management Modules
 
 ```
 ISOTPOverCANReceiver
@@ -766,11 +793,10 @@ CAN Frames. These modules abstract away all the Socket and Linux networking deta
 the system, and expose only a circular buffer for each network interface configured, exposing the
 raw CAN Frames to be consumed by the Data Inspection Modules.
 
-**Data Management Modules**
+#### Data Management Modules
 
 ```
 CANDecoder
-CheckinAndPersistency
 CollectionSchemeIngestion
 CollectionSchemeIngestionList
 CollectionSchemeManager
@@ -781,6 +807,7 @@ DecoderDictionaryExtractor
 DecoderManifestIngestion
 InspectionMatrixExtractor
 OBDDataDecoder
+Persistency
 RawDataManager
 Schema
 ```
@@ -808,7 +835,7 @@ module will attempt to send the data to the cloud. The `CacheAndPersist` module 
 disk space is not exhausted, so this module just invokes the persistency module when it wants to
 read or write data to disk.
 
-**Data Inspection Modules**
+#### Data Inspection Modules
 
 ```
 CANDataConsumer
@@ -836,14 +863,16 @@ Upon fulfillment of one or more trigger conditions, these modules extract from t
 buffer a data snapshot that's shared with the offboard connectivity modules for further processing.
 Again here a circular buffer is used as a transport mechanism of the data.
 
-**Offboard Connectivity Modules**
+#### Offboard Connectivity Modules
 
 ```
 AwsBootstrap
-AwsGGChannel
-AwsGGConnectivityModule
-AwsIotChannel
+AwsGreengrassV2ConnectivityModule
+AwsGreengrassV2Receiver
+AwsGreengrassV2Sender
 AwsIotConnectivityModule
+AwsIotReceiver
+AwsIotSender
 AwsSDKMemoryManager
 Credentials
 PayloadManager
@@ -865,7 +894,20 @@ eventual updates. On the subscribe side, these modules notifies the rest of the 
 arrival of an update of either the Scheme or the decoder manifests, which are enacted accordant in
 near real time.
 
-**Execution Management Module**
+Some MQTT connection parameters can be configured in the config file (refer to
+[Configuration](#configuration)). In general, FWE adopts the same defaults as the AWS SDK:
+
+1. Keep alive interval default is `1200` seconds. Set `keepAliveIntervalSeconds` to override it.
+1. Ping timeout default is `30000` ms. Set `pingTimeoutMs` to override it.
+1. Persistent sessions are disabled by default. Set `sessionExpiryIntervalSeconds` to a non-zero
+   value to enable it.
+
+Note that `keepAliveIntervalSeconds` and `pingTimeoutMs` influence how a disconnection is detected.
+In case the network is down, you can expect the MQTT client to take at least the keep alive interval
+plus the ping timeout to detect the interruption. For example, if you set `keepAliveIntervalSeconds`
+to `60` and `pingTimeoutMs` to `3000`, it could take up to `63` seconds for the client to detect it.
+
+#### Execution Management Module
 
 ```
 IoTFleetWiseEngine
@@ -1078,6 +1120,9 @@ described below in the configuration section. Each log entry includes the follow
 |                             | rootCA                                      | The path to the root CA certificate file (optional, either `rootCAFilename` or `rootCA` can be provided)                                                                                                                                                                                                                                                                        | string   |
 |                             | metricsUploadTopic                          | Topic used to upload application metrics in plain json. Only used if `remoteProfilerDefaultValues` section is configured                                                                                                                                                                                                                                                        | string   |
 |                             | loggingUploadTopic                          | Topic used to upload log messages in plain json. Only used if `remoteProfilerDefaultValues` section is configured                                                                                                                                                                                                                                                               | string   |
+|                             | keepAliveIntervalSeconds                    | Only valid for 'iotCore' connection. The maximum time interval, in seconds, that is permitted to elapse between the point at which the client finishes transmitting one MQTT packet and the point it starts sending the next. Please note that the actual value is negotiated with the server and might be larger than the one configured.                                      | string   |
+|                             | pingTimeoutMs                               | Only valid for 'iotCore' connection. Time interval to wait after sending a PINGREQ for a PINGRESP to arrive. If one does not arrive, the client will close the current connection.                                                                                                                                                                                              | string   |
+|                             | sessionExpiryIntervalSeconds                | Only valid for 'iotCore' connection. The duration of persistent sessions. If omitted or set to 0, persistent sessions will be disabled.                                                                                                                                                                                                                                         | string   |
 | remoteProfilerDefaultValues | loggingUploadLevelThreshold                 | Only log messages with this or higher severity will be uploaded                                                                                                                                                                                                                                                                                                                 | integer  |
 |                             | metricsUploadIntervalMs                     | The interval in milliseconds to wait for uploading new values of all metrics                                                                                                                                                                                                                                                                                                    | integer  |
 |                             | loggingUploadMaxWaitBeforeUploadMs          | The maximum time in milliseconds to cache log messages before uploading them                                                                                                                                                                                                                                                                                                    | string   |

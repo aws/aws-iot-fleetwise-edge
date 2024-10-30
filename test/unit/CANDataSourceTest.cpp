@@ -7,6 +7,7 @@
 #include "CollectionInspectionAPITypes.h"
 #include "IDecoderDictionary.h"
 #include "MessageTypes.h"
+#include "QueueTypes.h"
 #include "SignalTypes.h"
 #include "VehicleDataSourceTypes.h"
 #include "WaitUntil.h"
@@ -141,7 +142,7 @@ protected:
         mSocketFD = setup();
         if ( mSocketFD == -1 )
         {
-            GTEST_SKIP() << "Skipping test fixture due to unavailability of socket";
+            GTEST_FAIL() << "Test failed due to unavailability of socket";
         }
         std::unordered_map<CANRawFrameID, CANMessageDecoderMethod> frameMap;
         CANMessageDecoderMethod decoderMethod;
@@ -158,6 +159,7 @@ protected:
         sigFormat1.mSizeInBits = 30;
         sigFormat1.mOffset = 0.0;
         sigFormat1.mFactor = 1.0;
+        sigFormat1.mSignalType = SignalType::DOUBLE;
 
         CANSignalFormat sigFormat2;
         sigFormat2.mSignalID = 7;
@@ -167,6 +169,7 @@ protected:
         sigFormat2.mSizeInBits = 31;
         sigFormat2.mOffset = 0.0;
         sigFormat2.mFactor = 1.0;
+        sigFormat2.mSignalType = SignalType::DOUBLE;
 
         decoderMethod.format.mSignals.push_back( sigFormat1 );
         decoderMethod.format.mSignals.push_back( sigFormat2 );
@@ -189,9 +192,10 @@ protected:
 
 TEST_F( CANDataSourceTest, invalidInit )
 {
-    auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
-
-    CANDataConsumer consumer{ signalBufferPtr };
+    auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+    CANDataConsumer consumer{ signalBufferDistributor };
     CANDataSource dataSource{
         INVALID_CAN_SOURCE_NUMERIC_ID, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_FALSE( dataSource.init() );
@@ -200,29 +204,33 @@ TEST_F( CANDataSourceTest, invalidInit )
 TEST_F( CANDataSourceTest, testNoDecoderDictionary )
 {
     ASSERT_TRUE( mSocketFD != -1 );
-    auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
-
-    CANDataConsumer consumer{ signalBufferPtr };
+    auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+    CANDataConsumer consumer{ signalBufferDistributor };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
     CollectedDataFrame collectedDataFrame;
-    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
+    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBuffer->pop( collectedDataFrame ) );
     // No disconnect to test destructor disconnect
 }
 
 TEST_F( CANDataSourceTest, testValidDecoderDictionary )
 {
     ASSERT_TRUE( mSocketFD != -1 );
-    auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
+    auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
 
-    CANDataConsumer consumer{ signalBufferPtr };
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+
+    CANDataConsumer consumer{ signalBufferDistributor };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     CollectedDataFrame collectedDataFrame;
-    WAIT_ASSERT_TRUE( sendTestMessage( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
+    WAIT_ASSERT_TRUE( sendTestMessage( mSocketFD ) && signalBuffer->pop( collectedDataFrame ) );
     auto signal = collectedDataFrame.mCollectedSignals[0];
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_EQ( signal.signalID, 1 );
@@ -241,14 +249,14 @@ TEST_F( CANDataSourceTest, testValidDecoderDictionary )
     }
 
     // Test message a different message ID is not received
-    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD, 0x456 ) && signalBufferPtr->pop( collectedDataFrame ) );
+    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD, 0x456 ) && signalBuffer->pop( collectedDataFrame ) );
 
     // Test invalidation of decoder dictionary
     dataSource.onChangeOfActiveDictionary( nullptr, VehicleDataSourceProtocol::RAW_SOCKET );
-    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
+    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBuffer->pop( collectedDataFrame ) );
     // Check it ignores dictionaries for other protocols
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::OBD );
-    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
+    DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBuffer->pop( collectedDataFrame ) );
     ASSERT_TRUE( dataSource.disconnect() );
 }
 
@@ -257,15 +265,18 @@ TEST_F( CANDataSourceTest, testCanFDSocketMode )
     cleanUp( mSocketFD );
     mSocketFD = setup( true );
     ASSERT_TRUE( mSocketFD != -1 );
-    auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
+    auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
 
-    CANDataConsumer consumer{ signalBufferPtr };
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+
+    CANDataConsumer consumer{ signalBufferDistributor };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_SOFTWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     CollectedDataFrame collectedDataFrame;
-    WAIT_ASSERT_TRUE( sendTestFDMessage( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
+    WAIT_ASSERT_TRUE( sendTestFDMessage( mSocketFD ) && signalBuffer->pop( collectedDataFrame ) );
     auto signal = collectedDataFrame.mCollectedSignals[0];
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_EQ( signal.signalID, 1 );
@@ -288,15 +299,18 @@ TEST_F( CANDataSourceTest, testCanFDSocketMode )
 TEST_F( CANDataSourceTest, testExtractExtendedID )
 {
     ASSERT_TRUE( mSocketFD != -1 );
-    auto signalBufferPtr = std::make_shared<SignalBuffer>( 10 );
+    auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
 
-    CANDataConsumer consumer{ signalBufferPtr };
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+
+    CANDataConsumer consumer{ signalBufferDistributor };
     CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
     ASSERT_TRUE( dataSource.init() );
     ASSERT_TRUE( dataSource.isAlive() );
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     CollectedDataFrame collectedDataFrame;
-    WAIT_ASSERT_TRUE( sendTestMessageExtendedID( mSocketFD ) && signalBufferPtr->pop( collectedDataFrame ) );
+    WAIT_ASSERT_TRUE( sendTestMessageExtendedID( mSocketFD ) && signalBuffer->pop( collectedDataFrame ) );
     auto signal = collectedDataFrame.mCollectedSignals[0];
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_EQ( signal.signalID, 1 );

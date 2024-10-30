@@ -111,13 +111,18 @@ CollectionSchemeIngestionList::build()
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     // Reset partial signal id counter
     CollectionSchemeIngestion::mPartialSignalCounter = 0;
+    auto partialSignalIDLookup = std::make_shared<CollectionSchemeIngestion::PartialSignalIDLookup>();
 #endif
 
     // Iterate through all the collectionSchemes in the collectionScheme list, make a shared pointer of them
     for ( int i = 0; i < mCollectionSchemeListMsg.collection_schemes_size(); i++ )
     {
         // Create a CollectionSchemeIngestion Pointer, or pICPPtr.
-        auto pICPPtr = std::make_shared<CollectionSchemeIngestion>();
+        auto pICPPtr = std::make_shared<CollectionSchemeIngestion>(
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+            partialSignalIDLookup
+#endif
+        );
 
         // Stuff the pointer with the collectionScheme proto message data
         pICPPtr->copyData( std::make_shared<Schemas::CollectionSchemesMsg::CollectionScheme>(

@@ -5,12 +5,13 @@
 #include "CollectionInspectionAPITypes.h"
 #include "LoggingModule.h"
 #include <google/protobuf/message.h>
+#include <string>
+#include <vector>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include "MessageTypes.h"
 #include <unordered_map>
 #include <utility>
-#include <vector>
 #endif
 
 namespace Aws
@@ -26,6 +27,26 @@ CollectionSchemeIngestion::~CollectionSchemeIngestion()
 {
     /* Delete all global objects allocated by libprotobuf. */
     google::protobuf::ShutdownProtobufLibrary();
+}
+
+bool
+CollectionSchemeIngestion::operator==( const ICollectionScheme &other ) const
+{
+    bool isEqual = isReady() && other.isReady() && ( getCollectionSchemeID() == other.getCollectionSchemeID() );
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    // For Vision System Data, comparing just the ID isn't enough, because even though schemes with the same ID
+    // should be identical from the perspective of the Cloud, FWE generates some additional data internally which can
+    // change when it ingests a new message.
+    isEqual =
+        isEqual && ( getPartialSignalIdToSignalPathLookupTable() == other.getPartialSignalIdToSignalPathLookupTable() );
+#endif
+    return isEqual;
+}
+
+bool
+CollectionSchemeIngestion::operator!=( const ICollectionScheme &other ) const
+{
+    return !( *this == other );
 }
 
 bool
@@ -129,12 +150,13 @@ CollectionSchemeIngestion::build()
         FWE_LOG_INFO( "CollectionScheme is Condition Based. Building AST with " + std::to_string( numNodes ) +
                       " nodes" );
 
-        mExpressionNodes.resize( numNodes );
+        mExpressionNodes.reserve( numNodes );
 
         // As pointers to elements inside the vector are used after this no realloc for mExpressionNodes is allowed
         std::size_t currentIndex = 0; // start at index 0 of mExpressionNodes for first node
         mExpressionNode =
             serializeNode( mProtoCollectionSchemeMessagePtr->condition_based_collection_scheme().condition_tree(),
+                           mExpressionNodes,
                            currentIndex,
                            MAX_EQUATION_DEPTH );
         FWE_LOG_INFO( "AST complete" );
@@ -192,7 +214,7 @@ CollectionSchemeIngestion::getOrInsertPartialSignalId( SignalID signalId,
 {
 
     // Search if path already exists
-    for ( auto &partialSignal : mPartialSignalIDLookup )
+    for ( auto &partialSignal : *mPartialSignalIDLookup )
     {
         if ( partialSignal.second.first == signalId )
         {
@@ -226,7 +248,7 @@ CollectionSchemeIngestion::getOrInsertPartialSignalId( SignalID signalId,
     // coverity[autosar_cpp14_m5_2_10_violation] For std::atomic this must be performed in a single statement
     PartialSignalID newPartialSignalId = mPartialSignalCounter++ | INTERNAL_SIGNAL_ID_BITMASK;
 
-    mPartialSignalIDLookup[newPartialSignalId] = std::pair<SignalID, SignalPath>( signalId, signal_path );
+    ( *mPartialSignalIDLookup )[newPartialSignalId] = std::pair<SignalID, SignalPath>( signalId, signal_path );
     return newPartialSignalId;
 }
 
@@ -238,7 +260,7 @@ CollectionSchemeIngestion::getPartialSignalIdToSignalPathLookupTable() const
     {
         return INVALID_PARTIAL_SIGNAL_ID_LOOKUP;
     }
-    return mPartialSignalIDLookup;
+    return *mPartialSignalIDLookup;
 }
 #endif
 
@@ -247,7 +269,7 @@ CollectionSchemeIngestion::getAllExpressionNodes() const
 {
     if ( !mReady )
     {
-        return INVALID_EXPRESSION_NODE;
+        return INVALID_EXPRESSION_NODES;
     }
 
     return mExpressionNodes;
@@ -278,7 +300,7 @@ CollectionSchemeIngestion::convertFunctionType(
         FWE_LOG_INFO( "Converting node to: PREV_LAST_FIXED_WINDOW_AVG" );
         return WindowFunction::PREV_LAST_FIXED_WINDOW_AVG;
     default:
-        FWE_LOG_ERROR( "Function node type not supported." );
+        FWE_LOG_ERROR( "WindowFunction node type not supported." );
         return WindowFunction::NONE;
     }
 }
@@ -357,6 +379,7 @@ CollectionSchemeIngestion::getNumberOfNodes( const Schemas::CommonTypesMsg::Cond
 
 ExpressionNode *
 CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::ConditionNode &node,
+                                          ExpressionNode_t &expressionNodes,
                                           std::size_t &nextIndex,
                                           int remainingDepth )
 {
@@ -364,15 +387,15 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
     {
         return nullptr;
     }
-    mExpressionNodes.emplace_back();
+    expressionNodes.emplace_back();
     ExpressionNode *currentNode = nullptr;
-    if ( mExpressionNodes.empty() || ( mExpressionNodes.size() <= nextIndex ) )
+    if ( expressionNodes.empty() || ( expressionNodes.size() <= nextIndex ) )
     {
         return nullptr;
     }
     else
     {
-        currentNode = &( mExpressionNodes[nextIndex] );
+        currentNode = &( expressionNodes[nextIndex] );
     }
     nextIndex++;
 
@@ -430,7 +453,7 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
             }
             currentNode->function.windowFunction =
                 convertFunctionType( node.node_function().window_function().window_type() );
-            currentNode->nodeType = ExpressionNodeType::WINDOWFUNCTION;
+            currentNode->nodeType = ExpressionNodeType::WINDOW_FUNCTION;
             FWE_LOG_TRACE( "Creating Window FUNCTION node for Signal ID:" + std::to_string( currentNode->signalID ) );
             return currentNode;
         }
@@ -446,14 +469,8 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
         {
             currentNode->nodeType = convertOperatorType( node.node_operator().operator_() );
             FWE_LOG_TRACE( "Processing left child" );
-            // If no valid function found return always false
-            if ( currentNode->nodeType == ExpressionNodeType::BOOLEAN )
-            {
-                FWE_LOG_INFO( "Setting BOOLEAN node to false" );
-                currentNode->booleanValue = false;
-                return currentNode;
-            }
-            ExpressionNode *left = serializeNode( node.node_operator().left_child(), nextIndex, remainingDepth - 1 );
+            ExpressionNode *left =
+                serializeNode( node.node_operator().left_child(), expressionNodes, nextIndex, remainingDepth - 1 );
             currentNode->left = left;
             // Not operator is unary and has only left child
             if ( ( currentNode->nodeType != ExpressionNodeType::OPERATOR_LOGICAL_NOT ) &&
@@ -461,7 +478,7 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
             {
                 FWE_LOG_TRACE( "Processing right child" );
                 ExpressionNode *right =
-                    serializeNode( node.node_operator().right_child(), nextIndex, remainingDepth - 1 );
+                    serializeNode( node.node_operator().right_child(), expressionNodes, nextIndex, remainingDepth - 1 );
                 currentNode->right = right;
             }
             else
@@ -469,8 +486,18 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
                 FWE_LOG_TRACE( "Setting right child to nullptr" );
                 currentNode->right = nullptr;
             }
-            return currentNode;
+
+            if ( ( currentNode->nodeType != ExpressionNodeType::BOOLEAN ) && ( currentNode->left != nullptr ) &&
+                 ( ( currentNode->nodeType == ExpressionNodeType::OPERATOR_LOGICAL_NOT ) ||
+                   ( currentNode->right != nullptr ) ) )
+            {
+                FWE_LOG_TRACE( "Creating Operator node" );
+
+                return currentNode;
+            }
         }
+
+        FWE_LOG_WARN( "Invalid Operator node" );
     }
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     else if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodePrimitiveTypeInSignal )
@@ -497,11 +524,11 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
 #endif
 
     // if not returned until here its an invalid node so remove it from buffer
-    mExpressionNodes.pop_back();
+    expressionNodes.pop_back();
     return nullptr;
 }
 
-const std::string &
+const SyncID &
 CollectionSchemeIngestion::getCollectionSchemeID() const
 {
     if ( !mReady )
@@ -512,7 +539,7 @@ CollectionSchemeIngestion::getCollectionSchemeID() const
     return mProtoCollectionSchemeMessagePtr->campaign_sync_id();
 }
 
-const std::string &
+const SyncID &
 CollectionSchemeIngestion::getDecoderManifestID() const
 {
     if ( !mReady )

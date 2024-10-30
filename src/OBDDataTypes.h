@@ -4,6 +4,7 @@
 #pragma once
 
 #include "EnumUtility.h"
+#include "SignalTypes.h"
 #include "TimeTypes.h"
 #include "VehicleDataSourceTypes.h"
 #include <array>
@@ -19,35 +20,6 @@ namespace Aws
 {
 namespace IoTFleetWise
 {
-
-union OBDValue {
-    double doubleVal;
-    uint64_t uint64Val;
-    int64_t int64Val;
-};
-
-struct OBDSignal
-{
-    OBDValue signalValue;
-    SignalType signalType;
-
-    template <typename T>
-    OBDSignal( T val, SignalType type )
-        : signalType( type )
-    {
-        switch ( signalType )
-        {
-        case SignalType::UINT64:
-            signalValue.uint64Val = static_cast<uint64_t>( val );
-            break;
-        case SignalType::INT64:
-            signalValue.int64Val = static_cast<int64_t>( val );
-            break;
-        default:
-            signalValue.doubleVal = static_cast<double>( val );
-        }
-    }
-};
 
 // List of OBD Service IDs/ Modes
 enum class SID : uint32_t
@@ -229,7 +201,7 @@ struct DTCInfo
 struct EmissionInfo
 {
     SID mSID;
-    std::map<uint32_t, OBDSignal> mPIDsToValues;
+    std::map<uint32_t, DecodedSignalValue> mPIDsToValues;
 };
 
 // Structure of a single PID OBD request.

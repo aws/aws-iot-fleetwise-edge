@@ -5,6 +5,7 @@
 #include "CollectionInspectionAPITypes.h"
 #include "IDecoderDictionary.h"
 #include "MessageTypes.h"
+#include "QueueTypes.h"
 #include "SignalTypes.h"
 #include "VehicleDataSourceTypes.h"
 #include "WaitUntil.h"
@@ -52,20 +53,22 @@ protected:
 // Test if valid gps data
 TEST_F( ExternalGpsSourceTest, testDecoding ) // NOLINT
 {
-    SignalBufferPtr signalBufferPtr = std::make_shared<SignalBuffer>( 100 );
-    ExternalGpsSource gpsSource( signalBufferPtr );
+    auto signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+    ExternalGpsSource gpsSource( signalBufferDistributor );
     ASSERT_FALSE( gpsSource.init( INVALID_CAN_SOURCE_NUMERIC_ID, 1, 0, 32 ) );
     ASSERT_TRUE( gpsSource.init( 1, 1, 0, 32 ) );
     gpsSource.start();
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
 
     CollectedDataFrame collectedDataFrame;
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    DELAY_ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
 
     gpsSource.setLocation( 360, 360 ); // Invalid
     gpsSource.setLocation( 52.5761, 12.5761 );
 
-    WAIT_ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+    WAIT_ASSERT_TRUE( signalBuffer->pop( collectedDataFrame ) );
 
     auto firstSignal = collectedDataFrame.mCollectedSignals[0];
     auto secondSignal = collectedDataFrame.mCollectedSignals[1];
@@ -77,7 +80,7 @@ TEST_F( ExternalGpsSourceTest, testDecoding ) // NOLINT
 
     ASSERT_TRUE( gpsSource.init( 1, 1, 123, 456 ) ); // Invalid start bits
     gpsSource.setLocation( 52.5761, 12.5761 );
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    DELAY_ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
 
     ASSERT_TRUE( gpsSource.stop() );
 }
@@ -85,17 +88,19 @@ TEST_F( ExternalGpsSourceTest, testDecoding ) // NOLINT
 // Test longitude west
 TEST_F( ExternalGpsSourceTest, testWestNegativeLongitude ) // NOLINT
 {
-    SignalBufferPtr signalBufferPtr = std::make_shared<SignalBuffer>( 100 );
-    ExternalGpsSource gpsSource( signalBufferPtr );
+    SignalBufferPtr signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
+    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    signalBufferDistributor->registerQueue( signalBuffer );
+    ExternalGpsSource gpsSource( signalBufferDistributor );
     gpsSource.init( 1, 1, 0, 32 );
     gpsSource.start();
     CollectedDataFrame collectedDataFrame;
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    DELAY_ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
     gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-    DELAY_ASSERT_FALSE( signalBufferPtr->pop( collectedDataFrame ) );
+    DELAY_ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
     gpsSource.setLocation( 52.5761, -12.5761 );
 
-    WAIT_ASSERT_TRUE( signalBufferPtr->pop( collectedDataFrame ) );
+    WAIT_ASSERT_TRUE( signalBuffer->pop( collectedDataFrame ) );
     auto firstSignal = collectedDataFrame.mCollectedSignals[0];
     auto secondSignal = collectedDataFrame.mCollectedSignals[1];
     ASSERT_EQ( firstSignal.signalID, 0x1234 );

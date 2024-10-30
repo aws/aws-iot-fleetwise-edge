@@ -35,7 +35,7 @@ using ::testing::SaveArgPointee;
 class CustomDataSourceTestImplementation : public CustomDataSource
 {
 public:
-    MOCK_METHOD( (void), pollData, () );
+    MOCK_METHOD( (void), pollData, (), ( override ) );
 
     void
     setPollInternalIntervalMs( uint32_t pollIntervalMs )

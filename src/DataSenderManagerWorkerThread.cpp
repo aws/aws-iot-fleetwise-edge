@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "DataSenderManagerWorkerThread.h"
+#include "DataSenderTypes.h"
 #include "LoggingModule.h"
-#include "OBDDataTypes.h"
-#include "SignalTypes.h"
-#include "TraceModule.h"
+#include "QueueTypes.h"
 #include <algorithm>
+#include <cstddef>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace Aws
 {
@@ -22,8 +21,8 @@ DataSenderManagerWorkerThread::DataSenderManagerWorkerThread(
     std::shared_ptr<IConnectivityModule> connectivityModule,
     std::shared_ptr<DataSenderManager> dataSenderManager,
     uint64_t persistencyUploadRetryIntervalMs,
-    std::shared_ptr<CollectedDataReadyToPublish> &collectedDataQueue )
-    : mCollectedDataQueue( collectedDataQueue )
+    std::vector<std::shared_ptr<DataSenderQueue>> dataToSendQueues )
+    : mDataToSendQueues( std::move( dataToSendQueues ) )
     , mPersistencyUploadRetryIntervalMs{ persistencyUploadRetryIntervalMs }
     , mDataSenderManager( std::move( dataSenderManager ) )
     , mConnectivityModule( std::move( connectivityModule ) )
@@ -85,16 +84,6 @@ DataSenderManagerWorkerThread::doWork( void *data )
         sender->mTimer.reset();
         uint64_t minTimeToWaitMs = UINT64_MAX;
 
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-        // Check if new collection scheme is available to update available senders
-        if ( sender->mUpdatedCollectionSchemeListAvailable )
-        {
-            std::lock_guard<std::mutex> lock( sender->mActiveCollectionSchemesMutex );
-            sender->mDataSenderManager->onChangeCollectionSchemeList( sender->mActiveCollectionSchemes );
-            sender->mUpdatedCollectionSchemeListAvailable = false;
-        }
-#endif
-
         if ( sender->mPersistencyUploadRetryIntervalMs > 0 )
         {
             uint64_t timeToWaitMs =
@@ -120,119 +109,14 @@ DataSenderManagerWorkerThread::doWork( void *data )
                            " ms" );
         }
 
-        // Dequeues the collected data queue and sends the data to cloud
-        auto consumeData = [&]( const TriggeredCollectionSchemeDataPtr &triggeredCollectionSchemeDataPtr ) {
-            // Only used for trace logging
-            std::string firstSignalValues = "[";
-            uint32_t signalPrintCounter = 0;
-            std::string firstSignalTimestamp;
-            for ( auto &s : triggeredCollectionSchemeDataPtr->signals )
-            {
-                if ( firstSignalTimestamp.empty() )
-                {
-                    firstSignalTimestamp = " first signal timestamp: " + std::to_string( s.receiveTime );
-                }
-                signalPrintCounter++;
-                if ( signalPrintCounter > MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG )
-                {
-                    firstSignalValues += " ...";
-                    break;
-                }
-                auto signalValue = s.getValue();
-                firstSignalValues += std::to_string( s.signalID ) + ":";
-                switch ( signalValue.getType() )
-                {
-                case SignalType::UINT8:
-                    firstSignalValues += std::to_string( signalValue.value.uint8Val ) + ",";
-                    break;
-                case SignalType::INT8:
-                    firstSignalValues += std::to_string( signalValue.value.int8Val ) + ",";
-                    break;
-                case SignalType::UINT16:
-                    firstSignalValues += std::to_string( signalValue.value.uint16Val ) + ",";
-                    break;
-                case SignalType::INT16:
-                    firstSignalValues += std::to_string( signalValue.value.int16Val ) + ",";
-                    break;
-                case SignalType::UINT32:
-                    firstSignalValues += std::to_string( signalValue.value.uint32Val ) + ",";
-                    break;
-                case SignalType::INT32:
-                    firstSignalValues += std::to_string( signalValue.value.int32Val ) + ",";
-                    break;
-                case SignalType::UINT64:
-                    firstSignalValues += std::to_string( signalValue.value.uint64Val ) + ",";
-                    break;
-                case SignalType::INT64:
-                    firstSignalValues += std::to_string( signalValue.value.int64Val ) + ",";
-                    break;
-                case SignalType::FLOAT:
-                    firstSignalValues += std::to_string( signalValue.value.floatVal ) + ",";
-                    break;
-                case SignalType::DOUBLE:
-                    firstSignalValues += std::to_string( signalValue.value.doubleVal ) + ",";
-                    break;
-                case SignalType::BOOLEAN:
-                    firstSignalValues += std::to_string( static_cast<int>( signalValue.value.boolVal ) ) + ",";
-                    break;
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                case SignalType::RAW_DATA_BUFFER_HANDLE:
-                    firstSignalValues += std::to_string( signalValue.value.uint32Val ) + ",";
-                    break;
-#endif
-                }
-            }
-            firstSignalValues += "]";
-            // Avoid invoking Data Collection Sender if there is nothing to send.
-            if ( triggeredCollectionSchemeDataPtr->signals.empty() &&
-                 triggeredCollectionSchemeDataPtr->canFrames.empty() &&
-                 triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.empty()
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                 && triggeredCollectionSchemeDataPtr->uploadedS3Objects.empty()
-#endif
-            )
-            {
-                FWE_LOG_INFO(
-                    "The trigger for Campaign:  " + triggeredCollectionSchemeDataPtr->metadata.collectionSchemeID +
-                    " activated eventID: " + std::to_string( triggeredCollectionSchemeDataPtr->eventID ) +
-                    " but no data is available to ingest" );
-            }
-            else
-            {
-                std::string message =
-                    "FWE data ready to send with eventID " +
-                    std::to_string( triggeredCollectionSchemeDataPtr->eventID ) + " from " +
-                    triggeredCollectionSchemeDataPtr->metadata.collectionSchemeID +
-                    " Signals:" + std::to_string( triggeredCollectionSchemeDataPtr->signals.size() ) + " " +
-                    firstSignalValues + firstSignalTimestamp +
-                    " trigger timestamp: " + std::to_string( triggeredCollectionSchemeDataPtr->triggerTime ) +
-                    " raw CAN frames:" + std::to_string( triggeredCollectionSchemeDataPtr->canFrames.size() ) +
-                    " DTCs:" + std::to_string( triggeredCollectionSchemeDataPtr->mDTCInfo.mDTCCodes.size() )
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                    + " Uploaded S3 Objects: " +
-                    std::to_string( triggeredCollectionSchemeDataPtr->uploadedS3Objects.size() )
-#endif
-                    ;
-                FWE_LOG_INFO( message );
-                sender->mDataSenderManager->processCollectedData(
-                    triggeredCollectionSchemeDataPtr
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                    ,
-                    [sender]( TriggeredCollectionSchemeDataPtr uploadedData ) {
-                        if ( !sender->mCollectedDataQueue->push( std::move( uploadedData ) ) )
-                        {
-                            FWE_LOG_WARN( "Collected data output buffer is full" );
-                            return;
-                        }
-                        sender->mWait.notify();
-                    }
-#endif
-                );
-            }
-        };
+        size_t consumedElements = 0;
+        for ( auto &queue : sender->mDataToSendQueues )
+        {
+            consumedElements += queue->consumeAll( [sender]( std::shared_ptr<const DataToSend> dataToSend ) {
+                sender->mDataSenderManager->processData( dataToSend );
+            } );
+        }
 
-        auto consumedElements = sender->mCollectedDataQueue->consumeAll( consumeData );
-        TraceModule::get().setVariable( TraceVariable::QUEUE_INSPECTION_TO_SENDER, consumedElements );
         if ( ( !uploadedPersistedDataOnce ) ||
              ( ( sender->mPersistencyUploadRetryIntervalMs > 0 ) &&
                ( static_cast<uint64_t>( sender->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) >=
@@ -247,19 +131,6 @@ DataSenderManagerWorkerThread::doWork( void *data )
         }
     }
 }
-
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-void
-DataSenderManagerWorkerThread::onChangeCollectionSchemeList(
-    const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes )
-{
-    std::lock_guard<std::mutex> lock( mActiveCollectionSchemesMutex );
-    mActiveCollectionSchemes = activeCollectionSchemes;
-    mUpdatedCollectionSchemeListAvailable = true;
-    FWE_LOG_TRACE( "New list of active collections schemes was handed over" );
-    mWait.notify();
-}
-#endif
 
 bool
 DataSenderManagerWorkerThread::isAlive()

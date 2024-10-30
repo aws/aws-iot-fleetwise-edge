@@ -92,8 +92,10 @@ if __name__ == "__main__":
                 if val is None:
                     val = get_val(row, "measure_value::bigint")
                 if val is None:
-                    val = get_val(row, "measure_value::boolean") != "false"
-                df.at[ts, signal_name] = float(val)
+                    val = get_val(row, "measure_value::boolean")
+                    if val is not None:
+                        val = 0 if val == "false" else 1
+                df.at[ts, signal_name] = val
         except Exception as e:
             raise Exception(str(e) + f" in {file.name}")
 

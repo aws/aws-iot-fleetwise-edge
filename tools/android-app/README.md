@@ -57,15 +57,6 @@ available [ELM327 Bluetooth OBD adapter](https://www.amazon.com/s?k=elm327+bluet
    aws s3 rm s3://<S3_BUCKET_NAME>/fwdemo-android-<TIMESTAMP>-creds.json
    ```
 
-1. In the cloud shell, run the following command to create an AWS IoT FleetWise campaign to collect
-   GPS and OBD PID data and send it to Amazon Timestream. After a short time you should see that the
-   status in the app is updated with:
-   `Campaign ARNs: arn:aws:iotfleetwise:us-east-1:XXXXXXXXXXXX:campaign/fwdemo-android-XXXXXXXXXX-campaign`.
-
-   ```bash
-   ./setup-iotfleetwise.sh
-   ```
-
 1. Plug in the ELM327 OBD Bluetooth adapter to your vehicle and switch on the ignition.
 
 1. Go to the Bluetooth menu of your phone, then pair the ELM327 Bluetooth adapter. Typically the the
@@ -76,20 +67,40 @@ available [ELM327 Bluetooth OBD adapter](https://www.amazon.com/s?k=elm327+bluet
 1. After a short time you should see that the status is updated with:
    `Bluetooth: Connected to ELM327 vX.X` and `Supported OBD PIDs: XX XX XX`.
 
-1. Go to the
-   [Amazon Timestream Query editor](https://us-east-1.console.aws.amazon.com/timestream/home?region=us-east-1#query-editor:)
-   and run the query suggested by the `setup-iotfleetwise.sh` script, which will be of the form:
-
-   ```
-   SELECT * FROM "IoTFleetWiseDB-<TIMESTAMP>"."VehicleDataTable" WHERE vehicleName='fwdemo-android-<TIMESTAMP>' ORDER BY time DESC LIMIT 1000
-   ```
-
-1. **Optional:** If you want to clean up the resources created by the `provision.sh` and
-   `setup-iotfleetwise.sh` scripts, run the following command. **Note:** this will not delete the
-   Amazon Timestream database.
+1. In the cloud shell, run the following command to create an AWS IoT FleetWise campaign to collect
+   GPS and OBD PID data and send it to Amazon Timestream. After a short time you should see that the
+   status in the app is updated with:
+   `Campaign ARNs: arn:aws:iotfleetwise:us-east-1:XXXXXXXXXXXX:campaign/fwdemo-android-XXXXXXXXXX-campaign`.
 
    ```bash
-   ./clean-up.sh
+   ../../cloud/demo.sh \
+      --vehicle-name `cat config/vehicle-name.txt` \
+      --node-file ../../cloud/obd-nodes.json \
+      --node-file externalGpsNodes.json\
+      --decoder-file ../../cloud/obd-decoders.json \
+        --decoder-file externalGpsDecoders.json \
+      --network-interface-file ../../cloud/network-interface-obd.json \
+        --network-interface-file network-interface-can-external-gps.json \
+      --campaign-file campaign-android-obd.json
+   ```
+
+1. Go to the
+   [Amazon Timestream Query editor](https://us-east-1.console.aws.amazon.com/timestream/home?region=us-east-1#query-editor:)
+   and run the query suggested by the demo script, which will be of the form:
+
+   ```
+   SELECT * FROM "IoTFleetWiseDB-<TIMESTAMP>"."VehicleDataTable" WHERE vehicleName='fwdemo-android-<TIMESTAMP>' AND time between ago(1m) and now() ORDER BY time ASC
+   ```
+
+1. **Optional:** If you want to clean up the resources created by the `provision.sh` and `demo.sh`
+   scripts, run the following command. **Note:** this will not delete the Amazon Timestream
+   database.
+
+   ```bash
+   ../../cloud/clean-up.sh \
+   && ../../provision.sh \
+      --vehicle-name `cat config/vehicle-name.txt` \
+      --only-clean-up
    ```
 
 ## Android Automotive User Guide
@@ -157,23 +168,35 @@ privileged VHAL properties. To demonstrate the app accessing privileged VHAL pro
    `Campaign ARNs: arn:aws:iotfleetwise:us-east-1:XXXXXXXXXXXX:campaign/fwdemo-android-XXXXXXXXXX-campaign`.
 
    ```bash
-   ./setup-iotfleetwise.sh
+   sudo -H ../../cloud/install-deps.sh \
+   && ../../cloud/demo.sh \
+      --vehicle-name `cat config/vehicle-name.txt` \
+      --node-file externalGpsNodes.json\
+      --node-file aaosVhalNodes.json \
+      --decoder-file externalGpsDecoders.json \
+      --decoder-file aaosVhalDecoders.json \
+      --network-interface-file network-interface-can-external-gps.json \
+      --network-interface-file network-interface-can-aaos-vhal.json \
+      --campaign-file campaign-android-aaos-vhal.json
    ```
 
 1. Go to the
    [Amazon Timestream Query editor](https://us-east-1.console.aws.amazon.com/timestream/home?region=us-east-1#query-editor:)
-   and run the query suggested by the `setup-iotfleetwise.sh` script, which will be of the form:
+   and run the query suggested by the script, which will be of the form:
 
    ```
-   SELECT * FROM "IoTFleetWiseDB-<TIMESTAMP>"."VehicleDataTable" WHERE vehicleName='fwdemo-android-<TIMESTAMP>' ORDER BY time DESC LIMIT 1000
+   SELECT * FROM "IoTFleetWiseDB-<TIMESTAMP>"."VehicleDataTable" WHERE vehicleName='fwdemo-android-<TIMESTAMP>' AND time between ago(1m) and now() ORDER BY time ASC
    ```
 
-1. **Optional:** If you want to clean up the resources created by the `provision.sh` and
-   `setup-iotfleetwise.sh` scripts, run the following command. **Note:** this will not delete the
-   Amazon Timestream database.
+1. **Optional:** If you want to clean up the resources created by the `provision.sh` and `demo.sh`
+   scripts, run the following command. **Note:** this will not delete the Amazon Timestream
+   database.
 
    ```bash
-   ./clean-up.sh
+   ../../cloud/clean-up.sh \
+   && ../../provision.sh \
+      --vehicle-name `cat config/vehicle-name.txt` \
+      --only-clean-up
    ```
 
 ## Android Developer Guide

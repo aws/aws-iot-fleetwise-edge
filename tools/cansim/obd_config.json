@@ -2,7 +2,6 @@
     "ecus": [
         {
             "name": "engine",
-            "rx_ids": ["0x7DF", "0x7E0"],
             "tx_id": "0x7E8",
             "zero_padding": true,
             "pids": {
@@ -37,7 +36,6 @@
         },
         {
             "name": "transmission",
-            "rx_ids": ["0x7DF", "0x7E1"],
             "tx_id": "0x7E9",
             "zero_padding": true,
             "pids": {

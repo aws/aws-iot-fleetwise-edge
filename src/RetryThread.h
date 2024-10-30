@@ -7,6 +7,7 @@
 #include "Thread.h"
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <mutex>
 
 namespace Aws
@@ -21,33 +22,31 @@ enum class RetryStatus
     ABORT
 };
 
-class IRetryable
-{
-public:
-    /**
-     * @brief This function will be called for every retry
-     * @return decides if the function can be retried later or succeeded or unrecoverable failed
-     */
-    virtual RetryStatus attempt() = 0;
-
-    /**
-     * @brief Is called after the retries stopped which means it succeeded or is aborted
-     * @param code signals how it finished: if it was aborted or succeeded. retry should be never observed here
-     */
-    virtual void onFinished( RetryStatus code ) = 0;
-    virtual ~IRetryable() = default;
-};
+/**
+ * @brief This function will be called for every retry
+ * @return decides if the function can be retried later or succeeded or unrecoverable failed
+ */
+using Retryable = std::function<RetryStatus()>;
 
 class RetryThread
 {
 public:
-    RetryThread( IRetryable &retryable, uint32_t startBackoffMs, uint32_t maxBackoffMs );
+    RetryThread( Retryable retryable, uint32_t startBackoffMs, uint32_t maxBackoffMs );
 
     /**
      * @brief start the thread
      * @return true if thread starting was successful
      */
     bool start();
+
+    /**
+     * @brief Restart the thread
+     *
+     * If the retryable is currently running, it won't be stopped, but the thread will run it again
+     * even if the retryable succeeds.
+     * The time to wait between retries is also reset.
+     */
+    void restart();
 
     /**
      * @brief stops the thread
@@ -83,13 +82,14 @@ private:
     static void doWork( void *data );
 
     static std::atomic<int> fInstanceCounter; // NOLINT Global atomic instance counter
-    IRetryable &fRetryable;
+    Retryable fRetryable;
     int fInstance;
     const uint32_t fStartBackoffMs;
     const uint32_t fMaxBackoffMs;
     uint32_t fCurrentWaitTime;
     Thread fThread;
     std::atomic<bool> fShouldStop;
+    std::atomic<bool> fRestart;
     std::mutex fThreadMutex;
     Signal fWait;
 };

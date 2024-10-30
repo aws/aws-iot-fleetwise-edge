@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "AwsIotConnectivityModule.h"
+#include "IConnectionTypes.h"
 #include "LoggingModule.h"
 #include "Thread.h"
 #include "TraceModule.h"
-#include <algorithm>
 #include <aws/crt/Api.h>
 #include <aws/crt/Optional.h>
 #include <aws/crt/Types.h>
@@ -21,31 +21,26 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-// Default MQTT Keep alive in seconds.
-// Defines how often an MQTT PING message is sent to the MQTT broker to keep the connection alive
-// Default set to 60 seconds. Every 60 seconds the stack will send an MQTT PING req.
-// The longer this interval is, the more the stack takes to detect the state of the TCP connection
-// at the lower network layers.
-// This parameter is asserted in the C SDK. It shall be strictly bigger than the default
-// connection ping timeout( set to 3 seconds).
-// Refer to https://github.com/awslabs/aws-c-mqtt/blob/a2ee9a321fcafa19b0473b88a54e0ae8dde5fddf/source/client.c#L1461
-constexpr uint16_t MQTT_CONNECT_KEEP_ALIVE_SECONDS = 60;
-// Default ping timeout value in milliseconds
-// If a response is not received within this interval, the connection will be reestablished.
-// If the PING request does not return within this interval, the stack will create a new one.
-constexpr uint32_t MQTT_PING_TIMEOUT_MS = 3000;
-constexpr uint32_t MQTT_SESSION_EXPIRY_INTERVAL_SEC = 3600;
-
-// How much time to wait for a response to an unsubscribe operation when shutting the module down.
-constexpr uint32_t MQTT_UNSUBSCRIBE_TIMEOUT_ON_SHUTDOWN_SEC = 5;
-
 AwsIotConnectivityModule::AwsIotConnectivityModule( std::string rootCA,
                                                     std::string clientId,
-                                                    std::shared_ptr<MqttClientBuilderWrapper> mqttClientBuilder )
+                                                    std::shared_ptr<MqttClientBuilderWrapper> mqttClientBuilder,
+                                                    AwsIotConnectivityConfig connectionConfig )
     : mRootCA( std::move( rootCA ) )
     , mClientId( std::move( clientId ) )
     , mMqttClientBuilder( std::move( mqttClientBuilder ) )
-    , mRetryThread( *this, RETRY_FIRST_CONNECTION_START_BACKOFF_MS, RETRY_FIRST_CONNECTION_MAX_BACKOFF_MS )
+    , mConnectionConfig( std::move( connectionConfig ) )
+    , mInitialConnectionThread(
+          [this]() -> RetryStatus {
+              return this->connectMqttClient();
+          },
+          RETRY_FIRST_CONNECTION_START_BACKOFF_MS,
+          RETRY_FIRST_CONNECTION_MAX_BACKOFF_MS )
+    , mSubscriptionsThread(
+          [this]() -> RetryStatus {
+              return this->subscribeAllReceivers();
+          },
+          RETRY_FIRST_CONNECTION_START_BACKOFF_MS,
+          RETRY_FIRST_CONNECTION_MAX_BACKOFF_MS )
     , mConnected( false )
     , mConnectionEstablished( false )
 {
@@ -61,26 +56,49 @@ AwsIotConnectivityModule::connect()
     mConnected = false;
 
     FWE_LOG_INFO( "Establishing an MQTT Connection" );
-    if ( !createMqttConnection() )
+    if ( !createMqttClient() )
     {
         return false;
     }
 
-    return mRetryThread.start();
+    return mInitialConnectionThread.start();
 }
 
-std::shared_ptr<IConnectivityChannel>
-AwsIotConnectivityModule::createNewChannel( const std::shared_ptr<PayloadManager> &payloadManager,
-                                            const std::string &topicName,
-                                            bool subscription )
+std::shared_ptr<ISender>
+AwsIotConnectivityModule::createSender( const std::string &topicName, QoS publishQoS )
 {
-    auto channel = std::make_shared<AwsIotChannel>( this, payloadManager, mMqttClient, topicName, subscription );
-    mChannels.emplace_back( channel );
+    auto sdkPublishQoS = Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE;
+    switch ( publishQoS )
     {
-        std::lock_guard<std::mutex> lock( mTopicToChannelMutex );
-        mTopicToChannel[topicName] = channel;
+    case QoS::AT_MOST_ONCE:
+        sdkPublishQoS = Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE;
+        break;
+    case QoS::AT_LEAST_ONCE:
+        sdkPublishQoS = Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_LEAST_ONCE;
+        break;
     }
-    return channel;
+
+    auto sender = std::make_shared<AwsIotSender>( this, mMqttClient, topicName, sdkPublishQoS );
+    mSenders.emplace_back( sender );
+    return sender;
+}
+
+std::shared_ptr<IReceiver>
+AwsIotConnectivityModule::createReceiver( const std::string &topicName )
+{
+    auto receiver = std::make_shared<AwsIotReceiver>( this, mMqttClient, topicName );
+    mReceivers.emplace_back( receiver );
+
+    std::lock_guard<std::mutex> lock( mTopicsMutex );
+    mSubscribedTopicToReceiver[topicName] = receiver;
+    mSubscribedTopicsTree.insert( topicName, receiver );
+    return receiver;
+}
+
+void
+AwsIotConnectivityModule::subscribeToConnectionEstablished( OnConnectionEstablishedCallback callback )
+{
+    mConnectionEstablishedListeners.subscribe( callback );
 }
 
 bool
@@ -88,7 +106,7 @@ AwsIotConnectivityModule::resetConnection()
 {
     if ( !mConnectionEstablished )
     {
-        return false;
+        return true;
     }
 
     mConnectionCompletedPromise = std::promise<bool>();
@@ -96,7 +114,15 @@ AwsIotConnectivityModule::resetConnection()
     // Get the future before calling the client code as get_future() is not guaranteed to be thread-safe
     auto closedResult = mConnectionClosedPromise.get_future();
     FWE_LOG_INFO( "Closing the MQTT Connection" );
-    if ( !mMqttClient->Stop() )
+    // Before we close the connection, we need to create a Disconnect Packet
+    // So that we indicate to the broker that we intend to close the session,
+    // Otherwise, the socket will simply be closed and thus the broker thinks
+    // the connection is lost.
+    // Default constructor of DisconnectPacket sets the diconnectReason to
+    // CLIENT_INITIATED_DISCONNECT which is what we want here.
+    auto disconnectPacket = std::make_shared<Aws::Crt::Mqtt5::DisconnectPacket>();
+
+    if ( !mMqttClient->Stop( disconnectPacket ) )
     {
         FWE_LOG_ERROR( "Failed to close the MQTT Connection" );
         return false;
@@ -104,37 +130,50 @@ AwsIotConnectivityModule::resetConnection()
 
     closedResult.wait();
     mConnectionEstablished = false;
+
     return true;
 }
 
 bool
 AwsIotConnectivityModule::disconnect()
 {
-    // In case there is no connection or the connection is bad, we don't want to be waiting here for
-    // a long time. So we tell all channels to unsubscribe asynchronously, and then wait for them
-    // in a separate step.
-    std::vector<std::pair<std::string, std::future<bool>>> unsubscribeResults;
+    mSubscriptionsThread.stop();
+
+    // Only unsubscribe from topics if not using persistent sessions. Otherwise when reconnecting
+    // the broker won't send messages sent while the client was disconnected.
+    if ( mConnectionConfig.sessionExpiryIntervalSeconds == 0 )
     {
-        std::lock_guard<std::mutex> lock( mTopicToChannelMutex );
-        for ( auto &topicAndChannel : mTopicToChannel )
+        // In case there is no connection or the connection is bad, we don't want to be waiting here for
+        // a long time. So we tell all receivers to unsubscribe asynchronously, and then wait for them
+        // in a separate step.
+        std::vector<std::pair<std::string, std::future<bool>>> unsubscribeResults;
         {
-            unsubscribeResults.emplace_back( topicAndChannel.first, topicAndChannel.second->unsubscribeAsync() );
+            std::lock_guard<std::mutex> lock( mTopicsMutex );
+            for ( auto &topicAndReceiver : mSubscribedTopicToReceiver )
+            {
+                unsubscribeResults.emplace_back( topicAndReceiver.first, topicAndReceiver.second->unsubscribeAsync() );
+            }
+        }
+
+        auto timeout =
+            std::chrono::steady_clock::now() + std::chrono::seconds( MQTT_UNSUBSCRIBE_TIMEOUT_ON_SHUTDOWN_SECONDS );
+        for ( auto &topicAndResult : unsubscribeResults )
+        {
+            if ( topicAndResult.second.wait_until( timeout ) == std::future_status::timeout )
+            {
+                FWE_LOG_WARN( "Unsubscribe operation timed out for topic " + topicAndResult.first );
+            }
         }
     }
 
-    auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds( MQTT_UNSUBSCRIBE_TIMEOUT_ON_SHUTDOWN_SEC );
-    for ( auto &topicAndResult : unsubscribeResults )
+    mInitialConnectionThread.stop();
+    for ( auto sender : mSenders )
     {
-        if ( topicAndResult.second.wait_until( timeout ) == std::future_status::timeout )
-        {
-            FWE_LOG_WARN( "Unsubscribe operation timed out for topic " + topicAndResult.first );
-        }
+        sender->invalidateConnection();
     }
-
-    mRetryThread.stop();
-    for ( auto channel : mChannels )
+    for ( auto receiver : mReceivers )
     {
-        channel->invalidateConnection();
+        receiver->invalidateConnection();
     }
     return resetConnection();
 }
@@ -155,7 +194,7 @@ AwsIotConnectivityModule::renameEventLoopTask()
 }
 
 bool
-AwsIotConnectivityModule::createMqttConnection()
+AwsIotConnectivityModule::createMqttClient()
 {
     if ( mMqttClientBuilder == nullptr )
     {
@@ -173,15 +212,30 @@ AwsIotConnectivityModule::createMqttConnection()
     auto connectOptions = std::make_shared<Aws::Crt::Mqtt5::ConnectPacket>();
     // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
     connectOptions->WithClientId( mClientId.c_str() )
-        .WithSessionExpiryIntervalSec( MQTT_SESSION_EXPIRY_INTERVAL_SEC )
-        .WithKeepAliveIntervalSec( MQTT_CONNECT_KEEP_ALIVE_SECONDS );
+        .WithSessionExpiryIntervalSec( mConnectionConfig.sessionExpiryIntervalSeconds )
+        .WithKeepAliveIntervalSec( mConnectionConfig.keepAliveIntervalSeconds );
+
+    if ( mConnectionConfig.sessionExpiryIntervalSeconds > 0 )
+    {
+        connectOptions->WithSessionExpiryIntervalSec( mConnectionConfig.sessionExpiryIntervalSeconds );
+    }
 
     mMqttClientBuilder
         ->WithClientExtendedValidationAndFlowControl(
-            Aws::Crt::Mqtt5::ClientExtendedValidationAndFlowControl::AWS_MQTT5_EVAFCO_NONE )
+            Aws::Crt::Mqtt5::ClientExtendedValidationAndFlowControl::AWS_MQTT5_EVAFCO_AWS_IOT_CORE_DEFAULTS )
+        // Make queued packets fail on disconnection so we can better control how to handle those failures
+        // (e.g. drop, persist). Otherwise, using the default behavior, packets with QoS1 could stay in the
+        // queue for a long time and be transmitted even if they are no longer relevant.
+        .WithOfflineQueueBehavior(
+            Aws::Crt::Mqtt5::ClientOperationQueueBehaviorType::AWS_MQTT5_COQBT_FAIL_ALL_ON_DISCONNECT )
         .WithConnectOptions( connectOptions )
-        .WithSessionBehavior( Aws::Crt::Mqtt5::ClientSessionBehaviorType::AWS_MQTT5_CSBT_REJOIN_POST_SUCCESS )
-        .WithPingTimeoutMs( MQTT_PING_TIMEOUT_MS );
+        .WithPingTimeoutMs( mConnectionConfig.pingTimeoutMs );
+
+    if ( mConnectionConfig.sessionExpiryIntervalSeconds > 0 )
+    {
+        mMqttClientBuilder->WithSessionBehavior(
+            Aws::Crt::Mqtt5::ClientSessionBehaviorType::AWS_MQTT5_CSBT_REJOIN_ALWAYS );
+    }
 
     if ( !mRootCA.empty() )
     {
@@ -191,21 +245,50 @@ AwsIotConnectivityModule::createMqttConnection()
     mMqttClientBuilder->WithClientConnectionSuccessCallback(
         [&]( const Aws::Crt::Mqtt5::OnConnectionSuccessEventData &eventData ) {
             std::string logMessage = "Connection completed successfully";
+            bool rejoinedSession = false;
             if ( eventData.negotiatedSettings != nullptr )
             {
+                rejoinedSession = eventData.negotiatedSettings->getRejoinedSession();
                 // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
                 auto clientId = std::string( eventData.negotiatedSettings->getClientId().c_str() );
-                logMessage +=
-                    ". ClientId: " + clientId + ", SessionExpiryIntervalSec: " +
-                    std::to_string( eventData.negotiatedSettings->getSessionExpiryIntervalSec() ) +
-                    ", ServerKeepAliveSec: " + std::to_string( eventData.negotiatedSettings->getServerKeepAlive() ) +
-                    ", RejoinedSession: " + ( eventData.negotiatedSettings->getRejoinedSession() ? "true" : "false" );
+                auto negotiatedKeepAlive = eventData.negotiatedSettings->getServerKeepAlive();
+                logMessage += ". ClientId: " + clientId + ", SessionExpiryIntervalSec: " +
+                              std::to_string( eventData.negotiatedSettings->getSessionExpiryIntervalSec() ) +
+                              ", ServerKeepAliveSec: " + std::to_string( negotiatedKeepAlive ) +
+                              ", RejoinedSession: " + ( rejoinedSession ? "true" : "false" );
+                if ( negotiatedKeepAlive != mConnectionConfig.keepAliveIntervalSeconds )
+                {
+                    FWE_LOG_WARN( "Negotiated keep alive " + std::to_string( negotiatedKeepAlive ) +
+                                  " does not match the requested value " +
+                                  std::to_string( mConnectionConfig.keepAliveIntervalSeconds ) );
+                }
             }
             FWE_LOG_INFO( logMessage );
             mConnected = true;
             mConnectionCompletedPromise.set_value( true );
             mConnectionCompletedPromise = std::promise<bool>();
             renameEventLoopTask();
+
+            // If we didn't rejoin a session (which could happen because the previous session expired
+            // or persistent session is disabled), the client won't be subscribed to any topic even if
+            // this is a reconnection. So we need to ensure that all receivers subscribe again.
+            if ( !rejoinedSession )
+            {
+                std::lock_guard<std::mutex> lock( mTopicsMutex );
+                for ( auto &topicAndReceiver : mSubscribedTopicToReceiver )
+                {
+                    topicAndReceiver.second->resetSubscription();
+                }
+            }
+
+            if ( mSubscriptionsThread.isAlive() )
+            {
+                mSubscriptionsThread.restart();
+            }
+            else
+            {
+                mSubscriptionsThread.start();
+            }
         } );
 
     mMqttClientBuilder->WithClientConnectionFailureCallback(
@@ -231,7 +314,7 @@ AwsIotConnectivityModule::createMqttConnection()
         } );
 
     mMqttClientBuilder->WithClientAttemptingConnectCallback( [&]( const OnAttemptingConnectEventData &eventData ) {
-        (void)eventData;
+        static_cast<void>( eventData );
         FWE_LOG_INFO( "Attempting MQTT connection" );
     } );
 
@@ -261,7 +344,7 @@ AwsIotConnectivityModule::createMqttConnection()
     } );
 
     mMqttClientBuilder->WithClientStoppedCallback( [&]( const Aws::Crt::Mqtt5::OnStoppedEventData &eventData ) {
-        (void)eventData;
+        static_cast<void>( eventData );
         FWE_LOG_INFO( "The MQTT connection is closed and client stopped" );
         mConnectionClosedPromise.set_value();
         mConnected = false;
@@ -277,23 +360,19 @@ AwsIotConnectivityModule::createMqttConnection()
 
         // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
         auto topic = std::string( eventData.publishPacket->getTopic().c_str() );
-        std::shared_ptr<AwsIotChannel> channel;
+        std::shared_ptr<AwsIotReceiver> receiver;
         {
-            std::lock_guard<std::mutex> lock( mTopicToChannelMutex );
-            auto it = mTopicToChannel.find( topic );
-            if ( it != mTopicToChannel.end() )
-            {
-                channel = it->second;
-            }
+            std::lock_guard<std::mutex> lock( mTopicsMutex );
+            receiver = mSubscribedTopicsTree.find( topic );
         }
 
-        if ( channel == nullptr )
+        if ( receiver == nullptr )
         {
-            FWE_LOG_ERROR( "Channel not found for topic " + topic );
+            FWE_LOG_ERROR( "Receiver not found for topic " + topic );
             return;
         }
 
-        channel->onDataReceived( eventData );
+        receiver->onDataReceived( eventData );
     } );
 
     TraceModule::get().sectionBegin( TraceSection::BUILD_MQTT );
@@ -320,7 +399,7 @@ AwsIotConnectivityModule::createMqttConnection()
 }
 
 RetryStatus
-AwsIotConnectivityModule::attempt()
+AwsIotConnectivityModule::connectMqttClient()
 {
     FWE_LOG_TRACE( "Starting MQTT client" );
 
@@ -330,41 +409,58 @@ AwsIotConnectivityModule::attempt()
     {
         int lastError = mMqttClient->LastError();
         auto errorString = Aws::Crt::ErrorDebugString( lastError );
-        FWE_LOG_WARN( "The MQTT Connection failed wit error  code " + std::to_string( lastError ) + ": " +
+        FWE_LOG_WARN( "The MQTT Connection failed with error  code " + std::to_string( lastError ) + ": " +
                       std::string( errorString != nullptr ? errorString : "Unknown error" ) );
         mConnectionCompletedPromise = std::promise<bool>();
         return RetryStatus::RETRY;
     }
 
-    FWE_LOG_TRACE( "Waiting of connection completed callback" );
+    FWE_LOG_TRACE( "Waiting for connection completed callback" );
     mConnectionEstablished = true;
     // Block until the connection establishes or fails.
     // If the connection fails, the module will also fail.
-    if ( connectionResult.get() )
-    {
-        return RetryStatus::SUCCESS;
-    }
-    else
+    if ( !connectionResult.get() )
     {
         // Cleanup resources
         resetConnection();
         return RetryStatus::RETRY;
     }
+
+    return RetryStatus::SUCCESS;
 }
 
-void
-AwsIotConnectivityModule::onFinished( RetryStatus code )
+RetryStatus
+AwsIotConnectivityModule::subscribeAllReceivers()
 {
-    if ( code == RetryStatus::SUCCESS )
+    auto result = RetryStatus::SUCCESS;
+
+    // We make a copy because the subscribe() call is blocking and can take very long. So we should
+    // not hold the lock the whole time, otherwise we could block the callbacks called by the MQTT
+    // client.
+    std::vector<std::shared_ptr<AwsIotReceiver>> receivers;
     {
-        for ( auto channel : mChannels )
+        std::lock_guard<std::mutex> lock( mTopicsMutex );
+        for ( auto &topicAndReceiver : mSubscribedTopicToReceiver )
         {
-            if ( channel->shouldSubscribeAsynchronously() )
-            {
-                channel->subscribe();
-            }
+            receivers.emplace_back( topicAndReceiver.second );
         }
     }
+
+    for ( auto receiver : receivers )
+    {
+        if ( receiver->subscribe() != ConnectivityError::Success )
+        {
+            result = RetryStatus::RETRY;
+        }
+    }
+
+    if ( result == RetryStatus::SUCCESS )
+    {
+        // subscribe to all topics first before notifying listeners for connection
+        mConnectionEstablishedListeners.notify();
+    }
+
+    return result;
 }
 
 AwsIotConnectivityModule::~AwsIotConnectivityModule()
