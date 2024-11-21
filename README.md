@@ -1,14 +1,35 @@
 # Reference Implementation for AWS IoT FleetWise
 
-:robot: AWS IoT FleetWise now supports [ROS2](https://docs.ros.org) for collecting vision system
-data.<br> :information_source: To quickly get started, jump to the
-**[Jupyter Notebook demo](./docs/dev-guide/vision-system-data/vision-system-data-demo.ipynb)** and
-collect camera data from a [CARLA](https://carla.org) vehicle simulation.
+**AWS IoT FleetWise now supports:**
 
-:information_source: To quickly get started with telematics data collection, jump to the
-[Edge Agent Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md), the
-[Android Guide](./tools/android-app/README.md), or the
-[Raspberry Pi Tutorial](./docs/rpi-tutorial/raspberry-pi-tutorial.md).
+- :mechanical_arm: Remote commands for actuators, see the
+  [CAN actuators guide](./docs/dev-guide/can-actuators-dev-guide.md) and the
+  [SOME/IP guide](./docs/dev-guide/edge-agent-dev-guide-someip.md).
+- :electric_plug:
+  [Network agnostic data collection and actuator commands](./docs/dev-guide/network-agnostic-dev-guide.md).
+- :red_car: SOME/IP support, see:
+  - the
+    [SOME/IP guide for data collection and commands](./docs/dev-guide/edge-agent-dev-guide-someip.md),
+  - the
+    [Device shadow proxy for SOME/IP guide](./docs/dev-guide/edge-agent-dev-guide-device-shadow-over-someip.md),
+  - and the [CAN over SOME/IP guide](./docs/dev-guide/can-over-someip-demo.md).
+- :abc: String datatype support for both sensor data collection and actuator commands.
+- :feather: [Last Known State (LKS)](./docs/dev-guide/edge-agent-dev-guide-last-known-state.md), a
+  lighter method of data collection.
+- :cloud:
+  [IoT topics as a data destination](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/create-campaign.html).
+- :jigsaw: [Custom functions in expressions](./docs/dev-guide/custom-function-dev-guide.md).
+- :fast_forward: [Store and forward](./docs/dev-guide/store-and-forward-dev-guide.md), for
+  conditional upload of collected data.
+- :wrench: [UDS DTC data collection](./docs/dev-guide/edge-agent-uds-dtc-dev-guide.md).
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> To quickly get started, jump to the
+> [Edge Agent Developer Guide](./docs/dev-guide/edge-agent-dev-guide.md), the
+> [ROS2 developer guide](./docs/dev-guide/vision-system-data/vision-system-data-demo.ipynb), the
+> [Android Guide](./tools/android-app/README.md), or the
+> [Raspberry Pi Tutorial](./docs/rpi-tutorial/raspberry-pi-tutorial.md).
 
 AWS IoT FleetWise is a service that makes it easy for Automotive OEMs, Fleet operators, Independent
 Software vendors (ISVs) to collect, store, organize, and monitor data from vehicles at scale. The
@@ -28,10 +49,11 @@ Predictive Diagnostics, electric vehicle's battery cells outlier detection, etc.
 included sample C++ application to learn more about the FWE, develop an Edge Agent for your use case
 and test interactions before integration.
 
-> _**Important**_ As provided in the AWS IoT FleetWise
-> [Service Terms](https://aws.amazon.com/service-terms/), you are solely responsible for your Edge
-> Agent, including ensuring that your Edge Agent and any updates and modifications to it are
-> deployed and maintained safely and securely in any vehicles.
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> As provided in the AWS IoT FleetWise [Service Terms](https://aws.amazon.com/service-terms/), you
+> are solely responsible for your Edge Agent, including ensuring that your Edge Agent and any
+> updates and modifications to it are deployed and maintained safely and securely in any vehicles.
 
 ## AWS IoT FleetWise Architecture
 
@@ -101,7 +123,7 @@ from and to AWS IoT FleetWise Server. All data sent to the AWS IoT FleetWise ser
 encrypted
 [TLS connection](https://docs.aws.amazon.com/iot/latest/developerguide/data-encryption.html) using
 MQTT, which is designed to make it secure by default while in transit. FWE uses MQTT quality of
-service zero (QoS = 0).
+service one (QoS = 1).
 
 ## Security
 
@@ -139,6 +161,18 @@ enabled.
 - [ROS2: Galactic](https://github.com/ros2/rclcpp)
 - [Cyclone DDS: 0.8.0](https://github.com/eclipse-cyclonedds/cyclonedds)
 - [Fast-CDR: v1.0.21](https://github.com/eProsima/Fast-CDR)
+
+Optional: The following dependencies are only required when the option `FWE_FEATURE_SOMEIP` is
+enabled.
+
+- [vsomeip: 3.5.1](https://github.com/COVESA/vsomeip)
+- [CommonAPI C++ Core Runtime: 3.2.4](https://github.com/COVESA/capicxx-core-runtime)
+- [CommonAPI C++ SOME/IP Runtime: 3.2.4](https://github.com/COVESA/capicxx-someip-runtime)
+
+Optional: The following dependencies are only required when the option
+`FWE_FEATURE_STORE_AND_FORWARD` is enabled.
+
+- [device-storelibrary-cpp: v1.0.0](https://github.com/aws/device-storelibrary-cpp)
 
 See [LICENSE](./LICENSE) for more information.
 

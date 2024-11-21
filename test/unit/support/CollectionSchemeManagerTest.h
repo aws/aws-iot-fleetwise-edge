@@ -7,6 +7,7 @@
 #include "CollectionInspectionWorkerThread.h"
 #include "CollectionSchemeIngestion.h"
 #include "CollectionSchemeIngestionList.h"
+#include "DataFetchManagerAPITypes.h"
 #include "DecoderManifestIngestion.h"
 #include "ICollectionScheme.h"
 #include "ICollectionSchemeList.h"
@@ -52,7 +53,8 @@ public:
         SyncID id,
         std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap,
         std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID,
-        std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat
+        std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat,
+        SignalIDToCustomSignalDecoderFormatMap signalIDToCustomDecoderFormat
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
         ,
         std::unordered_map<SignalID, ComplexSignalDecoderFormat> complexSignalMap =
@@ -65,6 +67,7 @@ public:
         , mFormatMap( std::move( formatMap ) )
         , mSignalToFrameAndNodeID( std::move( signalToFrameAndNodeID ) )
         , mSignalIDToPIDDecoderFormat( std::move( signalIDToPIDDecoderFormat ) )
+        , mSignalIDToCustomDecoderFormat( std::move( signalIDToCustomDecoderFormat ) )
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
         , mComplexSignalMap( std::move( complexSignalMap ) )
         , mComplexDataTypeMap( std::move( complexDataTypeMap ) )
@@ -109,6 +112,10 @@ public:
         {
             return VehicleDataSourceProtocol::OBD;
         }
+        else if ( signalID < 0x3000 )
+        {
+            return VehicleDataSourceProtocol::CUSTOM_DECODING;
+        }
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
         else if ( signalID < 0xFFFFFF00 )
         {
@@ -130,6 +137,16 @@ public:
         return NOT_FOUND_PID_DECODER_FORMAT;
     }
 
+    CustomSignalDecoderFormat
+    getCustomSignalDecoderFormat( SignalID signalID ) const
+    {
+        auto it = mSignalIDToCustomDecoderFormat.find( signalID );
+        if ( it == mSignalIDToCustomDecoderFormat.end() )
+        {
+            return INVALID_CUSTOM_SIGNAL_DECODER_FORMAT;
+        }
+        return it->second;
+    }
     SignalType
     getSignalType( SignalID signalID ) const override
     {
@@ -173,6 +190,7 @@ private:
     std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> mFormatMap;
     std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> mSignalToFrameAndNodeID;
     std::unordered_map<SignalID, PIDSignalDecoderFormat> mSignalIDToPIDDecoderFormat;
+    SignalIDToCustomSignalDecoderFormatMap mSignalIDToCustomDecoderFormat;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     std::unordered_map<SignalID, ComplexSignalDecoderFormat> mComplexSignalMap;
     std::unordered_map<ComplexDataTypeId, ComplexDataElement> mComplexDataTypeMap;
@@ -246,6 +264,53 @@ public:
         , root( root )
     {
     }
+    ICollectionSchemeTest( SyncID collectionSchemeID,
+                           SyncID decoderManifestID,
+                           uint64_t startTime,
+                           uint64_t expiryTime,
+                           uint32_t minimumPublishIntervalMs,
+                           uint32_t afterDurationMs,
+                           bool activeDTCsIncluded,
+                           bool triggerOnlyOnRisingEdge,
+                           uint32_t priority,
+                           bool persistNeeded,
+                           bool compressionNeeded,
+                           Signals_t collectSignals,
+                           RawCanFrames_t collectRawCanFrames,
+                           ExpressionNode *condition,
+                           FetchInformation_t fetchInformations
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                           ,
+                           PartialSignalIDLookup partialSignalLookup = PartialSignalIDLookup(),
+                           S3UploadMetadata s3UploadMetadata = S3UploadMetadata()
+#endif
+                               )
+        : CollectionSchemeIngestion(
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+              std::make_shared<CollectionSchemeIngestion::PartialSignalIDLookup>()
+#endif
+                  )
+        , collectionSchemeID( collectionSchemeID )
+        , decoderManifestID( decoderManifestID )
+        , startTime( startTime )
+        , expiryTime( expiryTime )
+        , minimumPublishIntervalMs( minimumPublishIntervalMs )
+        , afterDurationMs( afterDurationMs )
+        , activeDTCsIncluded( activeDTCsIncluded )
+        , triggerOnlyOnRisingEdge( triggerOnlyOnRisingEdge )
+        , priority( priority )
+        , persistNeeded( persistNeeded )
+        , compressionNeeded( compressionNeeded )
+        , signals( collectSignals )
+        , rawCanFrms( collectRawCanFrames )
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        , partialSignalLookup( partialSignalLookup )
+        , s3UploadMetadata( s3UploadMetadata )
+#endif
+        , root( condition )
+        , fetchInformations( fetchInformations )
+    {
+    }
     const SyncID &
     getCollectionSchemeID() const
     {
@@ -266,6 +331,41 @@ public:
     {
         return expiryTime;
     }
+    uint32_t
+    getMinimumPublishIntervalMs() const override
+    {
+        return minimumPublishIntervalMs;
+    }
+    uint32_t
+    getAfterDurationMs() const override
+    {
+        return afterDurationMs;
+    }
+    bool
+    isActiveDTCsIncluded() const override
+    {
+        return activeDTCsIncluded;
+    }
+    bool
+    isTriggerOnlyOnRisingEdge() const override
+    {
+        return triggerOnlyOnRisingEdge;
+    }
+    uint32_t
+    getPriority() const override
+    {
+        return priority;
+    }
+    bool
+    isPersistNeeded() const override
+    {
+        return persistNeeded;
+    }
+    bool
+    isCompressionNeeded() const override
+    {
+        return compressionNeeded;
+    }
     const Signals_t &
     getCollectSignals() const
     {
@@ -280,6 +380,11 @@ public:
     getCondition() const
     {
         return root;
+    }
+    const FetchInformation_t &
+    getAllFetchInformations() const override
+    {
+        return fetchInformations;
     }
     bool
     build() override
@@ -311,6 +416,13 @@ private:
     SyncID decoderManifestID;
     uint64_t startTime;
     uint64_t expiryTime;
+    uint32_t minimumPublishIntervalMs;
+    uint32_t afterDurationMs;
+    bool activeDTCsIncluded;
+    bool triggerOnlyOnRisingEdge;
+    uint32_t priority;
+    bool persistNeeded;
+    bool compressionNeeded;
     Signals_t signals;
     RawCanFrames_t rawCanFrms;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -318,6 +430,7 @@ private:
     S3UploadMetadata s3UploadMetadata;
 #endif
     ExpressionNode *root;
+    FetchInformation_t fetchInformations;
 };
 
 class ICollectionSchemeListTest : public CollectionSchemeIngestionList
@@ -381,13 +494,14 @@ private:
     bool mUpdateFlag;
 };
 
-/* mock Collection Inspection Engine class that receive Inspection Matrix update from PM */
+/* mock Collection Inspection Engine class that receive Inspection Matrix and Fetch Matrix update from PM */
 class CollectionInspectionWorkerThreadMock : public CollectionInspectionWorkerThread
 {
 public:
     CollectionInspectionWorkerThreadMock()
         : CollectionInspectionWorkerThread( mEngine )
         , mInspectionMatrixUpdateFlag( false )
+        , mFetchMatrixUpdateFlag( false )
     {
     }
     ~CollectionInspectionWorkerThreadMock()
@@ -400,20 +514,39 @@ public:
         mInspectionMatrixUpdateFlag = true;
     }
     void
+    onChangeFetchMatrix( const std::shared_ptr<const FetchMatrix> &fetchMatrix )
+    {
+        static_cast<void>( fetchMatrix );
+        mFetchMatrixUpdateFlag = true;
+    }
+    void
     setInspectionMatrixUpdateFlag( bool flag )
     {
         mInspectionMatrixUpdateFlag = flag;
+    }
+    void
+    setFetchMatrixUpdateFlag( bool flag )
+    {
+        mFetchMatrixUpdateFlag = flag;
     }
     bool
     getInspectionMatrixUpdateFlag()
     {
         return mInspectionMatrixUpdateFlag;
     }
+    bool
+    getFetchMatrixUpdateFlag()
+    {
+        return mFetchMatrixUpdateFlag;
+    }
 
 private:
     CollectionInspectionEngine mEngine;
     // This flag is used for testing whether the listener received the Inspection Matrix update
     bool mInspectionMatrixUpdateFlag;
+
+    // This flag is used for testing whether the listener received the Fetch Matrix update
+    bool mFetchMatrixUpdateFlag;
 };
 
 } // namespace IoTFleetWise

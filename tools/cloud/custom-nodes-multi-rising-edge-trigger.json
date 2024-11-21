@@ -1,0 +1,15 @@
+[
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle",
+      "description": "Vehicle"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.MultiRisingEdgeTrigger",
+      "description": "Vehicle.MultiRisingEdgeTrigger",
+      "dataType": "STRING"
+    }
+  }
+]

@@ -1,0 +1,87 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+option java_package = "com.amazonaws.iot.autobahn.schemas";
+package Aws.IoTFleetWise.Schemas.LastKnownState;
+
+/*
+ * Top level message sent to the Cloud with collected signals
+ */
+message LastKnownStateData {
+  /*
+   * The absolute timestamp in milliseconds since Unix Epoch of when the event was triggered.
+   */
+   uint64 collection_event_time_ms_epoch = 2;
+
+   /*
+    * List of state templates signal data that are captured.
+    *
+    * Each state template contains the signals that are collected for it.
+    */
+   repeated CapturedStateTemplateSignals captured_state_template_signals = 6;
+}
+
+message CapturedStateTemplateSignals {
+    /*
+     * Synchronization ID for the state template
+     * Any business logic or validation logic should not be built on basis of the structure of this ID
+     */
+    string state_template_sync_id = 1;
+
+    /*
+     * List of captured signals
+     *
+     * This list doesn't necessarily include all signals that were requested as data could be split in
+     * multiple messages.
+     *
+     */
+    repeated CapturedSignal captured_signals = 2;
+}
+
+message CapturedSignal {
+    uint32 signal_id = 1;
+
+    /*
+     * Data types of physical signal values.
+     */
+    oneof SignalValue {
+
+        double double_value = 2;
+
+        bool boolean_value = 3;
+
+        sint32 int8_value = 4;
+
+        uint32 uint8_value = 5;
+
+        sint32 int16_value = 6;
+
+        uint32 uint16_value = 7;
+
+        sint32 int32_value = 8;
+
+        uint32 uint32_value = 9;
+
+        sint64 int64_value = 10;
+
+        uint64 uint64_value = 11;
+
+        float float_value = 12;
+
+        /*
+         * An UTF-8 encoded or 7-bit ASCII string
+         */
+        string string_value = 13;
+    }
+
+    reserved 14;
+    reserved "update_strategy";
+}
+
+enum UpdateStrategy {
+    UPDATE_STRATEGY_UNSPECIFIED = 0;
+    UPDATE_STRATEGY_ON_CHANGE = 1;
+    UPDATE_STRATEGY_PERIODIC = 2;
+}

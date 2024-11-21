@@ -40,8 +40,7 @@ public:
     /**
      * @brief Construct the RemoteProfiler which can upload metrics and logs over MQTT
      *
-     * @param metricsSender the sender that should be used to upload metrics
-     * @param logSender the sender that should be used to upload logs
+     * @param sender the sender that should be used to upload metrics and logs
      * @param initialMetricsUploadInterval the interval used between two metrics uploads
      * @param initialLogMaxInterval the max interval that logs can be cached before uploading
      * @param initialLogLevelThresholdToSend all logs below this threshold will be ignored
@@ -49,8 +48,7 @@ public:
      * specific vehicles
      *
      */
-    RemoteProfiler( std::shared_ptr<ISender> metricsSender,
-                    std::shared_ptr<ISender> logSender,
+    RemoteProfiler( std::shared_ptr<ISender> sender,
                     uint32_t initialMetricsUploadInterval,
                     uint32_t initialLogMaxInterval,
                     LogLevel initialLogLevelThresholdToSend,
@@ -140,8 +138,7 @@ private:
 
     Thread fThread;
     std::atomic<bool> fShouldStop;
-    std::shared_ptr<ISender> fMetricsSender;
-    std::shared_ptr<ISender> fLogSender;
+    std::shared_ptr<ISender> mMqttSender;
     std::mutex fThreadMutex;
     std::mutex loggingMutex;
     Signal fWait;

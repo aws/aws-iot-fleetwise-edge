@@ -4,3 +4,6 @@ line_length = 100
 
 [tool.black]
 line_length = 100
+
+[tool.md_dead_link_check]
+check_web_links = false

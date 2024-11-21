@@ -114,7 +114,7 @@ private:
     /**
      * @brief ISender object used to interface with cloud to send Checkins
      */
-    std::shared_ptr<ISender> mSender;
+    std::shared_ptr<ISender> mMqttSender;
 
     /**
      * @brief CheckinMsg member variable used to hold the checkin data and minimize heap fragmentation

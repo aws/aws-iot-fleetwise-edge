@@ -10,15 +10,19 @@
 #include "OBDDataTypes.h"
 #include "RawDataManager.h"
 #include "SignalTypes.h"
+#include "Testing.h"
 #include "TimeTypes.h"
 #include "vehicle_data.pb.h"
 #include <array>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <google/protobuf/message.h>
 #include <gtest/gtest.h>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace Aws
@@ -29,6 +33,117 @@ namespace IoTFleetWise
 class DataSenderProtoWriterTest : public ::testing::Test
 {
 };
+
+TEST_F( DataSenderProtoWriterTest, CollectStringSignalNoRawBufferManager )
+{
+    CANInterfaceIDTranslator canIDTranslator;
+    CollectedSignal stringSignal;
+    stringSignal.signalID = 101;
+    stringSignal.value.type = SignalType::STRING;
+    stringSignal.receiveTime = 5678;
+
+    std::shared_ptr<TriggeredCollectionSchemeData> triggeredCollectionSchemeDataPtr =
+        std::make_shared<TriggeredCollectionSchemeData>();
+    auto testClock = ClockHandler::getClock();
+    Timestamp testTriggerTime = testClock->systemTimeSinceEpochMs();
+    uint32_t collectionEventID = std::rand();
+    std::string serializedData;
+
+    triggeredCollectionSchemeDataPtr->metadata.persist = false;
+    triggeredCollectionSchemeDataPtr->metadata.compress = false;
+    triggeredCollectionSchemeDataPtr->metadata.priority = 0;
+    triggeredCollectionSchemeDataPtr->metadata.collectionSchemeID = "123";
+    triggeredCollectionSchemeDataPtr->metadata.decoderID = "456";
+    triggeredCollectionSchemeDataPtr->triggerTime = testTriggerTime;
+
+    DataSenderProtoWriter mDataSenderProtoWriter( canIDTranslator, nullptr );
+    mDataSenderProtoWriter.setupVehicleData( triggeredCollectionSchemeDataPtr, collectionEventID );
+
+    stringSignal.value.value.uint32Val = static_cast<uint32_t>( 123 );
+    mDataSenderProtoWriter.append( stringSignal );
+
+    ASSERT_TRUE( mDataSenderProtoWriter.serializeVehicleData( &serializedData ) );
+
+    Schemas::VehicleDataMsg::VehicleData vehicleData;
+    vehicleData.ParseFromString( serializedData );
+    ASSERT_EQ( vehicleData.captured_signals_size(), 0 );
+}
+
+TEST_F( DataSenderProtoWriterTest, CollectStringSignal )
+{
+    CANInterfaceIDTranslator canIDTranslator;
+    CollectedSignal stringSignal;
+    TimePoint timestamp = { 160000000, 100 };
+    std::shared_ptr<RawData::BufferManager> mRawDataBufferManager;
+    RawData::SignalUpdateConfig signalUpdateConfig1;
+    RawData::SignalBufferOverrides signalOverrides1;
+    std::vector<RawData::SignalBufferOverrides> overridesPerSignal;
+    std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> updatedSignals;
+    std::shared_ptr<TriggeredCollectionSchemeData> triggeredCollectionSchemeDataPtr =
+        std::make_shared<TriggeredCollectionSchemeData>();
+    auto testClock = ClockHandler::getClock();
+    Timestamp testTriggerTime = testClock->systemTimeSinceEpochMs();
+    uint32_t collectionEventID = std::rand();
+    std::string stringData = "1BDD00";
+    std::string serializedData;
+
+    stringSignal.signalID = 101;
+    stringSignal.value.type = SignalType::STRING;
+    stringSignal.receiveTime = 5678;
+
+    signalUpdateConfig1.typeId = stringSignal.signalID;
+    signalUpdateConfig1.interfaceId = "interface1";
+    signalUpdateConfig1.messageId = "VEHICLE.DTC_INFO";
+    signalOverrides1.interfaceId = signalUpdateConfig1.interfaceId;
+    signalOverrides1.messageId = signalUpdateConfig1.messageId;
+    signalOverrides1.maxNumOfSamples = 20;
+    signalOverrides1.maxBytesPerSample = 5_MiB;
+    signalOverrides1.reservedBytes = 5_MiB;
+    signalOverrides1.maxBytes = 100_MiB;
+
+    triggeredCollectionSchemeDataPtr->metadata.persist = false;
+    triggeredCollectionSchemeDataPtr->metadata.compress = false;
+    triggeredCollectionSchemeDataPtr->metadata.priority = 0;
+    triggeredCollectionSchemeDataPtr->metadata.collectionSchemeID = "123";
+    triggeredCollectionSchemeDataPtr->metadata.decoderID = "456";
+    triggeredCollectionSchemeDataPtr->triggerTime = testTriggerTime;
+
+    overridesPerSignal = { signalOverrides1 };
+
+    boost::optional<RawData::BufferManagerConfig> rawDataBufferManagerConfig = RawData::BufferManagerConfig::create(
+        1_GiB, boost::none, boost::make_optional( (size_t)20 ), boost::none, boost::none, overridesPerSignal );
+
+    updatedSignals = { { signalUpdateConfig1.typeId, signalUpdateConfig1 } };
+
+    std::shared_ptr<RawData::BufferManager> rawDataBufferManager =
+        std::make_shared<RawData::BufferManager>( rawDataBufferManagerConfig.get() );
+    rawDataBufferManager->updateConfig( updatedSignals );
+
+    DataSenderProtoWriter mDataSenderProtoWriter( canIDTranslator, rawDataBufferManager );
+    mDataSenderProtoWriter.setupVehicleData( triggeredCollectionSchemeDataPtr, collectionEventID );
+
+    auto handle = rawDataBufferManager->push(
+        (uint8_t *)stringData.c_str(), stringData.length(), timestamp.systemTimeMs, stringSignal.signalID );
+
+    rawDataBufferManager->increaseHandleUsageHint(
+        101, handle, RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD );
+
+    stringSignal.value.value.uint32Val = static_cast<uint32_t>( handle );
+    mDataSenderProtoWriter.append( stringSignal );
+    // Invalid buffer handle
+    mDataSenderProtoWriter.append( CollectedSignal( 123,                            // signalId
+                                                    timestamp.systemTimeMs,         // receiveTime,
+                                                    RawData::INVALID_BUFFER_HANDLE, // value
+                                                    SignalType::STRING ) );
+
+    ASSERT_TRUE( mDataSenderProtoWriter.serializeVehicleData( &serializedData ) );
+
+    Schemas::VehicleDataMsg::VehicleData vehicleData;
+    vehicleData.ParseFromString( serializedData );
+    ASSERT_EQ( vehicleData.captured_signals_size(), 1 );
+    EXPECT_EQ( vehicleData.captured_signals( 0 ).signal_id(), stringSignal.signalID );
+    EXPECT_EQ( vehicleData.captured_signals( 0 ).string_value(), stringData.c_str() );
+}
 
 // Test the edge to cloud payload fields in the proto
 TEST_F( DataSenderProtoWriterTest, TestVehicleData )

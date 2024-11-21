@@ -54,6 +54,10 @@ CollectionSchemeManager::addSignalToDecoderDictionaryMap(
         {
             decoderDictionaryMap[networkType] = std::make_shared<CANDecoderDictionary>();
         }
+        else if ( networkType == VehicleDataSourceProtocol::CUSTOM_DECODING )
+        {
+            decoderDictionaryMap[networkType] = std::make_shared<CustomDecoderDictionary>();
+        }
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
         // Currently we don't have decoder dictionary for this type of network protocol, create one
         else if ( networkType == VehicleDataSourceProtocol::COMPLEX_DATA )
@@ -175,6 +179,28 @@ CollectionSchemeManager::addSignalToDecoderDictionaryMap(
             obdPidCanDecoderDictionaryPtr->canMessageDecoderMethod.at( canChannelID )
                 .at( pidDecoderFormat.mPID )
                 .format.mSignals.emplace_back( format );
+        }
+    }
+    else if ( networkType == VehicleDataSourceProtocol::CUSTOM_DECODING )
+    {
+        auto customDecoderDictionaryPtr = std::dynamic_pointer_cast<CustomDecoderDictionary>(
+            decoderDictionaryMap[VehicleDataSourceProtocol::CUSTOM_DECODING] );
+        auto customSignalDecoderFormat = mDecoderManifest->getCustomSignalDecoderFormat( signalId );
+        if ( !customDecoderDictionaryPtr )
+        {
+            FWE_LOG_WARN( "Can not cast dictionary to CustomDecoderDictionary for Custom Decoded Signal ID: " +
+                          std::to_string( signalId ) );
+        }
+        else if ( customSignalDecoderFormat.mInterfaceId.empty() )
+        {
+            FWE_LOG_WARN( "Custom Decoded signal ID has empty interfaceID: " + std::to_string( signalId ) );
+        }
+        else
+        {
+            customDecoderDictionaryPtr
+                ->customDecoderMethod[customSignalDecoderFormat.mInterfaceId][customSignalDecoderFormat.mDecoder] =
+                customSignalDecoderFormat;
+            FWE_LOG_TRACE( "Custom Decoded Signal ID: " + std::to_string( signalId ) );
         }
     }
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -355,6 +381,30 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                     signal.signalType = signalType->second;
                 }
             }
+        }
+    }
+#endif
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    for ( const auto &stateTemplate : mStateTemplates )
+    {
+        if ( stateTemplate.second->decoderManifestID != mCurrentDecoderManifestID )
+        {
+            continue;
+        }
+
+        for ( const auto &lksSignal : stateTemplate.second->signals )
+        {
+            addSignalToDecoderDictionaryMap( lksSignal.signalID,
+                                             decoderDictionaryMap
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+                                             ,
+                                             partialSignalTypes,
+                                             lksSignal.signalID,
+                                             // Complex types are not supported for Last Known State
+                                             SignalPath()
+#endif
+            );
         }
     }
 #endif

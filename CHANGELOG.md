@@ -1,5 +1,40 @@
 # Change Log
 
+## v1.2.0 (2024-11-21)
+
+New features:
+
+- Remote commands for actuators, see the
+  [CAN actuators guide](./docs/dev-guide/can-actuators-dev-guide.md) and the
+  [SOME/IP guide](./docs/dev-guide/edge-agent-dev-guide-someip.md).
+- [Network agnostic data collection and actuator commands](./docs/dev-guide/network-agnostic-dev-guide.md).
+- SOME/IP support, see the
+  [SOME/IP guide for data collection and commands](./docs/dev-guide/edge-agent-dev-guide-someip.md),
+  the
+  [Device shadow proxy for SOME/IP guide](./docs/dev-guide/edge-agent-dev-guide-device-shadow-over-someip.md),
+  and the [CAN over SOME/IP guide](./docs/dev-guide/can-over-someip-demo.md).
+- String datatype support for both sensor data collection and actuator commands.
+- [Last Known State (LKS)](./docs/dev-guide/edge-agent-dev-guide-last-known-state.md), a lighter
+  method of data collection.
+- [Custom functions in expressions](./docs/dev-guide/custom-function-dev-guide.md).
+- [Store and forward](./docs/dev-guide/store-and-forward-dev-guide.md), for conditional upload of
+  collected data.
+- [UDS DTC data collection](./docs/dev-guide/edge-agent-uds-dtc-dev-guide.md).
+
+Breaking changes:
+
+- The `collectionSchemeListTopic`, `decoderManifestTopic`, `canDataTopic` and `checkinTopic` config
+  fields are deprecated. If a config file has any of them, they will be ignored. Now FWE defaults to
+  AWS reserved topics without needing any additional config. If you still need to customize the
+  topics you can set the prefix using the new `iotFleetWiseTopicPrefix` field.
+- **Only affects existing iWave and Android instances**: Replaced the CAN-based `CustomDataSource`
+  implementation with the new
+  [Network agnostic data collection](./docs/dev-guide/network-agnostic-dev-guide.md) approach for
+  custom data sources. Existing iWave and Android instances will need to be re-configured and have
+  changes made to their decoder manifest to use this new version.
+  - For iWave devices, see the [iWave guide](./docs/iwave-g26-tutorial/iwave-g26-tutorial.md).
+  - For Android (including AAOS), see the [Android guide](./tools/android-app/README.md).
+
 ## v1.1.2 (2024-10-29)
 
 Bug fixes:

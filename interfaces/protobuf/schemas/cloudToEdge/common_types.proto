@@ -74,6 +74,11 @@ message ConditionNode {
          * The expression currently only supports primitive types so for complex signals this has to be used and not node_signal_id
          */
         PrimitiveTypeInComplexSignal node_primitive_type_in_signal = 6;
+
+        /*
+         * A node containing a string constant which can be used as a child node to an operator node.
+         */
+        string node_string_value = 7;
     }
 
     /*
@@ -134,7 +139,7 @@ message ConditionNode {
      * output based on specific logic
      */
     message NodeFunction{
-        /*
+/*
          * This field was never supported, so it should not be used any more.
          */
         reserved 2;
@@ -150,6 +155,17 @@ message ConditionNode {
              * run an aggregation function over the samples and evaluate to a double.
              */
             WindowFunction window_function = 1;
+
+            /**
+             * A custom function node will take function_name as first params followed by input params
+             * required for the function to be executed defined by first params on the Edge.
+             */
+            CustomFunction custom_function = 3;
+
+            /**
+             * A function to check if passed signal value is null or not
+             */
+            IsNullFunction is_null_function = 4;
         }
 
         /*
@@ -189,6 +205,24 @@ message ConditionNode {
                 PREV_LAST_WINDOW_MAX = 4;
                 PREV_LAST_WINDOW_AVG = 5;
             }
+        }
+
+        /**
+         * A custom function node will take function_name as first params followed by input params
+         * required for the function to be executed defined by first params on the Edge.
+         */
+        message CustomFunction {
+
+            string function_name = 1;
+
+            repeated ConditionNode params = 2;
+        }
+
+        /**
+         * An isNull function node will take single params and check for null condition of that params.
+         */
+        message IsNullFunction {
+            ConditionNode expression = 1;
         }
     }
 }

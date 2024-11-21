@@ -45,6 +45,10 @@ public:
 
     void processData( std::shared_ptr<const DataToSend> data, OnDataProcessedCallback callback ) override;
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    void processSerializedData( std::string &data, OnDataProcessedCallback callback );
+#endif
+
     void processPersistedData( std::istream &data,
                                const Json::Value &metadata,
                                OnPersistedDataProcessedCallback callback ) override;

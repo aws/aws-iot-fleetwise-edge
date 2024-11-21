@@ -5,6 +5,9 @@ package com.aws.iotfleetwise;
 
 import android.content.res.AssetManager;
 
+import java.lang.Double;
+import java.util.Map;
+
 public class Fwe {
     /**
      * Run FWE. This will block until the `stop` method is called.
@@ -50,6 +53,21 @@ public class Fwe {
      * @param data CAN message data
      */
     public native static void ingestCanMessage(String interfaceId, long timestamp, int messageId, byte[] data);
+
+    /**
+     * Ingest signal value by name
+     * @param timestamp Timestamp of the signal value in milliseconds since the epoch, or zero to use the system time
+     * @param name Signal name
+     * @param value Signal value
+     */
+    public native static void ingestSignalValueByName(long timestamp, String name, Object value);
+
+    /**
+     * Ingest multiple signal values by name
+     * @param timestamp Timestamp of the signal value in milliseconds since the epoch, or zero to use the system time
+     * @param values Signal values
+     */
+    public native static void ingestMultipleSignalValuesByName(long timestamp, Map<String, Object> values);
 
     /**
      * Set the GPS location

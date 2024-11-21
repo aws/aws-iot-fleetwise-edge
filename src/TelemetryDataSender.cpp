@@ -6,6 +6,7 @@
 #include "LoggingModule.h"
 #include "OBDDataTypes.h"
 #include "SignalTypes.h"
+#include "TopicConfig.h"
 #include "TraceModule.h"
 #include <boost/variant.hpp>
 #include <cstddef>
@@ -150,6 +151,9 @@ TelemetryDataSender::processData( std::shared_ptr<const DataToSend> data, OnData
         case SignalType::BOOLEAN:
             firstSignalValues += std::to_string( static_cast<int>( signalValue.value.boolVal ) ) + ",";
             break;
+        case SignalType::STRING:
+            firstSignalValues += std::to_string( signalValue.value.uint32Val ) + ",";
+            break;
         case SignalType::UNKNOWN:
             // Signal of type UNKNOWN cannot be processed
             break;
@@ -286,6 +290,27 @@ TelemetryDataSender::compress( std::string &input, std::string &output ) const
     return true;
 }
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+void
+TelemetryDataSender::processSerializedData( std::string &data, OnDataProcessedCallback callback )
+{
+    mMQTTSender->sendBuffer( mMQTTSender->getTopicConfig().telemetryDataTopic,
+                             reinterpret_cast<const uint8_t *>( data.data() ),
+                             data.size(),
+                             [callback, data]( ConnectivityError result ) {
+                                 auto success = result == ConnectivityError::Success;
+                                 if ( success )
+                                 {
+                                     FWE_LOG_INFO( "A Payload of size: " + std::to_string( data.size() ) +
+                                                   " bytes has been uploaded" );
+                                     TraceModule::get().addToVariable( TraceVariable::DATA_FORWARD_BYTES, data.size() );
+                                     TraceModule::get().incrementVariable( TraceVariable::VEHICLE_DATA_PUBLISH_COUNT );
+                                 }
+                                 callback( success, nullptr );
+                             } );
+}
+#endif
+
 size_t
 TelemetryDataSender::uploadProto( OnDataProcessedCallback callback, unsigned recursionLevel )
 {
@@ -352,6 +377,7 @@ TelemetryDataSender::uploadProto( OnDataProcessedCallback callback, unsigned rec
 
     mPartNumber++;
     mMQTTSender->sendBuffer(
+        mMQTTSender->getTopicConfig().telemetryDataTopic,
         reinterpret_cast<const uint8_t *>( protoOutput->data() ),
         protoOutput->size(),
         [callback,
@@ -417,16 +443,17 @@ TelemetryDataSender::processPersistedData( std::istream &data,
 
     auto buf = reinterpret_cast<const uint8_t *>( dataAsArray.data() );
     auto bufSize = static_cast<size_t>( size );
-    mMQTTSender->sendBuffer( buf, bufSize, [callback, size]( ConnectivityError result ) {
-        if ( result != ConnectivityError::Success )
-        {
-            callback( false );
-            return;
-        }
+    mMQTTSender->sendBuffer(
+        mMQTTSender->getTopicConfig().telemetryDataTopic, buf, bufSize, [callback, size]( ConnectivityError result ) {
+            if ( result != ConnectivityError::Success )
+            {
+                callback( false );
+                return;
+            }
 
-        FWE_LOG_INFO( "A Payload of size: " + std::to_string( size ) + " bytes has been uploaded" );
-        callback( true );
-    } );
+            FWE_LOG_INFO( "A Payload of size: " + std::to_string( size ) + " bytes has been uploaded" );
+            callback( true );
+        } );
 }
 
 } // namespace IoTFleetWise

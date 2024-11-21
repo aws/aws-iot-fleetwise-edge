@@ -1,6 +1,6 @@
 # Application level metrics
 
-The Reference Implementation for AWS IoT Fleetwise ("FWE") includes a
+The Reference Implementation for AWS IoT FleetWise ("FWE") includes a
 [TraceModule](../src/TraceModule.cpp). The TraceModule provides a set of metrics that are used as an
 entry point to efficiently diagnose issues, saving you time since you no longer need to review the
 entire log of all FWE instances running.
@@ -23,7 +23,7 @@ entire log of all FWE instances running.
   cloud, either no actual data was collected ( such as a time-based data collection campaign with no
   bus activity), or the data has been ingested to the cloud but there was an error processing it. To
   debug this,
-  [enable cloud logs in AWS IoT Fleetwise settings](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/logging-cw.html).
+  [enable cloud logs in AWS IoT FleetWise settings](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/logging-cw.html).
 - **`QueueConsumerToInspectionDataFrames`** monitors the current count of data frames in queue to
   the signal history buffer. If this value is close to the value defined in the static config
   `decodedSignalsBufferSize`, increase the static config, decrease `inspectionThreadIdleTimeMs`,
@@ -33,7 +33,7 @@ entire log of all FWE instances running.
 - **`ConFail`** monitors the number of MQTT connection failures. This can have multiple root causes.
   If this is not zero please check the logs and search for `Connection failed with error`
 - **`FWE_STARTUP`** and **`FWE_SHUTDOWN`** provide the amount of time it takes to start and stop the
-  AWS IoT Edge Fleetwise process. If any value is more than 5 seconds, review the logs and make sure
+  AWS IoT Edge FleetWise process. If any value is more than 5 seconds, review the logs and make sure
   all required resources such as internet and buses are available before starting the process.
 - **`ObdE0`** to **`ObdE3`** monitors errors related to the OBD session. If you see non-zero values,
   make sure you're connected to a compatible OBD vehicle which is powered on. Otherwise turn off the

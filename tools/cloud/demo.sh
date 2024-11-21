@@ -36,13 +36,14 @@ BATCH_SIZE=$((`nproc`*4))
 HEALTH_CHECK_RETRIES=360 # About 30mins
 MAX_ATTEMPTS_ON_REGISTRATION_FAILURE=5
 FORCE_REGISTRATION=false
-MIN_CLI_VERSION="aws-cli/2.13.39"
+MIN_CLI_VERSION="2.13.39"
 CREATED_SIGNAL_CATALOG_NAME=""
 CREATED_S3_BUCKET=""
 CREATED_CAMPAIGN_NAMES=""
 INCLUDE_SIGNALS=""
 EXCLUDE_SIGNALS=""
 DATA_DESTINATION="TIMESTREAM"
+IOT_TOPIC="iotfleetwise-data-${DISAMBIGUATOR}"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -112,27 +113,32 @@ parse_args() {
             EXCLUDE_SIGNALS="$2"
             shift
             ;;
+        --iot-topic)
+            IOT_TOPIC="$2"
+            shift
+            ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --vehicle-name <NAME>            Vehicle name"
-            echo "  --fleet-size <SIZE>              Size of fleet, default: ${FLEET_SIZE}. When greater than 1,"
-            echo "                                   the instance number will be appended to each"
-            echo "                                   Vehicle name after a '-', e.g. ${DEFAULT_VEHICLE_NAME}-42"
-            echo "  --node-file <FILE>               Node JSON file. Can be used multiple times for multiple files."
-            echo "  --decoder-file <FILE>            Decoder JSON file. Can be used multiple times for multiple files."
-            echo "  --network-interface-file <FILE>  Network interface JSON file. Can be used multiple times for multiple files."
-            echo "  --campaign-file <FILE>           Campaign JSON file. Can be used multiple times for multiple files."
-            echo "  --data-destination <DESTINATION> Data destination, either TIMESTREAM or S3, default: ${DATA_DESTINATION}"
-            echo "  --s3-format <FORMAT>             Either JSON or PARQUET, default: ${S3_FORMAT}"
-            echo "  --bucket-name <NAME>             S3 bucket name, if not specified a new bucket will be created"
-            echo "  --set-bucket-policy              Sets the required bucket policy"
-            echo "  --clean-up                       Delete created resources"
-            echo "  --skip-account-registration      Don't check account registration nor try to register it. Most features should work without registration."
-            echo "  --include-signals <CSV>          Comma separated list of signals to include in HTML plot"
-            echo "  --exclude-signals <CSV>          Comma separated list of signals to exclude from HTML plot"
-            echo "  --endpoint-url <URL>             The endpoint URL used for AWS CLI calls"
-            echo "  --service-principal <PRINCIPAL>  AWS service principal for policies, default: ${SERVICE_PRINCIPAL}"
-            echo "  --region <REGION>                The region used for AWS CLI calls, default: ${REGION}"
+            echo "  --vehicle-name <NAME>             Vehicle name"
+            echo "  --fleet-size <SIZE>               Size of fleet, default: ${FLEET_SIZE}. When greater than 1,"
+            echo "                                    the instance number will be appended to each"
+            echo "                                    Vehicle name after a '-', e.g. ${DEFAULT_VEHICLE_NAME}-42"
+            echo "  --node-file <FILE>                Node JSON file. Can be used multiple times for multiple files."
+            echo "  --decoder-file <FILE>             Decoder JSON file. Can be used multiple times for multiple files."
+            echo "  --network-interface-file <FILE>   Network interface JSON file. Can be used multiple times for multiple files."
+            echo "  --campaign-file <FILE>            Campaign JSON file. Can be used multiple times for multiple files."
+            echo "  --data-destination <DESTINATION>  Data destination, either TIMESTREAM, S3 or IOT_TOPIC, default: ${DATA_DESTINATION}"
+            echo "  --s3-format <FORMAT>              Either JSON or PARQUET, default: ${S3_FORMAT}"
+            echo "  --bucket-name <NAME>              S3 bucket name, if not specified a new bucket will be created"
+            echo "  --set-bucket-policy               Sets the required bucket policy"
+            echo "  --clean-up                        Delete created resources"
+            echo "  --skip-account-registration       Don't check account registration nor try to register it. Most features should work without registration."
+            echo "  --include-signals <CSV>           Comma separated list of signals to include in HTML plot"
+            echo "  --exclude-signals <CSV>           Comma separated list of signals to exclude from HTML plot"
+            echo "  --endpoint-url <URL>              The endpoint URL used for AWS CLI calls"
+            echo "  --service-principal <PRINCIPAL>   AWS service principal for policies, default: ${SERVICE_PRINCIPAL}"
+            echo "  --region <REGION>                 The region used for AWS CLI calls, default: ${REGION}"
+            echo "  --iot-topic <TOPIC>               The IoT topic to publish vehicle data to, default: ${IOT_TOPIC} when --data-destination IOT_TOPIC is used"
             exit 0
             ;;
         esac
@@ -180,10 +186,10 @@ echo "Vehicles: ${VEHICLES[@]}"
 
 # AWS CLI v1.x has a double base64 encoding issue
 echo "Checking AWS CLI version..."
-CLI_VERSION=`aws --version | grep -Eo "aws-cli/[[:digit:]]+.[[:digit:]]+.[[:digit:]]+"`
+CLI_VERSION=`aws --version | sed -nE 's#^aws-cli/([0-9]+\.[0-9]+\.[0-9]+).*$#\1#p'`
 echo "${CLI_VERSION}"
-
-if [[ "${CLI_VERSION}" < "${MIN_CLI_VERSION}" ]]; then
+CLI_VERSION_OK=`python3 -c "from packaging.version import Version;print(Version('${CLI_VERSION}') >= Version('${MIN_CLI_VERSION}'))" 2> /dev/null`
+if [ "${CLI_VERSION_OK}" != "True" ]; then
     echo "Error: Please update AWS CLI to ${MIN_CLI_VERSION} or newer" >&2
     exit -1
 fi
@@ -416,65 +422,21 @@ elif [ "${DATA_DESTINATION}" == "TIMESTREAM" ]; then # Timestream
         --retention-properties "{\"MemoryStoreRetentionPeriodInHours\":2, \
             \"MagneticStoreRetentionPeriodInDays\":2}" | jq -r .Table.Arn )
 
-    echo "Creating service role..."
-    SERVICE_ROLE_TRUST_POLICY=$(cat << EOF
-{
-"Version": "2012-10-17",
-"Statement": [
-    {
-        "Effect": "Allow",
-        "Principal": {
-            "Service": [
-                "$SERVICE_PRINCIPAL"
-            ]
-        },
-        "Action": "sts:AssumeRole"
-    }
-]
-}
-EOF
-)
-    SERVICE_ROLE_ARN=`aws iam create-role \
-        --role-name "${SERVICE_ROLE}" \
-        --assume-role-policy-document "${SERVICE_ROLE_TRUST_POLICY}" | jq -r .Role.Arn`
-    echo ${SERVICE_ROLE_ARN}
-
-    echo "Waiting for role to be created..."
-    aws iam wait role-exists \
-        --role-name "${SERVICE_ROLE}"
-
-    echo "Creating service role policy..."
-    SERVICE_ROLE_POLICY=$(cat <<'EOF'
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "timestreamIngestion",
-            "Effect": "Allow",
-            "Action": [
-                "timestream:WriteRecords",
-                "timestream:Select",
-                "timestream:DescribeTable"
-            ]
-        },
-        {
-            "Sid": "timestreamDescribeEndpoint",
-            "Effect": "Allow",
-            "Action": [
-                "timestream:DescribeEndpoints"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
-EOF
-)
-    SERVICE_ROLE_POLICY=`echo "${SERVICE_ROLE_POLICY}" \
-        | jq ".Statement[0].Resource=\"arn:aws:timestream:${REGION}:${ACCOUNT_ID}:database/${TIMESTREAM_DB_NAME}/*\""`
-    aws iam put-role-policy \
-        --role-name "${SERVICE_ROLE}" \
-        --policy-name ${SERVICE_ROLE}-policy \
-        --policy-document "${SERVICE_ROLE_POLICY}"
+    SERVICE_ROLE_ARN=`${SCRIPT_DIR}/manage-service-role.sh \
+        --service-role ${SERVICE_ROLE} \
+        --service-principal ${SERVICE_PRINCIPAL} \
+        --actions "timestream:WriteRecords,timestream:Select,timestream:DescribeTable" \
+        --resources "arn:aws:timestream:${REGION}:${ACCOUNT_ID}:database/${TIMESTREAM_DB_NAME}/*" \
+        --actions "timestream:DescribeEndpoints" \
+        --resources "*"`
+elif [ "${DATA_DESTINATION}" == "IOT_TOPIC" ]; then
+    TOPIC_ARN=arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/${IOT_TOPIC}
+    echo "IoT topic destination: ${TOPIC_ARN}"
+    SERVICE_ROLE_ARN=`${SCRIPT_DIR}/manage-service-role.sh \
+        --service-role ${SERVICE_ROLE} \
+        --service-principal ${SERVICE_PRINCIPAL} \
+        --actions "iot:Publish" \
+        --resources ${TOPIC_ARN}`
 else
     echo "Error: Unknown data destination ${DATA_DESTINATION}"
     exit -1
@@ -668,6 +630,9 @@ else
         elif [ "${DATA_DESTINATION}" == "TIMESTREAM" ]; then
             CAMPAIGN=`echo "${CAMPAIGN}" \
                 | jq ".dataDestinationConfigs=[{\"timestreamConfig\":{\"timestreamTableArn\":\"${TIMESTREAM_TABLE_ARN}\",\"executionRoleArn\":\"${SERVICE_ROLE_ARN}\"}}]"`
+        elif [ "${DATA_DESTINATION}" == "IOT_TOPIC" ]; then
+            CAMPAIGN=`echo "${CAMPAIGN}" \
+                | jq ".dataDestinationConfigs=[{\"mqttTopicConfig\":{\"mqttTopicArn\":\"${TOPIC_ARN}\",\"executionRoleArn\":\"${SERVICE_ROLE_ARN}\"}}]"`
         else
             echo "Error: Unknown data destination ${DATA_DESTINATION}"
             exit -1
@@ -790,7 +755,8 @@ else
         done
 
         if [ ${#OUTPUT_FILES[@]} -eq 0 ]; then
-            echo "WARNING: No output files saved, was any data collected on any vehicles?"
+            echo "Error: No output files saved, was any data collected on any vehicles?"
+            exit -1
         else
             echo "You can now view the collected data."
             echo "----------------------------------------------------------------"
@@ -800,7 +766,50 @@ else
                 echo `realpath ${FILE}`
             done
         fi
+    elif [ "${DATA_DESTINATION}" == "IOT_TOPIC" ]; then
+        echo "Publishing to ${IOT_TOPIC}"
 
+        OUTPUT_FILES=()
+
+        for VEHICLE in ${VEHICLES[@]}; do
+            TOPIC_NAME=${IOT_TOPIC}
+            TOPIC_JSON_FILE="${COLLECTED_DATA_DIR}${VEHICLE}-iot-topic-result.json"
+            SUBSCRIBE_TIME=30
+            echo "Subscribing to IoT topic '${TOPIC_NAME}' for vehicle ${VEHICLE} for ${SUBSCRIBE_TIME} seconds.."
+            if python3 ${SCRIPT_DIR}/iot-topic-subscribe.py \
+                --client-id ${VEHICLE}-subscriber \
+                --region ${REGION} \
+                --output-file ${TOPIC_JSON_FILE} \
+                --vehicle-name ${VEHICLE} \
+                --iot-topic ${IOT_TOPIC} \
+                --run-time ${SUBSCRIBE_TIME}; then
+                echo "Saved IoT topic results to ${TOPIC_JSON_FILE}"
+                OUTPUT_FILE_HTML="${COLLECTED_DATA_DIR}${VEHICLE}.html"
+                OUTPUT_FILES+=(${OUTPUT_FILE_HTML})
+                echo "Converting from IoT topic JSON to HTML..."
+                python3 ${SCRIPT_DIR}/iot-topic-to-html.py \
+                    --vehicle-name ${VEHICLE} \
+                    --files ${TOPIC_JSON_FILE} \
+                    --html-filename ${OUTPUT_FILE_HTML} \
+                    --include-signals "${INCLUDE_SIGNALS}" \
+                    --exclude-signals "${EXCLUDE_SIGNALS}"
+            else
+                echo "WARNING: Could not save IoT topic results for ${VEHICLE}, was any data collected?"
+            fi
+        done
+
+        if [ ${#OUTPUT_FILES[@]} -eq 0 ]; then
+            echo "Error: No output files saved, was any data collected on any vehicles?"
+            exit -1
+        else
+            echo "You can now view the collected data."
+            echo "----------------------------------------------------------------"
+            echo "| Collected data for all campaigns for ${NAME} in HTML format: |"
+            echo "----------------------------------------------------------------"
+            for FILE in ${OUTPUT_FILES[@]}; do
+                echo `realpath ${FILE}`
+            done
+        fi
     else
         echo "Error: Unknown data destination ${DATA_DESTINATION}"
         exit -1

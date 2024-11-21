@@ -12,6 +12,7 @@
 #include "LoggingModule.h"
 #include "MqttClientWrapper.h"
 #include "RetryThread.h"
+#include "TopicConfig.h"
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -175,11 +176,13 @@ public:
      * @param rootCA The Root CA for the certificate
      * @param clientId the id that is used to identify this connection instance
      * @param mqttClientBuilder a builder that can create MQTT client instances
+     * @param topicConfig responsible for building topic names. It will be available to senders.
      * @param connectionConfig allows some connection config to be overriden
      */
     AwsIotConnectivityModule( std::string rootCA,
                               std::string clientId,
                               std::shared_ptr<MqttClientBuilderWrapper> mqttClientBuilder,
+                              const TopicConfig &topicConfig,
                               AwsIotConnectivityConfig connectionConfig = AwsIotConnectivityConfig() );
     ~AwsIotConnectivityModule() override;
 
@@ -207,7 +210,7 @@ public:
         return mConnected;
     };
 
-    std::shared_ptr<ISender> createSender( const std::string &topicName, QoS publishQoS = QoS::AT_MOST_ONCE ) override;
+    std::shared_ptr<ISender> createSender() override;
 
     std::shared_ptr<IReceiver> createReceiver( const std::string &topicName ) override;
 
@@ -224,6 +227,7 @@ private:
     std::string mClientId;
     std::shared_ptr<MqttClientWrapper> mMqttClient;
     std::shared_ptr<MqttClientBuilderWrapper> mMqttClientBuilder;
+    const TopicConfig &mTopicConfig;
     AwsIotConnectivityConfig mConnectionConfig;
     RetryThread mInitialConnectionThread;
     RetryThread mSubscriptionsThread;

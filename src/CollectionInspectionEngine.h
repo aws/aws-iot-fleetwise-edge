@@ -7,6 +7,7 @@
 #include "CollectionInspectionAPITypes.h"
 #include "EventTypes.h"
 #include "ICollectionScheme.h"
+#include "Listener.h"
 #include "LoggingModule.h"
 #include "MessageTypes.h"
 #include "OBDDataTypes.h"
@@ -21,6 +22,7 @@
 #include <boost/variant.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <string>
@@ -35,6 +37,7 @@ namespace Aws
 namespace IoTFleetWise
 {
 
+static constexpr Timestamp MIN_FETCH_TRIGGER_MS = 1000;
 // Rule A14-8-2 suggests to use class template specialization instead of function template specialization
 template <typename T>
 class NotifyRawBufferManager
@@ -116,16 +119,19 @@ public:
     /**
      * @brief Construct the CollectionInspectionEngine which handles multiple conditions
      *
+     * @param minFetchTriggerIntervalMs the minimum interval in milliseconds between two fetch triggers
+     *
      * @param sendDataOnlyOncePerCondition if true only data with a millisecond timestamp, bigger than the timestamp the
      * condition last sent out data, will be included.
      */
-    CollectionInspectionEngine( bool sendDataOnlyOncePerCondition = true );
+    CollectionInspectionEngine( uint32_t minFetchTriggerIntervalMs = MIN_FETCH_TRIGGER_MS,
+                                bool sendDataOnlyOncePerCondition = true );
 
     void onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix,
                                    const TimePoint &currentTime );
 
     /**
-     * @brief Go through all conditions with changed condition signals and evaluate condition
+     * @brief Go through all conditions incl. fetch conditions with changed condition signals and evaluate condition
      *
      * This needs to be called directly after new signals are added to the CollectionEngine.
      * If multiple samples of the same signal are added to CollectionEngine without calling
@@ -134,6 +140,21 @@ public:
      *
      */
     bool evaluateConditions( const TimePoint &currentTime );
+
+    /**
+     * @brief The callback function used to notify any listeners on fetch condition evaluation
+     *
+     * @param fetchRequestID fetch request id for which the evaluation was done
+     * @param evaluationResult evaluation result (true/false)
+     */
+    using OnFetchConditionEvaluationCallback =
+        std::function<void( const FetchRequestID fetchRequestID, bool evaluationResult )>;
+
+    void
+    subscribeToFetchConditionEvaluationUpdate( OnFetchConditionEvaluationCallback callback )
+    {
+        mFetchConditionEvaluationListeners.subscribe( callback );
+    }
 
     /**
      * @brief Copy for a triggered condition data out of the signal buffer
@@ -150,6 +171,12 @@ public:
      * @return if dataReadyToBeSent() is false a nullptr otherwise the collected data will be returned
      */
     CollectionInspectionEngineOutput collectNextDataToSend( const TimePoint &currentTime, uint32_t &waitTimeMs );
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    // coverity[autosar_cpp14_a18_1_2_violation] std::vector<bool> specialization is acceptable in this usecase
+    std::unordered_map<std::string, std::vector<bool>> forwardConditionForCampaignPartitions();
+#endif
+
     /**
      * @brief Give a new signal to the collection engine to cached it
      *
@@ -160,12 +187,17 @@ public:
      * The signals should come in ordered by time (oldest signals first)
      *
      * @param id id of the obd based or can based signal
+     * @param fetchRequestID fetch request ID that signal was collected for
      * @param receiveTime timestamp at which time was the signal seen on the physical bus
      * @param currentMonotonicTimeMs current monotonic time for window function evaluation
      * @param value the signal value
      */
     template <typename T>
-    void addNewSignal( SignalID id, const TimePoint &receiveTime, const Timestamp &currentMonotonicTimeMs, T value );
+    void addNewSignal( SignalID id,
+                       FetchRequestID fetchRequestID,
+                       const TimePoint &receiveTime,
+                       const Timestamp &currentMonotonicTimeMs,
+                       T value );
 
     /**
      * @brief Add new signal buffer entry to mSignalBuffers (SignalHistoryBufferCollection)
@@ -174,7 +206,8 @@ public:
      * size.
      */
     template <typename T>
-    void addSignalBuffer( const InspectionMatrixSignalCollectionInfo &signal );
+    void addSignalBuffer( const InspectionMatrixSignalCollectionInfo &signal,
+                          SignalBufferConditionID signalBufferConditionIndex );
 
     /**
      * @brief Add new raw CAN Frame history buffer. If frame is not needed call will be just ignored
@@ -203,8 +236,11 @@ public:
 
     void setActiveDTCs( const DTCInfo &activeDTCs );
 
+    void registerCustomFunction( const std::string &name, CustomFunctionCallbacks callbacks );
+
 private:
     static const uint32_t MAX_SAMPLE_MEMORY = 20 * 1024 * 1024; // 20MB max for all samples
+    uint32_t mMinFetchTriggerIntervalMs;
     static inline double
     EVAL_EQUAL_DISTANCE()
     {
@@ -557,6 +593,16 @@ private:
         return ++counter;
     }
 
+    ExpressionErrorCode isNewSignalValueAvailable( SignalID signalID,
+                                                   ActiveCondition &condition,
+                                                   InspectionValue &resultValue,
+                                                   uint32_t conditionId );
+    template <typename T>
+    ExpressionErrorCode isNewSignalValueAvailableType( SignalID signalID,
+                                                       ActiveCondition &condition,
+                                                       InspectionValue &resultValue,
+                                                       uint32_t conditionId );
+
     // VSS supported datatypes
     using SignalHistoryBuffersVar = boost::variant<std::vector<SignalHistoryBuffer<uint8_t>>,
                                                    std::vector<SignalHistoryBuffer<int8_t>>,
@@ -569,10 +615,15 @@ private:
                                                    std::vector<SignalHistoryBuffer<float>>,
                                                    std::vector<SignalHistoryBuffer<double>>,
                                                    std::vector<SignalHistoryBuffer<bool>>>;
-    using SignalHistoryBufferCollection = std::unordered_map<SignalID, SignalHistoryBuffersVar>;
+    using SignalHistoryBufferCollection =
+        std::unordered_map<SignalBufferConditionID, std::unordered_map<SignalID, SignalHistoryBuffersVar>>;
     SignalHistoryBufferCollection
-        mSignalBuffers; /**< signal history buffer. First vector has the signalID as index. In the nested vector
+        mSignalBuffers; /**< signal history buffer. Vector has the "virtual" index, that is based of
+                         * condition index and fetch request id, and signalID as index. In the nested vector
                          * the different subsampling of this signal are stored. */
+
+    using FetchRequestToConditionIndexMap = std::unordered_map<FetchRequestID, SignalBufferConditionID>;
+    FetchRequestToConditionIndexMap mFetchRequestToConditionIndexMap;
 
     using SignalToBufferTypeMap = std::unordered_map<SignalID, SignalType>;
     SignalToBufferTypeMap mSignalToBufferTypeMap;
@@ -582,10 +633,12 @@ private:
      */
     template <typename T>
     std::vector<SignalHistoryBuffer<T>> *
-    getSignalHistoryBuffersPtr( SignalID signalID )
+    getSignalHistoryBuffersPtr( SignalID signalID, SignalBufferConditionID signalBufferConditionIndex )
     {
         std::vector<SignalHistoryBuffer<T>> *resVec = nullptr;
-        if ( mSignalBuffers.find( signalID ) == mSignalBuffers.end() )
+
+        auto outerMapIt = mSignalBuffers.find( signalBufferConditionIndex );
+        if ( outerMapIt == mSignalBuffers.end() || outerMapIt->second.find( signalID ) == outerMapIt->second.end() )
         {
             // create a new map entry
             auto mapEntryVec = std::vector<SignalHistoryBuffer<T>>{};
@@ -594,7 +647,7 @@ private:
                 SignalHistoryBuffersVar mapEntry = mapEntryVec;
                 FWE_LOG_TRACE( "Creating new signalHistoryBuffer vector for Signal " + std::to_string( signalID ) +
                                " with type " + boost::core::demangle( typeid( T ).name() ) );
-                mSignalBuffers.insert( { signalID, mapEntry } );
+                mSignalBuffers[signalBufferConditionIndex].insert( { signalID, mapEntry } );
             }
             catch ( ... )
             {
@@ -606,7 +659,7 @@ private:
 
         try
         {
-            auto signalBufferVectorPtr = mSignalBuffers.find( signalID );
+            auto signalBufferVectorPtr = mSignalBuffers.find( signalBufferConditionIndex )->second.find( signalID );
             resVec = boost::get<std::vector<SignalHistoryBuffer<T>>>( &( signalBufferVectorPtr->second ) );
             if ( resVec == nullptr )
             {
@@ -628,9 +681,11 @@ private:
      */
     template <typename T>
     SignalHistoryBuffer<T> *
-    getSignalHistoryBufferPtr( SignalID signalID, uint32_t minimumSampleIntervalMs )
+    getSignalHistoryBufferPtr( SignalID signalID,
+                               SignalBufferConditionID signalBufferConditionIndex,
+                               uint32_t minimumSampleIntervalMs )
     {
-        auto signalHistoryBufferVectorPtr = getSignalHistoryBuffersPtr<T>( signalID );
+        auto signalHistoryBufferVectorPtr = getSignalHistoryBuffersPtr<T>( signalID, signalBufferConditionIndex );
         if ( signalHistoryBufferVectorPtr != nullptr )
         {
             for ( auto &buffer : *signalHistoryBufferVectorPtr )
@@ -645,10 +700,14 @@ private:
     }
 
     template <typename T>
-    bool allocateBufferVector( SignalID signalID, size_t &usedBytes );
+    bool allocateBufferVector( SignalID signalID,
+                               SignalBufferConditionID signalBufferConditionIndex,
+                               size_t &usedBytes );
 
     template <typename T>
-    void updateBufferFixedWindowFunction( SignalID signalID, Timestamp timestamp );
+    void updateBufferFixedWindowFunction( SignalID signalID,
+                                          SignalBufferConditionID signalBufferConditionIndex,
+                                          Timestamp timestamp );
 
     template <typename T>
     ExpressionErrorCode getLatestBufferSignalValue( SignalID id, ActiveCondition &condition, InspectionValue &result );
@@ -679,8 +738,15 @@ private:
         mConditionsTriggeredWaitingPublished; // bit is set if condition is triggered and waits for its data to be sent
                                               // out, bit is not set if condition is not triggered
 
+    std::bitset<MAX_NUMBER_OF_ACTIVE_FETCH_CONDITION>
+        mFetchConditionsWithConditionCurrentlyTrue; // bit is set if the fetch condition evaluated to true the last time
+                                                    // indexed by fetch request ID which is unique and generated on
+                                                    // scheme arrival
+
     std::vector<ActiveCondition> mConditions;
     std::shared_ptr<const InspectionMatrix> mActiveInspectionMatrix;
+
+    ThreadSafeListeners<OnFetchConditionEvaluationCallback> mFetchConditionEvaluationListeners;
 
     void collectData( ActiveCondition &condition,
                       uint32_t conditionId,
@@ -690,24 +756,38 @@ private:
 
     Timestamp mNextWindowFunctionTimesOut{ 0 };
     bool mSendDataOnlyOncePerCondition{ false };
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    // coverity[autosar_cpp14_a18_1_2_violation] std::vector<bool> specialization is acceptable in this usecase
+    std::unordered_map<std::string, std::vector<bool>> mForwardConditionCurrentlyTrueForCampaignPartitions;
+#endif
+    std::unordered_map<FetchRequestID, Timestamp> mLastFetchTrigger;
     std::shared_ptr<RawData::BufferManager> mRawBufferManager{ nullptr };
+
+    std::unordered_map<std::string, CustomFunctionCallbacks> mCustomFunctionCallbacks;
+    void cleanupCustomFunctions( const ExpressionNode *expression );
 };
 
 template <typename T>
 void
 CollectionInspectionEngine::addNewSignal( SignalID id,
+                                          FetchRequestID fetchRequestID,
                                           const TimePoint &receiveTime,
                                           const Timestamp &currentMonotonicTimeMs,
                                           T value )
 {
-    if ( mSignalBuffers.find( id ) == mSignalBuffers.end() )
+    auto signalBufferConditionIndex = mFetchRequestToConditionIndexMap[fetchRequestID];
+    auto outerSignalBufferMapIt = mSignalBuffers.find( signalBufferConditionIndex );
+
+    if ( outerSignalBufferMapIt == mSignalBuffers.end() ||
+         outerSignalBufferMapIt->second.find( id ) == outerSignalBufferMapIt->second.end() )
     {
         // Signal not collected by any active condition
         return;
     }
     // Iterate through all sampling intervals of the signal
     std::vector<SignalHistoryBuffer<T>> *signalHistoryBufferPtr = nullptr;
-    signalHistoryBufferPtr = getSignalHistoryBuffersPtr<T>( id );
+    signalHistoryBufferPtr = getSignalHistoryBuffersPtr<T>( id, signalBufferConditionIndex );
     if ( signalHistoryBufferPtr == nullptr )
     {
         // Invalid access to the map Buffer datatype

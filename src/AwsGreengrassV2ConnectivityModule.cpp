@@ -12,10 +12,12 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-AwsGreengrassV2ConnectivityModule::AwsGreengrassV2ConnectivityModule( Aws::Crt::Io::ClientBootstrap *clientBootstrap )
+AwsGreengrassV2ConnectivityModule::AwsGreengrassV2ConnectivityModule( Aws::Crt::Io::ClientBootstrap *clientBootstrap,
+                                                                      const TopicConfig &topicConfig )
     : mConnected( false )
     , mConnectionEstablished( false )
     , mClientBootstrap( clientBootstrap )
+    , mTopicConfig( topicConfig )
 {
 }
 
@@ -51,20 +53,9 @@ AwsGreengrassV2ConnectivityModule::connect()
 }
 
 std::shared_ptr<ISender>
-AwsGreengrassV2ConnectivityModule::createSender( const std::string &topicName, QoS publishQoS )
+AwsGreengrassV2ConnectivityModule::createSender()
 {
-    auto greengrassPublishQoS = Aws::Greengrass::QOS_AT_MOST_ONCE;
-    switch ( publishQoS )
-    {
-    case QoS::AT_MOST_ONCE:
-        greengrassPublishQoS = Aws::Greengrass::QOS_AT_MOST_ONCE;
-        break;
-    case QoS::AT_LEAST_ONCE:
-        greengrassPublishQoS = Aws::Greengrass::QOS_AT_LEAST_ONCE;
-        break;
-    }
-
-    auto sender = std::make_shared<AwsGreengrassV2Sender>( this, mGreengrassClient, topicName, greengrassPublishQoS );
+    auto sender = std::make_shared<AwsGreengrassV2Sender>( this, mGreengrassClient, mTopicConfig );
     mSenders.emplace_back( sender );
     return sender;
 }

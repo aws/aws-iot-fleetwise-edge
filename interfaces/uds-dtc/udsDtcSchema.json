@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "http://aws-iot-automotive.com/udsDtcSchema",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "IoTFleetWise UDS DTC Schema",
+  "description": "The root schema for FWE UDS DTC JSON",
+  "properties": {
+    "DetectedDTCs": {
+      "description": "Detected DTCs",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "DTCAndSnapshot": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "DTCStatusAvailabilityMask": {
+                "description": "DTC status availability mask in hex format",
+                "type": "string"
+              },
+              "dtcCodes": {
+                "description": "List of DTC codes, snapshot and extended data",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "DTC": {
+                      "description": "DTC code in hex format",
+                      "type": "string"
+                    },
+                    "DTCExtendedData": {
+                      "description": "DTC extended data in hex reportDTCExtDataRecordByDTCNumber format",
+                      "type": "string"
+                    },
+                    "DTCSnapshotRecord": {
+                      "description": "DTC snapshot data in hex reportDTCSnapshotRecordByDTCNumber format",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "ECUID": {
+            "description": "ECU identifier in hex format",
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

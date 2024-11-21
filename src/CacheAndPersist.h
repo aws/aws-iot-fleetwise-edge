@@ -38,6 +38,10 @@ enum class DataType
     COLLECTION_SCHEME_LIST,
     DECODER_MANIFEST,
     DEFAULT_DATA_TYPE,
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    STATE_TEMPLATE_LIST,
+    STATE_TEMPLATE_LIST_METADATA,
+#endif
 };
 
 /**
@@ -206,6 +210,10 @@ private:
     // Define File names for the components using the lib
     static constexpr const char *DECODER_MANIFEST_FILE = "DecoderManifest.bin";
     static constexpr const char *COLLECTION_SCHEME_LIST_FILE = "CollectionSchemeList.bin";
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    static constexpr const char *STATE_TEMPLATE_LIST_FILE = "StateTemplateList.bin";
+    static constexpr const char *STATE_TEMPLATE_LIST_METADATA_FILE = "StateTemplateListMetadata.json";
+#endif
     static constexpr const char *PAYLOAD_METADATA_FILE = "PayloadMetadata.json";
     // Folder to isolate persistency workspace
     static constexpr const char *PERSISTENCY_WORKSPACE = "FWE_Persistency/";
@@ -222,6 +230,10 @@ private:
     std::string mPersistencyWorkspace;
     std::string mDecoderManifestFile;
     std::string mCollectionSchemeListFile;
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    std::string mStateTemplateListFile;
+    std::string mStateTemplateListMetadataFile;
+#endif
     std::string mPayloadMetadataFile;
     std::string mCollectedDataPath;
     std::uintmax_t mMaxPersistencePartitionSize;

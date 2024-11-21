@@ -1,5 +1,13 @@
 # Android App for AWS IoT FleetWise
 
+<!-- prettier-ignore -->
+> [!NOTE]
+> This guide makes use of "gated" features of AWS IoT FleetWise for which you will need to request
+> access. See
+> [here](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/fleetwise-regions.html) for
+> more information, or contact the
+> [AWS Support Center](https://console.aws.amazon.com/support/home#/).
+
 This app demonstrates AWS IoT FleetWise using an Android smartphone or Android Automotive.
 
 - [Android Smartphone User guide](#android-smartphone-user-guide)
@@ -7,6 +15,22 @@ This app demonstrates AWS IoT FleetWise using an Android smartphone or Android A
 - [Android Developer Guide](#android-developer-guide)
 
 ## Android Smartphone User guide
+
+**Prerequisites:**
+
+- An Android 5.0+ smartphone.
+- An [ELM327 Bluetooth OBD adapter](https://www.amazon.com/s?k=elm327+bluetooth).
+- Access to an AWS Account with administrator privileges.
+- Your AWS account has access to AWS IoT FleetWise "gated" features. See
+  [here](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/fleetwise-regions.html) for
+  more information, or contact the
+  [AWS Support Center](https://console.aws.amazon.com/support/home#/).
+- Logged in to the AWS Console in the `us-east-1` region using the account with administrator
+  privileges.
+  - Note: if you would like to use a different region you will need to change `us-east-1` to your
+    desired region in each place that it is mentioned below.
+  - Note: AWS IoT FleetWise is currently available in
+    [these](https://docs.aws.amazon.com/general/latest/gr/iotfleetwise.html) regions.
 
 This guide demonstrates AWS IoT FleetWise using a smartphone with Android 5.0+ and a commonly
 available [ELM327 Bluetooth OBD adapter](https://www.amazon.com/s?k=elm327+bluetooth).
@@ -21,7 +45,7 @@ available [ELM327 Bluetooth OBD adapter](https://www.amazon.com/s?k=elm327+bluet
 
 1. Open the AWS CloudShell: [Launch CloudShell](https://console.aws.amazon.com/cloudshell/home)
 
-1. Run the following command to clone the FWE repo from GitHub:
+1. Copy and paste the following command to clone the latest FWE source code from GitHub.
 
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge
@@ -34,7 +58,9 @@ available [ELM327 Bluetooth OBD adapter](https://www.amazon.com/s?k=elm327+bluet
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/android-app/cloud \
    && pip3 install segno \
-   && ./provision.sh --s3-qr-code
+   && ./provision.sh \
+      --region us-east-1 \
+      --s3-qr-code
    ```
 
 1. When the script completes, the path to a QR code image file is given:
@@ -74,13 +100,14 @@ available [ELM327 Bluetooth OBD adapter](https://www.amazon.com/s?k=elm327+bluet
 
    ```bash
    ../../cloud/demo.sh \
+      --region us-east-1 \
       --vehicle-name `cat config/vehicle-name.txt` \
       --node-file ../../cloud/obd-nodes.json \
-      --node-file externalGpsNodes.json\
+      --node-file ../../cloud/custom-nodes-location.json \
       --decoder-file ../../cloud/obd-decoders.json \
-        --decoder-file externalGpsDecoders.json \
+      --decoder-file ../../cloud/custom-decoders-location.json \
       --network-interface-file ../../cloud/network-interface-obd.json \
-        --network-interface-file network-interface-can-external-gps.json \
+      --network-interface-file ../../cloud/network-interface-custom-location.json \
       --campaign-file campaign-android-obd.json
    ```
 
@@ -100,6 +127,7 @@ available [ELM327 Bluetooth OBD adapter](https://www.amazon.com/s?k=elm327+bluet
    ../../cloud/clean-up.sh \
    && ../../provision.sh \
       --vehicle-name `cat config/vehicle-name.txt` \
+      --region us-east-1 \
       --only-clean-up
    ```
 
@@ -113,6 +141,17 @@ privileged VHAL properties. To demonstrate the app accessing privileged VHAL pro
 
 **Prerequisites:**
 
+- Access to an AWS Account with administrator privileges.
+- Your AWS account has access to AWS IoT FleetWise "gated" features. See
+  [here](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/fleetwise-regions.html) for
+  more information, or contact the
+  [AWS Support Center](https://console.aws.amazon.com/support/home#/).
+- Logged in to the AWS Console in the `us-east-1` region using the account with administrator
+  privileges.
+  - Note: if you would like to use a different region you will need to change `us-east-1` to your
+    desired region in each place that it is mentioned below.
+  - Note: AWS IoT FleetWise is currently available in
+    [these](https://docs.aws.amazon.com/general/latest/gr/iotfleetwise.html) regions.
 - A local x86_64 Ubuntu 20.04 machine with the
   [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
   installed.
@@ -147,7 +186,8 @@ privileged VHAL properties. To demonstrate the app accessing privileged VHAL pro
    ```bash
    git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
    && cd ~/aws-iot-fleetwise-edge/tools/android-app/cloud \
-   && ./provision.sh
+   && ./provision.sh \
+      --region us-east-1
    ```
 
 1. Run the following to configure the app with the credentials. This will cause the app to connect
@@ -170,13 +210,14 @@ privileged VHAL properties. To demonstrate the app accessing privileged VHAL pro
    ```bash
    sudo -H ../../cloud/install-deps.sh \
    && ../../cloud/demo.sh \
+      --region us-east-1 \
       --vehicle-name `cat config/vehicle-name.txt` \
-      --node-file externalGpsNodes.json\
-      --node-file aaosVhalNodes.json \
-      --decoder-file externalGpsDecoders.json \
-      --decoder-file aaosVhalDecoders.json \
-      --network-interface-file network-interface-can-external-gps.json \
-      --network-interface-file network-interface-can-aaos-vhal.json \
+      --node-file ../../cloud/custom-nodes-location.json \
+      --node-file custom-nodes-aaos-vhal.json \
+      --decoder-file ../../cloud/custom-decoders-location.json \
+      --decoder-file custom-decoders-aaos-vhal.json \
+      --network-interface-file ../../cloud/network-interface-custom-location.json \
+      --network-interface-file network-interface-custom-aaos-vhal.json \
       --campaign-file campaign-android-aaos-vhal.json
    ```
 
@@ -196,6 +237,7 @@ privileged VHAL properties. To demonstrate the app accessing privileged VHAL pro
    ../../cloud/clean-up.sh \
    && ../../provision.sh \
       --vehicle-name `cat config/vehicle-name.txt` \
+      --region us-east-1 \
       --only-clean-up
    ```
 

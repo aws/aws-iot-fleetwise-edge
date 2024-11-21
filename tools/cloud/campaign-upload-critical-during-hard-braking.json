@@ -1,0 +1,34 @@
+{
+  "compression": "SNAPPY",
+  "diagnosticsMode": "OFF",
+  "spoolingMode": "TO_DISK",
+  "collectionScheme": {
+    "timeBasedCollectionScheme": {
+      "periodMs": 10000
+    }
+  },
+  "postTriggerCollectionDuration": 1000,
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.ABS.DemoBrakePedalPressure",
+      "dataPartitionId": "critical"
+    }
+  ],
+  "dataPartitions": [
+    {
+      "id": "critical",
+      "storageOptions": {
+        "maximumSize": {
+          "unit": "MB",
+          "value": 10
+        },
+        "storageLocation": "critical_data",
+        "minimumTimeToLive": {
+          "unit": "DAYS",
+          "value": 7
+        }
+      },
+      "uploadOptions": { "expression": "$variable.`Vehicle.ABS.DemoBrakePedalPressure` > 7000" }
+    }
+  ]
+}

@@ -9,6 +9,7 @@
 #include "SignalTypes.h"
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace Aws
@@ -130,6 +131,43 @@ public:
     }
 };
 
+/*
+ * Custom signal decoder, which for example can be the fully-qualified-name of the signal
+ */
+using CustomSignalDecoder = std::string;
+const CustomSignalDecoder INVALID_CUSTOM_SIGNAL_DECODER = {};
+
+struct CustomSignalDecoderFormat
+{
+    InterfaceID mInterfaceId;
+    CustomSignalDecoder mDecoder;
+
+    /**
+     * @brief Unique Signal ID provided by Cloud
+     */
+    SignalID mSignalID{ 0x0 };
+
+    /**
+     * @brief The datatype of the signal. The default is double for backward compatibility
+     */
+    SignalType mSignalType{ SignalType::DOUBLE };
+
+public:
+    /**
+     * @brief Overload of the == operator
+     * @param other Other CustomSignalDecoderFormat object to compare
+     * @return true if ==, false otherwise
+     */
+    bool
+    operator==( const CustomSignalDecoderFormat &other ) const
+    {
+        return ( mInterfaceId == other.mInterfaceId ) && ( mDecoder == other.mDecoder );
+    }
+};
+
+using SignalIDToCustomSignalDecoderFormatMap = std::unordered_map<SignalID, CustomSignalDecoderFormat>;
+using SignalIDToCustomSignalDecoderFormatMapPtr = std::shared_ptr<const SignalIDToCustomSignalDecoderFormatMap>;
+
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 /**
  * @brief Contains on ComplexSignal from the decoder manifest that can be used to decode big structured
@@ -164,6 +202,11 @@ const PIDSignalDecoderFormat NOT_READY_PID_DECODER_FORMAT = PIDSignalDecoderForm
  * @brief Error Code for OBD-II PID Decoder Format Not Found in decoder manifest
  */
 const PIDSignalDecoderFormat NOT_FOUND_PID_DECODER_FORMAT = PIDSignalDecoderFormat();
+
+/**
+ * @brief Error code for custom signal decoder not found or not ready in decoder manifest
+ */
+const CustomSignalDecoderFormat INVALID_CUSTOM_SIGNAL_DECODER_FORMAT = CustomSignalDecoderFormat();
 
 /**
  * @brief IDecoderManifest is used to exchange DecoderManifest between components
@@ -242,6 +285,19 @@ public:
      */
     virtual ComplexDataElement getComplexDataType( ComplexDataTypeId typeId ) const = 0;
 #endif
+
+    /**
+     * @brief Get the custom decoder for this signal
+     * @param signalID the unique signalID
+     * @return invalid decoder if signal does not have a custom decoder
+     */
+    virtual CustomSignalDecoderFormat getCustomSignalDecoderFormat( SignalID signalID ) const = 0;
+
+    /**
+     * @brief Get custom signal decoder format map
+     * @return empty map if no map is present in the decoder manifest
+     */
+    virtual SignalIDToCustomSignalDecoderFormatMapPtr getSignalIDToCustomSignalDecoderFormatMap() const = 0;
 
     /**
      * @brief Used by the AWS IoT MQTT callback to copy data received from Cloud into this object without any further

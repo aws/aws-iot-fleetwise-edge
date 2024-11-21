@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "CollectionSchemeIngestion.h"
-#include "CollectionInspectionAPITypes.h"
 #include "LoggingModule.h"
 #include <google/protobuf/message.h>
 #include <string>
@@ -22,6 +21,7 @@ namespace IoTFleetWise
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 std::atomic<uint32_t> CollectionSchemeIngestion::mPartialSignalCounter( 0 ); // NOLINT Global atomic signal counter
 #endif
+CustomFunctionInvocationID CollectionSchemeIngestion::mCustomFunctionNextInvocationId{ 1 }; // NOLINT
 
 CollectionSchemeIngestion::~CollectionSchemeIngestion()
 {
@@ -84,6 +84,150 @@ CollectionSchemeIngestion::build()
 
     FWE_LOG_TRACE( "Building CollectionScheme with ID: " + mProtoCollectionSchemeMessagePtr->campaign_sync_id() );
 
+    // build fetch informations
+    if ( mProtoCollectionSchemeMessagePtr->signal_fetch_information_size() > 0 )
+    {
+        uint32_t numNodesCondition = 0U;
+        uint32_t numNodesAction = 0U;
+
+        for ( int i = 0; i < mProtoCollectionSchemeMessagePtr->signal_fetch_information_size(); i++ )
+        {
+            const Schemas::CollectionSchemesMsg::FetchInformation &signal_fetch_information =
+                mProtoCollectionSchemeMessagePtr->signal_fetch_information( i );
+
+            if ( signal_fetch_information.fetchConfig_case() ==
+                 Schemas::CollectionSchemesMsg::FetchInformation::kTimeBased )
+            {
+                // empty (nullptr) condition node for time-based fetching
+            }
+            else if ( ( signal_fetch_information.fetchConfig_case() ==
+                        Schemas::CollectionSchemesMsg::FetchInformation::kConditionBased ) &&
+                      signal_fetch_information.condition_based().has_condition_tree() )
+            {
+                numNodesCondition +=
+                    getNumberOfNodes( signal_fetch_information.condition_based().condition_tree(), MAX_EQUATION_DEPTH );
+            }
+            else
+            {
+                continue;
+            }
+
+            for ( int j = 0; j < signal_fetch_information.actions_size(); j++ )
+            {
+                numNodesAction += getNumberOfNodes( signal_fetch_information.actions( j ), MAX_EQUATION_DEPTH );
+            }
+        }
+
+        if ( numNodesCondition > 0 )
+        {
+            FWE_LOG_TRACE( "The CollectionScheme has some fetch conditions => will build " +
+                           std::to_string( numNodesCondition ) + " condition nodes for this purpose" );
+
+            // realloc for mExpressionNodesForFetchCondition is not allowed after reservation
+            // as pointers to its elements will be set during AST building process and be used later
+            mExpressionNodesForFetchCondition.reserve( numNodesCondition );
+        }
+
+        if ( numNodesAction > 0 )
+        {
+            FWE_LOG_TRACE( "The CollectionScheme has some fetch actions => will build " +
+                           std::to_string( numNodesAction ) + " fetch nodes for this purpose" );
+
+            // realloc for mExpressionNodesForFetchAction is not allowed after reservation
+            // as pointers to its elements will be set during AST building process and be used later
+            mExpressionNodesForFetchAction.reserve( numNodesAction );
+        }
+
+        std::size_t currentIndexCondition = 0U;
+        std::size_t currentIndexAction = 0U;
+
+        for ( int i = 0; i < mProtoCollectionSchemeMessagePtr->signal_fetch_information_size(); i++ )
+        {
+            const Schemas::CollectionSchemesMsg::FetchInformation &signal_fetch_information =
+                mProtoCollectionSchemeMessagePtr->signal_fetch_information( i );
+
+            mFetchInformations.emplace_back();
+
+            FetchInformation &fetchInformation = mFetchInformations.back();
+
+            fetchInformation.signalID = signal_fetch_information.signal_id();
+
+            if ( signal_fetch_information.fetchConfig_case() ==
+                 Schemas::CollectionSchemesMsg::FetchInformation::kTimeBased )
+            {
+                // no need to set fetchInformation.condition to nullptr here as it is default constructed value
+                fetchInformation.maxExecutionPerInterval = signal_fetch_information.time_based().max_execution_count();
+                fetchInformation.executionPeriodMs = signal_fetch_information.time_based().execution_frequency_ms();
+                fetchInformation.executionIntervalMs =
+                    signal_fetch_information.time_based().reset_max_execution_count_interval_ms();
+            }
+            else if ( ( signal_fetch_information.fetchConfig_case() ==
+                        Schemas::CollectionSchemesMsg::FetchInformation::kConditionBased ) &&
+                      signal_fetch_information.condition_based().has_condition_tree() )
+            {
+                fetchInformation.condition = serializeNode( signal_fetch_information.condition_based().condition_tree(),
+                                                            mExpressionNodesForFetchCondition,
+                                                            currentIndexCondition,
+                                                            MAX_EQUATION_DEPTH );
+
+                if ( fetchInformation.condition == nullptr )
+                {
+                    FWE_LOG_WARN( "Fetch information #" + std::to_string( i ) +
+                                  " contains invalid condition => will ignore the fetch information" );
+                    mFetchInformations.pop_back();
+                    continue;
+                }
+
+                fetchInformation.triggerOnlyOnRisingEdge =
+                    ( signal_fetch_information.condition_based().condition_trigger_mode() ==
+                      Schemas::CollectionSchemesMsg::
+                          ConditionBasedFetchConfig_ConditionTriggerMode_TRIGGER_ONLY_ON_RISING_EDGE );
+            }
+            else
+            {
+                FWE_LOG_WARN( "Fetch information #" + std::to_string( i ) +
+                              " contains unsupported configuration => will ignore the fetch information" );
+                mFetchInformations.pop_back();
+                continue;
+            }
+
+            bool isActionsValid = true;
+
+            for ( int j = 0; j < signal_fetch_information.actions_size(); j++ )
+            {
+                ExpressionNode *action = serializeNode( signal_fetch_information.actions( j ),
+                                                        mExpressionNodesForFetchAction,
+                                                        currentIndexAction,
+                                                        MAX_EQUATION_DEPTH );
+
+                if ( action == nullptr )
+                {
+                    FWE_LOG_WARN( "Action #" + std::to_string( j ) + " of fetch information #" + std::to_string( i ) +
+                                  " is invalid => will ignore the fetch information" );
+                    isActionsValid = false;
+                    break;
+                }
+
+                fetchInformation.actions.push_back( action );
+            }
+
+            if ( !isActionsValid )
+            {
+                mFetchInformations.pop_back();
+            }
+        }
+    }
+
+    if ( mFetchInformations.empty() )
+    {
+        FWE_LOG_TRACE( "The CollectionScheme does not have any valid fetch information" );
+    }
+    else
+    {
+        FWE_LOG_TRACE( "Adding " + std::to_string( mFetchInformations.size() ) +
+                       " fetch informations into the CollectionScheme" );
+    }
+
     // Build Collected Signals
     for ( int signalIndex = 0; signalIndex < mProtoCollectionSchemeMessagePtr->signal_information_size();
           ++signalIndex )
@@ -113,6 +257,9 @@ CollectionSchemeIngestion::build()
         signalInfo.minimumSampleIntervalMs = signalInformation.minimum_sample_period_ms();
         signalInfo.fixedWindowPeriod = signalInformation.fixed_window_period_ms();
         signalInfo.isConditionOnlySignal = signalInformation.condition_only_signal();
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        signalInfo.dataPartitionId = signalInformation.data_partition_id();
+#endif
 
         FWE_LOG_TRACE( "Adding signalID: " + std::to_string( signalInfo.signalID ) + " to list of signals to collect" +
                        additionalTraceInfo );
@@ -139,6 +286,27 @@ CollectionSchemeIngestion::build()
         mCollectedRawCAN.emplace_back( rawCAN );
     }
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    // calculate total number of nodes ahead of time,
+    // as we can only allocate mExpressionNodes once
+    uint32_t numForwardConditionNodes = 0;
+    if ( mProtoCollectionSchemeMessagePtr->has_store_and_forward_configuration() )
+    {
+        for ( auto i = 0;
+              i < mProtoCollectionSchemeMessagePtr->store_and_forward_configuration().partition_configuration_size();
+              ++i )
+        {
+            auto protoPartitionConfiguration =
+                mProtoCollectionSchemeMessagePtr->store_and_forward_configuration().partition_configuration( i );
+            if ( protoPartitionConfiguration.has_upload_options() )
+            {
+                numForwardConditionNodes += getNumberOfNodes(
+                    protoPartitionConfiguration.upload_options().condition_tree(), MAX_EQUATION_DEPTH );
+            }
+        }
+    }
+#endif
+
     // condition node
     if ( mProtoCollectionSchemeMessagePtr->collection_scheme_type_case() ==
          Schemas::CollectionSchemesMsg::CollectionScheme::kConditionBasedCollectionScheme )
@@ -146,6 +314,9 @@ CollectionSchemeIngestion::build()
         auto numNodes =
             getNumberOfNodes( mProtoCollectionSchemeMessagePtr->condition_based_collection_scheme().condition_tree(),
                               MAX_EQUATION_DEPTH );
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        numNodes += numForwardConditionNodes;
+#endif
 
         FWE_LOG_INFO( "CollectionScheme is Condition Based. Building AST with " + std::to_string( numNodes ) +
                       " nodes" );
@@ -170,6 +341,10 @@ CollectionSchemeIngestion::build()
                       std::to_string( mProtoCollectionSchemeMessagePtr->time_based_collection_scheme()
                                           .time_based_collection_scheme_period_ms() ) +
                       " ms" );
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        mExpressionNodes.reserve( numForwardConditionNodes + 1 );
+#endif
 
         mExpressionNodes.emplace_back();
         ExpressionNode &currentNode = mExpressionNodes.back();
@@ -197,6 +372,41 @@ CollectionSchemeIngestion::build()
         mS3UploadMetadata.region = mProtoCollectionSchemeMessagePtr->s3_upload_metadata().region();
         mS3UploadMetadata.bucketOwner =
             mProtoCollectionSchemeMessagePtr->s3_upload_metadata().bucket_owner_account_id();
+    }
+#endif
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    if ( mProtoCollectionSchemeMessagePtr->has_store_and_forward_configuration() )
+    {
+        FWE_LOG_INFO( "Store and Forward configuration was set CollectionScheme ID: " +
+                      mProtoCollectionSchemeMessagePtr->campaign_sync_id() );
+        for ( auto i = 0;
+              i < mProtoCollectionSchemeMessagePtr->store_and_forward_configuration().partition_configuration_size();
+              ++i )
+        {
+            auto protoPartitionConfiguration =
+                mProtoCollectionSchemeMessagePtr->store_and_forward_configuration().partition_configuration( i );
+            PartitionConfiguration partitionConfiguration;
+            if ( protoPartitionConfiguration.has_storage_options() )
+            {
+                partitionConfiguration.storageOptions.storageLocation =
+                    protoPartitionConfiguration.storage_options().storage_location();
+                partitionConfiguration.storageOptions.maximumSizeInBytes =
+                    protoPartitionConfiguration.storage_options().maximum_size_in_bytes();
+                partitionConfiguration.storageOptions.minimumTimeToLiveInSeconds =
+                    protoPartitionConfiguration.storage_options().minimum_time_to_live_in_seconds();
+            }
+            if ( protoPartitionConfiguration.has_upload_options() )
+            {
+                auto currentIndex = mExpressionNodes.size();
+                partitionConfiguration.uploadOptions.conditionTree =
+                    serializeNode( protoPartitionConfiguration.upload_options().condition_tree(),
+                                   mExpressionNodes,
+                                   currentIndex,
+                                   MAX_EQUATION_DEPTH );
+            }
+            mStoreAndForwardConfig.emplace_back( partitionConfiguration );
+        }
     }
 #endif
 
@@ -261,6 +471,18 @@ CollectionSchemeIngestion::getPartialSignalIdToSignalPathLookupTable() const
         return INVALID_PARTIAL_SIGNAL_ID_LOOKUP;
     }
     return *mPartialSignalIDLookup;
+}
+#endif
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+const ICollectionScheme::StoreAndForwardConfig &
+CollectionSchemeIngestion::getStoreAndForwardConfiguration() const
+{
+    if ( !mReady )
+    {
+        return INVALID_STORE_AND_FORWARD_CONFIG;
+    }
+    return mStoreAndForwardConfig;
 }
 #endif
 
@@ -374,6 +596,25 @@ CollectionSchemeIngestion::getNumberOfNodes( const Schemas::CommonTypesMsg::Cond
             sum += getNumberOfNodes( node.node_operator().right_child(), depth - 1 );
         }
     }
+    else if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodeFunction )
+    {
+        if ( node.node_function().functionType_case() ==
+             Schemas::CommonTypesMsg::ConditionNode_NodeFunction::kCustomFunction )
+        {
+            for ( int i = 0; i < node.node_function().custom_function().params_size(); i++ )
+            {
+                sum += getNumberOfNodes( node.node_function().custom_function().params( i ), depth - 1 );
+            }
+        }
+        else if ( node.node_function().functionType_case() ==
+                  Schemas::CommonTypesMsg::ConditionNode_NodeFunction::kIsNullFunction )
+        {
+            if ( node.node_function().is_null_function().has_expression() )
+            {
+                sum += getNumberOfNodes( node.node_function().is_null_function().expression(), depth - 1 );
+            }
+        }
+    }
     return sum;
 }
 
@@ -421,6 +662,13 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
                        std::to_string( static_cast<int>( currentNode->booleanValue ) ) );
         return currentNode;
     }
+    else if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodeStringValue )
+    {
+        currentNode->stringValue = node.node_string_value();
+        currentNode->nodeType = ExpressionNodeType::STRING;
+        FWE_LOG_TRACE( "Creating STRING node with value: " + currentNode->stringValue );
+        return currentNode;
+    }
     else if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodeFunction )
     {
         if ( node.node_function().functionType_case() ==
@@ -456,6 +704,69 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
             currentNode->nodeType = ExpressionNodeType::WINDOW_FUNCTION;
             FWE_LOG_TRACE( "Creating Window FUNCTION node for Signal ID:" + std::to_string( currentNode->signalID ) );
             return currentNode;
+        }
+        else if ( node.node_function().functionType_case() ==
+                  Schemas::CommonTypesMsg::ConditionNode_NodeFunction::kCustomFunction )
+        {
+            currentNode->function.customFunctionName = node.node_function().custom_function().function_name();
+            currentNode->function.customFunctionInvocationId = mCustomFunctionNextInvocationId;
+            mCustomFunctionNextInvocationId++;
+            bool isParamsValid = true;
+
+            for ( int i = 0; i < node.node_function().custom_function().params_size(); i++ )
+            {
+                FWE_LOG_TRACE( "Parsing param #" + std::to_string( i ) + " of CustomFunction node " +
+                               currentNode->function.customFunctionName );
+
+                ExpressionNode *param = serializeNode( node.node_function().custom_function().params( i ),
+                                                       expressionNodes,
+                                                       nextIndex,
+                                                       remainingDepth - 1 );
+
+                if ( param == nullptr )
+                {
+                    FWE_LOG_WARN( "Param #" + std::to_string( i ) + " of CustomFunction node " +
+                                  currentNode->function.customFunctionName +
+                                  " is invalid => will ignore the CustomFunction node" );
+                    isParamsValid = false;
+                    break;
+                }
+
+                currentNode->function.customFunctionParams.push_back( param );
+            }
+
+            if ( isParamsValid )
+            {
+                currentNode->nodeType = ExpressionNodeType::CUSTOM_FUNCTION;
+
+                FWE_LOG_TRACE( "Creating CustomFunction node with name " + currentNode->function.customFunctionName +
+                               " and " + std::to_string( currentNode->function.customFunctionParams.size() ) +
+                               " params" );
+
+                return currentNode;
+            }
+        }
+        else if ( node.node_function().functionType_case() ==
+                  Schemas::CommonTypesMsg::ConditionNode_NodeFunction::kIsNullFunction )
+        {
+            // If no expression node as parameter this isNull is invalid
+            if ( node.node_function().is_null_function().has_expression() )
+            {
+                currentNode->nodeType = ExpressionNodeType::IS_NULL_FUNCTION;
+                FWE_LOG_TRACE( "Processing isNull expression" );
+                ExpressionNode *left = serializeNode( node.node_function().is_null_function().expression(),
+                                                      expressionNodes,
+                                                      nextIndex,
+                                                      remainingDepth - 1 );
+
+                currentNode->left = left;
+                FWE_LOG_TRACE( "Setting right child to nullptr" );
+                currentNode->right = nullptr;
+
+                FWE_LOG_TRACE( "Creating IsNullFunction node" );
+                return currentNode;
+            }
+            FWE_LOG_WARN( "Invalid isNull function" );
         }
         else
         {
@@ -538,6 +849,19 @@ CollectionSchemeIngestion::getCollectionSchemeID() const
 
     return mProtoCollectionSchemeMessagePtr->campaign_sync_id();
 }
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+const std::string &
+CollectionSchemeIngestion::getCampaignArn() const
+{
+    if ( !mReady )
+    {
+        return INVALID_CAMPAIGN_ARN;
+    }
+
+    return mProtoCollectionSchemeMessagePtr->campaign_arn();
+}
+#endif
 
 const SyncID &
 CollectionSchemeIngestion::getDecoderManifestID() const
@@ -717,6 +1041,39 @@ CollectionSchemeIngestion::getS3UploadMetadata() const
     return mS3UploadMetadata;
 }
 #endif
+
+const ICollectionScheme::ExpressionNode_t &
+CollectionSchemeIngestion::getAllExpressionNodesForFetchCondition() const
+{
+    if ( !mReady )
+    {
+        return INVALID_EXPRESSION_NODES;
+    }
+
+    return mExpressionNodesForFetchCondition;
+}
+
+const ICollectionScheme::ExpressionNode_t &
+CollectionSchemeIngestion::getAllExpressionNodesForFetchAction() const
+{
+    if ( !mReady )
+    {
+        return INVALID_EXPRESSION_NODES;
+    }
+
+    return mExpressionNodesForFetchAction;
+}
+
+const ICollectionScheme::FetchInformation_t &
+CollectionSchemeIngestion::getAllFetchInformations() const
+{
+    if ( !mReady )
+    {
+        return INVALID_FETCH_INFORMATIONS;
+    }
+
+    return mFetchInformations;
+}
 
 } // namespace IoTFleetWise
 } // namespace Aws

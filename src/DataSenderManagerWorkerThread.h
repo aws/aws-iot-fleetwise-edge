@@ -77,6 +77,10 @@ private:
     std::shared_ptr<DataSenderManager> mDataSenderManager;
     std::shared_ptr<IConnectivityModule> mConnectivityModule;
 
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    std::shared_ptr<DataSenderQueue> mCommandResponses;
+#endif
+
     Timer mTimer;
     Timer mRetrySendingPersistedDataTimer;
 };

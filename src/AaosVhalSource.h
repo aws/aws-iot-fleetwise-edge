@@ -5,11 +5,13 @@
 #include "Clock.h"
 #include "ClockHandler.h"
 #include "CollectionInspectionAPITypes.h"
-#include "CustomDataSource.h"
+#include "IDecoderDictionary.h"
 #include "SignalTypes.h"
+#include "VehicleDataSourceTypes.h"
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -18,26 +20,23 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-/**
- * To implement a custom data source create a new class and inherit from CustomDataSource
- * then call setFilter() then start() and provide an implementation for pollData
- */
-class AaosVhalSource : public CustomDataSource
+class AaosVhalSource
 {
 public:
     /**
+     * @param interfaceId Interface identifier
      * @param signalBufferDistributor Signal buffer distributor
      */
-    AaosVhalSource( SignalBufferDistributorPtr signalBufferDistributor );
-    /**
-     * Initialize AaosVhalSource and set filter for CustomDataSource
-     *
-     * @param canChannel the CAN channel used in the decoder manifest
-     * @param canRawFrameId the CAN message Id used in the decoder manifest
-     *
-     * @return on success true otherwise false
-     */
-    bool init( CANChannelNumericID canChannel, CANRawFrameID canRawFrameId );
+    AaosVhalSource( InterfaceID interfaceId, SignalBufferDistributorPtr signalBufferDistributor );
+    ~AaosVhalSource() = default;
+
+    AaosVhalSource( const AaosVhalSource & ) = delete;
+    AaosVhalSource &operator=( const AaosVhalSource & ) = delete;
+    AaosVhalSource( AaosVhalSource && ) = delete;
+    AaosVhalSource &operator=( AaosVhalSource && ) = delete;
+
+    void onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary,
+                                     VehicleDataSourceProtocol networkProtocol );
 
     /**
      * Returns a vector of vehicle property info
@@ -58,19 +57,13 @@ public:
      */
     void setVehicleProperty( SignalID signalId, const DecodedSignalValue &value );
 
-    static constexpr const char *CAN_CHANNEL_NUMBER = "canChannel";
-    static constexpr const char *CAN_RAW_FRAME_ID = "canFrameId";
-
-protected:
-    void pollData() override;
-    const char *getThreadName() override;
-
 private:
+    InterfaceID mInterfaceId;
     SignalBufferDistributorPtr mSignalBufferDistributor;
     std::unordered_map<SignalID, SignalType> mSignalIdToSignalType;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
-    CANChannelNumericID mCanChannel{ INVALID_CAN_SOURCE_NUMERIC_ID };
-    CANRawFrameID mCanRawFrameId{ 0 };
+    std::mutex mDecoderDictionaryUpdateMutex;
+    std::vector<std::array<uint32_t, 4>> mVehiclePropertyInfo;
 };
 
 } // namespace IoTFleetWise

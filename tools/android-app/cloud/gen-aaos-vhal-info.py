@@ -78,34 +78,33 @@ for match in matches:
             )
             fqn = "Vehicle.VHAL." + full_name
             fqns += fqn + "\n"
+            custom_decoder = (
+                f"{prop_id}"
+                f":{0 if area_index == -1 else area_index}"
+                f":{0 if result_index == -1 else result_index}"
+            )
             decoders.append(
                 {
                     "fullyQualifiedName": fqn,
-                    "type": "CAN_SIGNAL",
-                    "interfaceId": "AAOS-VHAL-CAN",
-                    "canSignal": {
-                        "messageId": 1,
-                        "isBigEndian": True,
-                        "isSigned": True,
-                        "startBit": (0 if area_index == -1 else area_index),
-                        "offset": prop_id,
-                        "factor": 1,
-                        "length": (0 if result_index == -1 else result_index),
+                    "type": "CUSTOM_DECODING_SIGNAL",
+                    "interfaceId": "AAOS-VHAL",
+                    "customDecodingSignal": {
+                        "id": custom_decoder,
                     },
                 }
             )
             nodes.append(
                 {
                     "sensor": {
-                        "dataType": "DOUBLE",
+                        "dataType": "INT64" if "INT64" in prop_type else "DOUBLE",
                         "fullyQualifiedName": fqn,
                         "description": full_name,
                     }
                 }
             )
-with open("aaosVhalDecoders.json", "w") as fp:
+with open("custom-decoders-aaos-vhal.json", "w") as fp:
     json.dump(decoders, fp, indent=2)
-with open("aaosVhalNodes.json", "w") as fp:
+with open("custom-nodes-aaos-vhal.json", "w") as fp:
     json.dump(nodes, fp, indent=2)
 with open("aaos-vhal-fqns.txt", "w") as fp:
     fp.write(fqns)

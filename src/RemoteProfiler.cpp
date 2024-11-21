@@ -4,6 +4,7 @@
 #include "RemoteProfiler.h"
 #include "IConnectionTypes.h"
 #include "LoggingModule.h"
+#include "TopicConfig.h"
 #include "TraceModule.h"
 #include <algorithm>
 #include <limits>
@@ -15,15 +16,13 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-RemoteProfiler::RemoteProfiler( std::shared_ptr<ISender> metricsSender,
-                                std::shared_ptr<ISender> logSender,
+RemoteProfiler::RemoteProfiler( std::shared_ptr<ISender> sender,
                                 uint32_t initialMetricsUploadInterval,
                                 uint32_t initialLogMaxInterval,
                                 LogLevel initialLogLevelThresholdToSend,
                                 std::string profilerPrefix )
     : fShouldStop( false )
-    , fMetricsSender( std::move( metricsSender ) )
-    , fLogSender( std::move( logSender ) )
+    , mMqttSender( std::move( sender ) )
     , fCurrentMetricsPending( 0 )
     , fInitialUploadInterval( initialMetricsUploadInterval )
     , fInitialLogMaxInterval( initialLogMaxInterval )
@@ -54,13 +53,15 @@ RemoteProfiler::sendMetricsOut()
     Json::StreamWriterBuilder builder;
     builder["indentation"] = ""; // If you want whitespace-less output
     const std::string output = Json::writeString( builder, fMetricsRoot );
-    fMetricsSender->sendBuffer(
-        reinterpret_cast<const uint8_t *>( output.c_str() ), output.length(), []( ConnectivityError result ) {
-            if ( result == ConnectivityError::Success )
-            {
-                FWE_LOG_ERROR( "Send error " + std::to_string( static_cast<uint32_t>( result ) ) );
-            }
-        } );
+    mMqttSender->sendBuffer( mMqttSender->getTopicConfig().metricsTopic,
+                             reinterpret_cast<const uint8_t *>( output.c_str() ),
+                             output.length(),
+                             []( ConnectivityError result ) {
+                                 if ( result == ConnectivityError::Success )
+                                 {
+                                     FWE_LOG_ERROR( "Send error " + std::to_string( static_cast<uint32_t>( result ) ) );
+                                 }
+                             } );
     fMetricsRoot.clear();
     fCurrentMetricsPending = 0;
 }
@@ -80,15 +81,18 @@ RemoteProfiler::sendLogsOut()
             initLogStructure();
         }
 
-        if ( ( fLogSender != nullptr ) )
+        if ( ( mMqttSender != nullptr ) )
         {
-            fLogSender->sendBuffer(
-                reinterpret_cast<const uint8_t *>( output.c_str() ), output.length(), []( ConnectivityError result ) {
-                    if ( result == ConnectivityError::Success )
-                    {
-                        FWE_LOG_ERROR( "Send error " + std::to_string( static_cast<uint32_t>( result ) ) );
-                    }
-                } );
+            mMqttSender->sendBuffer( mMqttSender->getTopicConfig().logsTopic,
+                                     reinterpret_cast<const uint8_t *>( output.c_str() ),
+                                     output.length(),
+                                     []( ConnectivityError result ) {
+                                         if ( result == ConnectivityError::Success )
+                                         {
+                                             FWE_LOG_ERROR( "Send error " +
+                                                            std::to_string( static_cast<uint32_t>( result ) ) );
+                                         }
+                                     } );
         }
     }
 }
@@ -162,7 +166,7 @@ RemoteProfiler::setMetric( const std::string &name, double value, const std::str
 bool
 RemoteProfiler::start()
 {
-    if ( fMetricsSender == nullptr )
+    if ( mMqttSender == nullptr )
     {
         FWE_LOG_ERROR( "Trying to start without sender" );
         return false;

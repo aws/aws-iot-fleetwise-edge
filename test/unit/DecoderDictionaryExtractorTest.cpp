@@ -17,6 +17,9 @@
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include <boost/variant.hpp>
 #endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+#include "LastKnownStateTypes.h"
+#endif
 
 namespace Aws
 {
@@ -87,6 +90,15 @@ namespace IoTFleetWise
  *          num of byte: 1
  *          bit right shift: 2
  *          bit mask length: 2
+ *
+ * Custom decoded signal 0
+ *   SignalID: 0x2000
+ *   InterfaceID: 30
+ *   Decoder: custom-decoder-0
+ * Custom decoded signal 1
+ *   SignalID: 0x2001
+ *   InterfaceID: 31
+ *   Decoder: custom-decoder-1
  *
  * CollectionScheme1 is interested in signal 0 ~ 8 and CAN Raw Frame 0x100, 0x200 at Node 10 and OBD Signals
  * CollectionScheme2 is interested in signal 10 ~ 17 and CAN Raw Frame 0x200 at Node 20
@@ -243,7 +255,13 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
         { 0x1005, PIDSignalDecoderFormat( 10, SID::CURRENT_STATS, 0x70, 1.0, 0.0, 9, 1, 0, 2 ) },
         { 0x1006, PIDSignalDecoderFormat( 10, SID::CURRENT_STATS, 0x70, 1.0, 0.0, 9, 1, 2, 2 ) } };
 
-    // Add OBD-II PID signals to CollectionScheme 1
+    // Here's input to decoder manifest for Custom Signal decoder information
+    SignalIDToCustomSignalDecoderFormatMap signalIDToCustomDecoderFormat = {
+        { 0x2000, CustomSignalDecoderFormat{ "30", "custom-decoder-0", 0x2000, SignalType::DOUBLE } },
+        { 0x2001, CustomSignalDecoderFormat{ "31", "custom-decoder-1", 0x2001, SignalType::DOUBLE } },
+    };
+
+    // Add OBD-II PID signals to CollectionScheme 2
     SignalCollectionInfo obdPidSignal;
     obdPidSignal.signalID = 0x1000;
     signalInfo2.emplace_back( obdPidSignal );
@@ -253,6 +271,14 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
     signalInfo2.emplace_back( obdPidSignal );
     obdPidSignal.signalID = 0x1006;
     signalInfo2.emplace_back( obdPidSignal );
+
+    // Add Custom Decoded signals to CollectionScheme 2
+    SignalCollectionInfo customSignal;
+    customSignal.signalID = 0x2000;
+    signalInfo2.emplace_back( customSignal );
+    customSignal.signalID = 0x2001;
+    signalInfo2.emplace_back( customSignal );
+
     // Add an invalid network protocol signal. PM shall not add it to decoder dictionary
     SignalCollectionInfo inValidSignal;
     inValidSignal.signalID = 0x10000;
@@ -269,8 +295,8 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
     list1.emplace_back( collectionScheme2 );
     list1.emplace_back( collectionScheme3 );
 
-    IDecoderManifestPtr DM1 =
-        std::make_shared<IDecoderManifestTest>( "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat );
+    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>(
+        "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, signalIDToCustomDecoderFormat );
 
     // Set input as DM1, list1
     test.setDecoderManifest( DM1 );
@@ -283,6 +309,8 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
     test.decoderDictionaryExtractor( decoderDictionaryMap );
     ASSERT_TRUE( decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET ) != decoderDictionaryMap.end() );
     ASSERT_TRUE( decoderDictionaryMap.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap.end() );
+    ASSERT_TRUE( decoderDictionaryMap.find( VehicleDataSourceProtocol::CUSTOM_DECODING ) !=
+                 decoderDictionaryMap.end() );
     auto decoderDictionary =
         std::dynamic_pointer_cast<CANDecoderDictionary>( decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] );
     // Below section exam decoder dictionary
@@ -336,9 +364,9 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
     // CAN Frame 0x300 at Node 20 shall not exist in dictionary as CollectionScheme3 is not enabled yet
     ASSERT_EQ( decoderDictionary->canMessageDecoderMethod[secondChannelId].count( 0x300 ), 0 );
     // check the signalIDsToCollect from CAN decoder dictionary shall contain all the targeted CAN signals from
-    // collectionSchemes Note minus 5 because 4 signals are OBD signals which will be included in OBD decoder dictionary
-    // and one invalid signal
-    ASSERT_EQ( decoderDictionary->signalIDsToCollect.size(), signalInfo1.size() + signalInfo2.size() - 5 );
+    // collectionSchemes Note minus 7 because 4 signals are OBD signals which will be included in OBD decoder dictionary
+    // 2 custom decoded signals and one invalid signal
+    ASSERT_EQ( decoderDictionary->signalIDsToCollect.size(), signalInfo1.size() + signalInfo2.size() - 7 );
     for ( auto const &signal : signalInfo1 )
     {
         ASSERT_EQ( decoderDictionary->signalIDsToCollect.count( signal.signalID ), 1 );
@@ -382,6 +410,21 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
     ASSERT_EQ( formula.mSizeInBits, 2 );
     // Decoder Manifest doesn't contain PID 0x20, hence it shall not contain the decoder dictionary
     ASSERT_TRUE( obdPidDecoderDictionary.at( 0 ).find( 0x20 ) == obdPidDecoderDictionary.at( 0 ).end() );
+
+    auto customDecoderDictionary = std::dynamic_pointer_cast<CustomDecoderDictionary>(
+        decoderDictionaryMap[VehicleDataSourceProtocol::CUSTOM_DECODING] );
+    ASSERT_EQ( customDecoderDictionary->customDecoderMethod.size(), 2 ); // 2 interfaces
+    auto customDecoder = customDecoderDictionary->customDecoderMethod.find( "30" );
+    ASSERT_TRUE( customDecoder != customDecoderDictionary->customDecoderMethod.end() );
+    auto customDecoderSignalID = customDecoder->second.find( "custom-decoder-0" );
+    ASSERT_TRUE( customDecoderSignalID != customDecoder->second.end() );
+    ASSERT_EQ( customDecoderSignalID->second.mSignalID, 0x2000 );
+    customDecoder = customDecoderDictionary->customDecoderMethod.find( "31" );
+    ASSERT_TRUE( customDecoder != customDecoderDictionary->customDecoderMethod.end() );
+    customDecoderSignalID = customDecoder->second.find( "custom-decoder-1" );
+    ASSERT_TRUE( customDecoderSignalID != customDecoder->second.end() );
+    ASSERT_EQ( customDecoderSignalID->second.mSignalID, 0x2001 );
+
     // Time travel to the point where Both collectionScheme1 and collectionScheme2 are retired and CollectionScheme 3
     // enabled
     ASSERT_TRUE( test.updateMapsandTimeLine( currTime + SECOND_TO_MILLISECOND( 6 ) ) );
@@ -396,6 +439,11 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
     decoderDictionary =
         std::dynamic_pointer_cast<CANDecoderDictionary>( decoderDictionaryMapNew[VehicleDataSourceProtocol::OBD] );
     ASSERT_EQ( decoderDictionary, nullptr );
+    ASSERT_TRUE( decoderDictionaryMapNew.find( VehicleDataSourceProtocol::CUSTOM_DECODING ) !=
+                 decoderDictionaryMapNew.end() );
+    customDecoderDictionary = std::dynamic_pointer_cast<CustomDecoderDictionary>(
+        decoderDictionaryMapNew[VehicleDataSourceProtocol::CUSTOM_DECODING] );
+    ASSERT_EQ( customDecoderDictionary, nullptr );
 
     decoderDictionary = std::dynamic_pointer_cast<CANDecoderDictionary>(
         decoderDictionaryMapNew[VehicleDataSourceProtocol::RAW_SOCKET] );
@@ -423,6 +471,21 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
         ASSERT_EQ( decoderMethod.format.mSignals[0].mSignalID, 25 );
     }
 
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    auto stateTemplate = std::make_shared<StateTemplateInformation>();
+    stateTemplate->id = "LKS1";
+    stateTemplate->decoderManifestID = "DM1";
+    stateTemplate->updateStrategy = LastKnownStateUpdateStrategy::PERIODIC;
+    stateTemplate->periodMs = 10;
+    stateTemplate->signals.push_back( { 11, SignalType::DOUBLE } );
+    test.setStateTemplates( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 123, { stateTemplate }, {} } ) );
+    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap3;
+    test.decoderDictionaryExtractor( decoderDictionaryMap3 );
+    decoderDictionary =
+        std::dynamic_pointer_cast<CANDecoderDictionary>( decoderDictionaryMap3[VehicleDataSourceProtocol::RAW_SOCKET] );
+    ASSERT_EQ( decoderDictionary->signalIDsToCollect.count( 11 ), 1 );
+#endif
+
     // The following code validates that when we have first the OBD signals in the decoder manifest
     // and then the CAN signals, the extraction still functions. The above code starts processing
     // always the CAN Signals first as the first network type is CAN.
@@ -439,8 +502,8 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
     list2.emplace_back( collectionSchemeOBD ); // OBD Signals
     list2.emplace_back( collectionSchemeCAN ); // CAN Signals
 
-    IDecoderManifestPtr DM2 =
-        std::make_shared<IDecoderManifestTest>( "DM2", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat );
+    IDecoderManifestPtr DM2 = std::make_shared<IDecoderManifestTest>(
+        "DM2", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, signalIDToCustomDecoderFormat );
 
     // Set input as DM1, list1
     test2.setDecoderManifest( DM2 );
@@ -453,6 +516,8 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
     test2.decoderDictionaryExtractor( decoderDictionaryMap2 );
     ASSERT_TRUE( decoderDictionaryMap2.find( VehicleDataSourceProtocol::RAW_SOCKET ) != decoderDictionaryMap2.end() );
     ASSERT_TRUE( decoderDictionaryMap2.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap2.end() );
+    ASSERT_TRUE( decoderDictionaryMap2.find( VehicleDataSourceProtocol::CUSTOM_DECODING ) !=
+                 decoderDictionaryMap2.end() );
 }
 
 /**  @brief
@@ -496,9 +561,10 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorNoSignalsTest )
     list1.emplace_back( collectionScheme1 );
 
     std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat = {};
+    SignalIDToCustomSignalDecoderFormatMap signalIDToCustomDecoderFormat = {};
 
-    IDecoderManifestPtr DM1 =
-        std::make_shared<IDecoderManifestTest>( "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat );
+    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>(
+        "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, signalIDToCustomDecoderFormat );
 
     // Set input as DM1, list1
     test.setDecoderManifest( DM1 );
@@ -583,9 +649,10 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorFirstRawFrameThe
     list1.emplace_back( collectionScheme2 );
 
     std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat = {};
+    SignalIDToCustomSignalDecoderFormatMap signalIDToCustomDecoderFormat = {};
 
-    IDecoderManifestPtr DM1 =
-        std::make_shared<IDecoderManifestTest>( "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat );
+    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>(
+        "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, signalIDToCustomDecoderFormat );
 
     // Set input as DM1, list1
     test.setDecoderManifest( DM1 );
@@ -626,6 +693,7 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryComplexDataExtractor )
     ICollectionScheme::RawCanFrames_t canFrameInfo1;                                                // empty
     std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap; // empty
     std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat;                // empty
+    SignalIDToCustomSignalDecoderFormatMap signalIDToCustomDecoderFormat;                           // empty
 
     ICollectionScheme::PartialSignalIDLookup partialSignalIDLookup;
     std::unordered_map<SignalID, ComplexSignalDecoderFormat> complexSignalMap;
@@ -677,8 +745,13 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryComplexDataExtractor )
     std::vector<ICollectionSchemePtr> list1;
     list1.emplace_back( collectionScheme1 );
 
-    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>(
-        "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, complexSignalMap, complexDataTypeMap );
+    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>( "DM1",
+                                                                      formatMap,
+                                                                      signalToFrameAndNodeID,
+                                                                      signalIDToPIDDecoderFormat,
+                                                                      signalIDToCustomDecoderFormat,
+                                                                      complexSignalMap,
+                                                                      complexDataTypeMap );
 
     // Set input as DM1, list1
     test.setDecoderManifest( DM1 );
@@ -688,7 +761,8 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryComplexDataExtractor )
     ASSERT_TRUE( test.updateMapsandTimeLine( currTime ) );
 
     auto inspectionMatrixOutput = std::make_shared<InspectionMatrix>();
-    test.matrixExtractor( inspectionMatrixOutput );
+    auto fetchMatrixOutput = std::make_shared<FetchMatrix>();
+    test.matrixExtractor( inspectionMatrixOutput, fetchMatrixOutput );
     // Invoke Decoder Dictionary Extractor function
     std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
     test.decoderDictionaryExtractor( decoderDictionaryMap, inspectionMatrixOutput );
@@ -769,6 +843,7 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryInvalidPartialSignalIDAnd
     ICollectionScheme::RawCanFrames_t canFrameInfo1;                                                // empty
     std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap; // empty
     std::unordered_map<SignalID, PIDSignalDecoderFormat> signalIDToPIDDecoderFormat;                // empty
+    SignalIDToCustomSignalDecoderFormatMap signalIDToCustomDecoderFormat;                           // empty
 
     ICollectionScheme::PartialSignalIDLookup partialSignalIDLookup;
     std::unordered_map<SignalID, ComplexSignalDecoderFormat> complexSignalMap;
@@ -801,8 +876,13 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryInvalidPartialSignalIDAnd
     std::vector<ICollectionSchemePtr> list1;
     list1.emplace_back( collectionScheme1 );
 
-    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>(
-        "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, complexSignalMap, complexDataTypeMap );
+    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>( "DM1",
+                                                                      formatMap,
+                                                                      signalToFrameAndNodeID,
+                                                                      signalIDToPIDDecoderFormat,
+                                                                      signalIDToCustomDecoderFormat,
+                                                                      complexSignalMap,
+                                                                      complexDataTypeMap );
 
     test.setDecoderManifest( DM1 );
     ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );

@@ -10,6 +10,7 @@
 #include "ISender.h"
 #include "Listener.h"
 #include "LoggingModule.h"
+#include "TopicConfig.h"
 #include <atomic>
 #include <aws/crt/io/Bootstrap.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
@@ -61,7 +62,7 @@ private:
 class AwsGreengrassV2ConnectivityModule : public IConnectivityModule
 {
 public:
-    AwsGreengrassV2ConnectivityModule( Aws::Crt::Io::ClientBootstrap *clientBootstrap );
+    AwsGreengrassV2ConnectivityModule( Aws::Crt::Io::ClientBootstrap *clientBootstrap, const TopicConfig &topicConfig );
     ~AwsGreengrassV2ConnectivityModule() override;
 
     AwsGreengrassV2ConnectivityModule( const AwsGreengrassV2ConnectivityModule & ) = delete;
@@ -79,7 +80,7 @@ public:
         return mConnected;
     };
 
-    std::shared_ptr<ISender> createSender( const std::string &topicName, QoS publishQoS = QoS::AT_MOST_ONCE ) override;
+    std::shared_ptr<ISender> createSender() override;
 
     std::shared_ptr<IReceiver> createReceiver( const std::string &topicName ) override;
 
@@ -94,6 +95,7 @@ private:
     std::unique_ptr<IpcLifecycleHandler> mLifecycleHandler;
     std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> mGreengrassClient;
     Aws::Crt::Io::ClientBootstrap *mClientBootstrap;
+    const TopicConfig &mTopicConfig;
 };
 
 } // namespace IoTFleetWise

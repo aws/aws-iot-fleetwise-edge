@@ -118,7 +118,68 @@ message CollectionScheme {
      * Additional data for S3 upload.
      */
     S3UploadMetadata s3_upload_metadata = 16;
+
+    /*
+     * Configuration of store and forward campaign.
+     */
+    StoreAndForwardConfiguration store_and_forward_configuration = 17;
+    // Signals to fetch configurations.
+    repeated FetchInformation signal_fetch_information = 18;
+
+    /*
+     * Amazon Resource Name of the campaign this collectionScheme is part of
+     */
+    string campaign_arn = 19;
 }
+/*
+ * Condition based fetch configuration
+ */
+message ConditionBasedFetchConfig {
+    enum ConditionTriggerMode {
+
+        /*
+         * Condition will evaluate to true regardless of previous state
+         */
+        TRIGGER_ALWAYS = 0;
+
+        /*
+         * Condition will evaluate to true only when it previously evaluated to false
+         */
+        TRIGGER_ONLY_ON_RISING_EDGE = 1;
+    }
+    // Condition to be evaluated for fetch to trigger
+    CommonTypesMsg.ConditionNode condition_tree = 1;
+    // Trigger mode for condition
+    ConditionTriggerMode condition_trigger_mode = 2;
+}
+
+/*
+ * Time based fetch configuration
+ */
+message TimeBasedFetchConfig {
+    // Max number of time action for fetch should be executed
+    uint64 max_execution_count = 1;
+    // Frequency for action execution
+    uint64 execution_frequency_ms = 2;
+    // Time after which max_execution_count should be reset to original value
+    uint64 reset_max_execution_count_interval_ms = 3;
+}
+
+message FetchInformation {
+    // Signal id that will be fetched
+    uint32 signal_id = 1;
+
+    // Fetch configuration for this signal
+    oneof fetchConfig {
+        TimeBasedFetchConfig time_based = 2;
+        ConditionBasedFetchConfig  condition_based = 3;
+    };
+    // IOT Event expression language version for this config
+    uint32 condition_language_version = 4;
+    // Expression for the function(s) to call for fetch
+    repeated CommonTypesMsg.ConditionNode actions = 5;
+}
+
 
 message S3UploadMetadata {
 
@@ -241,6 +302,12 @@ message SignalInformation {
      * its associated fixed_window_period_ms. Default is false.
      */
     bool condition_only_signal = 5;
+
+    /*
+     * The Id of the partition where this signal should be stored. This Id will be used to index into the partition
+     * configuration array.
+     */
+    uint32 data_partition_id = 7;
 }
 
 /*
@@ -270,4 +337,73 @@ message RawCanFrame {
      * this period will be dropped. A value of 0 will collect samples as fast as they arrive.
      */
     uint32 minimum_sample_period_ms = 4;
+}
+
+/*
+ * Store and Forward storage options, required. It defines where and how the data will be stored on the edge. It is only used when
+ * spoolerMode=TO_DISK. May be non-null only when spoolerMode=TO_DISK.
+ */
+message StorageOptions {
+
+    /*
+     * The total amount of space allocated to this campaign including all overhead. Limited to a maximum of 1024TB.
+     */
+    uint64 maximum_size_in_bytes = 1;
+
+    /*
+     * Specifies where the data should be stored withing the device. Implementation is defined by the user who
+     * integrates FWE with their filesystem library.
+     */
+    string storage_location = 2;
+
+    /*
+     * The minimum amount of time to keep data on disk after it is collected. When this TTL expires, data may be
+     * deleted, but it is not guaranteed to be deleted immediately after expiry. Can hold TTL more than 132 years.
+     */
+    uint32 minimum_time_to_live_in_seconds = 3;
+
+}
+
+/*
+ * Store and Forward upload options defines when the stored data may be uploaded. It is only used when
+ * spoolerMode=TO_DISK. May be non-null only when spoolerMode=TO_DISK.
+ */
+message UploadOptions {
+
+    /*
+     * Root condition node for the Abstract Syntax Tree.
+     */
+    CommonTypesMsg.ConditionNode condition_tree = 1;
+}
+
+/*
+ * Store and Forward configuration for each partition.
+ */
+message PartitionConfiguration {
+
+    /*
+     * Optional Store and Forward storage options. If not specified, data in this partition will be uploaded in
+     * realtime.
+     */
+    StorageOptions storage_options = 1;
+
+    /*
+     * Store and Forward upload options defines when the stored data may be uploaded. It is only used when
+     * spoolingMode=TO_DISK. May be non-null only when spoolingMode=TO_DISK.
+     */
+    UploadOptions upload_options = 2;
+}
+
+/*
+ * When spoolingMode is set to TO_DISK and PartitionConfiguration is not Null, then store and forward subsystem will be
+ * used to persistently store collected data. If non-null then spoolingMode must be TO_DISK.
+ *
+ * Optional. Required if any signalsToCollect specify a non-default partition.
+ */
+message StoreAndForwardConfiguration {
+
+    /*
+     * Array of Store and Forward configurations for each data partition.
+     */
+    repeated PartitionConfiguration partition_configuration = 1;
 }

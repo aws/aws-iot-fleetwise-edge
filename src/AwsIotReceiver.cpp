@@ -80,10 +80,18 @@ AwsIotReceiver::subscribe()
         mSubscribed = false;
         if ( errorCode != 0 )
         {
-            TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
             auto errorString = Aws::Crt::ErrorDebugString( errorCode );
-            FWE_LOG_ERROR( "Subscribe failed with error code " + std::to_string( errorCode ) + ": " +
-                           std::string( errorString != nullptr ? errorString : "Unknown error" ) );
+            auto logMessage = "Subscribe failed with error code " + std::to_string( errorCode ) + ": " +
+                              std::string( errorString != nullptr ? errorString : "Unknown error" );
+            if ( errorCode == AWS_ERROR_MQTT5_USER_REQUESTED_STOP )
+            {
+                FWE_LOG_TRACE( logMessage );
+            }
+            else
+            {
+                TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::SUBSCRIBE_ERROR );
+                FWE_LOG_ERROR( logMessage );
+            }
             subscribeFinishedPromise.set_value( false );
             return;
         }

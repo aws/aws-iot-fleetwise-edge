@@ -167,3 +167,7 @@ repos:
         types_or: [c++, python, yaml, cmake, proto, shell]
         exclude: "gradlew|.prettierrc.yaml|.clang-format|.clang-tidy|create_avd_config.sh"
         verbose: true
+  - repo: https://github.com/AlexanderDokuchaev/md-dead-link-check
+    rev: "v0.9"
+    hooks:
+      - id: md-dead-link-check

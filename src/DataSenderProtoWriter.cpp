@@ -2,15 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "DataSenderProtoWriter.h"
+#include "LoggingModule.h"
 #include "SignalTypes.h"
 #include <array>
 #include <google/protobuf/message.h>
 #include <memory>
 #include <utility>
-
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-#include "LoggingModule.h"
-#endif
 
 namespace Aws
 {
@@ -115,6 +112,33 @@ DataSenderProtoWriter::append( const CollectedSignal &msg )
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
+    case SignalType::STRING: {
+        if ( mRawDataBufferManager == nullptr )
+        {
+            FWE_LOG_WARN( "Raw Data Buffer not initalized so impossible to send data for signal: " +
+                          std::to_string( msg.signalID ) );
+            return;
+        }
+        auto loanedRawDataFrame = mRawDataBufferManager->borrowFrame(
+            msg.signalID, static_cast<RawData::BufferHandle>( signalValue.value.uint32Val ) );
+        if ( loanedRawDataFrame.isNull() )
+        {
+            FWE_LOG_WARN( "Could not capture the frame from buffer handle" );
+            return;
+        }
+        mRawDataBufferManager->increaseHandleUsageHint(
+            msg.signalID, signalValue.value.uint32Val, RawData::BufferHandleUsageStage::HANDED_OVER_TO_SENDER );
+        mRawDataBufferManager->decreaseHandleUsageHint(
+            msg.signalID,
+            signalValue.value.uint32Val,
+            RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD );
+
+        auto data = loanedRawDataFrame.getData();
+        auto stringSize = loanedRawDataFrame.getSize();
+        capturedSignal.set_string_value( reinterpret_cast<const char *>( data ), stringSize );
+        size += STRING_OVERHEAD + stringSize;
+        break;
+    }
     case SignalType::UNKNOWN:
         // UNKNOWN signal should not be processed
         return;

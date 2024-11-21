@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "CollectionInspectionAPITypes.h"
 #include "ICollectionScheme.h"
 #include "SignalTypes.h"
 #include "collection_schemes.pb.h"
@@ -14,6 +15,9 @@
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include <atomic>
 #include <utility>
+#endif
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+#include <string>
 #endif
 
 namespace Aws
@@ -55,6 +59,10 @@ public:
 
     const SyncID &getCollectionSchemeID() const override;
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    const std::string &getCampaignArn() const override;
+#endif
+
     const SyncID &getDecoderManifestID() const override;
 
     uint64_t getStartTime() const override;
@@ -95,6 +103,15 @@ public:
 
     S3UploadMetadata getS3UploadMetadata() const override;
 #endif
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    const StoreAndForwardConfig &getStoreAndForwardConfiguration() const override;
+#endif
+
+    const ExpressionNode_t &getAllExpressionNodesForFetchCondition() const override;
+    const ExpressionNode_t &getAllExpressionNodesForFetchAction() const override;
+
+    const FetchInformation_t &getAllFetchInformations() const override;
 
 private:
     /**
@@ -139,6 +156,28 @@ private:
     S3UploadMetadata mS3UploadMetadata;
 #endif
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    /**
+     * @brief Configuration of store and forward campaign
+     */
+    StoreAndForwardConfig mStoreAndForwardConfig;
+#endif
+
+    /**
+     * @brief   Vector representing all expression nodes used for fetching conditions.
+     */
+    ExpressionNode_t mExpressionNodesForFetchCondition;
+
+    /**
+     * @brief   Vector representing all expression nodes used for fetching actions.
+     */
+    ExpressionNode_t mExpressionNodesForFetchAction;
+
+    /**
+     * @brief   Vector representing all fetch informations.
+     */
+    FetchInformation_t mFetchInformations;
+
     /**
      * @brief Function used to Flatten the Abstract Syntax Tree (AST)
      */
@@ -174,6 +213,11 @@ private:
      */
     PartialSignalID getOrInsertPartialSignalId( SignalID signalId, const Schemas::CommonTypesMsg::SignalPath &path );
 #endif
+
+    /**
+     * @brief Next custom function invocation ID to assign
+     */
+    static CustomFunctionInvocationID mCustomFunctionNextInvocationId; // NOLINT
 };
 
 } // namespace IoTFleetWise

@@ -13,6 +13,11 @@
 #include <utility>
 #include <vector>
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+#include "StreamManager.h"
+#include <unordered_map>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -22,7 +27,13 @@ bool
 CollectionInspectionWorkerThread::init( const std::shared_ptr<SignalBuffer> &inputSignalBuffer,
                                         const std::shared_ptr<DataSenderQueue> &outputCollectedData,
                                         uint32_t idleTimeMs,
-                                        std::shared_ptr<RawData::BufferManager> rawBufferManager )
+                                        std::shared_ptr<RawData::BufferManager> rawBufferManager
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                                        ,
+                                        std::shared_ptr<Aws::IoTFleetWise::Store::StreamForwarder> streamForwarder,
+                                        std::shared_ptr<Store::StreamManager> streamManager
+#endif
+)
 {
     mInputSignalBuffer = inputSignalBuffer;
     mOutputCollectedData = outputCollectedData;
@@ -33,6 +44,10 @@ CollectionInspectionWorkerThread::init( const std::shared_ptr<SignalBuffer> &inp
 
     mCollectionInspectionEngine.setRawDataBufferManager( rawBufferManager );
     mRawBufferManager = std::move( rawBufferManager );
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    mStreamForwarder = std::move( streamForwarder );
+    mStreamManager = std::move( streamManager );
+#endif
     return true;
 }
 
@@ -152,6 +167,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::UINT8:
                             consumer->mCollectionInspectionEngine.addNewSignal<uint8_t>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint8Val );
@@ -159,6 +175,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::INT8:
                             consumer->mCollectionInspectionEngine.addNewSignal<int8_t>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.int8Val );
@@ -166,6 +183,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::UINT16:
                             consumer->mCollectionInspectionEngine.addNewSignal<uint16_t>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint16Val );
@@ -173,6 +191,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::INT16:
                             consumer->mCollectionInspectionEngine.addNewSignal<int16_t>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.int16Val );
@@ -180,6 +199,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::UINT32:
                             consumer->mCollectionInspectionEngine.addNewSignal<uint32_t>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint32Val );
@@ -187,6 +207,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::INT32:
                             consumer->mCollectionInspectionEngine.addNewSignal<int32_t>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.int32Val );
@@ -194,6 +215,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::UINT64:
                             consumer->mCollectionInspectionEngine.addNewSignal<uint64_t>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint64Val );
@@ -201,6 +223,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::INT64:
                             consumer->mCollectionInspectionEngine.addNewSignal<int64_t>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.int64Val );
@@ -208,6 +231,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::FLOAT:
                             consumer->mCollectionInspectionEngine.addNewSignal<float>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.floatVal );
@@ -215,6 +239,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::DOUBLE:
                             consumer->mCollectionInspectionEngine.addNewSignal<double>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.doubleVal );
@@ -222,9 +247,25 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::BOOLEAN:
                             consumer->mCollectionInspectionEngine.addNewSignal<bool>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.boolVal );
+                            break;
+                        case SignalType::STRING:
+                            consumer->mCollectionInspectionEngine.addNewSignal<RawData::BufferHandle>(
+                                inputSignal.signalID,
+                                inputSignal.fetchRequestID,
+                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                currentTime.monotonicTimeMs,
+                                signalValue.value.uint32Val );
+                            if ( consumer->mRawBufferManager != nullptr )
+                            {
+                                consumer->mRawBufferManager->decreaseHandleUsageHint(
+                                    inputSignal.signalID,
+                                    signalValue.value.uint32Val,
+                                    RawData::BufferHandleUsageStage::COLLECTED_NOT_IN_HISTORY_BUFFER );
+                            }
                             break;
                         case SignalType::UNKNOWN:
                             FWE_LOG_WARN( "UNKNOWN signal [signal id: " + std::to_string( inputSignal.signalID ) +
@@ -234,6 +275,7 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         case SignalType::COMPLEX_SIGNAL:
                             consumer->mCollectionInspectionEngine.addNewSignal<RawData::BufferHandle>(
                                 inputSignal.signalID,
+                                inputSignal.fetchRequestID,
                                 calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint32Val );
@@ -335,6 +377,30 @@ CollectionInspectionWorkerThread::collectDataAndUpload()
 {
     uint32_t collectedDataPackages = 0;
     uint32_t waitTimeMs = this->mIdleTimeMs;
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    // TODO consider priority, queue is shared between collecting and forwarding
+    if ( this->mStreamForwarder != nullptr )
+    {
+        for ( const auto &campaign : this->mCollectionInspectionEngine.forwardConditionForCampaignPartitions() )
+        {
+            for ( Aws::IoTFleetWise::Store::PartitionID pID = 0; pID < campaign.second.size(); ++pID )
+            {
+                if ( campaign.second[pID] )
+                {
+                    this->mStreamForwarder->beginForward(
+                        campaign.first, pID, Store::StreamForwarder::Source::CONDITION );
+                }
+                else
+                {
+                    this->mStreamForwarder->cancelForward(
+                        campaign.first, pID, Store::StreamForwarder::Source::CONDITION );
+                }
+            }
+        }
+    }
+#endif
+
     auto collectedData =
         this->mCollectionInspectionEngine.collectNextDataToSend( this->mClock->timeSinceEpoch(), waitTimeMs );
     while ( ( ( collectedData.triggeredCollectionSchemeData != nullptr )
@@ -347,6 +413,30 @@ CollectionInspectionWorkerThread::collectDataAndUpload()
         TraceModule::get().incrementVariable( TraceVariable::CE_TRIGGERS );
         if ( collectedData.triggeredCollectionSchemeData != nullptr )
         {
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+            auto result = Store::StreamManager::ReturnCode::STREAM_NOT_FOUND;
+            if ( mStreamManager != nullptr )
+            {
+                result = mStreamManager->appendToStreams( *collectedData.triggeredCollectionSchemeData );
+            }
+            if ( result == Store::StreamManager::ReturnCode::SUCCESS )
+            {
+                // Successfully appended
+            }
+            else if ( result == Store::StreamManager::ReturnCode::EMPTY_DATA )
+            {
+                FWE_LOG_INFO(
+                    "The trigger for Campaign:  " + collectedData.triggeredCollectionSchemeData->metadata.campaignArn +
+                    " activated eventID: " + std::to_string( collectedData.triggeredCollectionSchemeData->eventID ) +
+                    " but no data is available to ingest" );
+            }
+            else if ( result != Store::StreamManager::ReturnCode::STREAM_NOT_FOUND )
+            {
+                FWE_LOG_ERROR( "Failed to store FWE data with eventID " +
+                               std::to_string( collectedData.triggeredCollectionSchemeData->eventID ) );
+            }
+            else
+#endif
             {
                 if ( this->mOutputCollectedData->push( collectedData.triggeredCollectionSchemeData ) )
                 {

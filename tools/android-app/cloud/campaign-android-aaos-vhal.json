@@ -63,6 +63,21 @@
       "name": "Vehicle.VHAL.TIRE_PRESSURE_3"
     },
     {
+      "name": "Vehicle.VHAL.WHEEL_TICK_0"
+    },
+    {
+      "name": "Vehicle.VHAL.WHEEL_TICK_1"
+    },
+    {
+      "name": "Vehicle.VHAL.WHEEL_TICK_2"
+    },
+    {
+      "name": "Vehicle.VHAL.WHEEL_TICK_3"
+    },
+    {
+      "name": "Vehicle.VHAL.WHEEL_TICK_4"
+    },
+    {
       "name": "Vehicle.VHAL.GEAR_SELECTION"
     },
     {

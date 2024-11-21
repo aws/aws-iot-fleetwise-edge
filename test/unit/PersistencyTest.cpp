@@ -74,6 +74,15 @@ TEST( PersistencyTest, storeTest )
     // getData() return >0, write returns memory_full
     gmocktest.store( DataType::COLLECTION_SCHEME_LIST );
     gmocktest.store( DataType::DECODER_MANIFEST );
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    auto lastKnownStateIngestionMock = std::make_shared<LastKnownStateIngestionMock>();
+    EXPECT_CALL( *lastKnownStateIngestionMock, getData() ).WillRepeatedly( ReturnRef( dataPL ) );
+    EXPECT_CALL( *testPersistency, write( _, _, DataType::STATE_TEMPLATE_LIST, _ ) )
+        .WillRepeatedly( Return( ErrorCode::SUCCESS ) );
+    gmocktest.store( DataType::STATE_TEMPLATE_LIST );
+    gmocktest.setLastKnownStateIngestion( lastKnownStateIngestionMock );
+    gmocktest.store( DataType::STATE_TEMPLATE_LIST );
+#endif
 }
 
 /** @brief
@@ -183,6 +192,118 @@ TEST( PersistencyTest, StoreAndRetrieve )
     ret = std::system( "rm -rf ./testPersist" );
     ASSERT_FALSE( WIFEXITED( ret ) == 0 );
 }
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+/** @brief
+ * This test validates Store and Forward campaign persistency with the usage of the store/retrieve APIs.
+ */
+TEST( CollectionSchemeManagerTest2, StoreAndForwardPersistency )
+{
+    int ret = std::system( "mkdir ./testPersist" );
+    ASSERT_FALSE( WIFEXITED( ret ) == 0 );
+    std::shared_ptr<CacheAndPersist> testPersistency = std::make_shared<CacheAndPersist>( "./testPersist", 4096 );
+    ASSERT_TRUE( testPersistency->init() );
+
+    Schemas::CollectionSchemesMsg::CollectionSchemes protoCollectionSchemesMsg;
+    auto *collectionSchemeTestMessage = protoCollectionSchemesMsg.add_collection_schemes();
+    collectionSchemeTestMessage->set_campaign_sync_id( "arn:aws:iam::2.23606797749:user/Development/product_1235/*" );
+    collectionSchemeTestMessage->set_decoder_manifest_sync_id( "model_manifest_13" );
+    collectionSchemeTestMessage->set_start_time_ms_epoch( 162144816000 );
+    collectionSchemeTestMessage->set_expiry_time_ms_epoch( 262144816000 );
+
+    // Create an Event/Condition Based CollectionScheme
+    Schemas::CollectionSchemesMsg::ConditionBasedCollectionScheme *message =
+        collectionSchemeTestMessage->mutable_condition_based_collection_scheme();
+    message->set_condition_minimum_interval_ms( 650 );
+    message->set_condition_language_version( 20 );
+    message->set_condition_trigger_mode(
+        Schemas::CollectionSchemesMsg::ConditionBasedCollectionScheme_ConditionTriggerMode_TRIGGER_ALWAYS );
+
+    // Create store and forward configuration
+    auto *store_and_forward_configuration = collectionSchemeTestMessage->mutable_store_and_forward_configuration();
+    auto *store_and_forward_entry = store_and_forward_configuration->add_partition_configuration();
+    auto *storage_options = store_and_forward_entry->mutable_storage_options();
+    auto *upload_options = store_and_forward_entry->mutable_upload_options();
+    storage_options->set_maximum_size_in_bytes( 1000000 );
+    storage_options->set_storage_location( "/storage" );
+    storage_options->set_minimum_time_to_live_in_seconds( 1000000 );
+
+    //  Build the AST Tree:
+    //----------
+
+    upload_options->mutable_condition_tree()->set_node_signal_id( 10 );
+    message->mutable_condition_tree();
+
+    //----------
+
+    collectionSchemeTestMessage->set_after_duration_ms( 0 );
+    collectionSchemeTestMessage->set_include_active_dtcs( true );
+    collectionSchemeTestMessage->set_persist_all_collected_data( true );
+    collectionSchemeTestMessage->set_compress_collected_data( true );
+    collectionSchemeTestMessage->set_priority( 5 );
+
+    // Add 3 Signals
+    Schemas::CollectionSchemesMsg::SignalInformation *signal1 = collectionSchemeTestMessage->add_signal_information();
+    signal1->set_signal_id( 19 );
+    signal1->set_sample_buffer_size( 5 );
+    signal1->set_minimum_sample_period_ms( 500 );
+    signal1->set_fixed_window_period_ms( 600 );
+    signal1->set_condition_only_signal( true );
+    signal1->set_data_partition_id( 1 );
+
+    Schemas::CollectionSchemesMsg::SignalInformation *signal2 = collectionSchemeTestMessage->add_signal_information();
+    signal2->set_signal_id( 17 );
+    signal2->set_sample_buffer_size( 10000 );
+    signal2->set_minimum_sample_period_ms( 1000 );
+    signal2->set_fixed_window_period_ms( 1000 );
+    signal2->set_condition_only_signal( false );
+    signal2->set_data_partition_id( 1 );
+
+    Schemas::CollectionSchemesMsg::SignalInformation *signal3 = collectionSchemeTestMessage->add_signal_information();
+    signal3->set_signal_id( 3 );
+    signal3->set_sample_buffer_size( 1000 );
+    signal3->set_minimum_sample_period_ms( 100 );
+    signal3->set_fixed_window_period_ms( 100 );
+    signal3->set_condition_only_signal( true );
+    signal3->set_data_partition_id( 1 );
+
+    // Add 1 RAW CAN Messages
+    Schemas::CollectionSchemesMsg::RawCanFrame *can1 = collectionSchemeTestMessage->add_raw_can_frames_to_collect();
+    can1->set_can_interface_id( "1230" );
+    can1->set_can_message_id( 0x1FF );
+    can1->set_sample_buffer_size( 200 );
+    can1->set_minimum_sample_period_ms( 255 );
+
+    std::string protoMessage;
+    ASSERT_TRUE( protoCollectionSchemesMsg.SerializeToString( &protoMessage ) );
+    size_t sizePL = protoMessage.length();
+    std::string dataPL = protoMessage;
+
+    CANInterfaceIDTranslator canIDTranslator;
+    CollectionSchemeManagerWrapper testCollectionSchemeManager(
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ) );
+    testCollectionSchemeManager.setCollectionSchemePersistency( testPersistency );
+    std::vector<ICollectionSchemePtr> emptyCP;
+    ICollectionSchemeListPtr storePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
+    storePL->copyData( reinterpret_cast<const uint8_t *>( dataPL.c_str() ), sizePL );
+    testCollectionSchemeManager.setCollectionSchemeList( storePL );
+    testCollectionSchemeManager.store( DataType::COLLECTION_SCHEME_LIST );
+
+    ret = std::system( "ls -l ./testPersist >test.txt" );
+    ASSERT_FALSE( WIFEXITED( ret ) == 0 );
+    std::cout << std::ifstream( "test.txt" ).rdbuf();
+
+    ICollectionSchemeListPtr retrievePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
+    testCollectionSchemeManager.setCollectionSchemeList( retrievePL );
+    testCollectionSchemeManager.retrieve( DataType::COLLECTION_SCHEME_LIST );
+
+    std::vector<uint8_t> orgData = storePL->getData();
+    std::vector<uint8_t> retData = retrievePL->getData();
+    ASSERT_EQ( orgData, retData );
+    ret = std::system( "rm -rf ./testPersist" );
+    ASSERT_FALSE( WIFEXITED( ret ) == 0 );
+}
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

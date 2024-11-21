@@ -1,0 +1,62 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package commonapi
+
+interface DeviceShadowOverSomeipInterface {
+    version { major 1 minor 0 }
+
+    method getShadow {
+        in {
+            String shadowName // empty ("") for classic shadow; non-empty for named shadow
+        }
+
+        out {
+            String errorMessage // only valid in case of error
+            String shadowDocument // only valid in case of no error
+        }
+
+      error ErrorCode // please check it to determine which output (errorMessage, shadowDocument) is valid
+    }
+
+    method updateShadow {
+        in {
+            String shadowName // empty ("") for classic shadow; non-empty for named shadow
+            String updateDocument
+        }
+
+        out {
+            String errorMessage // only valid in case of error
+            String shadowDocument // only valid in case of no error
+        }
+
+        error ErrorCode // please check it to determine which output (errorMessage, shadowDocument) is valid
+    }
+
+    method deleteShadow {
+        in {
+            String shadowName // empty ("") for classic shadow; non-empty for named shadow
+        }
+
+        out {
+            String errorMessage // only valid in case of error
+        }
+
+        error ErrorCode // please check it to determine which output (errorMessage) is valid
+    }
+
+    broadcast shadowChanged {
+        out {
+            String shadowName // empty ("") for classic shadow; non-empty for named shadow
+            String shadowDocument
+        }
+    }
+
+    enumeration ErrorCode {
+        NO_ERROR
+        INVALID_REQUEST
+        SHADOW_SERVICE_UNREACHABLE
+        REJECTED
+        UNKNOWN
+    }
+}

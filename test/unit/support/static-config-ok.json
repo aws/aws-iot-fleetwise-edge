@@ -33,6 +33,76 @@
       },
       "interfaceId": "10",
       "type": "ros2Interface"
+    },
+    {
+      "someipToCanBridgeInterface": {
+        "someipServiceId": "0x7777",
+        "someipInstanceId": "0x5678",
+        "someipEventId": "0x8778",
+        "someipEventGroupId": "0x5555",
+        "someipApplicationName": "someipToCanBridgeInterface"
+      },
+      "interfaceId": "3",
+      "type": "someipToCanBridgeInterface"
+    },
+    {
+      "someipCollectionInterface": {
+        "someipApplicationName": "someipCollectionInterface",
+        "cyclicUpdatePeriodMs": 200
+      },
+      "interfaceId": "SOMEIP",
+      "type": "someipCollectionInterface"
+    },
+    {
+      "someipCommandInterface": {
+        "someipApplicationName": "someipCommandInterface"
+      },
+      "interfaceId": "SOMEIP",
+      "type": "someipCommandInterface"
+    },
+    {
+      "interfaceId": "NAMED_SIGNAL",
+      "type": "namedSignalInterface"
+    },
+    {
+      "interfaceId": "AAOS-VHAL",
+      "type": "aaosVhalInterface"
+    },
+    {
+      "iWaveGpsInterface": {
+        "latitudeSignalName": "Vehicle.CurrentLocation.Latitude",
+        "longitudeSignalName": "Vehicle.CurrentLocation.Longitude",
+        "nmeaFilePath": "/dev/null",
+        "pollIntervalMs": 123
+      },
+      "interfaceId": "LOCATION",
+      "type": "iWaveGpsInterface"
+    },
+    {
+      "externalGpsInterface": {
+        "latitudeSignalName": "Vehicle.CurrentLocation.Latitude",
+        "longitudeSignalName": "Vehicle.CurrentLocation.Longitude"
+      },
+      "interfaceId": "LOCATION",
+      "type": "externalGpsInterface"
+    },
+    {
+      "interfaceId": "UDS_DTC",
+      "type": "exampleUDSInterface",
+      "exampleUDSInterface": {
+        "configs": [
+          {
+            "targetAddress": "0x01",
+            "name": "ECM",
+            "can": {
+              "interfaceName": "vcan0",
+              "functionalAddress": "0x7DF",
+              "physicalRequestID": "0x7E0",
+              "physicalResponseID": "0x7E8"
+            }
+          }
+        ]
+      }
     }
   ],
   "staticConfig": {
@@ -55,7 +125,8 @@
       "readyToPublishDataBufferSize": 10000,
       "systemWideLogLevel": "Trace",
       "persistencyUploadRetryIntervalMs": 5000,
-      "maximumAwsSdkHeapMemoryBytes": 10000000
+      "maximumAwsSdkHeapMemoryBytes": 10000000,
+      "minFetchTriggerIntervalMs": 1000
     },
     "publishToCloudParameters": {
       "maxPublishMessageCount": 1000,
@@ -64,22 +135,11 @@
     "mqttConnection": {
       "endpointUrl": "my-endpoint.my-region.amazonaws.com",
       "clientId": "ClientId",
-      "collectionSchemeListTopic": "collection-scheme-list-topic",
-      "decoderManifestTopic": "decoder-manifest-topic",
       "metricsUploadTopic": "aws-iot-fleetwise-metrics-upload",
       "loggingUploadTopic": "aws-iot-fleetwise-logging-upload",
-      "canDataTopic": "can-data",
-      "checkinTopic": "checkin",
       "certificateFilename": "/tmp/dummyCertificate.pem",
       "privateKeyFilename": "/tmp/dummyPrivateKey.key",
       "rootCAFilename": "/tmp/dummyCertificate.pem"
-    },
-    "iWaveGpsExample": {
-      "nmeaFilePath": "/tmp/engineTestIWaveGPSfile.txt",
-      "canChannel": "IWAVE-GPS-CAN",
-      "canFrameId": "1",
-      "longitudeStartBit": "32",
-      "latitudeStartBit": "0"
     },
     "remoteProfilerDefaultValues": {
       "loggingUploadLevelThreshold": "Warning",

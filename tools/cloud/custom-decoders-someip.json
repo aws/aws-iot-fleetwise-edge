@@ -1,0 +1,98 @@
+[
+  {
+    "fullyQualifiedName": "Vehicle.actuator1",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.actuator1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.actuator2",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.actuator2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.actuator3",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.actuator3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.actuator4",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.actuator4"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.actuator5",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.actuator5"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.actuator9",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.actuator9"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.actuator20",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.actuator20"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.X",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.X"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.A",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.A"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.B",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.B"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.D",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.D"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.S",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.S"
+    }
+  }
+]

@@ -63,6 +63,10 @@ public:
 
     PIDSignalDecoderFormat getPIDSignalDecoderFormat( SignalID signalID ) const override;
 
+    CustomSignalDecoderFormat getCustomSignalDecoderFormat( SignalID signalID ) const override;
+
+    SignalIDToCustomSignalDecoderFormatMapPtr getSignalIDToCustomSignalDecoderFormatMap() const override;
+
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     ComplexSignalDecoderFormat getComplexSignalDecoderFormat( SignalID signalID ) const override;
 
@@ -154,6 +158,11 @@ private:
      */
     static boost::optional<SignalType> convertPrimitiveTypeToSignalType(
         Schemas::DecoderManifestMsg::PrimitiveType primitiveType );
+
+    /**
+     * @brief A dictionary used to obtain the custom decoder for a given signal
+     */
+    SignalIDToCustomSignalDecoderFormatMapPtr mSignalToCustomDecoder;
 };
 
 } // namespace IoTFleetWise

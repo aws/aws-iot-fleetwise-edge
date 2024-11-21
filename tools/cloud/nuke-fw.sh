@@ -116,6 +116,17 @@ for ((i=0;;i++)); do
     aws iotfleetwise delete-model-manifest --region ${REGION} ${ENDPOINT_URL_OPTION} --name ${MODEL_MANIFEST_NAME}
 done
 
+echo "Getting state templates..."
+STATE_TEMPLATES=`aws iotfleetwise list-state-templates --region ${REGION} ${ENDPOINT_URL_OPTION}`
+for ((i=0;;i++)); do
+    STATE_TEMPLATE=`echo "${STATE_TEMPLATES}" | jq -r .summaries[$i].name`
+    if [ "${STATE_TEMPLATE}" == "null" ]; then
+        break
+    fi
+    echo "Deleting state template ${STATE_TEMPLATE}..."
+    aws iotfleetwise delete-state-template --region ${REGION} ${ENDPOINT_URL_OPTION} --identifier ${STATE_TEMPLATE}
+done
+
 echo "Getting signal catalogs..."
 SIGNAL_CATALOGS=`aws iotfleetwise list-signal-catalogs --region ${REGION} ${ENDPOINT_URL_OPTION}`
 for ((i=0;;i++)); do

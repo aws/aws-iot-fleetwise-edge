@@ -63,6 +63,29 @@ TEST( CacheAndPersistTest, testDecoderManifestPersistency )
     ASSERT_EQ( storage->getSize( DataType::DECODER_MANIFEST ), 0 );
 }
 
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+TEST( CacheAndPersistTest, testStateTemplatesPersistency )
+{
+    auto storage = createCacheAndPersist();
+    // create a test obj
+    std::string testString = "Test StateTemplate";
+    size_t size = testString.size();
+
+    ASSERT_EQ(
+        storage->write( reinterpret_cast<const uint8_t *>( testString.c_str() ), size, DataType::STATE_TEMPLATE_LIST ),
+        ErrorCode::SUCCESS );
+    ASSERT_EQ( storage->getSize( DataType::STATE_TEMPLATE_LIST ), size );
+
+    std::unique_ptr<uint8_t[]> readBufPtr( new uint8_t[size]() );
+    ASSERT_EQ( storage->read( readBufPtr.get(), size, DataType::STATE_TEMPLATE_LIST ), ErrorCode::SUCCESS );
+    std::string out( reinterpret_cast<char *>( readBufPtr.get() ), size );
+    std::cout << "File contents: " << out << std::endl;
+    ASSERT_STREQ( out.c_str(), testString.c_str() );
+    ASSERT_EQ( storage->erase( DataType::STATE_TEMPLATE_LIST ), ErrorCode::SUCCESS );
+    ASSERT_EQ( storage->getSize( DataType::STATE_TEMPLATE_LIST ), 0 );
+}
+#endif
+
 TEST( CacheAndPersistTest, testWriteEmptyBuffer )
 {
     auto storage = createCacheAndPersist();

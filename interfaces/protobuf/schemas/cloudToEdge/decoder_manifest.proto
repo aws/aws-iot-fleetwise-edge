@@ -33,6 +33,11 @@ message DecoderManifest {
    * List of complex signals, which refer to the complex types
    */
   repeated ComplexSignal complex_signals = 5;
+
+  /*
+   * List of custom decoding signals
+   */
+  repeated CustomDecodingSignal custom_decoding_signals = 6;
 }
 
 message CANSignal {
@@ -187,6 +192,7 @@ enum PrimitiveType {
   INT64 = 9;
   FLOAT32 = 10;
   FLOAT64 = 11;
+  STRING = 12;
 }
 
 /*
@@ -279,4 +285,30 @@ message ComplexSignal {
    * Type id of the root signal. 0 is reserved for future usage.
    */
   uint32 root_type_id = 4;
+}
+
+message CustomDecodingSignal {
+  /*
+   * Unique FleetWise internal identifier of the signal across all types (  i.e. CANSignal, OBDPIDSignal, CustomDecodingSignal)
+   * Value zero is reserved for internal usage.
+   * The most significant bit is reserved for internal usage.
+   */
+  uint32 signal_id = 1;
+
+  /*
+   * Interface ID for the network interface this signal is found on. The network interface details are provided as
+   * a part of the edge static configuration file.
+   */
+  string interface_id = 2;
+
+  /*
+   * Custom proprietary decoding identifier.
+   */
+  string custom_decoding_id = 3;
+
+  /*
+   * A CustomDecodingSignal has always a primitive type, so here the primitive type can be defined.
+   * If not present this value defaults to FLOAT64.
+   */
+  PrimitiveType primitive_type = 4;
 }

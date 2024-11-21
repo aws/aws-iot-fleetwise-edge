@@ -1,0 +1,90 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+option java_package = "com.amazonaws.iot.autobahn.schemas";
+package Aws.IoTFleetWise.Schemas.LastKnownState;
+
+/*
+ * Top level message sent by Cloud with signals to be collected to measure last known state for provided signals
+ *
+ * When a new message arrives containing a list of state templates, all current state templates in FWE
+ * will be replaced with the new ones. Therefore, this message should always contain a complete list
+ * of all state templates that exist in the Cloud, even if some of the templates are already present
+ * in FWE.
+ */
+message StateTemplates {
+  /*
+   * Synchronization ID of the required decoder manifest for this collection scheme
+   *
+   * The signal IDs present in this message are mapped to the actual signals based on this decoder
+   * manifest, which must be received by Edge before the collection scheme.
+   */
+  string decoder_manifest_sync_id = 2;
+
+  /*
+   * Old field for state_template_information that is not supported anymore
+   */
+  reserved 4;
+
+  /*
+   * List of state templates that should be added.
+   *
+   * Note: populating this field will override any values in state_template_information
+   *
+   * Each state template contains the signals that should be collected for it.
+   */
+  repeated StateTemplateInformation state_templates_to_add = 5;
+
+  /*
+   * List of state template synchronization IDs that must be removed from Edge.
+   * Note: populating this field will override any values in state_template_information
+   */
+  repeated string state_template_sync_ids_to_remove = 6;
+
+  /*
+   * The version denotes the latest set of changes requested by FW Cloud.
+   * All the messages with the same version are considered different parts of the same requested config.
+   */
+  uint64 version = 7;
+}
+
+message StateTemplateInformation {
+  /*
+   * Synchronization ID for the state template
+   * This ID is expected to uniquely identify the update strategy and the set of signals that are associated with a state template.
+   */
+  string state_template_sync_id = 1;
+
+  reserved 2;
+  reserved "decoder_manifest_sync_id";
+
+  /*
+   * Update strategy for state template
+   */
+  oneof UpdateStrategy {
+    OnChangeUpdateStrategy on_change_update_strategy = 3;
+    PeriodicUpdateStrategy periodic_update_strategy = 4;
+  };
+
+  /*
+   * List of signals that should be collected.
+   */
+  repeated uint32 signal_ids = 5;
+}
+
+/*
+ * Signals with this strategy will be sent in a specific interval
+ */
+message PeriodicUpdateStrategy {
+  /*
+   * This can't be zero or omitted
+   */
+  uint64 period_ms = 1;
+}
+
+/*
+ * Signals with this strategy will be sent only when its value changes
+ */
+message OnChangeUpdateStrategy {}

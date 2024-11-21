@@ -1,0 +1,68 @@
+From 5675092caebdc9c9914652d5dcd8c6f2dbebfca1 Mon Sep 17 00:00:00 2001
+From: Geoff Phillips <phigeoff@amazon.de>
+Date: Wed, 27 Sep 2023 18:25:38 +0200
+Subject: [PATCH] Allow static libs
+
+Remove SHARED option from add_library to allow static libs,
+CMake then respects the standard BUILD_SHARED_LIBS option.
+Set the default value of BUILD_SHARED_LIBS to ON.
+
+Remove FactoryDeinit DEINITIALIZER, since it can be called
+after the runtime has been destroyed when statically linked,
+causing abort/segfault. Also as it is anyway not called via
+dlclose and CommonAPI::Runtime when dynamically linked.
+---
+ CMakeLists.txt                   |  5 ++++-
+ src/CommonAPI/SomeIP/Factory.cpp | 11 +----------
+ 2 files changed, 5 insertions(+), 11 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 08eab86..da39d47 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -26,6 +26,9 @@ message(STATUS "USE_FILE is set to value: ${USE_FILE}")
+ OPTION(USE_CONSOLE "Set to OFF to disable console logging" OFF )
+ message(STATUS "USE_CONSOLE is set to value: ${USE_CONSOLE}")
+
++OPTION(BUILD_SHARED_LIBS "Set to OFF to build static libraries" ON )
++message(STATUS "BUILD_SHARED_LIBS is set to value: ${BUILD_SHARED_LIBS}")
++
+ SET(DEFAULT_SEND_TIMEOUT "5000" CACHE STRING "default send timeout")
+ message(STATUS "DEFAULT_SEND_TIMEOUT is set to value: ${DEFAULT_SEND_TIMEOUT} ms")
+
+@@ -139,7 +142,7 @@ file (GLOB CommonAPI-SomeIP_SRC "src/CommonAPI/SomeIP/*.cpp")
+ list (SORT CommonAPI-SomeIP_SRC)
+
+ # CommonAPI
+-add_library (CommonAPI-SomeIP SHARED ${CommonAPI-SomeIP_SRC})
++add_library (CommonAPI-SomeIP ${CommonAPI-SomeIP_SRC})
+ set_target_properties (CommonAPI-SomeIP PROPERTIES VERSION ${COMPONENT_VERSION} SOVERSION ${COMPONENT_VERSION})
+ target_include_directories(CommonAPI-SomeIP INTERFACE
+     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+diff --git a/src/CommonAPI/SomeIP/Factory.cpp b/src/CommonAPI/SomeIP/Factory.cpp
+index c434543..efe01cd 100644
+--- a/src/CommonAPI/SomeIP/Factory.cpp
++++ b/src/CommonAPI/SomeIP/Factory.cpp
+@@ -16,19 +16,10 @@ namespace CommonAPI {
+ namespace SomeIP {
+
+ INITIALIZER(FactoryInit) {
+-    Factory::runtime_ = Runtime::get();
+-    Factory::runtime_.lock()->registerFactory("someip", Factory::get());
++    Runtime::get()->registerFactory("someip", Factory::get());
+     Configuration::load();
+ }
+
+-DEINITIALIZER(FactoryDeinit) {
+-    if (auto rt = Factory::runtime_.lock()) {
+-        rt->unregisterFactory("someip");
+-    }
+-}
+-
+-std::weak_ptr<CommonAPI::Runtime> Factory::runtime_;
+-
+ std::shared_ptr<Factory>
+ Factory::get() {
+     static std::shared_ptr<Factory> theFactory = std::make_shared<Factory>();
+--
+2.25.1

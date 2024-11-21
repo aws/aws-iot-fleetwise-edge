@@ -3,5 +3,6 @@ demo.env
 collected-data-*
 ros2-nodes.json
 ros2-decoders.json
+last_known_state_message_pb2.py
 can-nodes.json
 can-decoders.json

@@ -1,0 +1,10 @@
+[
+  {
+    "fullyQualifiedName": "Vehicle.ECU1.DTC_INFO",
+    "interfaceId": "UDS_DTC",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ECU1.DTC_INFO"
+    }
+  }
+]

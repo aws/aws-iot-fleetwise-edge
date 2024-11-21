@@ -28,7 +28,6 @@
 #include <fstream>
 #include <functional>
 #include <unordered_map>
-#include <utility>
 
 #ifdef FWE_FEATURE_GREENGRASSV2
 #include "AwsGreengrassV2ConnectivityModule.h"
@@ -48,6 +47,28 @@
 #include "DataSenderIonWriter.h"
 #include "VisionSystemDataSender.h"
 #endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+#include "CommandResponseDataSender.h"
+#endif
+#ifdef FWE_FEATURE_SOMEIP
+#include "ExampleSomeipInterfaceWrapper.h"
+#include <CommonAPI/CommonAPI.hpp>
+#include <vsomeip/vsomeip.hpp>
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+#include "LastKnownStateDataSender.h"
+#include "LastKnownStateInspector.h"
+#endif
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+#include "RateLimiter.h"
+#include "StreamForwarder.h"
+#endif
+#ifdef FWE_FEATURE_CUSTOM_FUNCTION_EXAMPLES
+#include "CustomFunctionMath.h"
+#endif
+#ifdef FWE_FEATURE_UDS_DTC_EXAMPLE
+#include <stdexcept>
+#endif
 
 namespace Aws
 {
@@ -58,17 +79,36 @@ static constexpr uint64_t DEFAULT_RETRY_UPLOAD_PERSISTED_INTERVAL_MS = 10000;
 static const std::string CAN_INTERFACE_TYPE = "canInterface";
 static const std::string EXTERNAL_CAN_INTERFACE_TYPE = "externalCanInterface";
 static const std::string OBD_INTERFACE_TYPE = "obdInterface";
+static const std::string NAMED_SIGNAL_INTERFACE_TYPE = "namedSignalInterface";
 #ifdef FWE_FEATURE_ROS2
 static const std::string ROS2_INTERFACE_TYPE = "ros2Interface";
 #endif
+#ifdef FWE_FEATURE_SOMEIP
+static const std::string SOMEIP_TO_CAN_BRIDGE_INTERFACE_TYPE = "someipToCanBridgeInterface";
+static const std::string SOMEIP_COLLECTION_INTERFACE_TYPE = "someipCollectionInterface";
+#endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+#ifdef FWE_FEATURE_SOMEIP
+static const std::string SOMEIP_COMMAND_INTERFACE_TYPE = "someipCommandInterface";
+#endif
+static const std::string CAN_COMMAND_INTERFACE_TYPE = "canCommandInterface";
+static const std::unordered_map<std::string, CanCommandDispatcher::CommandConfig>
+    EXAMPLE_CAN_INTERFACE_SUPPORTED_ACTUATOR_MAP = {
+        { "Vehicle.actuator6", { 0x00000123, 0x00000456, SignalType::INT32 } },
+        { "Vehicle.actuator7", { 0x80000789, 0x80000ABC, SignalType::DOUBLE } },
+};
+#endif
 #ifdef FWE_FEATURE_IWAVE_GPS
-static const std::string CONFIG_SECTION_IWAVE_GPS = "iWaveGpsExample";
+static const std::string IWAVE_GPS_INTERFACE_TYPE = "iWaveGpsInterface";
 #endif
 #ifdef FWE_FEATURE_EXTERNAL_GPS
-static const std::string CONFIG_SECTION_EXTERNAL_GPS = "externalGpsExample";
+static const std::string EXTERNAL_GPS_INTERFACE_TYPE = "externalGpsInterface";
 #endif
 #ifdef FWE_FEATURE_AAOS_VHAL
-static const std::string CONFIG_SECTION_AAOS_VHAL = "aaosVhalExample";
+static const std::string AAOS_VHAL_INTERFACE_TYPE = "aaosVhalInterface";
+#endif
+#ifdef FWE_FEATURE_UDS_DTC_EXAMPLE
+static const std::string UDS_DTC_INTERFACE = "exampleUDSInterface";
 #endif
 
 namespace
@@ -145,6 +185,28 @@ IoTFleetWiseEngine::~IoTFleetWiseEngine()
     setLogForwarding( nullptr );
 }
 
+#ifdef FWE_FEATURE_SOMEIP
+static std::shared_ptr<ExampleSomeipInterfaceWrapper>
+createExampleSomeipInterfaceWrapper( const std::string &applicationName,
+                                     const std::string &exampleInstance,
+                                     std::shared_ptr<RawData::BufferManager> rawBufferManager,
+                                     bool subscribeToLongRunningCommandStatus )
+{
+    return std::make_shared<ExampleSomeipInterfaceWrapper>(
+        "local",
+        exampleInstance,
+        applicationName,
+        []( std::string domain,
+            std::string instance,
+            std::string connection ) -> std::shared_ptr<v1::commonapi::ExampleSomeipInterfaceProxy<>> {
+            return CommonAPI::Runtime::get()->buildProxy<v1::commonapi::ExampleSomeipInterfaceProxy>(
+                domain, instance, connection );
+        },
+        std::move( rawBufferManager ),
+        subscribeToLongRunningCommandStatus );
+}
+#endif
+
 bool
 IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesystem::path &configFileDirectoryPath )
 {
@@ -174,6 +236,10 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         else
         {
             FWE_LOG_INFO( "Persistency feature is disabled in the configuration." );
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+            FWE_LOG_INFO( "Disabling Store and Forward feature as persistency is disabled." );
+            mStoreAndForwardEnabled = false;
+#endif
         }
         /*************************Payload Manager and Persistency library bootstrap end************/
 
@@ -183,45 +249,15 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             auto networkInterface = config["networkInterfaces"][i];
             auto networkInterfaceType = networkInterface["type"].asStringRequired();
             if ( ( networkInterfaceType == CAN_INTERFACE_TYPE ) ||
-                 ( networkInterfaceType == EXTERNAL_CAN_INTERFACE_TYPE ) )
+                 ( networkInterfaceType == EXTERNAL_CAN_INTERFACE_TYPE )
+#ifdef FWE_FEATURE_SOMEIP
+                 || ( networkInterfaceType == SOMEIP_TO_CAN_BRIDGE_INTERFACE_TYPE )
+#endif
+            )
             {
                 mCANIDTranslator.add( networkInterface["interfaceId"].asStringRequired() );
             }
         }
-#ifdef FWE_FEATURE_IWAVE_GPS
-        if ( config["staticConfig"].isMember( CONFIG_SECTION_IWAVE_GPS ) )
-        {
-            mCANIDTranslator.add( config["staticConfig"][CONFIG_SECTION_IWAVE_GPS][IWaveGpsSource::CAN_CHANNEL_NUMBER]
-                                      .asStringRequired() );
-        }
-        else
-        {
-            mCANIDTranslator.add( "IWAVE-GPS-CAN" );
-        }
-#endif
-#ifdef FWE_FEATURE_EXTERNAL_GPS
-        if ( config["staticConfig"].isMember( CONFIG_SECTION_EXTERNAL_GPS ) )
-        {
-            mCANIDTranslator.add(
-                config["staticConfig"][CONFIG_SECTION_EXTERNAL_GPS][ExternalGpsSource::CAN_CHANNEL_NUMBER]
-                    .asStringRequired() );
-        }
-        else
-        {
-            mCANIDTranslator.add( "EXTERNAL-GPS-CAN" );
-        }
-#endif
-#ifdef FWE_FEATURE_AAOS_VHAL
-        if ( config["staticConfig"].isMember( CONFIG_SECTION_AAOS_VHAL ) )
-        {
-            mCANIDTranslator.add( config["staticConfig"][CONFIG_SECTION_AAOS_VHAL][AaosVhalSource::CAN_CHANNEL_NUMBER]
-                                      .asStringRequired() );
-        }
-        else
-        {
-            mCANIDTranslator.add( "AAOS-VHAL-CAN" );
-        }
-#endif
         /*************************CAN InterfaceID to InternalID Translator end*********/
 
         /**************************Connectivity bootstrap begin*******************************/
@@ -251,6 +287,14 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         auto mqttConfig = config["staticConfig"]["mqttConnection"];
         auto clientId = mqttConfig["clientId"].asStringRequired();
         std::string connectionType = mqttConfig["connectionType"].asStringOptional().get_value_or( "iotCore" );
+        TopicConfigArgs topicConfigArgs;
+        topicConfigArgs.iotFleetWisePrefix = mqttConfig["iotFleetWiseTopicPrefix"].asStringOptional();
+        topicConfigArgs.commandsPrefix = mqttConfig["commandsTopicPrefix"].asStringOptional();
+        topicConfigArgs.deviceShadowPrefix = mqttConfig["deviceShadowTopicPrefix"].asStringOptional();
+        topicConfigArgs.jobsPrefix = mqttConfig["jobsTopicPrefix"].asStringOptional();
+        topicConfigArgs.metricsTopic = mqttConfig["metricsUploadTopic"].asStringOptional().get_value_or( "" );
+        topicConfigArgs.logsTopic = mqttConfig["loggingUploadTopic"].asStringOptional().get_value_or( "" );
+        mTopicConfig = std::make_unique<TopicConfig>( clientId, topicConfigArgs );
 
         if ( connectionType == "iotCore" )
         {
@@ -324,7 +368,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                     MQTT_SESSION_EXPIRY_INTERVAL_SECONDS );
 
             mConnectivityModule = std::make_shared<AwsIotConnectivityModule>(
-                rootCA, clientId, std::move( builderWrapper ), mqttConnectionConfig );
+                rootCA, clientId, std::move( builderWrapper ), *mTopicConfig, mqttConnectionConfig );
 
 #ifdef FWE_FEATURE_S3
             if ( config["staticConfig"].isMember( "credentialsProvider" ) )
@@ -344,7 +388,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         else if ( connectionType == "iotGreengrassV2" )
         {
             FWE_LOG_INFO( "ConnectionType is iotGreengrassV2" );
-            mConnectivityModule = std::make_shared<AwsGreengrassV2ConnectivityModule>( bootstrapPtr );
+            mConnectivityModule = std::make_shared<AwsGreengrassV2ConnectivityModule>( bootstrapPtr, *mTopicConfig );
 #ifdef FWE_FEATURE_S3
             mAwsCredentialsProvider = std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>();
 #endif
@@ -356,38 +400,78 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             return false;
         }
 
-        // Only CAN data channel needs a payloadManager object for persistency and compression support,
-        // for other components this will be nullptr
-        mSenderVehicleData = mConnectivityModule->createSender( mqttConfig["canDataTopic"].asStringRequired() );
-
-        mReceiverCollectionSchemeList =
-            mConnectivityModule->createReceiver( mqttConfig["collectionSchemeListTopic"].asStringRequired() );
-
-        mReceiverDecoderManifest =
-            mConnectivityModule->createReceiver( mqttConfig["decoderManifestTopic"].asStringRequired() );
-
-        /*
-         * Over this sender, metrics like performance (resident ram pages, cpu time spent in threads)
-         * and tracing metrics like internal variables and time spent in specially instrumented functions
-         * spent are uploaded in json format over mqtt.
-         */
-        auto metricsUploadTopic = mqttConfig["metricsUploadTopic"].asStringOptional().get_value_or( "" );
-        if ( !metricsUploadTopic.empty() )
+        mReceiverCollectionSchemeList = mConnectivityModule->createReceiver( mTopicConfig->collectionSchemesTopic );
+        mReceiverDecoderManifest = mConnectivityModule->createReceiver( mTopicConfig->decoderManifestTopic );
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        if ( mStoreAndForwardEnabled )
         {
-            mSenderMetrics = mConnectivityModule->createSender( metricsUploadTopic );
+            // Receivers to receive Store and Forward Data Upload Requests
+            mReceiverIotJob = mConnectivityModule->createReceiver( mTopicConfig->jobNotificationTopic );
+            mReceiverJobDocumentAccepted =
+                mConnectivityModule->createReceiver( mTopicConfig->getJobExecutionAcceptedTopic );
+            mReceiverJobDocumentRejected =
+                mConnectivityModule->createReceiver( mTopicConfig->getJobExecutionRejectedTopic );
+            mReceiverPendingJobsAccepted =
+                mConnectivityModule->createReceiver( mTopicConfig->getPendingJobExecutionsAcceptedTopic );
+            mReceiverPendingJobsRejected =
+                mConnectivityModule->createReceiver( mTopicConfig->getPendingJobExecutionsRejectedTopic );
+            mReceiverUpdateIotJobStatusAccepted =
+                mConnectivityModule->createReceiver( mTopicConfig->updateJobExecutionAcceptedTopic );
+            mReceiverUpdateIotJobStatusRejected =
+                mConnectivityModule->createReceiver( mTopicConfig->updateJobExecutionRejectedTopic );
+            mReceiverCanceledIoTJobs =
+                mConnectivityModule->createReceiver( mTopicConfig->jobCancellationInProgressTopic );
         }
-        /*
-         * Over this sender, log messages that are currently logged to STDOUT are uploaded in json
-         * format over MQTT.
-         */
-        auto loggingUploadTopic = mqttConfig["loggingUploadTopic"].asStringOptional().get_value_or( "" );
-        if ( !loggingUploadTopic.empty() )
-        {
-            mSenderLogs = mConnectivityModule->createSender( loggingUploadTopic );
-        }
+#endif
 
-        // Create an ISender for sending Checkins
-        mSenderCheckin = mConnectivityModule->createSender( mqttConfig["checkinTopic"].asStringRequired() );
+        mMqttSender = mConnectivityModule->createSender();
+
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+        std::shared_ptr<IReceiver> receiverCommandRequest;
+        std::shared_ptr<IReceiver> receiverRejectedCommandResponse;
+        std::shared_ptr<IReceiver> receiverAcceptedCommandResponse;
+        receiverCommandRequest = mConnectivityModule->createReceiver( mTopicConfig->commandRequestTopic );
+        // The accepted/rejected messages are always sent regardless of whether we are subscribing to the topics or
+        // not. So even if we don't need to receive them, we subscribe to them just to ensure we don't log any
+        // error.
+        receiverAcceptedCommandResponse =
+            mConnectivityModule->createReceiver( mTopicConfig->commandResponseAcceptedTopic );
+        receiverRejectedCommandResponse =
+            mConnectivityModule->createReceiver( mTopicConfig->commandResponseRejectedTopic );
+#endif
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+        std::shared_ptr<IReceiver> receiverLastKnownStateConfig =
+            mConnectivityModule->createReceiver( mTopicConfig->lastKnownStateConfigTopic );
+#endif
+
+#ifdef FWE_FEATURE_SOMEIP
+        if ( !config["staticConfig"].isMember( "deviceShadowOverSomeip" ) )
+        {
+            FWE_LOG_TRACE( "DeviceShadowOverSomeip is disabled as no deviceShadowOverSomeip member in staticConfig" );
+        }
+        else
+        {
+            std::shared_ptr<IReceiver> receiverDeviceShadow =
+                mConnectivityModule->createReceiver( mTopicConfig->deviceShadowPrefix + "#" );
+            mDeviceShadowOverSomeip = std::make_shared<DeviceShadowOverSomeip>( mMqttSender );
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            receiverDeviceShadow->subscribeToDataReceived( std::bind(
+                &DeviceShadowOverSomeip::onDataReceived, mDeviceShadowOverSomeip.get(), std::placeholders::_1 ) );
+            mDeviceShadowOverSomeipInstanceName =
+                config["staticConfig"]["deviceShadowOverSomeip"]["someipInstance"].asStringOptional().get_value_or(
+                    "commonapi.DeviceShadowOverSomeipInterface" );
+            if ( !CommonAPI::Runtime::get()->registerService(
+                     "local",
+                     mDeviceShadowOverSomeipInstanceName,
+                     mDeviceShadowOverSomeip,
+                     config["staticConfig"]["deviceShadowOverSomeip"]["someipApplicationName"].asStringRequired() ) )
+            {
+                FWE_LOG_ERROR( "Failed to register DeviceShadowOverSomeip service" );
+                return false;
+            }
+        }
+#endif
 
         boost::optional<RawData::BufferManagerConfig> rawDataBufferManagerConfig;
         auto rawDataBufferJsonConfig = config["staticConfig"]["visionSystemDataCollection"]["rawDataBuffer"];
@@ -456,8 +540,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             // loggingUploadMaxWaitBeforeUploadMs
             // profilerPrefix
             mRemoteProfiler = std::make_unique<RemoteProfiler>(
-                mSenderMetrics,
-                mSenderLogs,
+                mMqttSender,
                 config["staticConfig"]["remoteProfilerDefaultValues"]["metricsUploadIntervalMs"].asU32Required(),
                 config["staticConfig"]["remoteProfilerDefaultValues"]["loggingUploadMaxWaitBeforeUploadMs"]
                     .asU32Required(),
@@ -502,22 +585,55 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             payloadConfigCompressed["payloadSizeLimitMinPercent"].asU32Optional().get_value_or( 70 ),
             payloadConfigCompressed["payloadSizeLimitMaxPercent"].asU32Optional().get_value_or( 90 ),
             payloadConfigCompressed["transmitThresholdAdaptPercent"].asU32Optional().get_value_or( 10 ) };
-        auto telemetryDataSender = std::make_shared<TelemetryDataSender>( mSenderVehicleData,
-                                                                          dataSenderProtoWriter,
-                                                                          payloadAdaptionConfigUncompressed,
-                                                                          payloadAdaptionConfigCompressed );
+        auto telemetryDataSender = std::make_shared<TelemetryDataSender>(
+            mMqttSender, dataSenderProtoWriter, payloadAdaptionConfigUncompressed, payloadAdaptionConfigCompressed );
         std::unordered_map<SenderDataType, std::shared_ptr<DataSender>> dataSenders;
         dataSenders[SenderDataType::TELEMETRY] = telemetryDataSender;
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        if ( mStoreAndForwardEnabled )
+        {
+            const auto persistencyPath = config["staticConfig"]["persistency"]["persistencyPath"].asStringRequired();
+
+            mStreamManager = std::make_shared<Aws::IoTFleetWise::Store::StreamManager>(
+                persistencyPath,
+                dataSenderProtoWriter,
+                config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asU32Required() );
+            auto rateLimiter = std::make_shared<RateLimiter>(
+                config["staticConfig"]["storeAndForward"]["forwardMaxTokens"].asU32Optional().get_value_or(
+                    DEFAULT_MAX_TOKENS ),
+                config["staticConfig"]["storeAndForward"]["forwardTokenRefillsPerSecond"].asU32Optional().get_value_or(
+                    DEFAULT_TOKEN_REFILLS_PER_SECOND ) );
+            mStreamForwarder = std::make_shared<Aws::IoTFleetWise::Store::StreamForwarder>(
+                mStreamManager, telemetryDataSender, rateLimiter );
+
+            // Start the forwarder
+            if ( !mStreamForwarder->start() )
+            {
+                FWE_LOG_ERROR( "Failed to init and start the Stream Forwarder" );
+                return false;
+            }
+        }
+#endif
+
         // Init and start the Inspection Engine
-        mCollectionInspectionEngine = std::make_shared<CollectionInspectionEngine>();
+        auto minFetchTriggerIntervalMs =
+            config["staticConfig"]["internalParameters"]["minFetchTriggerIntervalMs"].asU32Optional().get_value_or(
+                MIN_FETCH_TRIGGER_MS );
+        mCollectionInspectionEngine = std::make_shared<CollectionInspectionEngine>( minFetchTriggerIntervalMs );
         mCollectionInspectionWorkerThread =
             std::make_shared<CollectionInspectionWorkerThread>( *mCollectionInspectionEngine );
         if ( ( !mCollectionInspectionWorkerThread->init(
                  signalBuffer,
                  mCollectedDataReadyToPublish,
                  config["staticConfig"]["threadIdleTimes"]["inspectionThreadIdleTimeMs"].asU32Required(),
-                 mRawBufferManager ) ) ||
+                 mRawBufferManager
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                 ,
+                 mStreamForwarder,
+                 mStreamManager
+#endif
+                 ) ) ||
              ( !mCollectionInspectionWorkerThread->start() ) )
         {
             FWE_LOG_ERROR( "Failed to init and start the Inspection Engine" );
@@ -527,6 +643,31 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         signalBuffer->subscribeToNewDataAvailable( std::bind( &CollectionInspectionWorkerThread::onNewDataAvailable,
                                                               mCollectionInspectionWorkerThread.get() ) );
         /*************************Inspection Engine bootstrap end***********************************/
+
+        /*************************Store and Forward IoT Jobs bootstrap begin************************/
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        if ( mStoreAndForwardEnabled )
+        {
+            mIoTJobsDataRequestHandler =
+                std::make_unique<IoTJobsDataRequestHandler>( mMqttSender,
+                                                             mReceiverIotJob,
+                                                             mReceiverJobDocumentAccepted,
+                                                             mReceiverJobDocumentRejected,
+                                                             mReceiverPendingJobsAccepted,
+                                                             mReceiverPendingJobsRejected,
+                                                             mReceiverUpdateIotJobStatusAccepted,
+                                                             mReceiverUpdateIotJobStatusRejected,
+                                                             mReceiverCanceledIoTJobs,
+                                                             mStreamManager,
+                                                             mStreamForwarder,
+                                                             clientId );
+
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            mConnectivityModule->subscribeToConnectionEstablished(
+                std::bind( &IoTJobsDataRequestHandler::onConnectionEstablished, mIoTJobsDataRequestHandler.get() ) );
+        }
+#endif
+        /*************************Store and Forward IoT Jobs bootstrap end**************************/
 
         /*************************DataSender bootstrap begin*********************************/
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -563,10 +704,43 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             dataSenders[SenderDataType::VISION_SYSTEM] = visionSystemDataSender;
         }
 #endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+        mCommandResponses = std::make_shared<DataSenderQueue>(
+            config["staticConfig"]["internalParameters"]["readyToPublishCommandResponsesBufferSize"]
+                .asSizeOptional()
+                .get_value_or( 100 ),
+            "Command Responses",
+            TraceAtomicVariable::QUEUE_PENDING_COMMAND_RESPONSES );
+        size_t maxConcurrentCommandRequests =
+            config["staticConfig"]["internalParameters"]["maxConcurrentCommandRequests"].asSizeOptional().get_value_or(
+                100 );
+        mActuatorCommandManager = std::make_shared<ActuatorCommandManager>(
+            mCommandResponses, maxConcurrentCommandRequests, mRawBufferManager );
+
+        dataSenders[SenderDataType::COMMAND_RESPONSE] = std::make_shared<CommandResponseDataSender>( mMqttSender );
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+        mLastKnownStateDataReadyToPublish = std::make_shared<DataSenderQueue>(
+            config["staticConfig"]["internalParameters"]["readyToPublishDataBufferSize"].asSizeRequired(),
+            "LastKnownState data",
+            TraceAtomicVariable::QUEUE_LAST_KNOWN_STATE_INSPECTION_TO_SENDER );
+        dataSenders[SenderDataType::LAST_KNOWN_STATE] = std::make_shared<LastKnownStateDataSender>(
+            mMqttSender,
+            config["staticConfig"]["publishToCloudParameters"]["maxPublishLastKnownStateMessageCount"]
+                .asU32Optional()
+                .get_value_or( 1000 ) );
+#endif
 
         mDataSenderManager =
-            std::make_shared<DataSenderManager>( std::move( dataSenders ), mSenderVehicleData, mPayloadManager );
-        std::vector<std::shared_ptr<DataSenderQueue>> dataToSendQueues = { mCollectedDataReadyToPublish };
+            std::make_shared<DataSenderManager>( std::move( dataSenders ), mMqttSender, mPayloadManager );
+        std::vector<std::shared_ptr<DataSenderQueue>> dataToSendQueues = {
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+            mCommandResponses,
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+            mLastKnownStateDataReadyToPublish,
+#endif
+            mCollectedDataReadyToPublish };
         mDataSenderManagerWorkerThread = std::make_shared<DataSenderManagerWorkerThread>(
             mConnectivityModule, mDataSenderManager, persistencyUploadRetryIntervalMs, dataToSendQueues );
         if ( !mDataSenderManagerWorkerThread->start() )
@@ -578,6 +752,12 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
         mCollectedDataReadyToPublish->subscribeToNewDataAvailable(
             std::bind( &DataSenderManagerWorkerThread::onDataReadyToPublish, mDataSenderManagerWorkerThread.get() ) );
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        mLastKnownStateDataReadyToPublish->subscribeToNewDataAvailable(
+            std::bind( &DataSenderManagerWorkerThread::onDataReadyToPublish, mDataSenderManagerWorkerThread.get() ) );
+#endif
         /*************************DataSender bootstrap end*********************************/
 
         /*************************CollectionScheme Ingestion bootstrap begin*********************************/
@@ -585,9 +765,13 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         // CollectionScheme Ingestion module executes in the context for the offboardconnectivity thread. Upcoming
         // messages are expected to come either on the decoder manifest topic or the collectionScheme topic or both
         // ( eventually ).
-        mSchemaPtr =
-            std::make_shared<Schema>( mReceiverDecoderManifest, mReceiverCollectionSchemeList, mSenderCheckin );
-
+        mSchemaPtr = std::make_shared<Schema>( mReceiverDecoderManifest, mReceiverCollectionSchemeList, mMqttSender );
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+        if ( receiverLastKnownStateConfig != nullptr )
+        {
+            mLastKnownStateSchema = std::make_unique<LastKnownStateSchema>( receiverLastKnownStateConfig );
+        }
+#endif
         /*****************************CollectionScheme Management bootstrap begin*****************************/
 
         // Allow CollectionSchemeManagement to send checkins through the Schema Object Callback
@@ -598,7 +782,17 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
 
         // Create and connect the CollectionScheme Manager
         mCollectionSchemeManagerPtr = std::make_shared<CollectionSchemeManager>(
-            mPersistDecoderManifestCollectionSchemesAndData, mCANIDTranslator, mCheckinSender, mRawBufferManager );
+            mPersistDecoderManifestCollectionSchemesAndData,
+            mCANIDTranslator,
+            mCheckinSender,
+            mRawBufferManager
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+            ,
+            [this]() -> std::unordered_map<InterfaceID, std::vector<std::string>> {
+                return mActuatorCommandManager->getActuatorNames();
+            }
+#endif
+        );
 
         // Make sure the CollectionScheme Ingestion can notify the CollectionScheme Manager about the arrival
         // of new artifacts over the offboardconnectivity receiver.
@@ -610,6 +804,16 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         mSchemaPtr->subscribeToDecoderManifestUpdate( std::bind( &CollectionSchemeManager::onDecoderManifestUpdate,
                                                                  mCollectionSchemeManagerPtr.get(),
                                                                  std::placeholders::_1 ) );
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+        if ( mLastKnownStateSchema != nullptr )
+        {
+            mLastKnownStateSchema->subscribeToLastKnownStateReceived(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                std::bind( &CollectionSchemeManager::onStateTemplatesChanged,
+                           mCollectionSchemeManagerPtr.get(),
+                           std::placeholders::_1 ) );
+        }
+#endif
 
         // Make sure the CollectionScheme Manager can notify the Inspection Engine about the availability of
         // a new set of collection CollectionSchemes.
@@ -641,7 +845,28 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                            std::placeholders::_2 ) );
         }
 #endif
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        if ( mStoreAndForwardEnabled )
+        {
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            mCollectionSchemeManagerPtr->subscribeToCollectionSchemeListChange(
+                std::bind( &Aws::IoTFleetWise::Store::StreamManager::onChangeCollectionSchemeList,
+                           mStreamManager.get(),
+                           std::placeholders::_1 ) );
+        }
+#endif
 
+        /*************************DataFetchManager bootstrap begin*********************************/
+        mDataFetchManager = std::make_shared<DataFetchManager>();
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        mCollectionInspectionEngine->subscribeToFetchConditionEvaluationUpdate(
+            std::bind( &DataFetchManager::onFetchRequest,
+                       mDataFetchManager.get(),
+                       std::placeholders::_1,
+                       std::placeholders::_2 ) );
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        mCollectionSchemeManagerPtr->subscribeToFetchMatrixChange(
+            std::bind( &DataFetchManager::onChangeFetchMatrix, mDataFetchManager.get(), std::placeholders::_1 ) );
         /********************************Data source bootstrap start*******************************/
 
         auto obdOverCANModuleInit = false;
@@ -742,6 +967,105 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                                std::placeholders::_1,
                                std::placeholders::_2 ) );
             }
+            else if ( interfaceType == NAMED_SIGNAL_INTERFACE_TYPE )
+            {
+                if ( mNamedSignalDataSource != nullptr )
+                {
+                    continue;
+                }
+                mNamedSignalDataSource =
+                    std::make_shared<NamedSignalDataSource>( interfaceId, signalBufferDistributor );
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    std::bind( &NamedSignalDataSource::onChangeOfActiveDictionary,
+                               mNamedSignalDataSource.get(),
+                               std::placeholders::_1,
+                               std::placeholders::_2 ) );
+            }
+#ifdef FWE_FEATURE_SOMEIP
+            else if ( interfaceType == SOMEIP_COLLECTION_INTERFACE_TYPE )
+            {
+                if ( mSomeipDataSource != nullptr )
+                {
+                    continue;
+                }
+                // coverity[autosar_cpp14_a20_8_4_violation] Shared pointer interface required for unit testing
+                auto namedSignalDataSource =
+                    std::make_shared<NamedSignalDataSource>( interfaceId, signalBufferDistributor );
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    std::bind( &NamedSignalDataSource::onChangeOfActiveDictionary,
+                               namedSignalDataSource.get(),
+                               std::placeholders::_1,
+                               std::placeholders::_2 ) );
+                auto someipCollectionInterfaceConfig = networkInterfaceConfig[SOMEIP_COLLECTION_INTERFACE_TYPE];
+                mSomeipDataSource = std::make_unique<SomeipDataSource>(
+                    createExampleSomeipInterfaceWrapper(
+                        someipCollectionInterfaceConfig["someipApplicationName"].asStringRequired(),
+                        someipCollectionInterfaceConfig["someipInstance"].asStringOptional().get_value_or(
+                            "commonapi.ExampleSomeipInterface" ),
+                        mRawBufferManager,
+                        false ),
+                    std::move( namedSignalDataSource ),
+                    mRawBufferManager,
+                    someipCollectionInterfaceConfig["cyclicUpdatePeriodMs"].asU32Required() );
+                if ( !mSomeipDataSource->init() )
+                {
+                    FWE_LOG_ERROR( "Failed to initialize SOME/IP data source" );
+                    return false;
+                }
+            }
+#endif
+#ifdef FWE_FEATURE_UDS_DTC_EXAMPLE
+            else if ( interfaceType == UDS_DTC_INTERFACE )
+            {
+                FWE_LOG_INFO( "UDS Template DTC Interface Type received" );
+                mDiagnosticNamedSignalDataSource =
+                    std::make_shared<NamedSignalDataSource>( interfaceId, signalBufferDistributor );
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    std::bind( &NamedSignalDataSource::onChangeOfActiveDictionary,
+                               mDiagnosticNamedSignalDataSource.get(),
+                               std::placeholders::_1,
+                               std::placeholders::_2 ) );
+                std::vector<EcuConfig> remoteDiagnosticInterfaceConfig;
+                auto ecuConfiguration = networkInterfaceConfig[UDS_DTC_INTERFACE];
+                for ( unsigned j = 0; j < networkInterfaceConfig[UDS_DTC_INTERFACE]["configs"].getArraySizeRequired();
+                      j++ )
+                {
+                    auto ecu = ecuConfiguration["configs"][j];
+                    auto canInterface = ecu["can"];
+                    EcuConfig ecuConfig;
+                    ecuConfig.ecuName = static_cast<std::string>( ecu["name"].asStringRequired() );
+                    ecuConfig.canBus = static_cast<std::string>( canInterface["interfaceName"].asStringRequired() );
+                    try
+                    {
+                        ecuConfig.targetAddress =
+                            static_cast<int>( std::stoi( ecu["targetAddress"].asStringRequired(), nullptr, 0 ) );
+                        ecuConfig.physicalRequestID = static_cast<uint32_t>(
+                            std::stoi( canInterface["physicalRequestID"].asStringRequired(), nullptr, 0 ) );
+                        ecuConfig.physicalResponseID = static_cast<uint32_t>(
+                            std::stoi( canInterface["physicalResponseID"].asStringRequired(), nullptr, 0 ) );
+                        ecuConfig.functionalAddress = static_cast<uint32_t>(
+                            std::stoi( canInterface["functionalAddress"].asStringRequired(), nullptr, 0 ) );
+                    }
+                    catch ( const std::invalid_argument &err )
+                    {
+                        FWE_LOG_ERROR( "Could not parse received remote diagnostics interface configuration: " +
+                                       std::string( err.what() ) );
+                        return false;
+                    }
+                    remoteDiagnosticInterfaceConfig.emplace_back( ecuConfig );
+                }
+                mExampleDiagnosticInterface = std::make_shared<ExampleUDSInterface>();
+                if ( ( !mExampleDiagnosticInterface->init( remoteDiagnosticInterfaceConfig ) ) ||
+                     ( !mExampleDiagnosticInterface->start() ) )
+                {
+                    FWE_LOG_ERROR( "Failed to initialize the Template Interface" );
+                    return false;
+                }
+            }
+#endif
 #ifdef FWE_FEATURE_ROS2
             else if ( interfaceType == ROS2_INTERFACE_TYPE )
             {
@@ -761,13 +1085,291 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                                std::placeholders::_2 ) );
             }
 #endif
+#ifdef FWE_FEATURE_SOMEIP
+            else if ( interfaceType == SOMEIP_TO_CAN_BRIDGE_INTERFACE_TYPE )
+            {
+                auto canChannelId = mCANIDTranslator.getChannelNumericID( interfaceId );
+                auto someipToCanBridgeConfig = networkInterfaceConfig[SOMEIP_TO_CAN_BRIDGE_INTERFACE_TYPE];
+                auto bridge = std::make_unique<SomeipToCanBridge>(
+                    static_cast<uint16_t>( someipToCanBridgeConfig["someipServiceId"].asU32FromStringRequired() ),
+                    static_cast<uint16_t>( someipToCanBridgeConfig["someipInstanceId"].asU32FromStringRequired() ),
+                    static_cast<uint16_t>( someipToCanBridgeConfig["someipEventId"].asU32FromStringRequired() ),
+                    static_cast<uint16_t>( someipToCanBridgeConfig["someipEventGroupId"].asU32FromStringRequired() ),
+                    someipToCanBridgeConfig["someipApplicationName"].asStringRequired(),
+                    canChannelId,
+                    *mCANDataConsumer,
+                    []( std::string name ) -> std::shared_ptr<vsomeip::application> {
+                        return vsomeip::runtime::get()->create_application( name );
+                    },
+                    []( std::string name ) {
+                        vsomeip::runtime::get()->remove_application( name );
+                    } );
+                if ( !bridge->init() )
+                {
+                    FWE_LOG_ERROR( "Failed to initialize SomeipToCanBridge" );
+                    return false;
+                }
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    std::bind( &SomeipToCanBridge::onChangeOfActiveDictionary,
+                               bridge.get(),
+                               std::placeholders::_1,
+                               std::placeholders::_2 ) );
+                mSomeipToCanBridges.push_back( std::move( bridge ) );
+            }
+#endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+#ifdef FWE_FEATURE_SOMEIP
+            else if ( interfaceType == SOMEIP_COMMAND_INTERFACE_TYPE )
+            {
+                if ( mExampleSomeipCommandDispatcher != nullptr )
+                {
+                    continue;
+                }
+                auto exampleSomeipInterfaceWrapper = createExampleSomeipInterfaceWrapper(
+                    networkInterfaceConfig[SOMEIP_COMMAND_INTERFACE_TYPE]["someipApplicationName"].asStringRequired(),
+                    networkInterfaceConfig[SOMEIP_COMMAND_INTERFACE_TYPE]["someipInstance"]
+                        .asStringOptional()
+                        .get_value_or( "commonapi.ExampleSomeipInterface" ),
+                    mRawBufferManager,
+                    true );
+                mExampleSomeipCommandDispatcher =
+                    std::make_shared<SomeipCommandDispatcher>( exampleSomeipInterfaceWrapper );
+                if ( !mActuatorCommandManager->registerDispatcher( interfaceId, mExampleSomeipCommandDispatcher ) )
+                {
+                    return false;
+                }
+            }
+#endif
+            else if ( interfaceType == CAN_COMMAND_INTERFACE_TYPE )
+            {
+                if ( mCanCommandDispatcher != nullptr )
+                {
+                    continue;
+                }
+                mCanCommandDispatcher = std::make_shared<CanCommandDispatcher>(
+                    EXAMPLE_CAN_INTERFACE_SUPPORTED_ACTUATOR_MAP,
+                    networkInterfaceConfig[CAN_COMMAND_INTERFACE_TYPE]["interfaceName"].asStringRequired(),
+                    mRawBufferManager );
+                if ( !mActuatorCommandManager->registerDispatcher( interfaceId, mCanCommandDispatcher ) )
+                {
+                    return false;
+                }
+            }
+#endif
+#ifdef FWE_FEATURE_AAOS_VHAL
+            else if ( interfaceType == AAOS_VHAL_INTERFACE_TYPE )
+            {
+                if ( mAaosVhalSource != nullptr )
+                {
+                    continue;
+                }
+                mAaosVhalSource = std::make_shared<AaosVhalSource>( interfaceId, signalBufferDistributor );
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    std::bind( &AaosVhalSource::onChangeOfActiveDictionary,
+                               mAaosVhalSource.get(),
+                               std::placeholders::_1,
+                               std::placeholders::_2 ) );
+            }
+#endif
+#ifdef FWE_FEATURE_IWAVE_GPS
+            else if ( interfaceType == IWAVE_GPS_INTERFACE_TYPE )
+            {
+                if ( mIWaveGpsSource != nullptr )
+                {
+                    continue;
+                }
+                // coverity[autosar_cpp14_a20_8_4_violation] Shared pointer interface required for unit testing
+                auto namedSignalDataSource =
+                    std::make_shared<NamedSignalDataSource>( interfaceId, signalBufferDistributor );
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    std::bind( &NamedSignalDataSource::onChangeOfActiveDictionary,
+                               namedSignalDataSource.get(),
+                               std::placeholders::_1,
+                               std::placeholders::_2 ) );
+                auto iwaveGpsConfig = networkInterfaceConfig[IWAVE_GPS_INTERFACE_TYPE];
+                mIWaveGpsSource = std::make_shared<IWaveGpsSource>(
+                    namedSignalDataSource,
+                    iwaveGpsConfig[IWaveGpsSource::PATH_TO_NMEA].asStringRequired(),
+                    iwaveGpsConfig[IWaveGpsSource::LATITUDE_SIGNAL_NAME].asStringRequired(),
+                    iwaveGpsConfig[IWaveGpsSource::LONGITUDE_SIGNAL_NAME].asStringRequired(),
+                    iwaveGpsConfig[IWaveGpsSource::POLL_INTERVAL_MS].asU32Required() );
+                if ( !mIWaveGpsSource->connect() )
+                {
+                    FWE_LOG_ERROR( "IWaveGps initialization failed" );
+                    return false;
+                }
+            }
+#endif
+#ifdef FWE_FEATURE_EXTERNAL_GPS
+            else if ( interfaceType == EXTERNAL_GPS_INTERFACE_TYPE )
+            {
+                if ( mExternalGpsSource != nullptr )
+                {
+                    continue;
+                }
+                // coverity[autosar_cpp14_a20_8_4_violation] Shared pointer interface required for unit testing
+                auto namedSignalDataSource =
+                    std::make_shared<NamedSignalDataSource>( interfaceId, signalBufferDistributor );
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    std::bind( &NamedSignalDataSource::onChangeOfActiveDictionary,
+                               namedSignalDataSource.get(),
+                               std::placeholders::_1,
+                               std::placeholders::_2 ) );
+                auto externalGpsConfig = networkInterfaceConfig[EXTERNAL_GPS_INTERFACE_TYPE];
+                mExternalGpsSource = std::make_shared<ExternalGpsSource>(
+                    namedSignalDataSource,
+                    externalGpsConfig[ExternalGpsSource::LATITUDE_SIGNAL_NAME].asStringRequired(),
+                    externalGpsConfig[ExternalGpsSource::LONGITUDE_SIGNAL_NAME].asStringRequired() );
+            }
+#endif
             else
             {
                 FWE_LOG_ERROR( interfaceType + " is not supported" );
             }
         }
+#ifdef FWE_FEATURE_UDS_DTC
+        mDiagnosticDataSource = std::make_shared<RemoteDiagnosticDataSource>( mDiagnosticNamedSignalDataSource,
+                                                                              mRawBufferManager
+#ifdef FWE_FEATURE_UDS_DTC_EXAMPLE
+                                                                              ,
+                                                                              mExampleDiagnosticInterface
+#endif
+        );
+        if ( !mDiagnosticDataSource->start() )
+        {
+            FWE_LOG_ERROR( "Failed to start the Remote Diagnostics Data Source" );
+            return false;
+        }
+        mDataFetchManager->registerCustomFetchFunction( "DTC_QUERY",
+                                                        std::bind( &RemoteDiagnosticDataSource::DTC_QUERY,
+                                                                   mDiagnosticDataSource.get(),
+                                                                   std::placeholders::_1,
+                                                                   std::placeholders::_2,
+                                                                   std::placeholders::_3 ) );
+#endif
 
         /********************************Data source bootstrap end*******************************/
+
+        /*******************************Custom function setup begin******************************/
+#ifdef FWE_FEATURE_CUSTOM_FUNCTION_EXAMPLES
+        mCollectionInspectionEngine->registerCustomFunction( "abs", { CustomFunctionMath::absFunc, nullptr, nullptr } );
+        mCollectionInspectionEngine->registerCustomFunction( "min", { CustomFunctionMath::minFunc, nullptr, nullptr } );
+        mCollectionInspectionEngine->registerCustomFunction( "max", { CustomFunctionMath::maxFunc, nullptr, nullptr } );
+        mCollectionInspectionEngine->registerCustomFunction( "pow", { CustomFunctionMath::powFunc, nullptr, nullptr } );
+        mCollectionInspectionEngine->registerCustomFunction( "log", { CustomFunctionMath::logFunc, nullptr, nullptr } );
+        mCollectionInspectionEngine->registerCustomFunction( "ceil",
+                                                             { CustomFunctionMath::ceilFunc, nullptr, nullptr } );
+        mCollectionInspectionEngine->registerCustomFunction( "floor",
+                                                             { CustomFunctionMath::floorFunc, nullptr, nullptr } );
+
+        mCustomFunctionMultiRisingEdgeTrigger =
+            std::make_unique<CustomFunctionMultiRisingEdgeTrigger>( mNamedSignalDataSource, mRawBufferManager );
+        mCollectionInspectionEngine->registerCustomFunction(
+            "MULTI_RISING_EDGE_TRIGGER",
+            { [this]( auto invocationId, const auto &args ) -> CustomFunctionInvokeResult {
+                 return mCustomFunctionMultiRisingEdgeTrigger->invoke( invocationId, args );
+             },
+              [this]( const auto &collectedSignalIds, auto timestamp, auto &collectedData ) {
+                  mCustomFunctionMultiRisingEdgeTrigger->conditionEnd( collectedSignalIds, timestamp, collectedData );
+              },
+              [this]( auto invocationId ) {
+                  mCustomFunctionMultiRisingEdgeTrigger->cleanup( invocationId );
+              } } );
+#endif
+        /********************************Custom function setup end*******************************/
+
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+        /********************************Remote commands bootstrap begin***************************/
+        if ( receiverCommandRequest )
+        {
+            mCommandSchema =
+                std::make_unique<CommandSchema>( receiverCommandRequest, mCommandResponses, mRawBufferManager );
+            if ( receiverRejectedCommandResponse != nullptr )
+            {
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                receiverRejectedCommandResponse->subscribeToDataReceived(
+                    std::bind( &CommandSchema::onRejectedCommandResponseReceived, std::placeholders::_1 ) );
+            }
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            mCommandResponses->subscribeToNewDataAvailable( std::bind(
+                &DataSenderManagerWorkerThread::onDataReadyToPublish, mDataSenderManagerWorkerThread.get() ) );
+            if ( !mActuatorCommandManager->start() )
+            {
+                FWE_LOG_ERROR( "Failed to init and start the Command Manager" );
+                return false;
+            }
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            mCollectionSchemeManagerPtr->subscribeToCustomSignalDecoderFormatMapChange(
+                std::bind( &ActuatorCommandManager::onChangeOfCustomSignalDecoderFormatMap,
+                           mActuatorCommandManager.get(),
+                           std::placeholders::_1,
+                           std::placeholders::_2 ) );
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            mCommandSchema->subscribeToActuatorCommandRequestReceived(
+                std::bind( &ActuatorCommandManager::onReceivingCommandRequest,
+                           mActuatorCommandManager.get(),
+                           std::placeholders::_1 ) );
+        }
+
+        /********************************Remote commands bootstrap end*****************************/
+#endif
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+        /********************************Last known state bootstrap begin**************************/
+        if ( receiverCommandRequest && receiverLastKnownStateConfig )
+        {
+            auto lastKnownStateInspector = std::make_unique<LastKnownStateInspector>(
+                mCommandResponses, mPersistDecoderManifestCollectionSchemesAndData );
+            auto lastKnownStateSignalBuffer =
+                std::make_shared<SignalBuffer>( signalBufferSize,
+                                                "LKS Signal Buffer",
+                                                TraceAtomicVariable::QUEUE_CONSUMER_TO_LAST_KNOWN_STATE_INSPECTION,
+                                                // Notify listeners when 10% of the buffer is full so that we don't
+                                                // let it grow too much.
+                                                signalBufferSize / 10 );
+
+            signalBufferDistributor->registerQueue( lastKnownStateSignalBuffer );
+            mLastKnownStateWorkerThread = std::make_shared<LastKnownStateWorkerThread>(
+                lastKnownStateSignalBuffer,
+                mLastKnownStateDataReadyToPublish,
+                std::move( lastKnownStateInspector ),
+                config["staticConfig"]["threadIdleTimes"]["lastKnownStateThreadIdleTimeMs"]
+                    .asU32Optional()
+                    .get_value_or( 0 ) );
+            mCollectionSchemeManagerPtr->subscribeToStateTemplatesChange(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                std::bind( &LastKnownStateWorkerThread::onStateTemplatesChanged,
+                           mLastKnownStateWorkerThread.get(),
+                           std::placeholders::_1 ) );
+            mCommandSchema->subscribeToLastKnownStateCommandRequestReceived(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                std::bind( &LastKnownStateWorkerThread::onNewCommandReceived,
+                           mLastKnownStateWorkerThread.get(),
+                           std::placeholders::_1 ) );
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            lastKnownStateSignalBuffer->subscribeToNewDataAvailable(
+                std::bind( &LastKnownStateWorkerThread::onNewDataAvailable, mLastKnownStateWorkerThread.get() ) );
+
+            if ( !mLastKnownStateWorkerThread->start() )
+            {
+                FWE_LOG_ERROR( "Failed to init and start the Last Known State Inspection Engine" );
+                return false;
+            }
+        }
+        else if ( receiverLastKnownStateConfig == nullptr )
+        {
+            FWE_LOG_INFO( "Disabling LastKnownState because LastKnownState topics are not configured" );
+        }
+        else if ( receiverCommandRequest == nullptr )
+        {
+            FWE_LOG_WARN( "Disabling LastKnownState because command topics are not configured" );
+        }
+        /********************************Last known state bootstrap end****************************/
+#endif
 
         // For asynchronous connect the call needs to be done after all senders and receivers are
         // created and all receiver listeners are subscribed.
@@ -797,132 +1399,11 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         }
         /****************************CollectionScheme Manager bootstrap end*************************/
 
-#ifdef FWE_FEATURE_IWAVE_GPS
-        /********************************IWave GPS Example NMEA reader *********************************/
-        mIWaveGpsSource = std::make_shared<IWaveGpsSource>( signalBufferDistributor );
-        std::string pathToNmeaSource;
-        CANChannelNumericID canChannel{};
-        CANRawFrameID canRawFrameId{};
-        uint16_t latitudeStartBit{};
-        uint16_t longitudeStartBit{};
-        if ( config["staticConfig"].isMember( CONFIG_SECTION_IWAVE_GPS ) )
+        if ( !mDataFetchManager->start() )
         {
-            FWE_LOG_TRACE( "Found '" + CONFIG_SECTION_IWAVE_GPS + "' section in config file" );
-            const auto iwaveConfig = config["staticConfig"][CONFIG_SECTION_IWAVE_GPS];
-            pathToNmeaSource = iwaveConfig[IWaveGpsSource::PATH_TO_NMEA].asStringRequired();
-            canChannel = mCANIDTranslator.getChannelNumericID(
-                iwaveConfig[IWaveGpsSource::CAN_CHANNEL_NUMBER].asStringRequired() );
-            canRawFrameId = iwaveConfig[IWaveGpsSource::CAN_RAW_FRAME_ID].asU32FromStringRequired();
-            latitudeStartBit =
-                static_cast<uint16_t>( iwaveConfig[IWaveGpsSource::LATITUDE_START_BIT].asU32FromStringRequired() );
-            longitudeStartBit =
-                static_cast<uint16_t>( iwaveConfig[IWaveGpsSource::LONGITUDE_START_BIT].asU32FromStringRequired() );
-        }
-        else
-        {
-            // If not config available, autodetect the presence of the iWave by passing a blank source:
-            pathToNmeaSource = "";
-            canChannel = mCANIDTranslator.getChannelNumericID( "IWAVE-GPS-CAN" );
-            // Default to these values:
-            canRawFrameId = 1;
-            latitudeStartBit = 32;
-            longitudeStartBit = 0;
-        }
-        if ( mIWaveGpsSource->init( pathToNmeaSource, canChannel, canRawFrameId, latitudeStartBit, longitudeStartBit ) )
-        {
-            if ( !mIWaveGpsSource->connect() )
-            {
-                FWE_LOG_ERROR( "IWaveGps initialization failed" );
-                return false;
-            }
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
-            mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
-                std::bind( &IWaveGpsSource::onChangeOfActiveDictionary,
-                           mIWaveGpsSource.get(),
-                           std::placeholders::_1,
-                           std::placeholders::_2 ) );
-            mIWaveGpsSource->start();
-        }
-        /********************************IWave GPS Example NMEA reader end******************************/
-#endif
-
-#ifdef FWE_FEATURE_EXTERNAL_GPS
-        /********************************External GPS Example NMEA reader *********************************/
-        mExternalGpsSource = std::make_shared<ExternalGpsSource>( signalBufferDistributor );
-        bool externalGpsInitSuccessful = false;
-        if ( config["staticConfig"].isMember( CONFIG_SECTION_EXTERNAL_GPS ) )
-        {
-            FWE_LOG_TRACE( "Found '" + CONFIG_SECTION_EXTERNAL_GPS + "' section in config file" );
-            auto externalGpsConfig = config["staticConfig"][CONFIG_SECTION_EXTERNAL_GPS];
-            externalGpsInitSuccessful = mExternalGpsSource->init(
-                mCANIDTranslator.getChannelNumericID(
-                    externalGpsConfig[ExternalGpsSource::CAN_CHANNEL_NUMBER].asStringRequired() ),
-                externalGpsConfig[ExternalGpsSource::CAN_RAW_FRAME_ID].asU32FromStringRequired(),
-                static_cast<uint16_t>(
-                    externalGpsConfig[ExternalGpsSource::LATITUDE_START_BIT].asU32FromStringRequired() ),
-                static_cast<uint16_t>(
-                    externalGpsConfig[ExternalGpsSource::LONGITUDE_START_BIT].asU32FromStringRequired() ) );
-        }
-        else
-        {
-            // If not config available default to this values
-            externalGpsInitSuccessful =
-                mExternalGpsSource->init( mCANIDTranslator.getChannelNumericID( "EXTERNAL-GPS-CAN" ), 1, 32, 0 );
-        }
-        if ( externalGpsInitSuccessful )
-        {
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
-            mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
-                std::bind( &ExternalGpsSource::onChangeOfActiveDictionary,
-                           mExternalGpsSource.get(),
-                           std::placeholders::_1,
-                           std::placeholders::_2 ) );
-            mExternalGpsSource->start();
-        }
-        else
-        {
-            FWE_LOG_ERROR( "ExternalGpsSource initialization failed" );
+            FWE_LOG_ERROR( "Failed to start the DataFetchManager" );
             return false;
         }
-        /********************************External GPS Example NMEA reader end******************************/
-#endif
-
-#ifdef FWE_FEATURE_AAOS_VHAL
-        /********************************AAOS VHAL Example reader *********************************/
-        mAaosVhalSource = std::make_shared<AaosVhalSource>( signalBufferDistributor );
-        bool aaosVhalInitSuccessful = false;
-        if ( config["staticConfig"].isMember( CONFIG_SECTION_AAOS_VHAL ) )
-        {
-            FWE_LOG_TRACE( "Found '" + CONFIG_SECTION_AAOS_VHAL + "' section in config file" );
-            auto aaosConfig = config["staticConfig"][CONFIG_SECTION_AAOS_VHAL];
-            aaosVhalInitSuccessful =
-                mAaosVhalSource->init( mCANIDTranslator.getChannelNumericID(
-                                           aaosConfig[AaosVhalSource::CAN_CHANNEL_NUMBER].asStringRequired() ),
-                                       aaosConfig[AaosVhalSource::CAN_RAW_FRAME_ID].asU32FromStringRequired() );
-        }
-        else
-        {
-            // If not config available default to this values
-            aaosVhalInitSuccessful =
-                mAaosVhalSource->init( mCANIDTranslator.getChannelNumericID( "AAOS-VHAL-CAN" ), 1 );
-        }
-        if ( aaosVhalInitSuccessful )
-        {
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
-            mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
-                std::bind( &AaosVhalSource::onChangeOfActiveDictionary,
-                           mAaosVhalSource.get(),
-                           std::placeholders::_1,
-                           std::placeholders::_2 ) );
-            mAaosVhalSource->start();
-        }
-        else
-        {
-            FWE_LOG_ERROR( "AaosVhalExample initialization failed" );
-            return false;
-        }
-        /********************************AAOS VHAL Example reader end******************************/
-#endif
 
         mPrintMetricsCyclicPeriodMs =
             config["staticConfig"]["internalParameters"]["metricsCyclicPrintIntervalMs"].asU32Optional().get_value_or(
@@ -943,28 +1424,39 @@ bool
 IoTFleetWiseEngine::disconnect()
 {
 #ifdef FWE_FEATURE_AAOS_VHAL
-    if ( mAaosVhalSource )
-    {
-        mAaosVhalSource->stop();
-    }
+    mAaosVhalSource.reset();
 #endif
 #ifdef FWE_FEATURE_EXTERNAL_GPS
-    if ( mExternalGpsSource )
-    {
-        mExternalGpsSource->stop();
-    }
+    mExternalGpsSource.reset();
 #endif
 #ifdef FWE_FEATURE_IWAVE_GPS
-    if ( mIWaveGpsSource )
-    {
-        mIWaveGpsSource->stop();
-    }
+    mIWaveGpsSource.reset();
 #endif
 #ifdef FWE_FEATURE_ROS2
     if ( mROS2DataSource )
     {
         mROS2DataSource->disconnect();
     }
+#endif
+#ifdef FWE_FEATURE_SOMEIP
+    for ( auto &bridge : mSomeipToCanBridges )
+    {
+        bridge->disconnect();
+    }
+    mSomeipDataSource.reset();
+    mExampleSomeipCommandDispatcher.reset();
+    if ( mDeviceShadowOverSomeip )
+    {
+        if ( !CommonAPI::Runtime::get()->unregisterService(
+                 "local",
+                 v1::commonapi::DeviceShadowOverSomeipInterface::getInterface(),
+                 mDeviceShadowOverSomeipInstanceName ) )
+        {
+            FWE_LOG_ERROR( "Failed to unregister DeviceShadowOverSomeip service" );
+            return false;
+        }
+    }
+    mDeviceShadowOverSomeip.reset();
 #endif
 
     if ( mOBDOverCANModule )
@@ -1016,6 +1508,60 @@ IoTFleetWiseEngine::disconnect()
         return false;
     }
 
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    if ( mActuatorCommandManager != nullptr )
+    {
+        if ( !mActuatorCommandManager->stop() )
+        {
+            FWE_LOG_ERROR( "Could not stop the ActuatorCommandManager" );
+            return false;
+        }
+    }
+#endif
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    // iot jobs depends on stream forwarder,
+    // so only stop forwarder after connectivity module is disconnected
+    if ( mStreamForwarder )
+    {
+        if ( !mStreamForwarder->stop() )
+        {
+            FWE_LOG_ERROR( "Could not stop the SteamForwarder" );
+            return false;
+        }
+    }
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    if ( ( mLastKnownStateWorkerThread != nullptr ) && ( !mLastKnownStateWorkerThread->stop() ) )
+    {
+        FWE_LOG_ERROR( "Could not stop the Last Known State Inspection Thread" );
+        return false;
+    }
+#endif
+    if ( !mDataFetchManager->stop() )
+    {
+        FWE_LOG_ERROR( "Could not stop the DataFetchManager" );
+        return false;
+    }
+#ifdef FWE_FEATURE_UDS_DTC
+    if ( mDiagnosticDataSource != nullptr )
+    {
+        if ( !mDiagnosticDataSource->stop() )
+        {
+            FWE_LOG_ERROR( "Could not stop DiagnosticDataSource" );
+            return false;
+        }
+    }
+#endif
+#ifdef FWE_FEATURE_UDS_DTC_EXAMPLE
+    if ( mExampleDiagnosticInterface != nullptr )
+    {
+        if ( !mExampleDiagnosticInterface->stop() )
+        {
+            FWE_LOG_ERROR( "Could not stop DiagnosticInterface" );
+            return false;
+        }
+    }
+#endif
     if ( !mDataSenderManagerWorkerThread->stop() )
     {
         FWE_LOG_ERROR( "Could not stop the DataSenderManager" );
@@ -1169,6 +1715,29 @@ IoTFleetWiseEngine::ingestExternalCANMessage( const InterfaceID &interfaceId,
     mExternalCANDataSource->ingestMessage( canChannelId, timestamp, messageId, data );
 }
 
+void
+IoTFleetWiseEngine::ingestSignalValueByName( Timestamp timestamp,
+                                             const std::string &name,
+                                             const DecodedSignalValue &value )
+{
+    if ( mNamedSignalDataSource == nullptr )
+    {
+        return;
+    }
+    mNamedSignalDataSource->ingestSignalValue( timestamp, name, value );
+}
+
+void
+IoTFleetWiseEngine::ingestMultipleSignalValuesByName(
+    Timestamp timestamp, const std::vector<std::pair<std::string, DecodedSignalValue>> &values )
+{
+    if ( mNamedSignalDataSource == nullptr )
+    {
+        return;
+    }
+    mNamedSignalDataSource->ingestMultipleSignalValues( timestamp, values );
+}
+
 #ifdef FWE_FEATURE_EXTERNAL_GPS
 void
 IoTFleetWiseEngine::setExternalGpsLocation( double latitude, double longitude )
@@ -1207,7 +1776,7 @@ IoTFleetWiseEngine::setVehicleProperty( uint32_t signalId, const DecodedSignalVa
 std::string
 IoTFleetWiseEngine::getStatusSummary()
 {
-    if ( mConnectivityModule == nullptr || mCollectionSchemeManagerPtr == nullptr || mSenderVehicleData == nullptr ||
+    if ( mConnectivityModule == nullptr || mCollectionSchemeManagerPtr == nullptr || mMqttSender == nullptr ||
          mOBDOverCANModule == nullptr )
     {
         return "";
@@ -1231,7 +1800,7 @@ IoTFleetWiseEngine::getStatusSummary()
     }
     status += "\n";
 
-    status += "Payloads sent: " + std::to_string( mSenderVehicleData->getPayloadCountSent() ) + "\n\n";
+    status += "Payloads sent: " + std::to_string( mMqttSender->getPayloadCountSent() ) + "\n\n";
     return status;
 }
 

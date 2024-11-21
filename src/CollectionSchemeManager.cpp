@@ -19,9 +19,17 @@ namespace IoTFleetWise
 CollectionSchemeManager::CollectionSchemeManager( std::shared_ptr<CacheAndPersist> schemaPersistencyPtr,
                                                   CANInterfaceIDTranslator &canIDTranslator,
                                                   std::shared_ptr<CheckinSender> checkinSender,
-                                                  std::shared_ptr<RawData::BufferManager> rawDataBufferManager )
+                                                  std::shared_ptr<RawData::BufferManager> rawDataBufferManager
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+                                                  ,
+                                                  GetActuatorNamesCallback getActuatorNamesCallback
+#endif
+                                                  )
     : mCheckinSender( std::move( checkinSender ) )
     , mRawDataBufferManager( std::move( rawDataBufferManager ) )
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    , mGetActuatorNamesCallback( std::move( getActuatorNamesCallback ) )
+#endif
     , mSchemaPersistency( std::move( schemaPersistencyPtr ) )
     , mCANIDTranslator( canIDTranslator )
 {
@@ -122,6 +130,10 @@ CollectionSchemeManager::printWakeupStatus( std::string &wakeupStr ) const
     wakeupStr += mProcessCollectionScheme ? "Yes" : "No";
     wakeupStr += ", the DecoderManifest: ";
     wakeupStr += mProcessDecoderManifest ? "Yes" : "No";
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    wakeupStr += ", the StateTemplate: ";
+    wakeupStr += mProcessStateTemplates ? "Yes" : "No";
+#endif
 }
 
 void
@@ -132,11 +144,17 @@ CollectionSchemeManager::doWork( void *data )
     // Retrieve data from persistent storage
     static_cast<void>( collectionSchemeManager->retrieve( DataType::COLLECTION_SCHEME_LIST ) );
     static_cast<void>( collectionSchemeManager->retrieve( DataType::DECODER_MANIFEST ) );
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    static_cast<void>( collectionSchemeManager->retrieve( DataType::STATE_TEMPLATE_LIST ) );
+#endif
     bool initialCheckinDocumentsUpdate = true;
     while ( true )
     {
         bool decoderManifestChanged = false;
         bool enabledCollectionSchemeMapChanged = false;
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+        bool stateTemplatesChanged = false;
+#endif
         if ( collectionSchemeManager->mProcessDecoderManifest )
         {
             collectionSchemeManager->mProcessDecoderManifest = false;
@@ -157,13 +175,29 @@ CollectionSchemeManager::doWork( void *data )
             }
             TraceModule::get().sectionEnd( TraceSection::MANAGER_COLLECTION_BUILD );
         }
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+        if ( collectionSchemeManager->mProcessStateTemplates )
+        {
+            collectionSchemeManager->mProcessStateTemplates = false;
+            TraceModule::get().sectionBegin( TraceSection::MANAGER_LAST_KNOWN_STATE_BUILD );
+            if ( collectionSchemeManager->processStateTemplates() )
+            {
+                stateTemplatesChanged = true;
+            }
+            TraceModule::get().sectionEnd( TraceSection::MANAGER_LAST_KNOWN_STATE_BUILD );
+        }
+#endif
         auto checkTime = collectionSchemeManager->mClock->timeSinceEpoch();
         if ( collectionSchemeManager->checkTimeLine( checkTime ) )
         {
             enabledCollectionSchemeMapChanged = true;
         }
 
-        bool documentsChanged = decoderManifestChanged || enabledCollectionSchemeMapChanged;
+        bool documentsChanged = decoderManifestChanged
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+                                || stateTemplatesChanged
+#endif
+                                || enabledCollectionSchemeMapChanged;
 
         if ( documentsChanged || initialCheckinDocumentsUpdate )
         {
@@ -176,17 +210,28 @@ CollectionSchemeManager::doWork( void *data )
             TraceModule::get().sectionBegin( TraceSection::MANAGER_EXTRACTION );
             FWE_LOG_TRACE( "Start extraction at system time " + std::to_string( checkTime.systemTimeMs ) );
             auto inspectionMatrixOutput = std::make_shared<InspectionMatrix>();
-            TraceModule::get().sectionBegin( TraceSection::COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA );
+            auto fetchMatrixOutput = std::make_shared<FetchMatrix>();
+            if ( decoderManifestChanged || enabledCollectionSchemeMapChanged )
+            {
+                TraceModule::get().sectionBegin( TraceSection::COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA );
 
-            // Extract InspectionMatrix from mEnabledCollectionSchemeMap
-            collectionSchemeManager->updateActiveCollectionSchemeListeners();
-            collectionSchemeManager->matrixExtractor( inspectionMatrixOutput );
-            std::string enabled;
-            std::string idle;
-            collectionSchemeManager->printExistingCollectionSchemes( enabled, idle );
-            FWE_LOG_INFO( "FWE activated collection schemes:" + enabled + " using decoder manifest:" +
-                          collectionSchemeManager->mCurrentDecoderManifestID + " resulting in " +
-                          std::to_string( inspectionMatrixOutput->conditions.size() ) + " inspection conditions" );
+                // Extract InspectionMatrix and FetchMatrix from mEnabledCollectionSchemeMap
+                collectionSchemeManager->updateActiveCollectionSchemeListeners();
+                collectionSchemeManager->matrixExtractor( inspectionMatrixOutput, fetchMatrixOutput );
+                std::string enabled;
+                std::string idle;
+                collectionSchemeManager->printExistingCollectionSchemes( enabled, idle );
+                FWE_LOG_INFO( "FWE activated collection schemes:" + enabled + " using decoder manifest:" +
+                              collectionSchemeManager->mCurrentDecoderManifestID + " resulting in " +
+                              std::to_string( inspectionMatrixOutput->conditions.size() ) + " inspection conditions" );
+            }
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+            if ( decoderManifestChanged || stateTemplatesChanged )
+            {
+                collectionSchemeManager->lastKnownStateUpdater( collectionSchemeManager->lastKnownStateExtractor() );
+            }
+#endif
 
             // Extract decoder dictionary
             std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> decoderDictionaryMap;
@@ -200,12 +245,18 @@ CollectionSchemeManager::doWork( void *data )
             // Only notify the listeners after both have been extracted since the decoder dictionary
             // extraction might have modified the inspection matrix.
             collectionSchemeManager->decoderDictionaryUpdater( decoderDictionaryMap );
-            collectionSchemeManager->inspectionMatrixUpdater( inspectionMatrixOutput );
+            if ( decoderManifestChanged || enabledCollectionSchemeMapChanged )
+            {
+                collectionSchemeManager->inspectionMatrixUpdater( inspectionMatrixOutput );
+                collectionSchemeManager->fetchMatrixUpdater( fetchMatrixOutput );
+            }
 
             // Update the Raw Buffer Config
             if ( collectionSchemeManager->mRawDataBufferManager != nullptr )
             {
                 std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> updatedSignals;
+                collectionSchemeManager->updateRawDataBufferConfigStringSignals( updatedSignals );
+
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
                 std::shared_ptr<ComplexDataDecoderDictionary> complexDataDictionary;
                 auto decoderDictionary = decoderDictionaryMap.find( VehicleDataSourceProtocol::COMPLEX_DATA );
@@ -303,6 +354,12 @@ CollectionSchemeManager::updateCheckinDocuments()
     {
         checkinMsg.emplace_back( mCurrentDecoderManifestID );
     }
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    for ( auto &stateTemplate : mStateTemplates )
+    {
+        checkinMsg.emplace_back( stateTemplate.second->id );
+    }
+#endif
 
     mCheckinSender->onCheckinDocumentsChanged( checkinMsg );
 }
@@ -326,6 +383,17 @@ CollectionSchemeManager::onDecoderManifestUpdate( const IDecoderManifestPtr &dec
     mWait.notify();
 }
 
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+void
+CollectionSchemeManager::onStateTemplatesChanged( std::shared_ptr<LastKnownStateIngestion> lastKnownStateIngestion )
+{
+    std::lock_guard<std::mutex> lock( mSchemaUpdateMutex );
+    mLastKnownStateIngestionInput = lastKnownStateIngestion;
+    mStateTemplatesAvailable = true;
+    mWait.notify();
+}
+#endif
+
 void
 CollectionSchemeManager::updateAvailable()
 {
@@ -342,6 +410,14 @@ CollectionSchemeManager::updateAvailable()
         mProcessDecoderManifest = true;
     }
     mDecoderManifestAvailable = false;
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    if ( mStateTemplatesAvailable && mLastKnownStateIngestionInput != nullptr )
+    {
+        mLastKnownStateIngestion = mLastKnownStateIngestionInput;
+        mProcessStateTemplates = true;
+    }
+    mStateTemplatesAvailable = false;
+#endif
 }
 
 bool
@@ -399,6 +475,10 @@ CollectionSchemeManager::processDecoderManifest()
     // store the new DM, update mCurrentDecoderManifestID
     mCurrentDecoderManifestID = mDecoderManifest->getID();
     store( DataType::DECODER_MANIFEST );
+
+    // Notify components about custom signal decoder format map change
+    mCustomSignalDecoderFormatMapChangeListeners.notify(
+        mCurrentDecoderManifestID, mDecoderManifest->getSignalIDToCustomSignalDecoderFormatMap() );
     return true;
 }
 
@@ -432,6 +512,60 @@ CollectionSchemeManager::processCollectionScheme()
         return rebuildMapsandTimeLine( mClock->timeSinceEpoch() );
     }
 }
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+bool
+CollectionSchemeManager::processStateTemplates()
+{
+    if ( ( mLastKnownStateIngestion == nullptr ) || ( !mLastKnownStateIngestion->build() ) )
+    {
+        FWE_LOG_ERROR( "Incoming StateTemplate does not exist or fails to build" );
+        TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::STATE_TEMPLATE_ERROR );
+        return false;
+    }
+
+    auto stateTemplatesDiff = mLastKnownStateIngestion->getStateTemplatesDiff();
+    if ( stateTemplatesDiff == nullptr )
+    {
+        return false;
+    }
+
+    if ( stateTemplatesDiff->version < mLastStateTemplatesDiffVersion )
+    {
+        FWE_LOG_TRACE( "Ignoring state templates diff with version " + std::to_string( stateTemplatesDiff->version ) +
+                       " as it is older than the current version " + std::to_string( mLastStateTemplatesDiffVersion ) );
+        return false;
+    }
+
+    mLastStateTemplatesDiffVersion = stateTemplatesDiff->version;
+    bool modified = false;
+
+    for ( const auto &stateTemplateId : stateTemplatesDiff->stateTemplatesToRemove )
+    {
+        if ( mStateTemplates.erase( stateTemplateId ) != 0U )
+        {
+            modified = true;
+        }
+    }
+
+    for ( const auto &stateTemplate : stateTemplatesDiff->stateTemplatesToAdd )
+    {
+        if ( mStateTemplates.find( stateTemplate->id ) != mStateTemplates.end() )
+        {
+            continue;
+        }
+        modified = true;
+        mStateTemplates.emplace( stateTemplate->id, stateTemplate );
+    }
+
+    if ( modified )
+    {
+        store( DataType::STATE_TEMPLATE_LIST );
+    }
+
+    return modified;
+}
+#endif
 
 TimePoint
 CollectionSchemeManager::calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs )

@@ -9,6 +9,7 @@
 #include "Clock.h"
 #include "ClockHandler.h"
 #include "CollectionInspectionAPITypes.h"
+#include "DataFetchManagerAPITypes.h"
 #include "ICollectionScheme.h"
 #include "ICollectionSchemeList.h"
 #include "IDecoderDictionary.h"
@@ -28,11 +29,16 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include "MessageTypes.h"
-#include <unordered_map>
+#endif
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+#include "LastKnownStateIngestion.h"
+#include "LastKnownStateTypes.h"
 #endif
 
 namespace Aws
@@ -91,11 +97,38 @@ public:
         std::function<void( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )>;
 
     /**
+     * @brief   Callback to notify the change of fetch configuration matrix.
+     * Need to be used along with inspection matrix change callback.
+     *
+     * @param   fetchMatrix - all currently active fetch configuration.
+     * @return  none
+     * */
+    using OnFetchMatrixChangeCallback = std::function<void( const std::shared_ptr<const FetchMatrix> &fetchMatrix )>;
+
+    /**
      * @brief Callback to notify the change of active collection schemes
      *
      * */
     using OnCollectionSchemeListChangeCallback =
         std::function<void( const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes )>;
+
+    /**
+     * @brief Callback to notify about the change of custom signal decoder format map.
+     * It is used to notify data consumers, not the data sources.
+     * @param currentDecoderManifestID sync id of the decoder manifest that is used
+     * @param customSignalDecoderFormatMap const shared pointer pointing to a constant custom signal decoder format map
+     * */
+    using OnCustomSignalDecoderFormatMapChangeCallback =
+        std::function<void( const SyncID &currentDecoderManifestID,
+                            const SignalIDToCustomSignalDecoderFormatMapPtr &customSignalDecoderFormatMap )>;
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    using OnStateTemplatesChangeCallback = std::function<void( std::shared_ptr<StateTemplateList> stateTemplates )>;
+#endif
+
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    using GetActuatorNamesCallback = std::function<std::unordered_map<InterfaceID, std::vector<std::string>>()>;
+#endif
 
     CollectionSchemeManager(
         std::shared_ptr<CacheAndPersist>
@@ -107,6 +140,12 @@ public:
         std::shared_ptr<RawData::BufferManager> rawDataBufferManager =
             nullptr /**< rawDataBufferManager Optional manager to handle raw data. If not given, raw data
                        collection will be disabled */
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+        ,
+        GetActuatorNamesCallback getActuatorNamesCallback =
+            nullptr /**< Callback to get the names of actuators. TODO: Once the decoder manifest supports the
+                       READ/WRITE/READ_WRITE indication for each signal, this can be removed */
+#endif
     );
 
     ~CollectionSchemeManager();
@@ -157,6 +196,10 @@ public:
      */
     void onDecoderManifestUpdate( const IDecoderManifestPtr &decoderManifest );
 
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    void onStateTemplatesChanged( std::shared_ptr<LastKnownStateIngestion> lastKnownStateIngestion );
+#endif
+
     /**
      * @brief Returns the current list of collection scheme ARNs
      * @return List of collection scheme ARNs
@@ -184,6 +227,16 @@ public:
     }
 
     /**
+     * @brief   Subscribe to changes in the fetch matrix
+     * @param   callback - function that will be called when the fetch matrix changes
+     */
+    void
+    subscribeToFetchMatrixChange( OnFetchMatrixChangeCallback callback )
+    {
+        mFetchMatrixChangeListeners.subscribe( callback );
+    }
+
+    /**
      * @brief Subscribe to changes in the collection scheme list
      * @param callback A function that will be called when the collection scheme list changes
      */
@@ -192,6 +245,24 @@ public:
     {
         mCollectionSchemeListChangeListeners.subscribe( callback );
     }
+
+    /**
+     * @brief Subscribe to changes in the custom signal decoder format map
+     * @param callback A function that will be called when the custom signal decoder format map changes
+     */
+    void
+    subscribeToCustomSignalDecoderFormatMapChange( OnCustomSignalDecoderFormatMapChangeCallback callback )
+    {
+        mCustomSignalDecoderFormatMapChangeListeners.subscribe( callback );
+    }
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    void
+    subscribeToStateTemplatesChange( OnStateTemplatesChangeCallback callback )
+    {
+        mStateTemplatesChangeListeners.subscribe( callback );
+    }
+#endif
 
 private:
     /**
@@ -308,6 +379,13 @@ protected:
 #endif
     );
 
+    /**
+     * @brief Fills up and creates the BufferConfig with string signals
+     * @param updatedSignals map of the signals that will be updated by Raw Buffer Manager
+     */
+    void updateRawDataBufferConfigStringSignals(
+        std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> &updatedSignals );
+
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     /**
      * @brief only executed from within decoderDictionaryExtractor to put a complex signal into the dictionary
@@ -346,9 +424,12 @@ protected:
     void decoderDictionaryUpdater(
         std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap );
 
-    void matrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix );
+    void matrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix,
+                          const std::shared_ptr<FetchMatrix> &fetchMatrix );
 
     void inspectionMatrixUpdater( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix );
+
+    void fetchMatrixUpdater( const std::shared_ptr<const FetchMatrix> &fetchMatrix );
 
     bool retrieve( DataType retrieveType );
 
@@ -357,6 +438,13 @@ protected:
     bool processDecoderManifest();
 
     bool processCollectionScheme();
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    bool processStateTemplates();
+
+    std::shared_ptr<StateTemplateList> lastKnownStateExtractor();
+    void lastKnownStateUpdater( std::shared_ptr<StateTemplateList> stateTemplates );
+#endif
 
     void updateCheckinDocuments();
 
@@ -420,7 +508,12 @@ protected:
 
     ThreadSafeListeners<OnActiveDecoderDictionaryChangeCallback> mActiveDecoderDictionaryChangeListeners;
     ThreadSafeListeners<OnInspectionMatrixChangeCallback> mInspectionMatrixChangeListeners;
+    ThreadSafeListeners<OnFetchMatrixChangeCallback> mFetchMatrixChangeListeners;
     ThreadSafeListeners<OnCollectionSchemeListChangeCallback> mCollectionSchemeListChangeListeners;
+    ThreadSafeListeners<OnCustomSignalDecoderFormatMapChangeCallback> mCustomSignalDecoderFormatMapChangeListeners;
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    ThreadSafeListeners<OnStateTemplatesChangeCallback> mStateTemplatesChangeListeners;
+#endif
 
     /*
      * parameters used in  onCollectionSchemeAvailable()
@@ -443,6 +536,19 @@ protected:
      * mDecoderManifestInput: a shared pointer of IDecoderManifest PI copies into
      */
     IDecoderManifestPtr mDecoderManifestInput;
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    bool mStateTemplatesAvailable{ false };
+    bool mProcessStateTemplates{ false };
+    std::shared_ptr<LastKnownStateIngestion> mLastKnownStateIngestionInput;
+    std::shared_ptr<LastKnownStateIngestion> mLastKnownStateIngestion;
+    std::unordered_map<SyncID, std::shared_ptr<const StateTemplateInformation>> mStateTemplates;
+    uint64_t mLastStateTemplatesDiffVersion{ 0 };
+#endif
+
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    GetActuatorNamesCallback mGetActuatorNamesCallback;
+#endif
 
     // flag used by main thread to check if collectionScheme needs to be processed
     bool mProcessCollectionScheme{ false };

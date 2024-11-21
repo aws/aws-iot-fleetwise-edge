@@ -1,0 +1,33 @@
+{
+  "compression": "SNAPPY",
+  "diagnosticsMode": "OFF",
+  "spoolingMode": "TO_DISK",
+  "collectionScheme": {
+    "timeBasedCollectionScheme": {
+      "periodMs": 10000
+    }
+  },
+  "postTriggerCollectionDuration": 1000,
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.ECM.DemoEngineTorque",
+      "dataPartitionId": "engine"
+    }
+  ],
+  "dataPartitions": [
+    {
+      "id": "engine",
+      "storageOptions": {
+        "maximumSize": {
+          "unit": "MB",
+          "value": 10
+        },
+        "storageLocation": "engine_data",
+        "minimumTimeToLive": {
+          "unit": "DAYS",
+          "value": 7
+        }
+      }
+    }
+  ]
+}

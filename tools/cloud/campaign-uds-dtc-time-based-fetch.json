@@ -1,0 +1,31 @@
+{
+  "compression": "SNAPPY",
+  "spoolingMode": "TO_DISK",
+  "signalsToFetch": [
+    {
+      "fullyQualifiedName": "Vehicle.ECU1.DTC_INFO",
+      "signalFetchConfig": {
+        "timeBased": {
+          "executionFrequencyMs": 5000
+        }
+      },
+      "actions": [
+        "custom_function(\"DTC_QUERY\", -1, 4, -1)",
+        "custom_function(\"DTC_QUERY\", -1, 6, -1)"
+      ]
+    }
+  ],
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.ECU1.DTC_INFO"
+    }
+  ],
+  "collectionScheme": {
+    "conditionBasedCollectionScheme": {
+      "conditionLanguageVersion": 1,
+      "expression": "!isNull($variable.`Vehicle.ECU1.DTC_INFO`)",
+      "minimumTriggerIntervalMs": 1000,
+      "triggerMode": "ALWAYS"
+    }
+  }
+}

@@ -2,67 +2,52 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include "Clock.h"
-#include "ClockHandler.h"
-#include "CollectionInspectionAPITypes.h"
-#include "CustomDataSource.h"
-#include "SignalTypes.h"
+#include "NamedSignalDataSource.h"
 #include "Timer.h"
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-/**
- * To implement a custom data source create a new class and inherit from CustomDataSource
- * then call setFilter() then start() and provide an implementation for pollData
- */
-class IWaveGpsSource : public CustomDataSource
+class IWaveGpsSource
 {
 public:
     /**
-     * @param signalBufferDistributor Signal buffer distributor
+     * @param namedSignalDataSource Named signal data source
+     * @param pathToNmeaSource Path to the file/tty with the NMEA output with the GPS data
+     * @param latitudeSignalName the signal name of the latitude signal
+     * @param longitudeSignalName the signal name of the longitude signal
+     * @param pollIntervalMs the poll interval to read the GPS position
      */
-    IWaveGpsSource( SignalBufferDistributorPtr signalBufferDistributor );
-    /**
-     * Initialize IWaveGpsSource and set filter for CustomDataSource
-     *
-     * @param pathToNmeaSource Path to the file/tty with the NMEA output with the GPS data, or blank to auto-detect
-     * @param canChannel the CAN channel used in the decoder manifest
-     * @param canRawFrameId the CAN message Id used in the decoder manifest
-     * @param latitudeStartBit the startBit used in the decoder manifest for the latitude signal
-     * @param longitudeStartBit the startBit used in the decoder manifest for the longitude signal
-     *
-     * @return on success true otherwise false
-     */
-    bool init( const std::string &pathToNmeaSource,
-               CANChannelNumericID canChannel,
-               CANRawFrameID canRawFrameId,
-               uint16_t latitudeStartBit,
-               uint16_t longitudeStartBit );
+    IWaveGpsSource( std::shared_ptr<NamedSignalDataSource> namedSignalDataSource,
+                    std::string pathToNmeaSource,
+                    std::string latitudeSignalName,
+                    std::string longitudeSignalName,
+                    uint32_t pollIntervalMs );
+    ~IWaveGpsSource();
+
+    IWaveGpsSource( const IWaveGpsSource & ) = delete;
+    IWaveGpsSource &operator=( const IWaveGpsSource & ) = delete;
+    IWaveGpsSource( IWaveGpsSource && ) = delete;
+    IWaveGpsSource &operator=( IWaveGpsSource && ) = delete;
 
     bool connect();
-    bool disconnect();
 
     static constexpr const char *PATH_TO_NMEA = "nmeaFilePath";
-    static constexpr const char *CAN_CHANNEL_NUMBER = "canChannel";
-    static constexpr const char *CAN_RAW_FRAME_ID = "canFrameId";
-    static constexpr const char *LATITUDE_START_BIT = "latitudeStartBit";
-    static constexpr const char *LONGITUDE_START_BIT = "longitudeStartBit";
-
-protected:
-    void pollData() override;
-    const char *getThreadName() override;
+    static constexpr const char *LATITUDE_SIGNAL_NAME = "latitudeSignalName";
+    static constexpr const char *LONGITUDE_SIGNAL_NAME = "longitudeSignalName";
+    static constexpr const char *POLL_INTERVAL_MS = "pollIntervalMs";
 
 private:
+    void pollData();
     static bool validLatitude( double latitude );
     static bool validLongitude( double longitude );
-    static std::string getFileContents( const std::string &p );
-    static bool detectQuectelDevice();
 
     /**
      * The NMEA protocol provides the position in $GPGGA in the following format
@@ -80,19 +65,18 @@ private:
     static const uint32_t CYCLIC_LOG_PERIOD_MS = 10000;
     static const uint32_t MAX_BYTES_READ_PER_POLL = 2048;
 
-    uint16_t mLatitudeStartBit = 0;
-    uint16_t mLongitudeStartBit = 0;
-
     int mFileHandle = -1;
-    SignalBufferDistributorPtr mSignalBufferDistributor;
-    std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     Timer mCyclicLoggingTimer;
     uint32_t mGpggaLineCounter = 0;
     uint32_t mValidCoordinateCounter = 0;
+    std::shared_ptr<NamedSignalDataSource> mNamedSignalDataSource;
     std::string mPathToNmeaSource;
-    CANChannelNumericID mCanChannel{ INVALID_CAN_SOURCE_NUMERIC_ID };
-    CANRawFrameID mCanRawFrameId{};
+    std::string mLatitudeSignalName;
+    std::string mLongitudeSignalName;
+    uint32_t mPollIntervalMs;
     char mBuffer[MAX_BYTES_READ_PER_POLL]{};
+    std::thread mThread;
+    std::atomic<bool> mShouldStop{};
 };
 
 } // namespace IoTFleetWise

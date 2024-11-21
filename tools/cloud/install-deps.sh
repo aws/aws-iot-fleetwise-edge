@@ -6,8 +6,8 @@ set -eo pipefail
 
 # On Ubuntu install Python 3 and pip
 if command -v apt &> /dev/null; then
-    apt update -o DPkg::Lock::Timeout=1800
-    apt install -y -o DPkg::Lock::Timeout=1800 python3 python3-pip
+    apt update
+    apt install -y python3 python3-pip
 fi
 
 # Install pip packages
@@ -20,4 +20,8 @@ python3 -m pip install \
     plotly==5.3.1 \
     pandas==1.3.5 \
     cantools==36.4.0 \
-    pyarrow==12.0.1
+    pyarrow==12.0.1 \
+    boto3==1.18.60 \
+    protobuf==3.20.2 \
+    awsiotsdk==1.17.0 \
+    packaging==20.3

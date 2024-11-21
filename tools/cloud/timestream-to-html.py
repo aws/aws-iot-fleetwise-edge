@@ -95,6 +95,8 @@ if __name__ == "__main__":
                     val = get_val(row, "measure_value::boolean")
                     if val is not None:
                         val = 0 if val == "false" else 1
+                if val is None:
+                    val = get_val(row, "measure_value::varchar")
                 df.at[ts, signal_name] = val
         except Exception as e:
             raise Exception(str(e) + f" in {file.name}")

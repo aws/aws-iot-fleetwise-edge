@@ -1,0 +1,14 @@
+{
+  "logging": {
+    "level": "trace",
+    "console": "false",
+    "file": {
+      "enable": "true",
+      "path": "vsomeip-log.txt"
+    },
+    "dlt": "false",
+    "version": {
+      "enable": "false"
+    }
+  }
+}

@@ -1,0 +1,4866 @@
+[
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_MODEL_YEAR",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289407235:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_CAPACITY",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504388:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_TYPE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472773:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_TYPE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472773:0:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_TYPE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472773:0:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_TYPE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472773:0:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_BATTERY_CAPACITY",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504390:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_CONNECTOR_TYPE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472775:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_CONNECTOR_TYPE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472775:0:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_CONNECTOR_TYPE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472775:0:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_CONNECTOR_TYPE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472775:0:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_FUEL_DOOR_LOCATION",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289407240:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EV_PORT_LOCATION",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289407241:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_DRIVER_SEAT",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356516106:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472779:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472779:0:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472779:0:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472779:0:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472779:0:4"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472779:0:5"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472779:0:6"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_EXTERIOR_DIMENSIONS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472779:0:7"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_MULTI_EV_PORT_LOCATIONS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472780:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.INFO_MULTI_EV_PORT_LOCATIONS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289472780:0:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.PERF_ODOMETER",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504644:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.PERF_VEHICLE_SPEED",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504647:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.PERF_VEHICLE_SPEED_DISPLAY",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504648:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.PERF_STEERING_ANGLE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504649:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.PERF_REAR_STEERING_ANGLE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504656:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.ENGINE_COOLANT_TEMP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504897:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.ENGINE_OIL_LEVEL",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289407747:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.ENGINE_OIL_TEMP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504900:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.ENGINE_RPM",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504901:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WHEEL_TICK_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "290521862:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WHEEL_TICK_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "290521862:0:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WHEEL_TICK_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "290521862:0:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WHEEL_TICK_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "290521862:0:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WHEEL_TICK_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "290521862:0:4"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.FUEL_LEVEL",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504903:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.FUEL_DOOR_OPEN",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287310600:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.EV_BATTERY_LEVEL",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504905:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.EV_CHARGE_PORT_OPEN",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287310602:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.EV_CHARGE_PORT_CONNECTED",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287310603:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.EV_BATTERY_INSTANTANEOUS_CHARGE_RATE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504908:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.RANGE_REMAINING",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291504904:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.TIRE_PRESSURE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "392168201:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.TIRE_PRESSURE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "392168201:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.TIRE_PRESSURE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "392168201:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.TIRE_PRESSURE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "392168201:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.GEAR_SELECTION",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408000:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.CURRENT_GEAR",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408001:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.PARKING_BRAKE_ON",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287310850:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.PARKING_BRAKE_AUTO_APPLY",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287310851:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.FUEL_LEVEL_LOW",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287310853:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.NIGHT_MODE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287310855:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.TURN_SIGNAL_STATE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408008:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.IGNITION_STATE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408009:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.ABS_ACTIVE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287310858:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.TRACTION_CONTROL_ACTIVE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287310859:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517120:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517120:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517120:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517120:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517120:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517120:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517120:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517120:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_SPEED_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517120:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517121:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517121:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517121:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517121:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517121:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517121:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517121:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517121:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517121:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614274:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614274:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614274:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614274:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614274:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614274:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614274:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614274:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_CURRENT_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614274:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614275:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614275:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614275:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614275:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614275:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614275:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614275:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614275:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_SET_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "358614275:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865540:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865540:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865540:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865540:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865540:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865540:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865540:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865540:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865540:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DEFROSTER_9",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865540:9:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419973:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419973:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419973:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419973:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419973:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419973:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419973:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419973:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AC_ON_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419973:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419974:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419974:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419974:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419974:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419974:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419974:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419974:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419974:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_AC_ON_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419974:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419975:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419975:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419975:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419975:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419975:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419975:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419975:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419975:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_MAX_DEFROST_ON_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419975:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419976:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419976:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419976:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419976:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419976:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419976:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419976:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419976:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_RECIRC_ON_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419976:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419977:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419977:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419977:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419977:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419977:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419977:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419977:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419977:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_DUAL_ON_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419977:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419978:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419978:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419978:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419978:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419978:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419978:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419978:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419978:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_ON_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419978:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517131:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517131:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517131:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517131:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517131:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517131:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517131:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517131:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_TEMPERATURE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517131:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SIDE_MIRROR_HEAT_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339739916:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SIDE_MIRROR_HEAT_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339739916:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SIDE_MIRROR_HEAT_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339739916:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_STEERING_WHEEL_HEAT",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408269:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_TEMPERATURE_DISPLAY_UNITS",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408270:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517135:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517135:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517135:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517135:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517135:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517135:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517135:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517135:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ACTUAL_FAN_SPEED_RPM_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517135:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419984:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419984:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419984:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419984:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419984:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419984:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419984:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419984:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_POWER_ON_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419984:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_0_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_0_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:0:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_0_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:0:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_0_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:0:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_1_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_1_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:1:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_1_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:1:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_1_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:1:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_2_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_2_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:2:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_2_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:2:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_2_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:2:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_3_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_3_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:3:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_3_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:3:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_3_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:3:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_4_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_4_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:4:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_4_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:4:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_4_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:4:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_5_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_5_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:5:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_5_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:5:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_5_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:5:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_6_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_6_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:6:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_6_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:6:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_6_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:6:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_7_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_7_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:7:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_7_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:7:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_7_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:7:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_8_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_8_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:8:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_8_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:8:2"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_FAN_DIRECTION_AVAILABLE_8_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356582673:8:3"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419986:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419986:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419986:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419986:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419986:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419986:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419986:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419986:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_AUTO_RECIRC_ON_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354419986:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517139:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517139:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517139:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517139:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517139:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517139:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517139:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517139:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_SEAT_VENTILATION_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356517139:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865556:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865556:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865556:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865556:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865556:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865556:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865556:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865556:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865556:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HVAC_ELECTRIC_DEFROSTER_ON_9",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320865556:9:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DISTANCE_DISPLAY_UNITS",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408512:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.FUEL_VOLUME_DISPLAY_UNITS",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408513:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.TIRE_PRESSURE_DISPLAY_UNITS",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408514:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.EV_BATTERY_DISPLAY_UNITS",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408515:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.FUEL_CONSUMPTION_UNITS_DISTANCE_OVER_VOLUME",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287311364:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.VEHICLE_SPEED_DISPLAY_UNITS",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289408517:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.ENV_OUTSIDE_TEMPERATURE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "291505923:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.AP_POWER_STATE_REQ_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289475072:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.AP_POWER_STATE_REQ_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289475072:0:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.AP_POWER_STATE_REPORT_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289475073:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.AP_POWER_STATE_REPORT_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289475073:0:1"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.AP_POWER_BOOTUP_REASON",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289409538:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DISPLAY_BRIGHTNESS",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289409539:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295872:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295872:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295872:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295872:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295872:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295872:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295872:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295872:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295873:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295873:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295873:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295873:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295873:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295873:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295873:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "373295873:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "371198722:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "371198722:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "371198722:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "371198722:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "371198722:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "371198722:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "371198722:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.DOOR_LOCK_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "371198722:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741504:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741504:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741504:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741505:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741505:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Z_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741505:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741506:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741506:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741506:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741507:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741507:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_Y_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "339741507:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_LOCK",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287312708:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.MIRROR_FOLD",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "287312709:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518784:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518784:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518784:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518784:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518784:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518784:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518784:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518784:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SELECT_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518784:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518785:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518785:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518785:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518785:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518785:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518785:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518785:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518785:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_MEMORY_SET_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518785:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354421634:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354421634:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354421634:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354421634:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354421634:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354421634:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354421634:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354421634:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_BUCKLED_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "354421634:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518787:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518787:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518787:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518787:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518787:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518787:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518787:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518787:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518787:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518788:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518788:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518788:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518788:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518788:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518788:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518788:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518788:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BELT_HEIGHT_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518788:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518789:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518789:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518789:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518789:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518789:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518789:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518789:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518789:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518789:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518790:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518790:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518790:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518790:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518790:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518790:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518790:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518790:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_FORE_AFT_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518790:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518791:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518791:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518791:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518791:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518791:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518791:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518791:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518791:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518791:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518792:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518792:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518792:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518792:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518792:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518792:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518792:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518792:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_1_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518792:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518793:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518793:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518793:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518793:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518793:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518793:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518793:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518793:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518793:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518794:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518794:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518794:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518794:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518794:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518794:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518794:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518794:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_BACKREST_ANGLE_2_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518794:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518795:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518795:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518795:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518795:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518795:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518795:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518795:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518795:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518795:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518796:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518796:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518796:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518796:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518796:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518796:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518796:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518796:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEIGHT_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518796:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518797:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518797:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518797:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518797:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518797:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518797:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518797:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518797:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518797:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518798:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518798:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518798:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518798:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518798:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518798:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518798:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518798:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_DEPTH_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518798:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518799:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518799:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518799:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518799:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518799:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518799:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518799:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518799:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518799:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518800:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518800:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518800:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518800:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518800:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518800:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518800:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518800:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_TILT_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518800:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518801:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518801:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518801:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518801:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518801:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518801:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518801:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518801:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518801:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518802:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518802:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518802:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518802:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518802:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518802:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518802:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518802:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_FORE_AFT_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518802:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518803:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518803:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518803:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518803:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518803:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518803:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518803:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518803:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518803:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518804:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518804:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518804:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518804:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518804:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518804:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518804:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518804:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_LUMBAR_SIDE_SUPPORT_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518804:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_POS",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289409941:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518806:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518806:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518806:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518806:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518806:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518806:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518806:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518806:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_HEIGHT_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518806:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518807:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518807:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518807:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518807:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518807:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518807:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518807:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518807:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518807:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518808:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518808:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518808:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518808:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518808:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518808:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518808:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518808:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_ANGLE_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518808:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518809:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518809:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518809:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518809:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518809:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518809:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518809:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518809:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518809:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518810:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518810:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518810:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518810:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518810:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518810:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518810:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518810:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_HEADREST_FORE_AFT_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518810:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518832:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518832:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518832:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518832:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518832:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518832:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518832:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518832:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.SEAT_OCCUPANCY_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356518832:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964416:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964416:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964416:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964416:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964416:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964416:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964416:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964416:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964416:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_POS_9",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964416:9:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964417:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964417:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964417:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964417:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964417:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964417:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964417:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964417:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964417:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_MOVE_9",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "322964417:9:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320867268:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320867268:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320867268:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320867268:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320867268:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320867268:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320867268:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320867268:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320867268:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.WINDOW_LOCK_9",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "320867268:9:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HEADLIGHTS_STATE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289410560:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HIGH_BEAM_LIGHTS_STATE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289410561:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.FOG_LIGHTS_STATE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289410562:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HAZARD_LIGHTS_STATE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289410563:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HEADLIGHTS_SWITCH",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289410576:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HIGH_BEAM_LIGHTS_SWITCH",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289410577:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.FOG_LIGHTS_SWITCH",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289410578:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.HAZARD_LIGHTS_SWITCH",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289410579:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.CABIN_LIGHTS_STATE",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289410817:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.CABIN_LIGHTS_SWITCH",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "289410818:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519683:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519683:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519683:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519683:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519683:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519683:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519683:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519683:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_STATE_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519683:8:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_0",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519684:0:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_1",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519684:1:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_2",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519684:2:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_3",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519684:3:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_4",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519684:4:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_5",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519684:5:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_6",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519684:6:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_7",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519684:7:0"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.VHAL.READING_LIGHTS_SWITCH_8",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "interfaceId": "AAOS-VHAL",
+    "customDecodingSignal": {
+      "id": "356519684:8:0"
+    }
+  }
+]

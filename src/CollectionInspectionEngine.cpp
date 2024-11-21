@@ -6,23 +6,29 @@
 #include <algorithm>
 #include <cstdlib>
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+#include <unordered_map>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-CollectionInspectionEngine::CollectionInspectionEngine( bool sendDataOnlyOncePerCondition )
-    : mSendDataOnlyOncePerCondition( sendDataOnlyOncePerCondition )
+CollectionInspectionEngine::CollectionInspectionEngine( uint32_t minFetchTriggerIntervalMs,
+                                                        bool sendDataOnlyOncePerCondition )
+    : mMinFetchTriggerIntervalMs( minFetchTriggerIntervalMs )
+    , mSendDataOnlyOncePerCondition( sendDataOnlyOncePerCondition )
 {
     setActiveDTCsConsumed( ALL_CONDITIONS, false );
 }
 
 template <typename T>
 void
-CollectionInspectionEngine::addSignalBuffer( const InspectionMatrixSignalCollectionInfo &signal )
+CollectionInspectionEngine::addSignalBuffer( const InspectionMatrixSignalCollectionInfo &signal,
+                                             SignalBufferConditionID signalBufferConditionIndex )
 {
-    auto signalHistoryBufferVectorPtr = getSignalHistoryBuffersPtr<T>( signal.signalID );
-
+    auto signalHistoryBufferVectorPtr = getSignalHistoryBuffersPtr<T>( signal.signalID, signalBufferConditionIndex );
     if ( signalHistoryBufferVectorPtr == nullptr )
     {
         return;
@@ -39,13 +45,39 @@ CollectionInspectionEngine::addSignalBuffer( const InspectionMatrixSignalCollect
         }
     }
     signalHistoryBufferVector.emplace_back( signal.sampleBufferSize,
-                                            signal.minimumSampleIntervalMs
+                                            signal.minimumSampleIntervalMs,
+                                            ( signal.signalType == SignalType::STRING )
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-                                            ,
-                                            signal.signalType == SignalType::COMPLEX_SIGNAL
+                                                || ( signal.signalType == SignalType::COMPLEX_SIGNAL )
 #endif
+
     );
     signalHistoryBufferVector.back().addFixedWindow( signal.fixedWindowPeriod );
+}
+
+void
+CollectionInspectionEngine::cleanupCustomFunctions( const ExpressionNode *expression )
+{
+    if ( expression == nullptr )
+    {
+        return;
+    }
+    cleanupCustomFunctions( expression->left );
+    cleanupCustomFunctions( expression->right );
+    for ( const auto &param : expression->function.customFunctionParams )
+    {
+        cleanupCustomFunctions( param );
+    }
+    if ( expression->function.customFunctionName.empty() )
+    {
+        return;
+    }
+    auto customFunction = mCustomFunctionCallbacks.find( expression->function.customFunctionName );
+    if ( ( customFunction == mCustomFunctionCallbacks.end() ) || ( !customFunction->second.cleanupCallback ) )
+    {
+        return;
+    }
+    customFunction->second.cleanupCallback( expression->function.customFunctionInvocationId );
 }
 
 void
@@ -55,11 +87,12 @@ CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<cons
     // Clears everything in this class including all data in the signal history buffer
     clear();
 
-    // Default all conditions to true to force rising edge logic
-    mConditionsWithConditionCurrentlyTrue.set();
-
     mActiveInspectionMatrix = inspectionMatrix; // Pointers and references into this memory are maintained so hold
                                                 // a shared_ptr to it so it does not get deleted
+
+    // Use default id for default fetches (normal collection)
+    mFetchRequestToConditionIndexMap[DEFAULT_FETCH_REQUEST_ID] = DEFAULT_SIGNAL_BUFFER_CONDITION_ID;
+    SignalBufferConditionID signalBufferConditionIndexCount = 0;
     for ( auto &condition : mActiveInspectionMatrix->conditions )
     {
         // Check if we can add an additional condition to mConditions
@@ -81,6 +114,10 @@ CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<cons
             return;
         }
         mConditions.emplace_back( condition );
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        mForwardConditionCurrentlyTrueForCampaignPartitions[condition.metadata.campaignArn].resize(
+            condition.forwardConditions.size() );
+#endif
         for ( auto &signal : condition.signals )
         {
             if ( signal.signalID == INVALID_SIGNAL_ID )
@@ -105,47 +142,63 @@ CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<cons
             }
 
             mSignalToBufferTypeMap.insert( { signal.signalID, signal.signalType } );
+
+            // signalBufferConditionIndex that will be used for creating a signal buffer
+            auto signalBufferConditionIndex = mFetchRequestToConditionIndexMap[DEFAULT_FETCH_REQUEST_ID];
+            if ( !signal.fetchRequestIDs.empty() )
+            {
+                for ( auto fetchRequestID : signal.fetchRequestIDs )
+                {
+                    // Generate a lookup table for fetch ids and virtual signal buffer condition indexes
+                    mFetchRequestToConditionIndexMap[fetchRequestID] = signalBufferConditionIndexCount;
+                    signalBufferConditionIndex = signalBufferConditionIndexCount;
+                }
+            }
+
             switch ( signal.signalType )
             {
             case SignalType::UINT8:
-                addSignalBuffer<uint8_t>( signal );
+                addSignalBuffer<uint8_t>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::INT8:
-                addSignalBuffer<int8_t>( signal );
+                addSignalBuffer<int8_t>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::UINT16:
-                addSignalBuffer<uint16_t>( signal );
+                addSignalBuffer<uint16_t>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::INT16:
-                addSignalBuffer<int16_t>( signal );
+                addSignalBuffer<int16_t>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::UINT32:
-                addSignalBuffer<uint32_t>( signal );
+                addSignalBuffer<uint32_t>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::INT32:
-                addSignalBuffer<int32_t>( signal );
+                addSignalBuffer<int32_t>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::UINT64:
-                addSignalBuffer<uint64_t>( signal );
+                addSignalBuffer<uint64_t>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::INT64:
-                addSignalBuffer<int64_t>( signal );
+                addSignalBuffer<int64_t>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::FLOAT:
-                addSignalBuffer<float>( signal );
+                addSignalBuffer<float>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::DOUBLE:
-                addSignalBuffer<double>( signal );
+                addSignalBuffer<double>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::BOOLEAN:
-                addSignalBuffer<bool>( signal );
+                addSignalBuffer<bool>( signal, signalBufferConditionIndex );
+                break;
+            case SignalType::STRING:
+                addSignalBuffer<RawData::BufferHandle>( signal, signalBufferConditionIndex );
                 break;
             case SignalType::UNKNOWN:
                 // Signal of UNKNOWN type should not be processed
                 break;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
             case SignalType::COMPLEX_SIGNAL:
-                addSignalBuffer<RawData::BufferHandle>( signal );
+                addSignalBuffer<RawData::BufferHandle>( signal, signalBufferConditionIndex );
                 break;
 #endif
             }
@@ -169,6 +222,7 @@ CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<cons
                     canFrame.frameID, canFrame.channelID, canFrame.sampleBufferSize, canFrame.minimumSampleIntervalMs );
             }
         }
+        signalBufferConditionIndexCount++;
     }
     // At this point all buffers should be resized to correct size. Now pointer to std::vector elements can be used
     for ( uint32_t conditionIndex = 0; conditionIndex < mConditions.size(); conditionIndex++ )
@@ -218,6 +272,8 @@ CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<cons
             case SignalType::BOOLEAN:
                 updateConditionBuffer<bool>( signal, activeCondition, conditionIndex );
                 break;
+            case SignalType::STRING:
+                updateConditionBuffer<RawData::BufferHandle>( signal, activeCondition, conditionIndex );
             case SignalType::UNKNOWN:
                 // Signal of type UNKNOWN should not be processed
                 break;
@@ -251,7 +307,15 @@ CollectionInspectionEngine::updateConditionBuffer(
     const long unsigned int conditionIndex )
 {
     SignalID signalID = inspectionMatrixCollectionInfo.signalID;
-    auto buf = getSignalHistoryBufferPtr<T>( signalID, inspectionMatrixCollectionInfo.minimumSampleIntervalMs );
+    // Use a default index if fetch strategy wasn't specified or use the first associated id.
+    // All fetch ids in this struct are mapped to the same signalBufferConditionIndex
+    auto signalBufferConditionIndex =
+        inspectionMatrixCollectionInfo.fetchRequestIDs.empty()
+            ? mFetchRequestToConditionIndexMap[DEFAULT_FETCH_REQUEST_ID]
+            : mFetchRequestToConditionIndexMap[inspectionMatrixCollectionInfo.fetchRequestIDs[0]];
+
+    auto buf = getSignalHistoryBufferPtr<T>(
+        signalID, signalBufferConditionIndex, inspectionMatrixCollectionInfo.minimumSampleIntervalMs );
     if ( buf != nullptr )
     {
         buf->mConditionsThatEvaluateOnThisSignal.set( conditionIndex );
@@ -268,9 +332,11 @@ CollectionInspectionEngine::updateConditionBuffer(
 
 template <typename T>
 bool
-CollectionInspectionEngine::allocateBufferVector( SignalID signalID, size_t &usedBytes )
+CollectionInspectionEngine::allocateBufferVector( SignalID signalID,
+                                                  SignalBufferConditionID signalBufferConditionIndex,
+                                                  size_t &usedBytes )
 {
-    auto signalHistoryBufferVectorPtr = getSignalHistoryBuffersPtr<T>( signalID );
+    auto signalHistoryBufferVectorPtr = getSignalHistoryBuffersPtr<T>( signalID, signalBufferConditionIndex );
     if ( signalHistoryBufferVectorPtr != nullptr )
     {
         auto &signalHistoryBufferVector = *signalHistoryBufferVectorPtr;
@@ -303,91 +369,105 @@ CollectionInspectionEngine::preAllocateBuffers()
     size_t usedBytes = 0;
 
     // Allocate Signal Buffer
-    for ( auto &bufferVector : mSignalBuffers )
+    for ( auto &bufferVectorOuter : mSignalBuffers )
     {
-        auto signalID = bufferVector.first;
-        if ( mSignalToBufferTypeMap.find( signalID ) != mSignalToBufferTypeMap.end() )
+        auto signalBufferConditionIndex = bufferVectorOuter.first;
+        for ( auto &bufferVector : bufferVectorOuter.second )
         {
-            auto signalType = mSignalToBufferTypeMap[signalID];
-            switch ( signalType )
+            auto signalID = bufferVector.first;
+            if ( mSignalToBufferTypeMap.find( signalID ) != mSignalToBufferTypeMap.end() )
             {
-            case SignalType::UINT8:
-                if ( !allocateBufferVector<uint8_t>( signalID, usedBytes ) )
+                auto signalType = mSignalToBufferTypeMap[signalID];
+                // coverity[autosar_cpp14_m6_4_6_violation]
+                // coverity[misra_cpp_2008_rule_6_4_6_violation] compiler warning is preferred over a default-clause
+                switch ( signalType )
                 {
-                    return false;
-                }
-                break;
-            case SignalType::INT8:
-                if ( !allocateBufferVector<int8_t>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
-            case SignalType::UINT16:
-                if ( !allocateBufferVector<uint16_t>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
-            case SignalType::INT16:
-                if ( !allocateBufferVector<int16_t>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
-            case SignalType::UINT32:
-                if ( !allocateBufferVector<uint32_t>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
-            case SignalType::INT32:
-                if ( !allocateBufferVector<int32_t>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
-            case SignalType::UINT64:
-                if ( !allocateBufferVector<uint64_t>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
-            case SignalType::INT64:
-                if ( !allocateBufferVector<int64_t>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
-            case SignalType::FLOAT:
-                if ( !allocateBufferVector<float>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
-            case SignalType::DOUBLE:
-                if ( !allocateBufferVector<double>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
-            case SignalType::BOOLEAN:
-                if ( !allocateBufferVector<bool>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
+                case SignalType::UINT8:
+                    if ( !allocateBufferVector<uint8_t>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::INT8:
+                    if ( !allocateBufferVector<int8_t>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::UINT16:
+                    if ( !allocateBufferVector<uint16_t>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::INT16:
+                    if ( !allocateBufferVector<int16_t>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::UINT32:
+                    if ( !allocateBufferVector<uint32_t>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::INT32:
+                    if ( !allocateBufferVector<int32_t>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::UINT64:
+                    if ( !allocateBufferVector<uint64_t>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::INT64:
+                    if ( !allocateBufferVector<int64_t>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::FLOAT:
+                    if ( !allocateBufferVector<float>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::DOUBLE:
+                    if ( !allocateBufferVector<double>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::BOOLEAN:
+                    if ( !allocateBufferVector<bool>( signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::STRING:
+                    if ( !allocateBufferVector<RawData::BufferHandle>(
+                             signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
+                case SignalType::UNKNOWN:
+                    // Signal of type UNKNOWN should not be processed;
+                    break;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-            case SignalType::COMPLEX_SIGNAL:
-                if ( !allocateBufferVector<RawData::BufferHandle>( signalID, usedBytes ) )
-                {
-                    return false;
-                }
-                break;
+                case SignalType::COMPLEX_SIGNAL:
+                    if ( !allocateBufferVector<RawData::BufferHandle>(
+                             signalID, signalBufferConditionIndex, usedBytes ) )
+                    {
+                        return false;
+                    }
+                    break;
 #endif
-            default:
-                FWE_LOG_WARN( "Unknown type :" + std::to_string( static_cast<uint32_t>( signalType ) ) );
-                break;
+                }
             }
         }
     }
@@ -420,28 +500,44 @@ CollectionInspectionEngine::clear()
     mSignalToBufferTypeMap.clear();
     mCanFrameBuffers.clear();
     mConditions.clear();
+    mFetchRequestToConditionIndexMap.clear();
     mNextConditionToCollectedIndex = 0;
     mNextWindowFunctionTimesOut = 0;
     mConditionsWithInputSignalChanged.reset();
-    mConditionsWithConditionCurrentlyTrue.reset();
+    // Default all conditions to true to force rising edge logic
+    mConditionsWithConditionCurrentlyTrue.set();
     mConditionsTriggeredWaitingPublished.reset();
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    mForwardConditionCurrentlyTrueForCampaignPartitions.clear();
+#endif
     if ( mRawBufferManager != nullptr )
     {
         mRawBufferManager->resetUsageHintsForStage(
             RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_HISTORY_BUFFER );
     }
+    // Cleanup the custom functions for the last campaigns:
+    if ( mActiveInspectionMatrix )
+    {
+        for ( const auto &condition : mActiveInspectionMatrix->conditions )
+        {
+            cleanupCustomFunctions( condition.condition );
+        }
+    }
 }
 
 template <typename T>
 void
-CollectionInspectionEngine::updateBufferFixedWindowFunction( SignalID signalID, Timestamp timestamp )
+CollectionInspectionEngine::updateBufferFixedWindowFunction( SignalID signalID,
+                                                             SignalBufferConditionID signalBufferConditionIndex,
+                                                             Timestamp timestamp )
 {
     std::vector<SignalHistoryBuffer<T>> *signalHistoryBufferPtr = nullptr;
     try
     {
-        if ( mSignalBuffers.find( signalID ) != mSignalBuffers.end() )
+        auto outerMapIt = mSignalBuffers.find( signalBufferConditionIndex );
+        if ( outerMapIt != mSignalBuffers.end() && outerMapIt->second.find( signalID ) != outerMapIt->second.end() )
         {
-            auto &mapVal = mSignalBuffers.at( signalID );
+            auto &mapVal = outerMapIt->second[signalID];
             signalHistoryBufferPtr = boost::get<std::vector<SignalHistoryBuffer<T>>>( &mapVal );
         }
     }
@@ -471,58 +567,65 @@ void
 CollectionInspectionEngine::updateAllFixedWindowFunctions( Timestamp timestamp )
 {
     mNextWindowFunctionTimesOut = std::numeric_limits<Timestamp>::max();
-    for ( auto &signalVector : mSignalBuffers )
+    for ( auto &signalVectorOuter : mSignalBuffers )
     {
-        auto signalID = signalVector.first;
-        if ( mSignalToBufferTypeMap.find( signalID ) != mSignalToBufferTypeMap.end() )
+        auto signalBufferConditionIndex = signalVectorOuter.first;
+        for ( auto &signalVector : signalVectorOuter.second )
         {
-            auto signalType = mSignalToBufferTypeMap[signalID];
-            // coverity[autosar_cpp14_m6_4_6_violation]
-            // coverity[misra_cpp_2008_rule_6_4_6_violation] compiler warning is preferred over a default-clause
-            switch ( signalType )
+            auto signalID = signalVector.first;
+            if ( mSignalToBufferTypeMap.find( signalID ) != mSignalToBufferTypeMap.end() )
             {
-            case SignalType::UINT8:
-                updateBufferFixedWindowFunction<uint8_t>( signalID, timestamp );
-                break;
-            case SignalType::INT8:
-                updateBufferFixedWindowFunction<int8_t>( signalID, timestamp );
-                break;
-            case SignalType::UINT16:
-                updateBufferFixedWindowFunction<uint16_t>( signalID, timestamp );
-                break;
-            case SignalType::INT16:
-                updateBufferFixedWindowFunction<int16_t>( signalID, timestamp );
-                break;
-            case SignalType::UINT32:
-                updateBufferFixedWindowFunction<uint32_t>( signalID, timestamp );
-                break;
-            case SignalType::INT32:
-                updateBufferFixedWindowFunction<int32_t>( signalID, timestamp );
-                break;
-            case SignalType::UINT64:
-                updateBufferFixedWindowFunction<uint64_t>( signalID, timestamp );
-                break;
-            case SignalType::INT64:
-                updateBufferFixedWindowFunction<int64_t>( signalID, timestamp );
-                break;
-            case SignalType::FLOAT:
-                updateBufferFixedWindowFunction<float>( signalID, timestamp );
-                break;
-            case SignalType::DOUBLE:
-                updateBufferFixedWindowFunction<double>( signalID, timestamp );
-                break;
-            case SignalType::BOOLEAN:
-                updateBufferFixedWindowFunction<bool>( signalID, timestamp );
-                break;
-            case SignalType::UNKNOWN:
-                FWE_LOG_WARN( "Window functions are not supported for signal ID: " + std::to_string( signalID ) +
-                              " as it is of type UNKNOWN" );
-                break;
+                auto signalType = mSignalToBufferTypeMap[signalID];
+                // coverity[autosar_cpp14_m6_4_6_violation]
+                // coverity[misra_cpp_2008_rule_6_4_6_violation] compiler warning is preferred over a default-clause
+                switch ( signalType )
+                {
+                case SignalType::UINT8:
+                    updateBufferFixedWindowFunction<uint8_t>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::INT8:
+                    updateBufferFixedWindowFunction<int8_t>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::UINT16:
+                    updateBufferFixedWindowFunction<uint16_t>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::INT16:
+                    updateBufferFixedWindowFunction<int16_t>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::UINT32:
+                    updateBufferFixedWindowFunction<uint32_t>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::INT32:
+                    updateBufferFixedWindowFunction<int32_t>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::UINT64:
+                    updateBufferFixedWindowFunction<uint64_t>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::INT64:
+                    updateBufferFixedWindowFunction<int64_t>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::FLOAT:
+                    updateBufferFixedWindowFunction<float>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::DOUBLE:
+                    updateBufferFixedWindowFunction<double>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::BOOLEAN:
+                    updateBufferFixedWindowFunction<bool>( signalID, signalBufferConditionIndex, timestamp );
+                    break;
+                case SignalType::STRING:
+                    // Window functions are not supported for string signals
+                    break;
+                case SignalType::UNKNOWN:
+                    FWE_LOG_WARN( "Window functions are not supported for signal ID: " + std::to_string( signalID ) +
+                                  " as it is of type UNKNOWN" );
+                    break;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-            case SignalType::COMPLEX_SIGNAL:
-                // Window functions are not supported for complex signals
-                break;
+                case SignalType::COMPLEX_SIGNAL:
+                    // Window functions are not supported for complex signals
+                    break;
 #endif
+                }
             }
         }
     }
@@ -535,8 +638,7 @@ CollectionInspectionEngine::evaluateStaticCondition( uint32_t conditionIndex )
     InspectionValue result;
     ExpressionErrorCode ret =
         eval( condition.mCondition.condition, condition, result, MAX_EQUATION_DEPTH, conditionIndex );
-    if ( ( ret != ExpressionErrorCode::SUCCESSFUL ) || ( result.type != InspectionValue::DataType::BOOL ) ||
-         ( !result.boolVal ) )
+    if ( ( ret != ExpressionErrorCode::SUCCESSFUL ) || ( !result.isBoolOrDouble() ) || ( !result.asBool() ) )
     {
         // Flip default true flag to false if static condition is evaluated to false
         mConditionsWithConditionCurrentlyTrue.reset( conditionIndex );
@@ -559,11 +661,13 @@ CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
     for ( uint32_t i = 0; i < mConditions.size(); i++ )
     {
         ActiveCondition &condition = mConditions[i];
+        bool conditionEvaluated = false;
         bool conditionEvaluatedToTrue = false;
-        // Only reevaluate non-static conditions with changed input
+        // Only reevaluate non-static conditions with changed input or conditions with isNull or custom functions
         if ( ( ( mConditionsWithInputSignalChanged.test( i ) ) && ( !condition.mCondition.isStaticCondition ) ) ||
              ( condition.mCondition.alwaysEvaluateCondition ) )
         {
+            conditionEvaluated = true;
             InspectionValue result;
             ExpressionErrorCode ret = eval( condition.mCondition.condition, condition, result, MAX_EQUATION_DEPTH, i );
             if ( ( ret != ExpressionErrorCode::SUCCESSFUL ) || ( !result.isBoolOrDouble() ) || ( !result.asBool() ) )
@@ -574,6 +678,70 @@ CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
             {
                 conditionEvaluatedToTrue = true;
             }
+
+            // If fetch conditions are set and input signal has changed, evaluate fetch conditions
+            if ( !condition.mCondition.fetchConditions.empty() )
+            {
+                InspectionValue fetchConditionResult;
+                for ( auto fetchCondition : condition.mCondition.fetchConditions )
+                {
+                    if ( ( mLastFetchTrigger.find( fetchCondition.fetchRequestID ) != mLastFetchTrigger.end() ) &&
+                         ( currentTime.monotonicTimeMs <
+                           mLastFetchTrigger[fetchCondition.fetchRequestID] + mMinFetchTriggerIntervalMs ) )
+                    {
+                        continue;
+                    }
+
+                    ret = eval( fetchCondition.condition, condition, fetchConditionResult, MAX_EQUATION_DEPTH, i );
+
+                    if ( ( ret == ExpressionErrorCode::SUCCESSFUL ) && ( fetchConditionResult.isBoolOrDouble() ) &&
+                         ( fetchConditionResult.asBool() ) )
+                    {
+                        if ( ( !fetchCondition.triggerOnlyOnRisingEdge ) ||
+                             ( !mFetchConditionsWithConditionCurrentlyTrue.test( fetchCondition.fetchRequestID ) ) )
+                        {
+                            // Notify fetch manager that condition for this fetch request evaluated to TRUE
+                            mFetchConditionEvaluationListeners.notify( fetchCondition.fetchRequestID,
+                                                                       fetchConditionResult.boolVal );
+                            oneConditionEvaluatedToTrue = true;
+                            mLastFetchTrigger[fetchCondition.fetchRequestID] = currentTime.monotonicTimeMs;
+                        }
+                        mFetchConditionsWithConditionCurrentlyTrue.set( fetchCondition.fetchRequestID );
+                    }
+                    else
+                    {
+                        mFetchConditionsWithConditionCurrentlyTrue.reset( fetchCondition.fetchRequestID );
+                    }
+                }
+            }
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+            // If forward conditions are set and input signal has changed, evaluate forward conditions
+            if ( !condition.mCondition.forwardConditions.empty() )
+            {
+                for ( uint32_t j = 0; j < condition.mCondition.forwardConditions.size(); j++ )
+                {
+                    InspectionValue resultForward;
+                    auto forwardCondition = condition.mCondition.forwardConditions[j];
+                    ret = eval( forwardCondition.condition, condition, resultForward, MAX_EQUATION_DEPTH, i );
+                    if ( ( ret != ExpressionErrorCode::SUCCESSFUL ) || ( !resultForward.isBoolOrDouble() ) ||
+                         ( !resultForward.asBool() ) )
+                    {
+
+                        mForwardConditionCurrentlyTrueForCampaignPartitions[condition.mCondition.metadata.campaignArn]
+                                                                           [j] = false;
+                    }
+                    else
+                    {
+
+                        mForwardConditionCurrentlyTrueForCampaignPartitions[condition.mCondition.metadata.campaignArn]
+                                                                           [j] = true;
+                        oneConditionEvaluatedToTrue = true;
+                    }
+                }
+            }
+#endif
+            // Reset this flag only after fetch conditions are reevaluated
             mConditionsWithInputSignalChanged.reset( i );
         }
         // If condition was reevaluated to true or if condition is still true and not waiting to be published
@@ -603,7 +771,20 @@ CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
                 oneConditionEvaluatedToTrue = true;
             }
         }
+
+        if ( conditionEvaluated )
+        {
+            for ( const auto &customFunction : mCustomFunctionCallbacks )
+            {
+                if ( customFunction.second.conditionEndCallback )
+                {
+                    customFunction.second.conditionEndCallback(
+                        condition.mCollectedSignalIds, currentTime.systemTimeMs, condition.mCollectedData );
+                }
+            }
+        }
     }
+
     return oneConditionEvaluatedToTrue;
 }
 
@@ -639,8 +820,11 @@ CollectionInspectionEngine::collectLastSignals( SignalID id,
         {
             output.emplace_back( id, sample.mTimestamp, sample.mValue, signalType );
             sample.setAlreadyConsumed( conditionId, true );
+            if ( ( signalType == SignalType::STRING ) // NOLINT(clang-diagnostic-parentheses-equality)
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-            if ( signalType == SignalType::COMPLEX_SIGNAL )
+                 || ( signalType == SignalType::COMPLEX_SIGNAL )
+#endif
+            )
             {
                 NotifyRawBufferManager<T>::increaseElementUsage(
                     id,
@@ -648,7 +832,6 @@ CollectionInspectionEngine::collectLastSignals( SignalID id,
                     RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD,
                     sample.mValue );
             }
-#endif
         }
         newestSignalTimestamp = std::max( newestSignalTimestamp, sample.mTimestamp );
         pos--;
@@ -709,6 +892,7 @@ CollectionInspectionEngine::collectData( ActiveCondition &condition,
     output.triggeredVisionSystemData->triggerTime = condition.mLastTrigger.systemTimeMs;
     output.triggeredVisionSystemData->eventID = condition.mEventID;
 #endif
+
     // Pack signals
     for ( auto &s : condition.mCondition.signals )
     {
@@ -804,6 +988,14 @@ CollectionInspectionEngine::collectData( ActiveCondition &condition,
                                           newestSignalTimestamp,
                                           output.triggeredCollectionSchemeData->signals );
                 break;
+            case SignalType::STRING:
+                collectLastSignals<RawData::BufferHandle>( s.signalID,
+                                                           s.sampleBufferSize,
+                                                           conditionId,
+                                                           s.signalType,
+                                                           newestSignalTimestamp,
+                                                           output.triggeredCollectionSchemeData->signals );
+                break;
             case SignalType::UNKNOWN:
                 FWE_LOG_WARN( "Signal ID: " + std::to_string( s.signalID ) + " associated with Campaign SyncId: " +
                               ( condition.mCondition.metadata.collectionSchemeID ) +
@@ -868,6 +1060,7 @@ CollectionInspectionEngine::collectNextDataToSend( const TimePoint &currentTime,
         if ( mConditionsTriggeredWaitingPublished.test( mNextConditionToCollectedIndex ) )
         {
             auto &condition = mConditions[mNextConditionToCollectedIndex];
+
             {
                 if ( ( ( condition.mLastTrigger.systemTimeMs == 0 ) &&
                        ( condition.mLastTrigger.monotonicTimeMs == 0 ) ) ||
@@ -906,6 +1099,15 @@ CollectionInspectionEngine::collectNextDataToSend( const TimePoint &currentTime,
     waitTimeMs = minimumWaitTimeMs;
     return {};
 }
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+// coverity[autosar_cpp14_a18_1_2_violation] std::vector<bool> specialization is acceptable in this usecase
+std::unordered_map<std::string, std::vector<bool>>
+CollectionInspectionEngine::forwardConditionForCampaignPartitions()
+{
+    return mForwardConditionCurrentlyTrueForCampaignPartitions;
+}
+#endif
 
 void
 CollectionInspectionEngine::addNewRawCanFrame( CANRawFrameID canID,
@@ -958,29 +1160,22 @@ CollectionInspectionEngine::getLatestBufferSignalValue( SignalID id,
 {
 
     auto *s = condition.getEvaluationSignalsBufferPtr<T>( id );
-    if ( s == nullptr )
+    if ( ( s != nullptr ) && ( s->mCounter != 0 ) ) // Otherwise leave result as undefined
     {
-        FWE_LOG_WARN( "SIGNAL_NOT_FOUND" );
-        // Signal not collected by any active condition
-        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+        result = static_cast<double>( s->mBuffer[s->mCurrentPosition].mValue );
     }
-    if ( s->mCounter == 0 )
-    {
-        // Not a single sample collected yet
-        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
-    }
-    result = static_cast<double>( s->mBuffer[s->mCurrentPosition].mValue );
     return ExpressionErrorCode::SUCCESSFUL;
 }
 
 ExpressionErrorCode
 CollectionInspectionEngine::getLatestSignalValue( SignalID id, ActiveCondition &condition, InspectionValue &result )
 {
+    // Set the signal ID, even if value is undefined. Can be used by custom functions to use signal by reference.
+    result.signalID = id;
     if ( mSignalToBufferTypeMap.find( id ) == mSignalToBufferTypeMap.end() )
     {
-        FWE_LOG_WARN( "SIGNAL_NOT_FOUND" );
-        // Signal not collected by any active condition
-        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+        // Signal not collected by any active condition, leave result as undefined:
+        return ExpressionErrorCode::SUCCESSFUL;
     }
     auto signalType = mSignalToBufferTypeMap[id];
     // coverity[autosar_cpp14_m6_4_6_violation]
@@ -1009,17 +1204,46 @@ CollectionInspectionEngine::getLatestSignalValue( SignalID id, ActiveCondition &
         return getLatestBufferSignalValue<double>( id, condition, result );
     case SignalType::BOOLEAN:
         return getLatestBufferSignalValue<bool>( id, condition, result );
+    case SignalType::STRING: {
+        auto res = getLatestBufferSignalValue<RawData::BufferHandle>( id, condition, result );
+        if ( res != ExpressionErrorCode::SUCCESSFUL )
+        {
+            return res;
+        }
+        if ( result.isUndefined() )
+        {
+            return ExpressionErrorCode::SUCCESSFUL; // Undefined result
+        }
+        if ( result.type != InspectionValue::DataType::DOUBLE )
+        {
+            FWE_LOG_WARN( "Expected a numeric value for raw buffer handle type" );
+            return ExpressionErrorCode::TYPE_MISMATCH;
+        }
+        auto loanedRawDataFrame =
+            mRawBufferManager->borrowFrame( id, static_cast<RawData::BufferHandle>( result.doubleVal ) );
+
+        if ( loanedRawDataFrame.isNull() )
+        {
+            FWE_LOG_ERROR( "Raw data with signal id: " + std::to_string( id ) +
+                           " and buffer handle: " + std::to_string( result.doubleVal ) +
+                           " could not be used for inspection because it was already deleted" );
+            result.type = InspectionValue::DataType::UNDEFINED;
+            return ExpressionErrorCode::SUCCESSFUL;
+        }
+        auto data = loanedRawDataFrame.getData();
+        auto size = loanedRawDataFrame.getSize();
+        result = std::string( reinterpret_cast<const char *>( data ), size );
+        return ExpressionErrorCode::SUCCESSFUL;
+    }
     case SignalType::UNKNOWN:
-        FWE_LOG_WARN( "Signal ID: " + std::to_string( id ) + " associated with Campaign SyncId: " +
-                      condition.mCondition.metadata.collectionSchemeID + " is of type UNKNOWN and used in evaluation" );
-        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+        return ExpressionErrorCode::SUCCESSFUL; // Leave result as undefined
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     case SignalType::COMPLEX_SIGNAL:
         FWE_LOG_WARN( "Complex signals are not supported in evaluation" )
-        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+        return ExpressionErrorCode::NOT_IMPLEMENTED_TYPE;
 #endif
     }
-    return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+    return ExpressionErrorCode::NOT_IMPLEMENTED_TYPE;
 }
 
 template <typename T>
@@ -1032,36 +1256,52 @@ CollectionInspectionEngine::getSampleWindowFunctionType( WindowFunction function
     auto w = condition.getFixedTimeWindowFunctionDataPtr<T>( signalID );
     if ( w == nullptr )
     {
-        // Signal not collected by any active condition
-        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+        // Signal not collected by any active condition, leave result as undefined:
+        return ExpressionErrorCode::SUCCESSFUL;
     }
 
     switch ( function )
     {
     case WindowFunction::LAST_FIXED_WINDOW_AVG:
-        result = static_cast<double>( w->mLastAvg );
-        return w->mLastAvailable ? ExpressionErrorCode::SUCCESSFUL : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+        if ( w->mLastAvailable )
+        {
+            result = static_cast<double>( w->mLastAvg );
+        }
+        return ExpressionErrorCode::SUCCESSFUL;
     case WindowFunction::LAST_FIXED_WINDOW_MIN:
-        result = static_cast<double>( w->mLastMin );
-        return w->mLastAvailable ? ExpressionErrorCode::SUCCESSFUL : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+        if ( w->mLastAvailable )
+        {
+            result = static_cast<double>( w->mLastMin );
+        }
+        return ExpressionErrorCode::SUCCESSFUL;
     case WindowFunction::LAST_FIXED_WINDOW_MAX:
-        result = static_cast<double>( w->mLastMax );
-        return w->mLastAvailable ? ExpressionErrorCode::SUCCESSFUL : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+        if ( w->mLastAvailable )
+        {
+            result = static_cast<double>( w->mLastMax );
+        }
+        return ExpressionErrorCode::SUCCESSFUL;
     case WindowFunction::PREV_LAST_FIXED_WINDOW_AVG:
-        result = static_cast<double>( w->mPreviousLastAvg );
-        return w->mPreviousLastAvailable ? ExpressionErrorCode::SUCCESSFUL
-                                         : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+        if ( w->mPreviousLastAvailable )
+        {
+            result = static_cast<double>( w->mPreviousLastAvg );
+        }
+        return ExpressionErrorCode::SUCCESSFUL;
     case WindowFunction::PREV_LAST_FIXED_WINDOW_MIN:
-        result = static_cast<double>( w->mPreviousLastMin );
-        return w->mPreviousLastAvailable ? ExpressionErrorCode::SUCCESSFUL
-                                         : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
+        if ( w->mPreviousLastAvailable )
+        {
+            result = static_cast<double>( w->mPreviousLastMin );
+        }
+        return ExpressionErrorCode::SUCCESSFUL;
     case WindowFunction::PREV_LAST_FIXED_WINDOW_MAX:
-        result = static_cast<double>( w->mPreviousLastMax );
-        return w->mPreviousLastAvailable ? ExpressionErrorCode::SUCCESSFUL
-                                         : ExpressionErrorCode::FUNCTION_DATA_NOT_AVAILABLE;
-    default:
+        if ( w->mPreviousLastAvailable )
+        {
+            result = static_cast<double>( w->mPreviousLastMax );
+        }
+        return ExpressionErrorCode::SUCCESSFUL;
+    case WindowFunction::NONE:
         return ExpressionErrorCode::NOT_IMPLEMENTED_FUNCTION;
     }
+    return ExpressionErrorCode::NOT_IMPLEMENTED_FUNCTION;
 }
 
 ExpressionErrorCode
@@ -1072,9 +1312,8 @@ CollectionInspectionEngine::getSampleWindowFunction( WindowFunction function,
 {
     if ( mSignalToBufferTypeMap.find( signalID ) == mSignalToBufferTypeMap.end() )
     {
-        FWE_LOG_WARN( "SIGNAL_NOT_FOUND" );
-        // Signal not collected by any active condition
-        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+        // Signal not collected by any active condition, leave result as undefined:
+        return ExpressionErrorCode::SUCCESSFUL;
     }
     auto signalType = mSignalToBufferTypeMap[signalID];
     // coverity[autosar_cpp14_m6_4_6_violation]
@@ -1103,18 +1342,18 @@ CollectionInspectionEngine::getSampleWindowFunction( WindowFunction function,
         return getSampleWindowFunctionType<double>( function, signalID, condition, result );
     case SignalType::BOOLEAN:
         return getSampleWindowFunctionType<bool>( function, signalID, condition, result );
+    case SignalType::STRING:
+        FWE_LOG_WARN( "Window functions are not supported for string signals" )
+        return ExpressionErrorCode::NOT_IMPLEMENTED_TYPE;
     case SignalType::UNKNOWN:
-        FWE_LOG_WARN( "Window functions are not supported for signal ID: " + std::to_string( signalID ) +
-                      " associated with Campaign SyncId: " + condition.mCondition.metadata.collectionSchemeID +
-                      " as signal is of type UNKNOWN" );
-        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+        return ExpressionErrorCode::SUCCESSFUL; // Leave result as undefined
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     case SignalType::COMPLEX_SIGNAL:
         FWE_LOG_WARN( "Window functions are not supported for complex signals" )
-        return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+        return ExpressionErrorCode::NOT_IMPLEMENTED_TYPE;
 #endif
     }
-    return ExpressionErrorCode::SIGNAL_NOT_FOUND;
+    return ExpressionErrorCode::NOT_IMPLEMENTED_TYPE;
 }
 
 ExpressionErrorCode
@@ -1139,6 +1378,11 @@ CollectionInspectionEngine::eval( const ExpressionNode *expression,
         resultValue = expression->booleanValue;
         return ExpressionErrorCode::SUCCESSFUL;
     }
+    if ( expression->nodeType == ExpressionNodeType::STRING )
+    {
+        resultValue = expression->stringValue;
+        return ExpressionErrorCode::SUCCESSFUL;
+    }
     if ( expression->nodeType == ExpressionNodeType::SIGNAL )
     {
         return getLatestSignalValue( expression->signalID, condition, resultValue );
@@ -1147,6 +1391,46 @@ CollectionInspectionEngine::eval( const ExpressionNode *expression,
     {
         return getSampleWindowFunction(
             expression->function.windowFunction, expression->signalID, condition, resultValue );
+    }
+    if ( expression->nodeType == ExpressionNodeType::IS_NULL_FUNCTION )
+    {
+        if ( ( expression->left == nullptr ) || ( expression->left->nodeType != ExpressionNodeType::SIGNAL ) )
+        {
+            FWE_LOG_ERROR( "isNull function does not have signal ID as parameter" );
+            return ExpressionErrorCode::TYPE_MISMATCH;
+        }
+        auto ret = isNewSignalValueAvailable( expression->left->signalID, condition, resultValue, conditionId );
+        if ( ( ret == ExpressionErrorCode::SUCCESSFUL ) && ( resultValue.isBoolOrDouble() ) )
+        {
+            // Revert the result value of this function
+            resultValue = !resultValue.asBool();
+        }
+        return ret;
+    }
+    if ( expression->nodeType == ExpressionNodeType::CUSTOM_FUNCTION )
+    {
+        std::vector<InspectionValue> argResults( expression->function.customFunctionParams.size() );
+        for ( size_t i = 0; i < expression->function.customFunctionParams.size(); i++ )
+        {
+            auto argRet = eval( expression->function.customFunctionParams[i],
+                                condition,
+                                argResults[i],
+                                remainingStackDepth - 1,
+                                conditionId );
+            if ( argRet != ExpressionErrorCode::SUCCESSFUL )
+            {
+                return argRet;
+            }
+        }
+        auto customFunction = mCustomFunctionCallbacks.find( expression->function.customFunctionName );
+        if ( ( customFunction == mCustomFunctionCallbacks.end() ) || ( !customFunction->second.invokeCallback ) )
+        {
+            return ExpressionErrorCode::NOT_IMPLEMENTED_FUNCTION;
+        }
+        auto funcRes =
+            customFunction->second.invokeCallback( expression->function.customFunctionInvocationId, argResults );
+        resultValue = std::move( funcRes.value );
+        return funcRes.error;
     }
 
     InspectionValue leftResult;
@@ -1171,6 +1455,12 @@ CollectionInspectionEngine::eval( const ExpressionNode *expression,
         {
             return rightRet;
         }
+    }
+
+    if ( leftResult.isUndefined() ||
+         ( ( expression->nodeType != ExpressionNodeType::OPERATOR_LOGICAL_NOT ) && rightResult.isUndefined() ) )
+    {
+        return ExpressionErrorCode::SUCCESSFUL; // Leave result as undefined
     }
 
     switch ( expression->nodeType )
@@ -1204,7 +1494,11 @@ CollectionInspectionEngine::eval( const ExpressionNode *expression,
         resultValue = leftResult.asDouble() >= rightResult.asDouble();
         return ExpressionErrorCode::SUCCESSFUL;
     case ExpressionNodeType::OPERATOR_EQUAL:
-        if ( ( !leftResult.isBoolOrDouble() ) || ( !rightResult.isBoolOrDouble() ) )
+        if ( leftResult.isString() && rightResult.isString() )
+        {
+            resultValue = *leftResult.stringVal == *rightResult.stringVal;
+        }
+        else if ( ( !leftResult.isBoolOrDouble() ) || ( !rightResult.isBoolOrDouble() ) )
         {
             return ExpressionErrorCode::TYPE_MISMATCH;
         }
@@ -1214,7 +1508,11 @@ CollectionInspectionEngine::eval( const ExpressionNode *expression,
         }
         return ExpressionErrorCode::SUCCESSFUL;
     case ExpressionNodeType::OPERATOR_NOT_EQUAL:
-        if ( ( !leftResult.isBoolOrDouble() ) || ( !rightResult.isBoolOrDouble() ) )
+        if ( leftResult.isString() && rightResult.isString() )
+        {
+            resultValue = *leftResult.stringVal != *rightResult.stringVal;
+        }
+        else if ( ( !leftResult.isBoolOrDouble() ) || ( !rightResult.isBoolOrDouble() ) )
         {
             return ExpressionErrorCode::TYPE_MISMATCH;
         }
@@ -1245,7 +1543,11 @@ CollectionInspectionEngine::eval( const ExpressionNode *expression,
         resultValue = !leftResult.asBool();
         return ExpressionErrorCode::SUCCESSFUL;
     case ExpressionNodeType::OPERATOR_ARITHMETIC_PLUS:
-        if ( ( !leftResult.isBoolOrDouble() ) || ( !rightResult.isBoolOrDouble() ) )
+        if ( leftResult.isString() && rightResult.isString() )
+        {
+            resultValue = *leftResult.stringVal + *rightResult.stringVal;
+        }
+        else if ( ( !leftResult.isBoolOrDouble() ) || ( !rightResult.isBoolOrDouble() ) )
         {
             return ExpressionErrorCode::TYPE_MISMATCH;
         }
@@ -1276,7 +1578,7 @@ CollectionInspectionEngine::eval( const ExpressionNode *expression,
         resultValue = leftResult.asDouble() / rightResult.asDouble();
         return ExpressionErrorCode::SUCCESSFUL;
     default:
-        return ExpressionErrorCode::NOT_IMPLEMENTED_TYPE;
+        return ExpressionErrorCode::NOT_IMPLEMENTED_FUNCTION;
     }
 }
 
@@ -1288,6 +1590,80 @@ CollectionInspectionEngine::generateEventID( Timestamp timestamp )
     // As Kotlin reads eventId as int32, set most significant bit to 0 so event IDs stay positive
     eventId = eventId & 0x7FFFFFFF;
     return eventId;
+}
+
+ExpressionErrorCode
+CollectionInspectionEngine::isNewSignalValueAvailable( SignalID signalID,
+                                                       ActiveCondition &condition,
+                                                       InspectionValue &resultValue,
+                                                       uint32_t conditionId )
+{
+    if ( mSignalToBufferTypeMap.find( signalID ) == mSignalToBufferTypeMap.end() )
+    {
+        // Signal not collected by any active condition, leave result as undefined:
+        return ExpressionErrorCode::SUCCESSFUL;
+    }
+    auto signalType = mSignalToBufferTypeMap[signalID];
+
+    // coverity[autosar_cpp14_m6_4_6_violation]
+    // coverity[misra_cpp_2008_rule_6_4_6_violation] compiler warning is preferred over a default-clause
+    switch ( signalType )
+    {
+    case SignalType::UINT8:
+        return isNewSignalValueAvailableType<uint8_t>( signalID, condition, resultValue, conditionId );
+    case SignalType::INT8:
+        return isNewSignalValueAvailableType<int8_t>( signalID, condition, resultValue, conditionId );
+    case SignalType::UINT16:
+        return isNewSignalValueAvailableType<uint16_t>( signalID, condition, resultValue, conditionId );
+    case SignalType::INT16:
+        return isNewSignalValueAvailableType<uint16_t>( signalID, condition, resultValue, conditionId );
+    case SignalType::UINT32:
+        return isNewSignalValueAvailableType<uint32_t>( signalID, condition, resultValue, conditionId );
+    case SignalType::INT32:
+        return isNewSignalValueAvailableType<int32_t>( signalID, condition, resultValue, conditionId );
+    case SignalType::UINT64:
+        return isNewSignalValueAvailableType<uint64_t>( signalID, condition, resultValue, conditionId );
+    case SignalType::INT64:
+        return isNewSignalValueAvailableType<int64_t>( signalID, condition, resultValue, conditionId );
+    case SignalType::FLOAT:
+        return isNewSignalValueAvailableType<float>( signalID, condition, resultValue, conditionId );
+    case SignalType::DOUBLE:
+        return isNewSignalValueAvailableType<double>( signalID, condition, resultValue, conditionId );
+    case SignalType::BOOLEAN:
+        return isNewSignalValueAvailableType<bool>( signalID, condition, resultValue, conditionId );
+    case SignalType::STRING:
+        return isNewSignalValueAvailableType<RawData::BufferHandle>( signalID, condition, resultValue, conditionId );
+    case SignalType::UNKNOWN:
+        return ExpressionErrorCode::SUCCESSFUL; // Leave result as undefined
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    case SignalType::COMPLEX_SIGNAL:
+        FWE_LOG_WARN( "Complex signals are not supported in evaluation" )
+        return ExpressionErrorCode::NOT_IMPLEMENTED_TYPE;
+#endif
+    }
+    return ExpressionErrorCode::NOT_IMPLEMENTED_TYPE;
+}
+
+template <typename T>
+ExpressionErrorCode
+CollectionInspectionEngine::isNewSignalValueAvailableType( SignalID signalID,
+                                                           ActiveCondition &condition,
+                                                           InspectionValue &resultValue,
+                                                           uint32_t conditionId )
+{
+    auto *s = condition.getEvaluationSignalsBufferPtr<T>( signalID );
+    if ( s != nullptr ) // Otherwise leave result as undefined
+    {
+        resultValue = ( s->mCounter != 0 ) && ( !s->mBuffer[s->mCurrentPosition].isAlreadyConsumed( conditionId ) );
+    }
+    return ExpressionErrorCode::SUCCESSFUL;
+}
+
+void
+CollectionInspectionEngine::registerCustomFunction( const std::string &name, CustomFunctionCallbacks callbacks )
+{
+    FWE_LOG_TRACE( "Registering custom function " + name );
+    mCustomFunctionCallbacks.emplace( name, std::move( callbacks ) );
 }
 
 } // namespace IoTFleetWise

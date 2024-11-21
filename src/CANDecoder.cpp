@@ -160,7 +160,7 @@ CANDecoder::extractSignalFromFrame( const uint8_t *frameData, const CANSignalFor
     // Write first bits to result
     // NOTE: The start bit here is different from how it appears in a DBC file. In a DBC file, the
     // start bit indicates the LSB for little endian and MSB for big endian signals.
-    // But AWS IoT Fleetwise considers start bit to always be the LSB regardless of endianess.
+    // But AWS IoT FleetWise considers start bit to always be the LSB regardless of endianess.
     uint64_t result = frameData[startByte] >> startBitInByte;
 
     // Write residual bytes

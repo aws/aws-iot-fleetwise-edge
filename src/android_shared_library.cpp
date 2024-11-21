@@ -14,6 +14,8 @@
 #include <exception>
 #include <jni.h>
 #include <string>
+#include <utility>
+#include <vector>
 
 #define LOG_TAG "FWE"
 #define LOGE( x ) __android_log_print( ANDROID_LOG_ERROR, LOG_TAG, "%s", ( x ).c_str() )
@@ -126,11 +128,7 @@ Java_com_aws_iotfleetwise_Fwe_run( JNIEnv *env,
         mqttConnection["certificate"] = certificate;
         mqttConnection["rootCA"] = rootCA;
         mqttConnection["clientId"] = vehicleName;
-        mqttTopicPrefix += "vehicles/" + vehicleName;
-        mqttConnection["collectionSchemeListTopic"] = mqttTopicPrefix + "/collection_schemes";
-        mqttConnection["decoderManifestTopic"] = mqttTopicPrefix + "/decoder_manifests";
-        mqttConnection["canDataTopic"] = mqttTopicPrefix + "/signals";
-        mqttConnection["checkinTopic"] = mqttTopicPrefix + "/checkins";
+        mqttConnection["iotFleetWiseTopicPrefix"] = mqttTopicPrefix;
         // Set system wide log level
         configureLogging( config );
 
@@ -319,6 +317,115 @@ Java_com_aws_iotfleetwise_Fwe_ingestCanMessage(
     env->GetByteArrayRegion( dataJArray, 0, len, (int8_t *)data.data() );
     mEngine->ingestExternalCANMessage(
         interfaceId, static_cast<Aws::IoTFleetWise::Timestamp>( timestamp ), static_cast<uint32_t>( messageId ), data );
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_aws_iotfleetwise_Fwe_ingestSignalValueByName(
+    JNIEnv *env, jobject me, jlong timestamp, jstring nameJString, jobject value )
+{
+    static_cast<void>( me );
+    if ( mEngine == nullptr )
+    {
+        return;
+    }
+
+    auto nameCString = env->GetStringUTFChars( nameJString, 0 );
+    std::string name( nameCString );
+    env->ReleaseStringUTFChars( nameJString, nameCString );
+    jclass doubleJClass = env->FindClass( "java/lang/Double" );
+    jclass longJClass = env->FindClass( "java/lang/Long" );
+
+    if ( env->IsInstanceOf( value, doubleJClass ) )
+    {
+        jmethodID doubleJMethodIdDoubleValue = env->GetMethodID( doubleJClass, "doubleValue", "()D" );
+        jdouble doubleValue = env->CallDoubleMethod( value, doubleJMethodIdDoubleValue );
+        mEngine->ingestSignalValueByName(
+            static_cast<Aws::IoTFleetWise::Timestamp>( timestamp ),
+            name,
+            Aws::IoTFleetWise::DecodedSignalValue( doubleValue, Aws::IoTFleetWise::SignalType::DOUBLE ) );
+    }
+    else if ( env->IsInstanceOf( value, longJClass ) )
+    {
+        jmethodID longJMethodIdLongValue = env->GetMethodID( longJClass, "longValue", "()J" );
+        jlong longValue = env->CallLongMethod( value, longJMethodIdLongValue );
+        mEngine->ingestSignalValueByName(
+            static_cast<Aws::IoTFleetWise::Timestamp>( timestamp ),
+            name,
+            Aws::IoTFleetWise::DecodedSignalValue( longValue, Aws::IoTFleetWise::SignalType::INT64 ) );
+    }
+    else
+    {
+        LOGE( std::string( "Unsupported value type" ) );
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_aws_iotfleetwise_Fwe_ingestMultipleSignalValuesByName( JNIEnv *env,
+                                                                jobject me,
+                                                                jlong timestamp,
+                                                                jobject valuesJObject )
+{
+    static_cast<void>( me );
+    if ( mEngine == nullptr )
+    {
+        return;
+    }
+
+    jclass valuesJClass = env->GetObjectClass( valuesJObject );
+    jmethodID valuesJMethodIdEntrySet = env->GetMethodID( valuesJClass, "entrySet", "()Ljava/util/Set;" );
+    jclass setJClass = env->FindClass( "java/util/Set" );
+    jmethodID setJMethodIdIterator = env->GetMethodID( setJClass, "iterator", "()Ljava/util/Iterator;" );
+    jclass iteratorJClass = env->FindClass( "java/util/Iterator" );
+    jmethodID iteratorJMethodIdHasNext = env->GetMethodID( iteratorJClass, "hasNext", "()Z" );
+    jmethodID iteratorJMethodIdNext = env->GetMethodID( iteratorJClass, "next", "()Ljava/lang/Object;" );
+    jclass mapEntryJClass = env->FindClass( "java/util/Map$Entry" );
+    jmethodID mapEntryJMethodIdGetKey = env->GetMethodID( mapEntryJClass, "getKey", "()Ljava/lang/Object;" );
+    jmethodID mapEntryJMethodIdGetValue = env->GetMethodID( mapEntryJClass, "getValue", "()Ljava/lang/Object;" );
+    jclass stringJClass = env->FindClass( "java/lang/String" );
+    jmethodID stringJMethodIdToString = env->GetMethodID( stringJClass, "toString", "()Ljava/lang/String;" );
+    jclass doubleJClass = env->FindClass( "java/lang/Double" );
+    jmethodID doubleJMethodIdDoubleValue = env->GetMethodID( doubleJClass, "doubleValue", "()D" );
+    jclass longJClass = env->FindClass( "java/lang/Long" );
+    jmethodID longJMethodIdLongValue = env->GetMethodID( longJClass, "longValue", "()J" );
+
+    jobject valuesEntrySetJObject = env->CallObjectMethod( valuesJObject, valuesJMethodIdEntrySet );
+    jobject valuesEntrySetIteratorJObject = env->CallObjectMethod( valuesEntrySetJObject, setJMethodIdIterator );
+
+    std::vector<std::pair<std::string, Aws::IoTFleetWise::DecodedSignalValue>> values;
+    while ( env->CallBooleanMethod( valuesEntrySetIteratorJObject, iteratorJMethodIdHasNext ) )
+    {
+        jobject entryJObject = env->CallObjectMethod( valuesEntrySetIteratorJObject, iteratorJMethodIdNext );
+        jobject nameJObject = env->CallObjectMethod( entryJObject, mapEntryJMethodIdGetKey );
+        jobject valueJObject = env->CallObjectMethod( entryJObject, mapEntryJMethodIdGetValue );
+        jstring nameJString = (jstring)env->CallObjectMethod( nameJObject, stringJMethodIdToString );
+        auto nameCString = env->GetStringUTFChars( nameJString, 0 );
+        std::string name( nameCString );
+        if ( env->IsInstanceOf( valueJObject, doubleJClass ) )
+        {
+            jdouble value = env->CallDoubleMethod( valueJObject, doubleJMethodIdDoubleValue );
+            values.emplace_back(
+                name, Aws::IoTFleetWise::DecodedSignalValue( value, Aws::IoTFleetWise::SignalType::DOUBLE ) );
+        }
+        else if ( env->IsInstanceOf( valueJObject, longJClass ) )
+        {
+            jlong value = env->CallLongMethod( valueJObject, longJMethodIdLongValue );
+            values.emplace_back( name,
+                                 Aws::IoTFleetWise::DecodedSignalValue( value, Aws::IoTFleetWise::SignalType::INT64 ) );
+        }
+        else
+        {
+            LOGE( std::string( "Unsupported value type" ) );
+        }
+        env->ReleaseStringUTFChars( nameJString, nameCString );
+        env->DeleteLocalRef( nameJString );
+        env->DeleteLocalRef( valueJObject );
+        env->DeleteLocalRef( nameJObject );
+        env->DeleteLocalRef( entryJObject );
+    }
+    env->DeleteLocalRef( valuesEntrySetIteratorJObject );
+    env->DeleteLocalRef( valuesEntrySetJObject );
+
+    mEngine->ingestMultipleSignalValuesByName( static_cast<Aws::IoTFleetWise::Timestamp>( timestamp ), values );
 }
 
 extern "C" JNIEXPORT jstring JNICALL

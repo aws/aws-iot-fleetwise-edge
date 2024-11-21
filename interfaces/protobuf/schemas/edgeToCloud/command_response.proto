@@ -1,0 +1,41 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+option java_package = "com.amazonaws.iot.autobahn.schemas";
+package Aws.IoTFleetWise.Schemas.Commands;
+
+message CommandResponse {
+
+  Status status = 1;
+
+  /**
+   * CommandId is the identifier passed in the command request and passed back here in the command
+   * response in order to uniquely identify each command run.
+   */
+  string command_id = 2;
+
+  /**
+   * Integer reason code. The 32-bit range is allocated as follows:
+   *
+   *     0x00000000              : Unspecified reason
+   *     0x00000001 - 0x0000FFFF : AWS IoT FleetWise reason codes
+   *     0x00010000 - 0x0001FFFF : OEM reason codes
+   *     0x00020000 - 0xFFFFFFFF : Reserved
+   */
+  uint32 reason_code = 3;
+
+  /**
+   * String reason description
+   */
+  string reason_description = 4;
+}
+
+enum Status {
+  COMMAND_STATUS_UNSPECIFIED = 0;
+  COMMAND_STATUS_SUCCEEDED = 1;
+  COMMAND_STATUS_EXECUTION_TIMEOUT = 2;
+  COMMAND_STATUS_EXECUTION_FAILED = 4;
+  COMMAND_STATUS_IN_PROGRESS = 10;
+}

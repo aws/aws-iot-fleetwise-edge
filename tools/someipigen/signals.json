@@ -1,0 +1,12 @@
+{
+  "Int32": 10,
+  "Int64": 1000,
+  "Boolean": false,
+  "Float": 1.23,
+  "Double": 1.234567,
+  "Vehicle.ExampleSomeipInterface.A1.A2.A": 100,
+  "Vehicle.ExampleSomeipInterface.A1.A2.B": false,
+  "Vehicle.ExampleSomeipInterface.A1.A2.D": 1.0,
+  "Vehicle.ExampleSomeipInterface.A1.S": "hi",
+  "Vehicle.ExampleSomeipInterface.X": 1
+}

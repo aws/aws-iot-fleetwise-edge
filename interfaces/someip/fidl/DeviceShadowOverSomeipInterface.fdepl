@@ -1,0 +1,173 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+import "platform:/plugin/org.genivi.commonapi.someip/deployment/CommonAPI-4-SOMEIP_deployment_spec.fdepl"
+import "DeviceShadowOverSomeipInterface.fidl"
+
+define org.genivi.commonapi.someip.deployment for interface commonapi.DeviceShadowOverSomeipInterface {
+    SomeIpServiceID = 0x1235
+
+    method getShadow {
+        SomeIpMethodID = 0x753A
+        SomeIpReliable = false
+
+        in {
+            shadowName {
+                SomeIpStringEncoding = utf8
+            }
+        }
+
+        out {
+            shadowDocument {
+                SomeIpStringEncoding = utf8
+            }
+        }
+    }
+
+    method updateShadow {
+        SomeIpMethodID = 0x753B
+        SomeIpReliable = false
+
+        in {
+            shadowName {
+                SomeIpStringEncoding = utf8
+            }
+
+            updateDocument {
+                SomeIpStringEncoding = utf8
+            }
+        }
+
+        out {
+            shadowDocument {
+                SomeIpStringEncoding = utf8
+            }
+        }
+    }
+
+    method deleteShadow {
+        SomeIpMethodID = 0x753C
+        SomeIpReliable = false
+
+        in {
+            shadowName {
+                SomeIpStringEncoding = utf8
+            }
+        }
+    }
+
+    broadcast shadowChanged {
+        SomeIpEventID = 0x753D
+        SomeIpEventGroups = { 0x753D }
+
+        out {
+            shadowName {
+                SomeIpStringEncoding = utf8
+            }
+
+            shadowDocument {
+                SomeIpStringEncoding = utf8
+            }
+        }
+    }
+}
+
+define org.genivi.commonapi.someip.deployment for provider as Service {
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface"
+        SomeIpInstanceID = 0x5679
+    }
+
+    // Add several instances for DeviceShadowOverSomeipInterface. Each of these instances can be initialized
+    // after the routing manager and they can be associated to separate FWE processes so that the
+    // data seen by each FWE process is isolated.
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface0"
+        SomeIpInstanceID = 0x5700
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface1"
+        SomeIpInstanceID = 0x5701
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface2"
+        SomeIpInstanceID = 0x5702
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface3"
+        SomeIpInstanceID = 0x5703
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface4"
+        SomeIpInstanceID = 0x5704
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface5"
+        SomeIpInstanceID = 0x5705
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface6"
+        SomeIpInstanceID = 0x5706
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface7"
+        SomeIpInstanceID = 0x5707
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface8"
+        SomeIpInstanceID = 0x5708
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface9"
+        SomeIpInstanceID = 0x5709
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface10"
+        SomeIpInstanceID = 0x570a
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface11"
+        SomeIpInstanceID = 0x570b
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface12"
+        SomeIpInstanceID = 0x570c
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface13"
+        SomeIpInstanceID = 0x570d
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface14"
+        SomeIpInstanceID = 0x570e
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface15"
+        SomeIpInstanceID = 0x570f
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface16"
+        SomeIpInstanceID = 0x5710
+    }
+
+    instance commonapi.DeviceShadowOverSomeipInterface {
+        InstanceId = "commonapi.DeviceShadowOverSomeipInterface17"
+        SomeIpInstanceID = 0x5711
+    }
+}

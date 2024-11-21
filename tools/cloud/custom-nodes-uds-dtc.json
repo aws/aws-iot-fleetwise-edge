@@ -1,0 +1,21 @@
+[
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle",
+      "description": "Vehicle"
+    }
+  },
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle.ECU1",
+      "description": "Vehicle.ECU1"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ECU1.DTC_INFO",
+      "description": "Vehicle.ECU1.DTC_INFO",
+      "dataType": "STRING"
+    }
+  }
+]

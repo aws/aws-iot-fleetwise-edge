@@ -1,0 +1,9 @@
+[
+  {
+    "interfaceId": "AAOS-VHAL",
+    "type": "CUSTOM_DECODING_INTERFACE",
+    "customDecodingInterface": {
+      "name": "AaosVhalInterface"
+    }
+  }
+]

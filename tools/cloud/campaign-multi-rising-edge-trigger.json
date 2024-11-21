@@ -1,0 +1,15 @@
+{
+  "compression": "SNAPPY",
+  "collectionScheme": {
+    "conditionBasedCollectionScheme": {
+      "conditionLanguageVersion": 1,
+      "expression": "custom_function('MULTI_RISING_EDGE_TRIGGER', 'ALARM1', $variable.`Vehicle.ECM.DemoEngineTorque` > 500, 'ALARM2', $variable.`Vehicle.ABS.DemoBrakePedalPressure` > 7000)",
+      "triggerMode": "ALWAYS"
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.MultiRisingEdgeTrigger"
+    }
+  ]
+}

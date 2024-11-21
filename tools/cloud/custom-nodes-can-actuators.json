@@ -1,0 +1,16 @@
+[
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.actuator6",
+      "description": "Vehicle actuator6",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.actuator7",
+      "description": "Vehicle actuator7",
+      "dataType": "DOUBLE"
+    }
+  }
+]

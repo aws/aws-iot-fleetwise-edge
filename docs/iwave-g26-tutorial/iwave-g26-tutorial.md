@@ -1,5 +1,13 @@
 # iWave G26 TCU Tutorial
 
+<!-- prettier-ignore -->
+> [!NOTE]
+> This guide makes use of "gated" features of AWS IoT FleetWise for which you will need to request
+> access. See
+> [here](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/fleetwise-regions.html) for
+> more information, or contact the
+> [AWS Support Center](https://console.aws.amazon.com/support/home#/).
+
 **Topics**
 
 - [Introduction](#introduction)
@@ -11,7 +19,7 @@
 - [Step 4: Provision AWS IoT credentials](#step-4-provision-aws-iot-credentials)
 - [Step 5: Deploy Edge Agent](#step-5-deploy-edge-agent)
 - [Step 6: Connect the iWave G26 TCU to the vehicle](#step-6-connect-the-tcu-to-the-vehicle)
-- [Step 7: Collect OBD Data](#step-7-collect-obd-data)
+- [Step 7: Collect OBD Data](#step-7-collect-gps-and-obd-data)
 - [Step 8: Clean up](#step-8-clean-up)
 
 **Copyright (C) Amazon Web Services, Inc. and/or its affiliates. All rights reserved.**
@@ -81,21 +89,28 @@ to take action based on your use of AWS IoT FleetWise._**
 
 Follow the steps in this tutorial to set up and configure the iWave G26 TCU device hardware to work
 with your Edge Agent compiled from the FWE source code. You can then connect the device to a vehicle
-so that it collects vehicle J1979 OBD-II data and transfers it to the AWS IoT FleetWise service. To
-additionally also collected GPS data more steps described [here](./iwave-gps-setup.md) are required.
-They require the steps below to be executed first.
+so that it collects vehicle J1979 OBD-II data and GPS data, and transfers it to the AWS IoT
+FleetWise service.
 
 **Estimated Time**: 60 minutes
 
 ## Prerequisites
 
 - A [G26 TCU from iWave Systems](https://www.iwavesystems.com/product/telematics-control-unit/)
-  device
-- Access to an AWS account with administrator permissions
-- To be signed in to the AWS Management Console with an account in your chosen Region
-  - **Note:** AWS IoT FleetWise is currently available in `us-east-1` and `eu-central-1`.
-- A SIM card
-- A local Linux or MacOS machine
+  device.
+- Access to an AWS Account with administrator privileges.
+- Your AWS account has access to AWS IoT FleetWise "gated" features. See
+  [here](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/fleetwise-regions.html) for
+  more information, or contact the
+  [AWS Support Center](https://console.aws.amazon.com/support/home#/).
+- Logged in to the AWS Console in the `us-east-1` region using the account with administrator
+  privileges.
+  - Note: if you would like to use a different region you will need to change `us-east-1` to your
+    desired region in each place that it is mentioned below.
+  - Note: AWS IoT FleetWise is currently available in
+    [these](https://docs.aws.amazon.com/general/latest/gr/iotfleetwise.html) regions.
+- A local Linux or MacOS machine.
+- A SIM card.
 
 ## Step 1: Set up iWave Systems G26 TCU
 
@@ -404,6 +419,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 && mkdir -p config \
 && cd config \
 && ../tools/provision.sh \
+   --region us-east-1 \
    --vehicle-name fwdemo-g26 \
    --certificate-pem-outfile certificate.pem \
    --private-key-outfile private-key.key \
@@ -415,7 +431,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    --log-color Yes \
    --vehicle-name `cat vehicle-name.txt` \
    --endpoint-url `cat endpoint.txt` \
-   --can-bus0 can0 \
+   --can-bus0 can0
 && cd .. \
 && zip -r aws-iot-fleetwise-deploy.zip .
 ```
@@ -478,7 +494,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 
 2. After the OBD is connected, start the engine.
 
-## Step 7: Collect OBD data
+## Step 7: Collect GPS and OBD data
 
 1. Run the following _on the development machine_ to install the dependencies of the demo script:
 
@@ -495,11 +511,15 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 
    ```bash
    ./demo.sh \
+      --region us-east-1 \
       --vehicle-name fwdemo-g26 \
       --node-file obd-nodes.json \
+      --node-file custom-nodes-location.json \
       --decoder-file obd-decoders.json \
+      --decoder-file custom-decoders-location.json \
       --network-interface-file network-interface-obd.json \
-      --campaign-file campaign-obd-heartbeat.json
+      --network-interface-file network-interface-custom-location.json \
+      --campaign-file campaign-obd-and-location-heartbeat.json
    ```
 
    The demo script:
@@ -507,18 +527,20 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
    1. Creates an Amazon Timestream database and table.
    1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
-   1. Creates a signal catalog based on `obd-nodes.json`.
-   1. Creates a model manifest that references the signal catalog with all of the OBD signals.
+   1. Creates a signal catalog based on `obd-nodes.json` and `custom-nodes-location.json`.
+   1. Creates a model manifest that references the signal catalog with all of the OBD and location
+      signals.
    1. Activates the model manifest.
-   1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` for decoding
-      signals from the network interfaces defined in `network-interfaces-obd.json`.
+   1. Creates a decoder manifest linked to the model manifest using `obd-decoders.json` and
+      `custom-decoders-location.json` for decoding signals from the network interfaces defined in
+      `network-interface-obd.json` and `network-interface-custom-location.json`.
    1. Updates the decoder manifest to set the status as `ACTIVE`.
    1. Creates a vehicle with a name equal to `fwdemo-g26`, the same as the name passed to
       `provision.sh`.
    1. Creates a fleet.
    1. Associates the vehicle with the fleet.
    1. Creates a campaign from `campaign-obd-heartbeat.json` that contains a time-based collection
-      scheme that collects OBD data and targets the campaign at the fleet.
+      scheme that collects OBD and location data and targets the campaign at the fleet.
    1. Approves the campaign.
    1. Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to
       the fleet.
@@ -546,6 +568,25 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
   different vehicle models. For this reason, if you're not going to turn on the vehicle for an
   extended period (like a week), unplug the iWave device from the J1962 DCL port to avoid depleting
   the battery.
+
+### Troubleshooting
+
+- If you have problems collecting location data:
+
+  - Firstly check that you can see NMEA formatted ASCII data when you run `cat < /dev/ttyUSB1`.
+  - If the GPS NMEA output it working but no gps fix is available you should move to an area with an
+    open sight to the sky. As long as no GPS fix is available you will see every 10 seconds
+    (assuming you configured `systemWideLogLevel` to `Trace`):
+
+    ```
+    [TRACE] [IWaveGpsSource.cpp:80] [pollData()]: [In the last 10000 millisecond found 10 lines with $GPGGA and extracted 0 valid coordinates from it]
+    ```
+
+    As soon as data is available you should see this:
+
+    ```
+    [TRACE] [IWaveGpsSource.cpp:80] [pollData()]: [In the last 10000 millisecond found 11 lines with $GPGGA and extracted 11 valid coordinates from it]
+    ```
 
 ## Step 8: Clean up
 
