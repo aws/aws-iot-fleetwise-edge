@@ -140,6 +140,266 @@
               }
             },
             "required": ["ros2Interface", "interfaceId", "type"]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "someipToCanBridgeInterface": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "someipServiceId": {
+                    "type": "string",
+                    "description": "The Service ID that provides the CAN over SOME/IP service."
+                  },
+                  "someipInstanceId": {
+                    "type": "string",
+                    "description": "The Instance ID that provides the CAN over SOME/IP service."
+                  },
+                  "someipEventId": {
+                    "type": "string",
+                    "description": "The Event ID of the CAN over SOME/IP data."
+                  },
+                  "someipEventGroupId": {
+                    "type": "string",
+                    "description": "The Event Group ID that FWE should subscribe to for the CAN over SOME/IP data."
+                  },
+                  "someipApplicationName": {
+                    "type": "string",
+                    "description": "Name of the SOME/IP application"
+                  }
+                },
+                "required": [
+                  "someipServiceId",
+                  "someipInstanceId",
+                  "someipEventId",
+                  "someipEventGroupId",
+                  "someipApplicationName"
+                ]
+              },
+              "interfaceId": {
+                "type": "string",
+                "description": "Every network interface is associated with a unique ID that must match the interface ID sent by the cloud in the decoder manifest"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["someipToCanBridgeInterface"]
+              }
+            },
+            "required": ["someipToCanBridgeInterface", "interfaceId", "type"]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "someipCollectionInterface": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "someipApplicationName": {
+                    "type": "string",
+                    "description": "Name of the SOME/IP application"
+                  },
+                  "cyclicUpdatePeriodMs": {
+                    "type": "integer",
+                    "description": "Cyclic update period in milliseconds that FWE will periodically push the last available signal values. Set to zero to only collect values on change."
+                  }
+                },
+                "required": ["someipApplicationName", "cyclicUpdatePeriodMs"]
+              },
+              "interfaceId": {
+                "type": "string",
+                "description": "Every network interface is associated with a unique ID that must match the interface ID sent by the cloud in the decoder manifest"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["someipCollectionInterface"]
+              }
+            },
+            "required": ["someipCollectionInterface", "interfaceId", "type"]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "someipCommandInterface": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "someipApplicationName": {
+                    "type": "string",
+                    "description": "Name of the SOME/IP application"
+                  }
+                },
+                "required": ["someipApplicationName"]
+              },
+              "interfaceId": {
+                "type": "string",
+                "description": "Every network interface is associated with a unique ID that must match the interface ID sent by the cloud in the decoder manifest"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["someipCommandInterface"]
+              }
+            },
+            "required": ["someipCommandInterface", "interfaceId", "type"]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "iWaveGpsInterface": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "latitudeSignalName": {
+                    "type": "string",
+                    "description": "Name of latitude signal"
+                  },
+                  "longitudeSignalName": {
+                    "type": "string",
+                    "description": "Name of longitude signal"
+                  },
+                  "nmeaFilePath": {
+                    "type": "string",
+                    "description": "Path to NMEA device"
+                  },
+                  "pollIntervalMs": {
+                    "type": "string",
+                    "description": "Poll interval in milliseconds"
+                  }
+                },
+                "required": [
+                  "latitudeSignalName",
+                  "longitudeSignalName",
+                  "nmeaFilePath",
+                  "pollIntervalMs"
+                ]
+              },
+              "interfaceId": {
+                "type": "string",
+                "description": "Every network interface is associated with a unique ID that must match the interface ID sent by the cloud in the decoder manifest"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["iWaveGpsInterface"]
+              }
+            },
+            "required": ["iWaveGpsInterface", "interfaceId", "type"]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "externalGpsInterface": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "latitudeSignalName": {
+                    "type": "string",
+                    "description": "Name of latitude signal"
+                  },
+                  "longitudeSignalName": {
+                    "type": "string",
+                    "description": "Name of longitude signal"
+                  }
+                },
+                "required": ["latitudeSignalName", "longitudeSignalName"]
+              },
+              "interfaceId": {
+                "type": "string",
+                "description": "Every network interface is associated with a unique ID that must match the interface ID sent by the cloud in the decoder manifest"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["externalGpsInterface"]
+              }
+            },
+            "required": ["externalGpsInterface", "interfaceId", "type"]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "interfaceId": {
+                "type": "string",
+                "description": "Every network interface is associated with a unique ID that must match the interface ID sent by the cloud in the decoder manifest"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["aaosVhalInterface"]
+              }
+            },
+            "required": ["interfaceId", "type"]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "interfaceId": {
+                "type": "string",
+                "description": "Every network interface is associated with a unique ID that must match the interface ID sent by the cloud in the decoder manifest"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["exampleUDSInterface"]
+              },
+              "exampleUDSInterface": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "configs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "targetAddress": {
+                          "type": "string",
+                          "description": "ECU address"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Name of of the target"
+                        },
+                        "can": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "interfaceName": {
+                              "type": "string",
+                              "description": "Can interface name"
+                            },
+                            "functionalAddress": {
+                              "type": "string",
+                              "description": "Functional address for UDS request"
+                            },
+                            "physicalRequestID": {
+                              "type": "string",
+                              "description": "Physical request ID for UDS request"
+                            },
+                            "physicalResponseID": {
+                              "type": "string",
+                              "description": "Physical response ID for UDS response"
+                            }
+                          },
+                          "required": [
+                            "interfaceName",
+                            "functionalAddress",
+                            "physicalRequestID",
+                            "physicalResponseID"
+                          ]
+                        }
+                      },
+                      "required": ["targetAddress", "name", "can"]
+                    }
+                  }
+                },
+                "required": ["configs"]
+              }
+            },
+            "required": ["interfaceId", "type", "exampleUDSInterface"]
           }
         ]
       }
@@ -183,6 +443,10 @@
             "canDecoderThreadIdleTimeMs": {
               "type": "integer",
               "description": "Sleep time for CAN decoder thread if no new data is available (in milliseconds)"
+            },
+            "lastKnownStateThreadIdleTimeMs": {
+              "type": "integer",
+              "description": "Sleep time for last known state inspection engine thread (in milliseconds)"
             }
           },
           "required": [
@@ -234,6 +498,18 @@
             "maximumAwsSdkHeapMemoryBytes": {
               "type": "integer",
               "description": "Set the maximum AWS SDK heap memory bytes. Default to 10000000"
+            },
+            "readyToPublishCommandResponsesBufferSize": {
+              "type": "integer",
+              "description": "Max number of messages in the buffer used for storing ready to publish command responses"
+            },
+            "maxConcurrentCommandRequests": {
+              "type": "integer",
+              "description": "Max number of Command Requests to process concurrently"
+            },
+            "minFetchTriggerIntervalMs": {
+              "type": "integer",
+              "description": "Minimum interval between two fetch requests in milliseconds"
             }
           },
           "required": ["readyToPublishDataBufferSize", "systemWideLogLevel"]
@@ -245,6 +521,10 @@
             "maxPublishMessageCount": {
               "type": "integer",
               "description": "Maximum messages that can be published to the cloud as one payload"
+            },
+            "maxPublishLastKnownStateMessageCount": {
+              "type": "integer",
+              "description": "Maximum Last Known State messages that can be published to the cloud as one payload"
             },
             "collectionSchemeManagementCheckinIntervalMs": {
               "type": "integer",
@@ -266,21 +546,21 @@
               "type": "string",
               "description": "The ID that uniquely identifies this device in the AWS Region"
             },
-            "collectionSchemeListTopic": {
+            "iotFleetWiseTopicPrefix": {
               "type": "string",
-              "description": "Control Plane publishes to this Collection Scheme, vehicle subscribes"
+              "description": "The prefix for AWS IoT FleetWise topics. All topics from other services such as commands, jobs, device shadow will be unaffected by this option. If omitted, it defaults to $aws/iotfleetwise/"
             },
-            "decoderManifestTopic": {
+            "commandsTopicPrefix": {
               "type": "string",
-              "description": "Control Plane publishes to this Decoder Manifest CollectionScheme, vehicle subscribes"
+              "description": "The prefix for AWS IoT Commands topics. If omitted, it defaults to $aws/commands/"
             },
-            "canDataTopic": {
+            "deviceShadowTopicPrefix": {
               "type": "string",
-              "description": "Topic for sending collected data to cloud"
+              "description": "The prefix for AWS IoT Device Shadow topics. If omitted, it defaults to $aws/things/"
             },
-            "checkinTopic": {
+            "jobsTopicPrefix": {
               "type": "string",
-              "description": "Topic for sending checkins to cloud"
+              "description": "The prefix for AWS IoT Jobs topics. If omitted, it defaults to $aws/things/"
             },
             "certificateFilename": {
               "type": "string",
@@ -324,12 +604,6 @@
               "description": "Choose the connection module. Default to iotCore"
             }
           },
-          "required": [
-            "collectionSchemeListTopic",
-            "decoderManifestTopic",
-            "canDataTopic",
-            "checkinTopic"
-          ],
           "anyOf": [
             {
               "properties": {

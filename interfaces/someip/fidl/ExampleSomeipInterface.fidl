@@ -1,0 +1,120 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package commonapi
+
+interface ExampleSomeipInterface {
+    version { major 1 minor 0 }
+
+    attribute Int32 x
+    attribute CommonTypes.a1Struct a1
+
+    method setInt32 {
+        in {
+            Int32 value
+        }
+    }
+
+    method getInt32 {
+        out {
+            Int32 value
+        }
+    }
+
+    method setInt64 {
+        in {
+            Int64 value
+        }
+    }
+
+    method getInt64 {
+        out {
+            Int64 value
+        }
+    }
+
+    method setBoolean {
+        in {
+            Boolean value
+        }
+    }
+
+    method getBoolean {
+        out {
+            Boolean value
+        }
+    }
+
+    method setFloat {
+        in {
+            Float value
+        }
+    }
+
+    method getFloat {
+        out {
+            Float value
+        }
+    }
+
+    method setDouble {
+        in {
+            Double value
+        }
+    }
+
+    method getDouble {
+        out {
+            Double value
+        }
+    }
+
+    method setString {
+        in {
+            String value
+        }
+    }
+
+    method getString {
+        out {
+            String value
+        }
+    }
+
+    method setInt32LongRunning {
+        in {
+            String commandId
+            Int32 value
+        }
+    }
+
+    method getInt32LongRunning {
+        out {
+            Int32 value
+        }
+    }
+
+    broadcast notifyLRCStatus {
+        out {
+            String commandID
+            Int32 commandStatus
+            Int32 commandReasonCode
+            String commandReasonDescription
+        }
+    }
+}
+
+typeCollection CommonTypes {
+    version { major 1 minor 0 }
+
+    struct a1Struct {
+        String s
+        a2Struct a2
+    }
+
+    struct a2Struct {
+        Int32 a
+        Boolean b
+        Double d
+    }
+}

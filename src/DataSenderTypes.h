@@ -25,6 +25,12 @@ enum class SenderDataType
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     VISION_SYSTEM = 1,
 #endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    COMMAND_RESPONSE = 2,
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    LAST_KNOWN_STATE = 3,
+#endif
 };
 
 /**
@@ -96,6 +102,14 @@ senderDataTypeToString( SenderDataType dataType )
     case SenderDataType::VISION_SYSTEM:
         return "VisionSystem";
 #endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    case SenderDataType::COMMAND_RESPONSE:
+        return "CommandResponse";
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    case SenderDataType::LAST_KNOWN_STATE:
+        return "LastKnownState";
+#endif
     default:
         return "";
     }
@@ -123,6 +137,20 @@ stringToSenderDataType( const std::string &dataType, SenderDataType &output )
     else if ( dataType == "VisionSystem" )
     {
         output = SenderDataType::VISION_SYSTEM;
+        return true;
+    }
+#endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    else if ( dataType == "CommandResponse" )
+    {
+        output = SenderDataType::COMMAND_RESPONSE;
+        return true;
+    }
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    else if ( dataType == "LastKnownState" )
+    {
+        output = SenderDataType::LAST_KNOWN_STATE;
         return true;
     }
 #endif

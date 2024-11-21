@@ -12,6 +12,7 @@
 #include "IReceiver.h"
 #include "MqttClientWrapper.h"
 #include "MqttClientWrapperMock.h"
+#include "TopicConfig.h"
 #include "WaitUntil.h"
 #include <array>
 #include <atomic>
@@ -136,8 +137,11 @@ protected:
         ON_CALL( *mMqttClientBuilderWrapperMock, WithCertificateAuthority( _ ) )
             .WillByDefault( ReturnRef( *mMqttClientBuilderWrapperMock ) );
 
-        mConnectivityModule =
-            std::make_shared<AwsIotConnectivityModule>( "", "clientIdTest", mMqttClientBuilderWrapperMock );
+        TopicConfigArgs topicConfigArgs;
+        mTopicConfig = std::make_unique<TopicConfig>( "thing-name", topicConfigArgs );
+
+        mConnectivityModule = std::make_shared<AwsIotConnectivityModule>(
+            "", "clientIdTest", mMqttClientBuilderWrapperMock, *mTopicConfig );
     }
 
     void
@@ -155,7 +159,7 @@ protected:
             auto publishPacket =
                 std::make_shared<Aws::Crt::Mqtt5::PublishPacket>( topic.c_str(),
                                                                   Aws::Crt::ByteCursorFromCString( data.c_str() ),
-                                                                  Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE );
+                                                                  Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_LEAST_ONCE );
             eventData.publishPacket = publishPacket;
             mMqttClientBuilderWrapperMock->mOnPublishReceivedHandlerCallback( eventData );
         }
@@ -164,6 +168,7 @@ protected:
     std::shared_ptr<StrictMock<MqttClientWrapperMock>> mMqttClientWrapperMock;
     std::shared_ptr<MqttClientWrapper> mMqttClientWrapper;
     std::shared_ptr<StrictMock<MqttClientBuilderWrapperMock>> mMqttClientBuilderWrapperMock;
+    std::unique_ptr<TopicConfig> mTopicConfig;
     std::shared_ptr<AwsIotConnectivityModule> mConnectivityModule;
     std::shared_ptr<Aws::Crt::Mqtt5::ConnectPacket> mConnectPacket;
     aws_mqtt5_negotiated_settings mNegotiatedSettings;
@@ -212,14 +217,16 @@ protected:
 
 TEST_F( AwsIotConnectivityModuleTest, failToConnectWhenBuilderIsInvalid )
 {
-    mConnectivityModule = std::make_shared<AwsIotConnectivityModule>( "fakeRootCA", "clientIdTest", nullptr );
+    mConnectivityModule =
+        std::make_shared<AwsIotConnectivityModule>( "fakeRootCA", "clientIdTest", nullptr, *mTopicConfig );
     ASSERT_FALSE( mConnectivityModule->connect() );
 }
 
 /** @brief  Test attempting to disconnect when connection has already failed */
 TEST_F( AwsIotConnectivityModuleTest, disconnectAfterFailedConnect )
 {
-    mConnectivityModule = std::make_shared<AwsIotConnectivityModule>( "", "", mMqttClientBuilderWrapperMock );
+    mConnectivityModule =
+        std::make_shared<AwsIotConnectivityModule>( "", "", mMqttClientBuilderWrapperMock, *mTopicConfig );
     ASSERT_FALSE( mConnectivityModule->connect() );
     // disconnect must only disconnect when connection is available so this should not seg fault
     mConnectivityModule->disconnect();
@@ -249,8 +256,8 @@ TEST_F( AwsIotConnectivityModuleTest, connectSuccessfully )
 /** @brief Test successful connection with root CA */
 TEST_F( AwsIotConnectivityModuleTest, connectSuccessfullyWithRootCA )
 {
-    mConnectivityModule =
-        std::make_shared<AwsIotConnectivityModule>( "fakeRootCA", "clientIdTest", mMqttClientBuilderWrapperMock );
+    mConnectivityModule = std::make_shared<AwsIotConnectivityModule>(
+        "fakeRootCA", "clientIdTest", mMqttClientBuilderWrapperMock, *mTopicConfig );
 
     EXPECT_CALL( *mMqttClientBuilderWrapperMock, WithClientExtendedValidationAndFlowControl( _ ) ).Times( 1 );
     EXPECT_CALL( *mMqttClientBuilderWrapperMock, WithConnectOptions( _ ) ).Times( 1 );
@@ -274,7 +281,7 @@ TEST_F( AwsIotConnectivityModuleTest, connectSuccessfullyWithOverridenConnection
     mqttConnectionConfig.pingTimeoutMs = 17;
 
     mConnectivityModule = std::make_shared<AwsIotConnectivityModule>(
-        "", "clientIdTest", mMqttClientBuilderWrapperMock, mqttConnectionConfig );
+        "", "clientIdTest", mMqttClientBuilderWrapperMock, *mTopicConfig, mqttConnectionConfig );
 
     EXPECT_CALL( *mMqttClientBuilderWrapperMock, WithClientExtendedValidationAndFlowControl( _ ) ).Times( 1 );
     EXPECT_CALL( *mMqttClientBuilderWrapperMock, WithConnectOptions( _ ) ).Times( 1 );
@@ -298,7 +305,7 @@ TEST_F( AwsIotConnectivityModuleTest, connectSuccessfullyWithPersistentSession )
     mqttConnectionConfig.sessionExpiryIntervalSeconds = 7890;
 
     mConnectivityModule = std::make_shared<AwsIotConnectivityModule>(
-        "", "clientIdTest", mMqttClientBuilderWrapperMock, mqttConnectionConfig );
+        "", "clientIdTest", mMqttClientBuilderWrapperMock, *mTopicConfig, mqttConnectionConfig );
 
     EXPECT_CALL( *mMqttClientBuilderWrapperMock, WithClientExtendedValidationAndFlowControl( _ ) ).Times( 1 );
     EXPECT_CALL( *mMqttClientBuilderWrapperMock, WithConnectOptions( _ ) ).Times( 1 );
@@ -733,7 +740,7 @@ TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, receiveMessageFro
     std::string data1 = "data1";
     Aws::Crt::Mqtt5::PublishReceivedEventData eventData;
     auto publishPacket = std::make_shared<Aws::Crt::Mqtt5::PublishPacket>(
-        "topic1", Aws::Crt::ByteCursorFromCString( data1.c_str() ), Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE );
+        "topic1", Aws::Crt::ByteCursorFromCString( data1.c_str() ), Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_LEAST_ONCE );
     eventData.publishPacket = publishPacket;
     mMqttClientBuilderWrapperMock->mOnPublishReceivedHandlerCallback( eventData );
     // This situation shouldn't normally happen as we won't receive messages from a topic that we
@@ -787,51 +794,47 @@ TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, subscribeSuccessf
 /** @brief Test without a configured topic, expect an error */
 TEST_F( AwsIotConnectivityModuleTest, sendWithoutTopic )
 {
-    AwsIotSender sender(
-        mConnectivityModule.get(), mMqttClientWrapper, "", Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE );
+    AwsIotSender sender( mConnectivityModule.get(), mMqttClientWrapper, *mTopicConfig );
 
     std::uint8_t input[] = { 0xca, 0xfe };
     MockFunction<void( ConnectivityError result )> resultCallback;
     EXPECT_CALL( resultCallback, Call( ConnectivityError::NotConfigured ) ).Times( 1 );
-    sender.sendBuffer( input, sizeof( input ), resultCallback.AsStdFunction() );
+    sender.sendBuffer( "", input, sizeof( input ), resultCallback.AsStdFunction() );
     sender.invalidateConnection();
 }
 
 /** @brief Test sending without a connection, expect an error */
 TEST_F( AwsIotConnectivityModuleTest, sendWithoutConnection )
 {
-    AwsIotSender sender(
-        mConnectivityModule.get(), mMqttClientWrapper, "topic", Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE );
+    AwsIotSender sender( mConnectivityModule.get(), mMqttClientWrapper, *mTopicConfig );
     MockFunction<void( ConnectivityError result )> resultCallback;
     EXPECT_CALL( resultCallback, Call( ConnectivityError::NoConnection ) ).Times( 1 );
     std::uint8_t input[] = { 0xca, 0xfe };
-    sender.sendBuffer( input, sizeof( input ), resultCallback.AsStdFunction() );
+    sender.sendBuffer( "topic", input, sizeof( input ), resultCallback.AsStdFunction() );
     sender.invalidateConnection();
 }
 
 /** @brief Test passing a null pointer, expect an error */
 TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, sendWrongInput )
 {
-    AwsIotSender sender(
-        mConnectivityModule.get(), mMqttClientWrapper, "topic", Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE );
+    AwsIotSender sender( mConnectivityModule.get(), mMqttClientWrapper, *mTopicConfig );
 
     MockFunction<void( ConnectivityError result )> resultCallback;
     EXPECT_CALL( resultCallback, Call( ConnectivityError::WrongInputData ) ).Times( 1 );
-    sender.sendBuffer( nullptr, 10, resultCallback.AsStdFunction() );
+    sender.sendBuffer( "topic", nullptr, 10, resultCallback.AsStdFunction() );
     sender.invalidateConnection();
 }
 
 /** @brief Test sending a message larger then the maximum send size, expect an error */
 TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, sendTooBig )
 {
-    AwsIotSender sender(
-        mConnectivityModule.get(), mMqttClientWrapper, "topic", Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE );
+    AwsIotSender sender( mConnectivityModule.get(), mMqttClientWrapper, *mTopicConfig );
 
     MockFunction<void( ConnectivityError result )> resultCallback;
     EXPECT_CALL( resultCallback, Call( ConnectivityError::WrongInputData ) ).Times( 1 );
     std::vector<uint8_t> a;
     a.resize( sender.getMaxSendSize() + 1U );
-    sender.sendBuffer( a.data(), a.size(), resultCallback.AsStdFunction() );
+    sender.sendBuffer( "topic", a.data(), a.size(), resultCallback.AsStdFunction() );
     sender.invalidateConnection();
 }
 
@@ -840,8 +843,7 @@ TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, sendTooBig )
  * messages as failed to send to check that path. */
 TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, sendMultiple )
 {
-    AwsIotSender sender(
-        mConnectivityModule.get(), mMqttClientWrapper, "topic", Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE );
+    AwsIotSender sender( mConnectivityModule.get(), mMqttClientWrapper, *mTopicConfig );
 
     std::uint8_t input[] = { 0xca, 0xfe };
     std::list<Aws::Crt::Mqtt5::OnPublishCompletionHandler> completeHandlers;
@@ -857,9 +859,9 @@ TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, sendMultiple )
 
     // Queue 2 packets
     MockFunction<void( ConnectivityError result )> resultCallback1;
-    sender.sendBuffer( input, sizeof( input ), resultCallback1.AsStdFunction() );
+    sender.sendBuffer( "topic", input, sizeof( input ), resultCallback1.AsStdFunction() );
     MockFunction<void( ConnectivityError result )> resultCallback2;
-    sender.sendBuffer( input, sizeof( input ), resultCallback2.AsStdFunction() );
+    sender.sendBuffer( "topic", input, sizeof( input ), resultCallback2.AsStdFunction() );
 
     // Confirm 1st
     EXPECT_CALL( resultCallback1, Call( ConnectivityError::Success ) ).Times( 1 );
@@ -868,7 +870,7 @@ TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, sendMultiple )
 
     // Queue another:
     MockFunction<void( ConnectivityError result )> resultCallback3;
-    sender.sendBuffer( input, sizeof( input ), resultCallback3.AsStdFunction() );
+    sender.sendBuffer( "topic", input, sizeof( input ), resultCallback3.AsStdFunction() );
 
     // Confirm 2nd
     EXPECT_CALL( resultCallback2, Call( ConnectivityError::Success ) ).Times( 1 );
@@ -889,8 +891,7 @@ TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, sdkRAMExceeded )
 {
     auto &memMgr = AwsSDKMemoryManager::getInstance();
 
-    AwsIotSender sender(
-        mConnectivityModule.get(), mMqttClientWrapper, "topic", Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE );
+    AwsIotSender sender( mConnectivityModule.get(), mMqttClientWrapper, *mTopicConfig );
 
     std::array<std::uint8_t, 2> input = { 0xCA, 0xFE };
     const auto required = input.size() * sizeof( std::uint8_t );
@@ -900,7 +901,8 @@ TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, sdkRAMExceeded )
 
         MockFunction<void( ConnectivityError result )> resultCallback1;
         EXPECT_CALL( resultCallback1, Call( ConnectivityError::QuotaReached ) ).Times( 1 );
-        sender.sendBuffer( input.data(), input.size() * sizeof( std::uint8_t ), resultCallback1.AsStdFunction() );
+        sender.sendBuffer(
+            "topic", input.data(), input.size() * sizeof( std::uint8_t ), resultCallback1.AsStdFunction() );
         ASSERT_EQ( memMgr.releaseReservedMemory( reservedMemory ), 0 );
     }
     {
@@ -921,7 +923,7 @@ TEST_F( AwsIotConnectivityModuleTestAfterSuccessfulConnection, sdkRAMExceeded )
                 } ) );
 
         MockFunction<void( ConnectivityError result )> resultCallback3;
-        sender.sendBuffer( input.data(), sizeof( input ), resultCallback3.AsStdFunction() );
+        sender.sendBuffer( "topic", input.data(), sizeof( input ), resultCallback3.AsStdFunction() );
 
         // // Confirm 1st
         EXPECT_CALL( resultCallback3, Call( ConnectivityError::Success ) ).Times( 1 );

@@ -115,15 +115,34 @@ Resources:
           Fn::Base64: !Sub
             - |
               #!/bin/bash
-              set -euo pipefail
+              set -xeuo pipefail
 
               # Disable unattended upgrades
               systemctl stop unattended-upgrades
               systemctl disable unattended-upgrades
 
+              # Wait for any existing package install to finish
+              i=0
+              while true; do
+                if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
+                  i=0
+                else
+                  i=`expr $i + 1`
+                  if expr $i \>= 10 > /dev/null; then
+                    break
+                  fi
+                fi
+                sleep 1
+              done
+
+              print_process_list() {
+                ps aux # Print processes on error in case apt lock was still taken
+              }
+              trap print_process_list ERR
+
               # Upgrade system and reboot if required
-              apt update -o DPkg::Lock::Timeout=120
-              apt upgrade -y -o DPkg::Lock::Timeout=120
+              apt update
+              apt upgrade -y
               if [ -f /var/run/reboot-required ]; then
                 # Delete the UserData info file so that we run again after reboot
                 rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
@@ -132,8 +151,8 @@ Resources:
               fi
 
               # Install helper scripts:
-              apt update -o DPkg::Lock::Timeout=120
-              apt install -y -o DPkg::Lock::Timeout=120 python3-setuptools
+              apt update
+              apt install -y python3-setuptools
               mkdir -p /opt/aws/bin
               wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
               python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
@@ -141,13 +160,14 @@ Resources:
 
               # On error, signal back to cfn:
               error_handler() {
+                print_process_list
                 /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
               }
               trap error_handler ERR
 
               # Install packages
-              apt update -o DPkg::Lock::Timeout=120
-              apt install -y -o DPkg::Lock::Timeout=120 ec2-instance-connect htop jq unzip zip
+              apt update
+              apt install -y ec2-instance-connect htop jq unzip zip
 
               # Install AWS CLI:
               curl "https://awscli.amazonaws.com/awscli-exe-linux-${Arch}.zip" -o "awscliv2.zip"
@@ -158,9 +178,6 @@ Resources:
               # Signal init complete:
               /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
 
-              # Re-enable unattended upgrades
-              systemctl enable unattended-upgrades
-              systemctl start unattended-upgrades
             - Arch: !FindInMap [InstanceArchMap, !Ref Ec2InstanceType, Arch]
   Ec2Instance:
     Type: AWS::EC2::Instance

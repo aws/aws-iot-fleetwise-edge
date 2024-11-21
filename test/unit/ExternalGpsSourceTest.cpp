@@ -4,7 +4,8 @@
 #include "ExternalGpsSource.h"
 #include "CollectionInspectionAPITypes.h"
 #include "IDecoderDictionary.h"
-#include "MessageTypes.h"
+#include "IDecoderManifest.h"
+#include "NamedSignalDataSource.h"
 #include "QueueTypes.h"
 #include "SignalTypes.h"
 #include "VehicleDataSourceTypes.h"
@@ -12,7 +13,6 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <unordered_map>
-#include <vector>
 
 namespace Aws
 {
@@ -22,24 +22,24 @@ namespace IoTFleetWise
 class ExternalGpsSourceTest : public ::testing::Test
 {
 protected:
+    ExternalGpsSourceTest()
+        : mSignalBuffer( std::make_shared<SignalBuffer>( 2, "Signal Buffer" ) )
+        , mSignalBufferDistributor( std::make_shared<SignalBufferDistributor>() )
+        , mNamedSignalDataSource( std::make_shared<NamedSignalDataSource>( "5", mSignalBufferDistributor ) )
+        , mExternalGpsSource( std::make_shared<ExternalGpsSource>(
+              mNamedSignalDataSource, "Vehicle.CurrentLocation.Latitude", "Vehicle.CurrentLocation.Longitude" ) )
+        , mDictionary( std::make_shared<CustomDecoderDictionary>() )
+    {
+        mSignalBufferDistributor->registerQueue( mSignalBuffer );
+    }
+
     void
     SetUp() override
     {
-        std::unordered_map<CANRawFrameID, CANMessageDecoderMethod> frameMap;
-        CANMessageDecoderMethod decoderMethod;
-        decoderMethod.collectType = CANMessageCollectType::DECODE;
-        decoderMethod.format.mMessageID = 12345;
-        CANSignalFormat sig1;
-        CANSignalFormat sig2;
-        sig1.mFirstBitPosition = 0;
-        sig1.mSignalID = 0x1234;
-        sig2.mFirstBitPosition = 32;
-        sig2.mSignalID = 0x5678;
-        decoderMethod.format.mSignals.push_back( sig1 );
-        decoderMethod.format.mSignals.push_back( sig2 );
-        frameMap[1] = decoderMethod;
-        mDictionary = std::make_shared<CANDecoderDictionary>();
-        mDictionary->canMessageDecoderMethod[1] = frameMap;
+        mDictionary->customDecoderMethod["5"]["Vehicle.CurrentLocation.Latitude"] =
+            CustomSignalDecoderFormat{ "5", "Vehicle.CurrentLocation.Latitude", 0x1234, SignalType::DOUBLE };
+        mDictionary->customDecoderMethod["5"]["Vehicle.CurrentLocation.Longitude"] =
+            CustomSignalDecoderFormat{ "5", "Vehicle.CurrentLocation.Longitude", 0x5678, SignalType::DOUBLE };
     }
 
     void
@@ -47,28 +47,25 @@ protected:
     {
     }
 
-    std::shared_ptr<CANDecoderDictionary> mDictionary;
+    std::shared_ptr<SignalBuffer> mSignalBuffer;
+    SignalBufferDistributorPtr mSignalBufferDistributor;
+    std::shared_ptr<NamedSignalDataSource> mNamedSignalDataSource;
+    std::shared_ptr<ExternalGpsSource> mExternalGpsSource;
+    std::shared_ptr<CustomDecoderDictionary> mDictionary;
 };
 
 // Test if valid gps data
 TEST_F( ExternalGpsSourceTest, testDecoding ) // NOLINT
 {
-    auto signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
-    ExternalGpsSource gpsSource( signalBufferDistributor );
-    ASSERT_FALSE( gpsSource.init( INVALID_CAN_SOURCE_NUMERIC_ID, 1, 0, 32 ) );
-    ASSERT_TRUE( gpsSource.init( 1, 1, 0, 32 ) );
-    gpsSource.start();
-    gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
+    mNamedSignalDataSource->onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::CUSTOM_DECODING );
 
     CollectedDataFrame collectedDataFrame;
-    DELAY_ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
+    DELAY_ASSERT_FALSE( mSignalBuffer->pop( collectedDataFrame ) );
 
-    gpsSource.setLocation( 360, 360 ); // Invalid
-    gpsSource.setLocation( 52.5761, 12.5761 );
+    mExternalGpsSource->setLocation( 360, 360 ); // Invalid
+    mExternalGpsSource->setLocation( 52.5761, 12.5761 );
 
-    WAIT_ASSERT_TRUE( signalBuffer->pop( collectedDataFrame ) );
+    WAIT_ASSERT_TRUE( mSignalBuffer->pop( collectedDataFrame ) );
 
     auto firstSignal = collectedDataFrame.mCollectedSignals[0];
     auto secondSignal = collectedDataFrame.mCollectedSignals[1];
@@ -77,38 +74,24 @@ TEST_F( ExternalGpsSourceTest, testDecoding ) // NOLINT
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );
     ASSERT_NEAR( secondSignal.value.value.doubleVal, 12.5761, 0.0001 );
-
-    ASSERT_TRUE( gpsSource.init( 1, 1, 123, 456 ) ); // Invalid start bits
-    gpsSource.setLocation( 52.5761, 12.5761 );
-    DELAY_ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
-
-    ASSERT_TRUE( gpsSource.stop() );
 }
 
 // Test longitude west
 TEST_F( ExternalGpsSourceTest, testWestNegativeLongitude ) // NOLINT
 {
-    SignalBufferPtr signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
-    ExternalGpsSource gpsSource( signalBufferDistributor );
-    gpsSource.init( 1, 1, 0, 32 );
-    gpsSource.start();
     CollectedDataFrame collectedDataFrame;
-    DELAY_ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
-    gpsSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
-    DELAY_ASSERT_FALSE( signalBuffer->pop( collectedDataFrame ) );
-    gpsSource.setLocation( 52.5761, -12.5761 );
+    DELAY_ASSERT_FALSE( mSignalBuffer->pop( collectedDataFrame ) );
+    mNamedSignalDataSource->onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::CUSTOM_DECODING );
+    DELAY_ASSERT_FALSE( mSignalBuffer->pop( collectedDataFrame ) );
+    mExternalGpsSource->setLocation( 52.5761, -12.5761 );
 
-    WAIT_ASSERT_TRUE( signalBuffer->pop( collectedDataFrame ) );
+    WAIT_ASSERT_TRUE( mSignalBuffer->pop( collectedDataFrame ) );
     auto firstSignal = collectedDataFrame.mCollectedSignals[0];
     auto secondSignal = collectedDataFrame.mCollectedSignals[1];
     ASSERT_EQ( firstSignal.signalID, 0x1234 );
     ASSERT_EQ( secondSignal.signalID, 0x5678 );
     ASSERT_NEAR( firstSignal.value.value.doubleVal, 52.5761, 0.0001 );
     ASSERT_NEAR( secondSignal.value.value.doubleVal, -12.5761, 0.0001 ); // negative number
-
-    ASSERT_TRUE( gpsSource.stop() );
 }
 
 } // namespace IoTFleetWise

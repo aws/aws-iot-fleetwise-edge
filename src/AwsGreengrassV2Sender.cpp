@@ -11,7 +11,6 @@
 #include <chrono>
 #include <functional>
 #include <future>
-#include <utility>
 
 namespace Aws
 {
@@ -21,12 +20,10 @@ namespace IoTFleetWise
 AwsGreengrassV2Sender::AwsGreengrassV2Sender(
     IConnectivityModule *connectivityModule,
     std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &greengrassClient,
-    std::string topicName,
-    Aws::Greengrass::QOS publishQoS )
+    const TopicConfig &topicConfig )
     : mConnectivityModule( connectivityModule )
     , mGreengrassClient( greengrassClient )
-    , mPublishQoS( publishQoS )
-    , mTopicName( std::move( topicName ) )
+    , mTopicConfig( topicConfig )
 {
 }
 
@@ -54,16 +51,8 @@ AwsGreengrassV2Sender::getMaxSendSize() const
 }
 
 void
-AwsGreengrassV2Sender::sendBuffer( const std::uint8_t *buf, size_t size, OnDataSentCallback callback )
-{
-    sendBufferToTopic( mTopicName, buf, size, callback );
-}
-
-void
-AwsGreengrassV2Sender::sendBufferToTopic( const std::string &topic,
-                                          const uint8_t *buf,
-                                          size_t size,
-                                          OnDataSentCallback callback )
+AwsGreengrassV2Sender::sendBuffer(
+    const std::string &topic, const uint8_t *buf, size_t size, OnDataSentCallback callback, QoS qos )
 {
     std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
     if ( topic.empty() )
@@ -109,12 +98,24 @@ AwsGreengrassV2Sender::sendBufferToTopic( const std::string &topic,
         callback( ConnectivityError::NoConnection );
         return;
     }
+
+    auto greengrassPublishQoS = Aws::Greengrass::QOS_AT_MOST_ONCE;
+    switch ( qos )
+    {
+    case QoS::AT_MOST_ONCE:
+        greengrassPublishQoS = Aws::Greengrass::QOS_AT_MOST_ONCE;
+        break;
+    case QoS::AT_LEAST_ONCE:
+        greengrassPublishQoS = Aws::Greengrass::QOS_AT_LEAST_ONCE;
+        break;
+    }
+
     auto publishOperation = mGreengrassClient->NewPublishToIoTCore();
     Aws::Greengrass::PublishToIoTCoreRequest publishRequest;
     publishRequest.SetTopicName( topic.c_str() != nullptr ? topic.c_str() : "" );
     Aws::Crt::Vector<uint8_t> payload( buf, buf + size );
     publishRequest.SetPayload( payload );
-    publishRequest.SetQos( mPublishQoS );
+    publishRequest.SetQos( greengrassPublishQoS );
 
     FWE_LOG_TRACE( "Attempting to publish to " + topic + " topic" );
     auto onMessageFlushCallback = [callback, topicName = topic]( int errorCode ) {

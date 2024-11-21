@@ -11,6 +11,18 @@
       },
       "interfaceId": "0",
       "type": "obdInterface"
+    },
+    {
+      "externalGpsInterface": {
+        "latitudeSignalName": "Vehicle.CurrentLocation.Latitude",
+        "longitudeSignalName": "Vehicle.CurrentLocation.Longitude"
+      },
+      "interfaceId": "LOCATION",
+      "type": "externalGpsInterface"
+    },
+    {
+      "interfaceId": "AAOS-VHAL",
+      "type": "aaosVhalInterface"
     }
   ],
   "staticConfig": {
@@ -40,10 +52,6 @@
     "mqttConnection": {
       "endpointUrl": "MQTT_ENDPOINT_GOES_HERE",
       "clientId": "VEHICLE_ID_GOES_HERE",
-      "collectionSchemeListTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/collection_schemes",
-      "decoderManifestTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/decoder_manifests",
-      "canDataTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/signals",
-      "checkinTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/checkins",
       "certificate": "CERTIFICATE_GOES_HERE",
       "privateKey": "PRIVATE_KEY_GOES_HERE",
       "rootCA": "ROOT_CA_GOES_HERE"

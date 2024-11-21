@@ -48,6 +48,23 @@ using SyncID = std::string;
 using SignalID = uint32_t;
 static constexpr SignalID INVALID_SIGNAL_ID = 0;
 
+/**
+ * @brief Fetch Request ID is generated for each fetch configuration provided in collection scheme.
+ * It remains the same through the lifecycle of campaign and is used to identify received signal values
+ * for the specific query.
+ */
+using FetchRequestID = uint8_t;
+static constexpr FetchRequestID DEFAULT_FETCH_REQUEST_ID = 0xFF;
+
+/**
+ * @brief Signal buffer condition ID is a virtual id that is generated on top of condition id and fetch
+ * request id to correctly index signal buffers for the same campaign. If one campaign has multiple
+ * fetch strategies set for the same signal, data collected with these fetches should be stored in the
+ * same signal buffer. This behaviour is insured by SignalBufferConditionID.
+ */
+using SignalBufferConditionID = uint32_t;
+static constexpr SignalBufferConditionID DEFAULT_SIGNAL_BUFFER_CONDITION_ID = 0xFFFFFFFF;
+
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 /**
  * If this MSB is set the SignalID is an internal ID that is only valid while the process is running.
@@ -89,6 +106,7 @@ enum struct SignalType
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     COMPLEX_SIGNAL = 12, // internal type RawData::BufferHandle is defined as uint32
 #endif
+    STRING = 13, // internal type RawData::BufferHandle is defined as uint32
 };
 
 /**
@@ -128,6 +146,8 @@ signalTypeToString( SignalType signalType )
         return "BOOLEAN";
     case SignalType::UNKNOWN:
         return "UNKNOWN";
+    case SignalType::STRING:
+        return "STRING";
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     case SignalType::COMPLEX_SIGNAL:
         return "COMPLEX_SIGNAL";

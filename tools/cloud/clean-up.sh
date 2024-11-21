@@ -4,6 +4,7 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 ENDPOINT_URL=""
 ENDPOINT_URL_OPTION=""
 REGION="us-east-1"
@@ -189,67 +190,10 @@ if [ "${SIGNAL_CATALOG}" != "" ]; then
         || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-signal-catalog"
 fi
 
-# The role might not exist depending on which type of campaign was created, so only try to delete
-# it if it exists.
-echo "Checking if role exists: ${SERVICE_ROLE}"
-if ! GET_ROLE_OUTPUT=$(aws iam get-role --region ${REGION} --role-name ${SERVICE_ROLE} 2>&1); then
-    if ! echo ${GET_ROLE_OUTPUT} | grep -q "NoSuchEntity"; then
-        echo ${GET_ROLE_OUTPUT}
-        FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} get-role"
-    fi
-else
-    echo "Deleting service role and policy..."
-    ATTACHED_POLICIES=$(
-        aws iam list-attached-role-policies \
-            --region ${REGION} \
-            --role-name ${SERVICE_ROLE} --query 'AttachedPolicies[].PolicyArn' --output text
-    )
-    for POLICY_ARN in $ATTACHED_POLICIES; do
-        echo "Detaching policy: $POLICY_ARN from role: $SERVICE_ROLE"
-        aws iam detach-role-policy \
-            --region ${REGION} \
-            --role-name ${SERVICE_ROLE} --policy-arn ${POLICY_ARN} \
-            || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} detach-role-policy"
-
-        MAX_ATTEMPTS=60
-        for i in $(seq 1 $MAX_ATTEMPTS); do
-            echo "Deleting policy ${POLICY_ARN}. This might take a while until detach-role-policy operation propagates"
-            if aws iam delete-policy --region ${REGION} --policy-arn ${POLICY_ARN}; then
-                break
-            elif $i -eq $MAX_ATTEMPTS; then
-                FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-policy"
-            else
-                sleep 1
-            fi
-        done
-    done
-
-    INLINE_POLICIES=$(
-        aws iam list-role-policies \
-            --region ${REGION} \
-            --role-name ${SERVICE_ROLE} --query 'PolicyNames[]' --output text
-    )
-    for POLICY_NAME in $INLINE_POLICIES; do
-        echo "Deleting inline policy: $POLICY_NAME from role: $SERVICE_ROLE"
-        aws iam delete-role-policy \
-            --region ${REGION} \
-            --role-name ${SERVICE_ROLE} --policy-name ${POLICY_NAME} \
-            || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-role-policy"
-    done
-
-
-    MAX_ATTEMPTS=60
-    for i in $(seq 1 $MAX_ATTEMPTS); do
-        echo "Deleting service role ${SERVICE_ROLE}. This may take a while until the policy deletion propagates."
-        if aws iam delete-role --region ${REGION} --role-name ${SERVICE_ROLE}; then
-            break
-        elif $i -eq $MAX_ATTEMPTS; then
-            FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-role"
-        else
-            sleep 1
-        fi
-    done
-fi
+${SCRIPT_DIR}/manage-service-role.sh \
+    --service-role ${SERVICE_ROLE} \
+    --clean-up \
+    || FAILED_CLEAN_UP_STEPS="${FAILED_CLEAN_UP_STEPS} delete-service-role"
 
 if [ "${FAILED_CLEAN_UP_STEPS}" != "" ]; then
     echo "Failed to clean up the following resources: ${FAILED_CLEAN_UP_STEPS}"

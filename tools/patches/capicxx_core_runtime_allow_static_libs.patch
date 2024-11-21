@@ -1,0 +1,26 @@
+From b0194fa7bf389c9fb93224c7848347e95df53ca5 Mon Sep 17 00:00:00 2001
+From: Geoff Phillips <phigeoff@amazon.de>
+Date: Wed, 27 Sep 2023 18:20:24 +0200
+Subject: [PATCH] Allow static libs
+
+- Remove SHARED option from add_library to allow static libs,
+  CMake then respects the standard BUILD_SHARED_LIBS option.
+---
+ CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 11eb544..8c67377 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -131,7 +131,7 @@ link_directories(
+
+ file(GLOB CAPI_SRCS "src/CommonAPI/*.cpp")
+ list(SORT CAPI_SRCS)
+-add_library(CommonAPI SHARED ${CAPI_SRCS})
++add_library(CommonAPI ${CAPI_SRCS})
+ target_link_libraries(CommonAPI PRIVATE ${DL_LIBRARY} ${DLT_LIBRARIES})
+ set_target_properties(CommonAPI PROPERTIES VERSION ${LIBCOMMONAPI_MAJOR_VERSION}.${LIBCOMMONAPI_MINOR_VERSION}.${LIBCOMMONAPI_PATCH_VERSION} SOVERSION ${LIBCOMMONAPI_MAJOR_VERSION}.${LIBCOMMONAPI_MINOR_VERSION}.${LIBCOMMONAPI_PATCH_VERSION} LINKER_LANGUAGE C)
+ target_include_directories(CommonAPI INTERFACE
+--
+2.25.1

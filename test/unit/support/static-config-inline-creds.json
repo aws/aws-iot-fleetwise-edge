@@ -48,20 +48,9 @@
     "mqttConnection": {
       "endpointUrl": "my-endpoint.my-region.amazonaws.com",
       "clientId": "ClientId",
-      "collectionSchemeListTopic": "collection-scheme-list-topic",
-      "decoderManifestTopic": "decoder-manifest-topic",
-      "canDataTopic": "can-data",
-      "checkinTopic": "checkin",
       "certificate": "MY_INLINE_CERTIFICATE",
       "privateKey": "MY_INLINE_PRIVATE_KEY",
       "rootCA": "MY_INLINE_ROOT_CA"
-    },
-    "iWaveGpsExample": {
-      "nmeaFilePath": "/tmp/engineTestIWaveGPSfile.txt",
-      "canChannel": "IWAVE-GPS-CAN",
-      "canFrameId": "1",
-      "longitudeStartBit": "32",
-      "latitudeStartBit": "0"
     }
   }
 }

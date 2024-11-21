@@ -23,6 +23,18 @@
 #include <thread>
 #include <vector>
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+#include "CANInterfaceIDTranslator.h"
+#include "DataSenderProtoWriter.h"
+#include "RateLimiter.h"
+#include "StreamForwarder.h"
+#include "StreamManager.h"
+#include "StreamManagerMock.h"
+#include <condition_variable>
+#include <gmock/gmock.h>
+#include <mutex>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -37,10 +49,25 @@ protected:
     SignalBufferPtr signalBuffer;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     std::shared_ptr<DataSenderQueue> outputCollectedData;
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    std::shared_ptr<Aws::IoTFleetWise::Store::StreamForwarder> streamForwarder;
+    std::shared_ptr<::testing::StrictMock<Testing::StreamManagerMock>> streamManager;
+    std::shared_ptr<RateLimiter> rateLimiter;
+#endif
+
     void
     initAndStartWorker( CollectionInspectionWorkerThread &worker )
     {
-        bool res = worker.init( signalBuffer, outputCollectedData, 1000, nullptr );
+        bool res = worker.init( signalBuffer,
+                                outputCollectedData,
+                                1000,
+                                nullptr
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                                ,
+                                streamForwarder,
+                                streamManager
+#endif
+        );
         ASSERT_TRUE( res );
         ASSERT_TRUE( worker.start() );
     }
@@ -108,6 +135,20 @@ protected:
         signalBuffer.reset( new SignalBuffer( 1000, "Signal Buffer" ) );
         // Init the output buffer
         outputCollectedData = std::make_shared<DataSenderQueue>( 3, "Collected Data" );
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        CANInterfaceIDTranslator canIDTranslator;
+        auto protoWriter = std::make_shared<DataSenderProtoWriter>( canIDTranslator, nullptr );
+        streamManager = std::make_shared<::testing::StrictMock<Testing::StreamManagerMock>>( protoWriter );
+        // by default, forward data to DataSenderQueue
+        EXPECT_CALL( *streamManager, appendToStreams( ::testing::_ ) )
+            .Times( ::testing::AnyNumber() )
+            .WillRepeatedly( ::testing::Return( Store::StreamManager::ReturnCode::STREAM_NOT_FOUND ) );
+
+        rateLimiter = std::make_shared<RateLimiter>();
+        streamForwarder =
+            std::make_shared<Aws::IoTFleetWise::Store::StreamForwarder>( streamManager, nullptr, rateLimiter );
+#endif
     }
 
     void
@@ -453,6 +494,69 @@ TEST_F( CollectionInspectionWorkerThreadTest, StartWithoutInit )
     CollectionInspectionWorkerThread worker( engine );
     worker.onChangeInspectionMatrix( consCollectionSchemes );
 }
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+TEST_F( CollectionInspectionWorkerThreadTest, PutStoreAndForwardDataIntoStream )
+{
+    std::mutex mutex;
+    std::condition_variable appendComplete;
+    bool done = false;
+    EXPECT_CALL( *streamManager, appendToStreams( ::testing::_ ) )
+        .WillOnce( ::testing::Invoke( [&]( const TriggeredCollectionSchemeData & ) -> Store::StreamManager::ReturnCode {
+            std::lock_guard<std::mutex> lock( mutex );
+            done = true;
+            appendComplete.notify_one();
+            return Store::StreamManager::ReturnCode::SUCCESS;
+        } ) );
+
+    CollectionInspectionEngine engine;
+    CollectionInspectionWorkerThread inspectionWorker( engine );
+    initAndStartWorker( inspectionWorker );
+
+    DTCInfo dtcInfo;
+    dtcInfo.mDTCCodes.emplace_back( "P0143" );
+    dtcInfo.mDTCCodes.emplace_back( "C0196" );
+    dtcInfo.mSID = SID::STORED_DTC;
+    dtcInfo.receiveTime = mClock->systemTimeSinceEpochMs();
+    ASSERT_TRUE( dtcInfo.hasItems() );
+    ASSERT_TRUE( signalBuffer->push( CollectedDataFrame( std::make_shared<DTCInfo>( dtcInfo ) ) ) );
+    InspectionMatrixSignalCollectionInfo signal{};
+    signal.signalID = 1234;
+    signal.sampleBufferSize = 50;
+    signal.minimumSampleIntervalMs = 0;
+    signal.fixedWindowPeriod = 77777;
+    signal.isConditionOnlySignal = false;
+    signal.signalType = SignalType::DOUBLE;
+    collectionSchemes->conditions[0].signals.push_back( signal );
+    // Condition contains signals
+    collectionSchemes->conditions[0].isStaticCondition = false;
+    collectionSchemes->conditions[0].condition = getSignalsBiggerCondition( signal.signalID, 1 ).get();
+    collectionSchemes->conditions[0].includeActiveDtcs = false;
+    inspectionWorker.onChangeInspectionMatrix( consCollectionSchemes );
+    Timestamp timestamp = mClock->systemTimeSinceEpochMs();
+
+    // Push the signals so that the condition is met
+    CollectedSignalsGroup collectedSignalsGroup;
+    collectedSignalsGroup.push_back( CollectedSignal( signal.signalID, timestamp, 0.1, SignalType::DOUBLE ) );
+    collectedSignalsGroup.push_back( CollectedSignal( signal.signalID, timestamp, 0.2, SignalType::DOUBLE ) );
+    collectedSignalsGroup.push_back( CollectedSignal( signal.signalID, timestamp, 1.5, SignalType::DOUBLE ) );
+    ASSERT_TRUE( signalBuffer->push( CollectedDataFrame( collectedSignalsGroup ) ) );
+
+    // verify data was appended to stream
+    {
+        std::unique_lock<std::mutex> lock( mutex );
+        EXPECT_TRUE( appendComplete.wait_for( lock, std::chrono::seconds( 2 ), [&done] {
+            return done;
+        } ) );
+    }
+
+    // verify data was not forwarded to the queue
+    std::shared_ptr<const TriggeredCollectionSchemeData> collectedData;
+    ASSERT_FALSE( popCollectedData( collectedData ) );
+
+    inspectionWorker.stop();
+}
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

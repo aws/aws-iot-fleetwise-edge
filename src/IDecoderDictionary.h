@@ -112,5 +112,13 @@ struct ComplexDataDecoderDictionary : DecoderDictionary
 };
 #endif
 
+struct CustomDecoderDictionary : DecoderDictionary
+{
+    CustomDecoderDictionary() = default;
+    using CustomDecoderMethodType =
+        std::unordered_map<InterfaceID, std::unordered_map<CustomSignalDecoder, CustomSignalDecoderFormat>>;
+    CustomDecoderMethodType customDecoderMethod;
+};
+
 } // namespace IoTFleetWise
 } // namespace Aws

@@ -2,122 +2,35 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "IWaveGpsSource.h"
-#include "CollectionInspectionAPITypes.h"
 #include "LoggingModule.h"
-#include "QueueTypes.h"
-#include <boost/filesystem.hpp>
+#include "SignalTypes.h"
+#include "Thread.h"
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
-#include <fstream>
 #include <string>
 #include <unistd.h>
 #include <utility>
+#include <vector>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-// NOLINT below due to C++17 warning of redundant declarations that are required to maintain C++14 compatibility
-constexpr const char *IWaveGpsSource::PATH_TO_NMEA;        // NOLINT
-constexpr const char *IWaveGpsSource::CAN_CHANNEL_NUMBER;  // NOLINT
-constexpr const char *IWaveGpsSource::CAN_RAW_FRAME_ID;    // NOLINT
-constexpr const char *IWaveGpsSource::LATITUDE_START_BIT;  // NOLINT
-constexpr const char *IWaveGpsSource::LONGITUDE_START_BIT; // NOLINT
-const std::string DEFAULT_NMEA_SOURCE = "ttyUSB1";
-const std::string DEFAULT_PATH_TO_NMEA_SOURCE = "/dev/" + DEFAULT_NMEA_SOURCE;
-const std::string SYS_USB_DEVICES_PATH = "/sys/bus/usb/devices";
-const std::string QUECTEL_VENDOR_ID = "2c7c";
-
-std::string
-IWaveGpsSource::getFileContents( const std::string &p )
+IWaveGpsSource::IWaveGpsSource( std::shared_ptr<NamedSignalDataSource> namedSignalDataSource,
+                                std::string pathToNmeaSource,
+                                std::string latitudeSignalName,
+                                std::string longitudeSignalName,
+                                uint32_t pollIntervalMs )
+    : mNamedSignalDataSource( std::move( namedSignalDataSource ) )
+    , mPathToNmeaSource( std::move( pathToNmeaSource ) )
+    , mLatitudeSignalName( std::move( latitudeSignalName ) )
+    , mLongitudeSignalName( std::move( longitudeSignalName ) )
+    , mPollIntervalMs( pollIntervalMs )
 {
-    constexpr auto NUM_CHARS = 1;
-    std::string ret;
-    std::ifstream fs{ p };
-    // False alarm: uninit_use_in_call: Using uninitialized value "fs._M_streambuf_state" when calling "good".
-    // coverity[uninit_use_in_call : SUPPRESS]
-    while ( fs.good() )
-    {
-        auto c = static_cast<char>( fs.get() );
-        ret.append( NUM_CHARS, c );
-    }
-
-    return ret;
-}
-
-bool
-IWaveGpsSource::detectQuectelDevice()
-{
-    if ( !boost::filesystem::exists( DEFAULT_PATH_TO_NMEA_SOURCE ) )
-    {
-        return false;
-    }
-    for ( boost::filesystem::directory_iterator it( SYS_USB_DEVICES_PATH );
-          it != boost::filesystem::directory_iterator();
-          ++it )
-    {
-        if ( ( !boost::filesystem::is_directory( *it ) ) ||
-             ( !boost::filesystem::exists( it->path().string() + "/uevent" ) ) ||
-             ( !boost::filesystem::exists( it->path().string() + "/" + DEFAULT_NMEA_SOURCE ) ) )
-        {
-            continue;
-        }
-        auto result = getFileContents( it->path().string() + "/uevent" );
-        if ( result.find( QUECTEL_VENDOR_ID ) != std::string::npos )
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-IWaveGpsSource::IWaveGpsSource( SignalBufferDistributorPtr signalBufferDistributor )
-    : mSignalBufferDistributor{ std::move( signalBufferDistributor ) }
-{
-}
-
-bool
-IWaveGpsSource::init( const std::string &pathToNmeaSource,
-                      CANChannelNumericID canChannel,
-                      CANRawFrameID canRawFrameId,
-                      uint16_t latitudeStartBit,
-                      uint16_t longitudeStartBit )
-{
-    if ( canChannel == INVALID_CAN_SOURCE_NUMERIC_ID )
-    {
-        FWE_LOG_ERROR( "Invalid CAN channel" );
-        return false;
-    }
-    // If no configuration was provided, auto-detect the GPS presence for backwards compatibility
-    if ( pathToNmeaSource.empty() )
-    {
-        if ( !detectQuectelDevice() )
-        {
-            FWE_LOG_TRACE( "No Quectel device detected" );
-            return false;
-        }
-        FWE_LOG_INFO( "Quectel device detected at " + DEFAULT_PATH_TO_NMEA_SOURCE );
-        mPathToNmeaSource = DEFAULT_PATH_TO_NMEA_SOURCE;
-    }
-    else
-    {
-        mPathToNmeaSource = pathToNmeaSource;
-    }
-    mLatitudeStartBit = latitudeStartBit;
-    mLongitudeStartBit = longitudeStartBit;
-    mCanChannel = canChannel;
-    mCanRawFrameId = canRawFrameId;
-    setFilter( mCanChannel, mCanRawFrameId );
-    mCyclicLoggingTimer.reset();
-    return true;
-}
-const char *
-IWaveGpsSource::getThreadName()
-{
-    return "IWaveGpsSource";
 }
 
 void
@@ -160,20 +73,18 @@ IWaveGpsSource::pollData()
         i++;
     }
 
-    // If values were found pass them on as Signals similar to CAN Signals
-    if ( foundValid && mSignalBufferDistributor != nullptr )
+    if ( foundValid )
     {
         mValidCoordinateCounter++;
-        auto timestamp = mClock->systemTimeSinceEpochMs();
 
-        CollectedSignalsGroup collectedSignalsGroup;
-        collectedSignalsGroup.push_back( CollectedSignal(
-            getSignalIdFromStartBit( mLatitudeStartBit ), timestamp, lastValidLatitude, SignalType::DOUBLE ) );
-        collectedSignalsGroup.push_back( CollectedSignal(
-            getSignalIdFromStartBit( mLongitudeStartBit ), timestamp, lastValidLongitude, SignalType::DOUBLE ) );
-
-        mSignalBufferDistributor->push( CollectedDataFrame( collectedSignalsGroup ) );
+        std::vector<std::pair<std::string, DecodedSignalValue>> values;
+        values.emplace_back(
+            std::make_pair( mLatitudeSignalName, DecodedSignalValue( lastValidLatitude, SignalType::DOUBLE ) ) );
+        values.emplace_back(
+            std::make_pair( mLongitudeSignalName, DecodedSignalValue( lastValidLongitude, SignalType::DOUBLE ) ) );
+        mNamedSignalDataSource->ingestMultipleSignalValues( 0, values );
     }
+
     if ( mCyclicLoggingTimer.getElapsedMs().count() > CYCLIC_LOG_PERIOD_MS )
     {
         FWE_LOG_TRACE( "In the last " + std::to_string( CYCLIC_LOG_PERIOD_MS ) + " millisecond found " +
@@ -268,24 +179,44 @@ IWaveGpsSource::extractLongAndLatitudeFromLine(
 bool
 IWaveGpsSource::connect()
 {
+    if ( mPollIntervalMs == 0 )
+    {
+        FWE_LOG_ERROR( "Zero poll interval time" );
+        return false;
+    }
+
     mFileHandle = open( mPathToNmeaSource.c_str(), O_RDONLY | O_NOCTTY );
     if ( mFileHandle == -1 )
     {
         FWE_LOG_ERROR( "Could not open GPS NMEA file:" + mPathToNmeaSource );
         return false;
     }
+
+    mThread = std::thread( [this]() {
+        Thread::setCurrentThreadName( "IWaveGpsSource" );
+        while ( !mShouldStop )
+        {
+            pollData();
+            std::this_thread::sleep_for( std::chrono::milliseconds( mPollIntervalMs ) );
+        }
+    } );
     return true;
 }
 
-bool
-IWaveGpsSource::disconnect()
+IWaveGpsSource::~IWaveGpsSource()
 {
+    if ( mThread.joinable() )
+    {
+        mShouldStop = true;
+        mThread.join();
+    }
     if ( close( mFileHandle ) != 0 )
     {
-        return false;
+        FWE_LOG_ERROR( "Could not close NMEA file" );
     }
     mFileHandle = -1;
-    return true;
+    // coverity[cert_err50_cpp_violation] false positive - join is called to exit the previous thread
+    // coverity[autosar_cpp14_a15_5_2_violation] false positive - join is called to exit the previous thread
 }
 
 } // namespace IoTFleetWise

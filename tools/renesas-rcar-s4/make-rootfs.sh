@@ -46,7 +46,7 @@ if [[ $# < 2 ]]; then
     echo "    SD card option(optional) For S4 Spider:"
     echo "        -sd: use sdcard instead of eMMC."
     echo "Required package:"
-    echo "    sudo apt install -o DPkg::Lock::Timeout=120 debootstrap qemu-user-static binfmt-support gcc-aarch64-linux-gnu"
+    echo "    sudo apt install debootstrap qemu-user-static binfmt-support gcc-aarch64-linux-gnu"
     echo "    # Also required the software which is needed to build linux kernel."
     echo "memo:"
     echo "    debootstrap is not needed, but dependencies are required."
@@ -73,7 +73,7 @@ fi
 if [[ "`update-binfmts --display | grep aarch64`" == "" ]]; then
     echo "qemu may not be installed."
     echo "Please install it by following command:"
-    echo "    sudo apt install -o DPkg::Lock::Timeout=120 qemu-user-static"
+    echo "    sudo apt install qemu-user-static"
     exit
 fi
 if [[ "`update-binfmts --display | grep aarch64 | grep enable`" == "" ]]; then
@@ -178,12 +178,12 @@ cp ${QEMU_BIN_PATH} ./${ROOTFS}/${QEMU_BIN_PATH}
 chroot "${ROOTFS}" sh -c " \
     export DEBIAN_FRONTEND=noninteractive \
     && echo nameserver ${NAMESERVER} >/etc/resolv.conf \
-    && apt update -o DPkg::Lock::Timeout=120 \
-    && apt upgrade -y -o DPkg::Lock::Timeout=120 \
-    && apt install -y -o DPkg::Lock::Timeout=120 apt-utils perl-modules \
-    && apt install -y -o DPkg::Lock::Timeout=120 ubuntu-standard \
-    && apt install -y -o DPkg::Lock::Timeout=120 vim net-tools ssh sudo tzdata rsyslog udev iputils-ping \
-    && apt install -y -o DPkg::Lock::Timeout=120 unzip curl kmod iproute2 git python3-pip nano \
+    && apt update \
+    && apt upgrade -y \
+    && apt install -y apt-utils perl-modules \
+    && apt install -y ubuntu-standard \
+    && apt install -y vim net-tools ssh sudo tzdata rsyslog udev iputils-ping \
+    && apt install -y unzip curl kmod iproute2 git python3-pip nano \
     && echo \"${DHCP_CONF}\" > /etc/systemd/network/01-${NET_DEV}.network \
     && useradd -m -s /bin/bash -G sudo ${USERNAME} \
     && echo ${USERNAME}:${USERNAME} | chpasswd \

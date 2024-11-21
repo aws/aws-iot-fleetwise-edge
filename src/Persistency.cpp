@@ -10,6 +10,10 @@
 #include <cstdint>
 #include <string>
 
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+#include <utility>
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -39,6 +43,12 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
         infoStr = "Retrieved a DecoderManifest of size ";
         errStr = "Failed to retrieve the DecoderManifest from the persistency module due to an error: ";
         break;
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    case DataType::STATE_TEMPLATE_LIST:
+        infoStr = "Retrieved a StateTemplateList of size ";
+        errStr = "Failed to retrieve the StateTemplateList from the persistency module due to an error: ";
+        break;
+#endif
     default:
         FWE_LOG_ERROR( "Unknown data type: " + std::to_string( toUType( retrieveType ) ) );
         return false;
@@ -82,6 +92,19 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
         mDecoderManifest->copyData( protoOutput.data(), protoSize );
         mProcessDecoderManifest = true;
     }
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    // coverity[autosar_cpp14_m0_1_9_violation] - Second if-statement always follows same path as first
+    // coverity[misra_cpp_2008_rule_0_1_9_violation] - Second if-statement always follows same path as first
+    else if ( retrieveType == DataType::STATE_TEMPLATE_LIST )
+    {
+        if ( mLastKnownStateIngestion == nullptr )
+        {
+            mLastKnownStateIngestion = std::make_shared<LastKnownStateIngestion>();
+        }
+        mLastKnownStateIngestion->copyData( protoOutput.data(), protoSize );
+        mProcessStateTemplates = true;
+    }
+#endif
     return true;
 }
 
@@ -107,6 +130,7 @@ CollectionSchemeManager::store( DataType storeType )
         FWE_LOG_ERROR( "Invalid DecoderManifest" );
         return;
     }
+
     switch ( storeType )
     {
     case DataType::COLLECTION_SCHEME_LIST:
@@ -117,6 +141,47 @@ CollectionSchemeManager::store( DataType storeType )
         protoInput = mDecoderManifest->getData();
         logStr = "The DecoderManifest";
         break;
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    case DataType::STATE_TEMPLATE_LIST: {
+        // Different from the other data, we can't just store mLastKnownStateIngestion->getData()
+        // because it is just a diff of the previous ingested messages.
+        // So we need to reconstruct a protobuf with all state templates.
+        Schemas::LastKnownState::StateTemplates protoStateTemplates;
+        protoStateTemplates.set_version( mLastStateTemplatesDiffVersion );
+        for ( auto &stateTemplate : mStateTemplates )
+        {
+            protoStateTemplates.set_decoder_manifest_sync_id( stateTemplate.second->decoderManifestID );
+            auto *protoStateTemplate = protoStateTemplates.add_state_templates_to_add();
+            protoStateTemplate->set_state_template_sync_id( stateTemplate.first );
+            for ( auto &signal : stateTemplate.second->signals )
+            {
+                protoStateTemplate->add_signal_ids( signal.signalID );
+            }
+            switch ( stateTemplate.second->updateStrategy )
+            {
+            case LastKnownStateUpdateStrategy::PERIODIC: {
+                auto periodicUpdateStrategy = std::make_unique<Schemas::LastKnownState::PeriodicUpdateStrategy>();
+                periodicUpdateStrategy->set_period_ms( stateTemplate.second->periodMs );
+                protoStateTemplate->set_allocated_periodic_update_strategy( periodicUpdateStrategy.release() );
+                break;
+            }
+            case LastKnownStateUpdateStrategy::ON_CHANGE: {
+                auto onChangeUpdateStrategy = std::make_unique<Schemas::LastKnownState::OnChangeUpdateStrategy>();
+                protoStateTemplate->set_allocated_on_change_update_strategy( onChangeUpdateStrategy.release() );
+                break;
+            }
+            }
+        }
+        protoInput = std::vector<uint8_t>( protoStateTemplates.ByteSizeLong() );
+        if ( !protoStateTemplates.SerializeToArray( protoInput.data(), static_cast<int>( protoInput.capacity() ) ) )
+        {
+            FWE_LOG_ERROR( "Failed to serialize StateTemplateList" );
+            return;
+        }
+        logStr = "The StateTemplateList";
+        break;
+    }
+#endif
     default:
         FWE_LOG_ERROR( "cannot store unsupported type of " + std::to_string( toUType( storeType ) ) );
         return;

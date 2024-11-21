@@ -20,12 +20,12 @@ public:
     MOCK_METHOD( bool, isAlive, (), ( const, override ) );
 
     std::shared_ptr<ISender>
-    createSender( const std::string &topicName, QoS publishQoS = QoS::AT_MOST_ONCE ) override
+    createSender() override
     {
-        return mockedCreateSender( topicName, publishQoS );
+        return mockedCreateSender();
     };
 
-    MOCK_METHOD( std::shared_ptr<ISender>, mockedCreateSender, ( const std::string &topicName, QoS publishQoS ) );
+    MOCK_METHOD( std::shared_ptr<ISender>, mockedCreateSender, () );
 
     std::shared_ptr<IReceiver>
     createReceiver( const std::string &topicName ) override

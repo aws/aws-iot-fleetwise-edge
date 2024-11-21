@@ -8,6 +8,7 @@
 #include "IConnectivityModule.h"
 #include "ISender.h"
 #include "MqttClientWrapper.h"
+#include "TopicConfig.h"
 #include <atomic>
 #include <aws/crt/mqtt/Mqtt5Types.h>
 #include <cstddef>
@@ -34,8 +35,7 @@ class AwsIotSender : public ISender
 public:
     AwsIotSender( IConnectivityModule *connectivityModule,
                   std::shared_ptr<MqttClientWrapper> &mqttClient,
-                  std::string topicName,
-                  Aws::Crt::Mqtt5::QOS publishQoS );
+                  const TopicConfig &topicConfig );
     ~AwsIotSender() override = default;
 
     AwsIotSender( const AwsIotSender & ) = delete;
@@ -47,12 +47,11 @@ public:
 
     size_t getMaxSendSize() const override;
 
-    void sendBuffer( const std::uint8_t *buf, size_t size, OnDataSentCallback callback ) override;
-
-    void sendBufferToTopic( const std::string &topic,
-                            const uint8_t *buf,
-                            size_t size,
-                            OnDataSentCallback callback ) override;
+    void sendBuffer( const std::string &topic,
+                     const uint8_t *buf,
+                     size_t size,
+                     OnDataSentCallback callback,
+                     QoS qos = QoS::AT_LEAST_ONCE ) override;
 
     void
     invalidateConnection()
@@ -71,20 +70,20 @@ public:
         return mPayloadCountSent;
     }
 
+    const TopicConfig &
+    getTopicConfig() const override
+    {
+        return mTopicConfig;
+    }
+
 private:
     bool isAliveNotThreadSafe();
-
-    // coverity[autosar_cpp14_a0_1_3_violation] false positive - function is used
-    bool
-    isTopicValid()
-    {
-        return !mTopicName.empty();
-    };
 
     void publishMessageToTopic( const std::string &topic,
                                 const uint8_t *buf,
                                 size_t size,
-                                OnDataSentCallback callback );
+                                OnDataSentCallback callback,
+                                Aws::Crt::Mqtt5::QOS qos );
 
     /** See "Message size" : "The payload for every publish request can be no larger
      * than 128 KB. AWS IoT Core rejects publish and connect requests larger than this size."
@@ -93,16 +92,14 @@ private:
     static const size_t AWS_IOT_MAX_MESSAGE_SIZE = 131072; // = 128 KiB
     IConnectivityModule *mConnectivityModule;
     std::shared_ptr<MqttClientWrapper> &mMqttClient;
+    const TopicConfig &mTopicConfig;
     std::mutex mConnectivityMutex;
-    std::string mTopicName;
     std::atomic<unsigned> mPayloadCountSent{};
 
     /**
      * @brief Clock member variable used to generate the time an MQTT message was received
      */
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
-
-    Aws::Crt::Mqtt5::QOS mPublishQoS;
 };
 
 } // namespace IoTFleetWise

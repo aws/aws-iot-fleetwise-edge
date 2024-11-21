@@ -104,6 +104,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 && mkdir -p config \
 && cd config \
 && ../tools/provision.sh \
+   --region us-east-1 \
    --vehicle-name fwdemo-s32g \
    --certificate-pem-outfile certificate.pem \
    --private-key-outfile private-key.key \
@@ -163,6 +164,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
    && ./demo.sh \
+      --region us-east-1 \
       --vehicle-name fwdemo-s32g \
       --node-file obd-nodes.json \
       --decoder-file obd-decoders.json \

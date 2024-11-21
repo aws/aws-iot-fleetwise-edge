@@ -40,8 +40,11 @@
     },
     "internalParameters": {
       "readyToPublishDataBufferSize": 10000,
+      "readyToPublishCommandResponsesBufferSize": 100,
+      "maxConcurrentCommandRequests": 100,
       "systemWideLogLevel": "Trace",
-      "maximumAwsSdkHeapMemoryBytes": 10000000
+      "maximumAwsSdkHeapMemoryBytes": 10000000,
+      "minFetchTriggerIntervalMs": 1000
     },
     "publishToCloudParameters": {
       "maxPublishMessageCount": 1000,
@@ -54,10 +57,6 @@
       "keepAliveIntervalSeconds": 60,
       "pingTimeoutMs": 30000,
       "sessionExpiryIntervalSeconds": 0,
-      "collectionSchemeListTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/collection_schemes",
-      "decoderManifestTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/decoder_manifests",
-      "canDataTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/signals",
-      "checkinTopic": "$aws/iotfleetwise/vehicles/VEHICLE_ID_GOES_HERE/checkins",
       "certificateFilename": "path/to/my-certificate.pem.crt",
       "privateKeyFilename": "path/to/my-private.pem.key"
     },

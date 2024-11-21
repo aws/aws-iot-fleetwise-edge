@@ -30,8 +30,10 @@
                 "ENGINE_OIL_TEMPERATURE"             : {"num": "0x5C", "scale":    1.0  , "offset":  40.0, "size": 1}
             },
             "dtcs": {
-                "ECM_DTC1": {"num": "0x0123"},
-                "ECM_DTC2": {"num": "0x4567"}
+                "ECM_DTC1": {"num": "0x0123", "type": "OBD"},
+                "ECM_DTC2": {"num": "0x4567", "type": "OBD"},
+                "ECM_DTC3": {"num": "0xAAA123", "type": "UDS"},
+                "ECM_DTC4": {"num": "0xBBB456", "type": "UDS"}
             }
         },
         {
@@ -44,8 +46,10 @@
                 "ENGINE_REFERENCE_PERCENT_TORQUE"    : {"num": "0x63", "scale":    1.0  , "offset":   0.0, "size": 2}
             },
             "dtcs": {
-                "TCU_DTC1": {"num": "0x89AB"},
-                "TCU_DTC2": {"num": "0xCDEF"}
+                "TCU_DTC1": {"num": "0x89AB", "type": "OBD"},
+                "TCU_DTC2": {"num": "0xCDEF", "type": "OBD"},
+                "TCU_DTC3": {"num": "0xCCC789", "type": "UDS"},
+                "TCU_DTC4": {"num": "0xDDDABC", "type": "UDS"}
             }
         }
     ]

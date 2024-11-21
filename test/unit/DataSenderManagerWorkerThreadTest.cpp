@@ -19,6 +19,11 @@
 #include <memory>
 #include <vector>
 
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+#include "CommandTypes.h"
+#include "ICommandDispatcher.h"
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -48,6 +53,10 @@ public:
         mDataSenderManager = std::make_shared<StrictMock<Testing::DataSenderManagerMock>>();
         mCollectedDataQueue = std::make_shared<DataSenderQueue>( 10000, "Collected Data" );
         std::vector<std::shared_ptr<DataSenderQueue>> dataToSendQueues;
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+        mCommandResponses = std::make_shared<DataSenderQueue>( 10000, "Command Responses" );
+        dataToSendQueues.emplace_back( mCommandResponses );
+#endif
         dataToSendQueues.emplace_back( mCollectedDataQueue );
         mDataSenderManagerWorkerThread = std::make_unique<DataSenderManagerWorkerThread>(
             mConnectivityModule, mDataSenderManager, 100, dataToSendQueues );
@@ -70,6 +79,9 @@ protected:
     std::shared_ptr<StrictMock<Testing::DataSenderManagerMock>> mDataSenderManager;
     std::shared_ptr<DataSenderQueue> mCollectedDataQueue;
     std::unique_ptr<DataSenderManagerWorkerThread> mDataSenderManagerWorkerThread;
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    std::shared_ptr<DataSenderQueue> mCommandResponses;
+#endif
 };
 
 class DataSenderManagerWorkerThreadTestWithAllSignalTypes : public DataSenderManagerWorkerThreadTest,
@@ -151,6 +163,56 @@ TEST_F( DataSenderManagerWorkerThreadTest, ProcessMultipleTriggers )
     ASSERT_EQ( processedSignal.receiveTime, mTriggerTime );
     ASSERT_EQ( processedSignal.value.value.doubleVal, 99.5 );
 }
+
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+TEST_F( DataSenderManagerWorkerThreadTest, ProcessSingleCommandResponse )
+{
+    EXPECT_CALL( *mDataSenderManager, mockedProcessData( _ ) ).Times( 1 );
+    mDataSenderManagerWorkerThread->start();
+
+    mCommandResponses->push( std::make_shared<CommandResponse>(
+        "command123", CommandStatus::EXECUTION_FAILED, REASON_CODE_DECODER_MANIFEST_OUT_OF_SYNC, "status456" ) );
+
+    WAIT_ASSERT_EQ( mDataSenderManager->getProcessedData().size(), 1U );
+    ASSERT_TRUE( mDataSenderManagerWorkerThread->stop() );
+
+    auto processedCommandResponses = mDataSenderManager->getProcessedData<CommandResponse>();
+    ASSERT_EQ( processedCommandResponses[0]->id, "command123" );
+    ASSERT_EQ( processedCommandResponses[0]->status, CommandStatus::EXECUTION_FAILED );
+    ASSERT_EQ( processedCommandResponses[0]->reasonCode, REASON_CODE_DECODER_MANIFEST_OUT_OF_SYNC );
+    ASSERT_EQ( processedCommandResponses[0]->reasonDescription, "status456" );
+}
+
+TEST_F( DataSenderManagerWorkerThreadTest, ProcessMultipleCommandResponses )
+{
+    EXPECT_CALL( *mDataSenderManager, mockedProcessData( _ ) ).Times( 3 );
+    mDataSenderManagerWorkerThread->start();
+
+    mCommandResponses->push(
+        std::make_shared<CommandResponse>( "command1", CommandStatus::SUCCEEDED, 0x1234, "status1" ) );
+    mCommandResponses->push(
+        std::make_shared<CommandResponse>( "command2", CommandStatus::EXECUTION_FAILED, 0x5678, "status2" ) );
+    mCommandResponses->push(
+        std::make_shared<CommandResponse>( "command3", CommandStatus::EXECUTION_TIMEOUT, 0x9ABC, "status3" ) );
+
+    WAIT_ASSERT_EQ( mDataSenderManager->getProcessedData().size(), 3U );
+    ASSERT_TRUE( mDataSenderManagerWorkerThread->stop() );
+
+    auto processedCommandResponses = mDataSenderManager->getProcessedData<CommandResponse>();
+    ASSERT_EQ( processedCommandResponses[0]->id, "command1" );
+    ASSERT_EQ( processedCommandResponses[0]->status, CommandStatus::SUCCEEDED );
+    ASSERT_EQ( processedCommandResponses[0]->reasonCode, 0x1234 );
+    ASSERT_EQ( processedCommandResponses[0]->reasonDescription, "status1" );
+    ASSERT_EQ( processedCommandResponses[1]->id, "command2" );
+    ASSERT_EQ( processedCommandResponses[1]->status, CommandStatus::EXECUTION_FAILED );
+    ASSERT_EQ( processedCommandResponses[1]->reasonCode, 0x5678 );
+    ASSERT_EQ( processedCommandResponses[1]->reasonDescription, "status2" );
+    ASSERT_EQ( processedCommandResponses[2]->id, "command3" );
+    ASSERT_EQ( processedCommandResponses[2]->status, CommandStatus::EXECUTION_TIMEOUT );
+    ASSERT_EQ( processedCommandResponses[2]->reasonCode, 0x9ABC );
+    ASSERT_EQ( processedCommandResponses[2]->reasonDescription, "status3" );
+}
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

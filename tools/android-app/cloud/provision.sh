@@ -11,7 +11,7 @@ S3_PRESIGNED_URL_EXPIRY=86400 # One day
 ENDPOINT_URL=""
 ENDPOINT_URL_OPTION=""
 REGION="us-east-1"
-TOPIC_PREFIX="\$aws/iotfleetwise/"
+IOT_FLEETWISE_TOPIC_PREFIX="\$aws/iotfleetwise/"
 TIMESTAMP=`date +%s`
 VEHICLE_NAME="fwdemo-android-${TIMESTAMP}"
 
@@ -41,19 +41,19 @@ parse_args() {
             REGION=$2
             shift
             ;;
-        --topic-prefix)
-            TOPIC_PREFIX=$2
+        --iotfleetwise-topic-prefix)
+            IOT_FLEETWISE_TOPIC_PREFIX=$2
             shift
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --s3-qr-code                         Store credentials in S3 and generate QR code with pre-signed provisioning URL"
-            echo "  --s3-bucket <NAME>                   Existing S3 bucket name"
-            echo "  --s3-key-prefix <PREFIX>             S3 bucket prefix"
-            echo "  --s3-presigned-url-expiry <SECONDS>  S3 presigned URL expiry, default: ${S3_PRESIGNED_URL_EXPIRY}"
-            echo "  --endpoint-url <URL>                 The endpoint URL used for AWS CLI calls"
-            echo "  --region                             The region used for AWS CLI calls, default: ${REGION}"
-            echo "  --topic-prefix <PREFIX>              IoT MQTT topic prefix, default: ${TOPIC_PREFIX}"
+            echo "  --s3-qr-code                            Store credentials in S3 and generate QR code with pre-signed provisioning URL"
+            echo "  --s3-bucket <NAME>                      Existing S3 bucket name"
+            echo "  --s3-key-prefix <PREFIX>                S3 bucket prefix"
+            echo "  --s3-presigned-url-expiry <SECONDS>     S3 presigned URL expiry, default: ${S3_PRESIGNED_URL_EXPIRY}"
+            echo "  --endpoint-url <URL>                    The endpoint URL used for AWS CLI calls"
+            echo "  --region                                The region used for AWS CLI calls, default: ${REGION}"
+            echo "  --iotfleetwise-topic-prefix <PREFIX>    Prefix for AWS IoT FleetWise MQTT topics, default: ${IOT_FLEETWISE_TOPIC_PREFIX}"
             exit 0
             ;;
         esac
@@ -103,7 +103,7 @@ echo {} | jq ".vehicle_name=\"${VEHICLE_NAME}\"" \
     | jq ".endpoint_url=\"${MQTT_ENDPOINT_URL}\"" \
     | jq ".certificate=\"${CERTIFICATE}\"" \
     | jq ".private_key=\"${PRIVATE_KEY}\"" \
-    | jq ".mqtt_topic_prefix=\"${TOPIC_PREFIX}\"" \
+    | jq ".mqtt_topic_prefix=\"${IOT_FLEETWISE_TOPIC_PREFIX}\"" \
     > config/creds.json
 
 if ${S3_QR_CODE}; then

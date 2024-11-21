@@ -13,6 +13,7 @@
 #include "CollectionInspectionEngine.h"
 #include "CollectionInspectionWorkerThread.h"
 #include "CollectionSchemeManager.h"
+#include "DataFetchManager.h"
 #include "DataSenderManager.h"
 #include "DataSenderManagerWorkerThread.h"
 #include "DataSenderTypes.h"
@@ -20,6 +21,7 @@
 #include "IConnectivityModule.h"
 #include "IReceiver.h"
 #include "ISender.h"
+#include "NamedSignalDataSource.h"
 #include "OBDDataTypes.h"
 #include "OBDOverCANModule.h"
 #include "PayloadManager.h"
@@ -31,6 +33,7 @@
 #include "Thread.h"
 #include "TimeTypes.h"
 #include "Timer.h"
+#include "TopicConfig.h"
 #include <atomic>
 #include <boost/filesystem.hpp>
 #include <cstdint>
@@ -38,8 +41,15 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
+#ifdef FWE_FEATURE_UDS_DTC
+#include "RemoteDiagnosticDataSource.h"
+#endif
+#ifdef FWE_FEATURE_UDS_DTC_EXAMPLE
+#include "ExampleUDSInterface.h"
+#endif
 #ifdef FWE_FEATURE_AAOS_VHAL
 #include "AaosVhalSource.h"
 #include <array>
@@ -66,6 +76,29 @@
 #endif
 #ifdef FWE_FEATURE_ROS2
 #include "ROS2DataSource.h"
+#endif
+#ifdef FWE_FEATURE_SOMEIP
+#include "DeviceShadowOverSomeip.h"
+#include "SomeipCommandDispatcher.h"
+#include "SomeipDataSource.h"
+#include "SomeipToCanBridge.h"
+#endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+#include "ActuatorCommandManager.h"
+#include "CanCommandDispatcher.h"
+#include "CommandSchema.h"
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+#include "LastKnownStateSchema.h"
+#include "LastKnownStateWorkerThread.h"
+#endif
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+#include "IoTJobsDataRequestHandler.h"
+#include "StreamForwarder.h"
+#include "StreamManager.h"
+#endif
+#ifdef FWE_FEATURE_CUSTOM_FUNCTION_EXAMPLES
+#include "CustomFunctionMultiRisingEdgeTrigger.h"
 #endif
 
 namespace Aws
@@ -119,6 +152,18 @@ public:
                                    Timestamp timestamp,
                                    uint32_t messageId,
                                    const std::vector<uint8_t> &data );
+
+    /** @brief Ingest a signal value by name
+     * @param timestamp Timestamp of signal value in milliseconds since epoch, or zero if unknown.
+     * @param name Signal name
+     * @param value Signal value */
+    void ingestSignalValueByName( Timestamp timestamp, const std::string &name, const DecodedSignalValue &value );
+
+    /** @brief Ingest multiple signal values by name
+     * @param timestamp Timestamp of signal values in milliseconds since epoch, or zero if unknown.
+     * @param values Signal values */
+    void ingestMultipleSignalValuesByName( Timestamp timestamp,
+                                           const std::vector<std::pair<std::string, DecodedSignalValue>> &values );
 
 #ifdef FWE_FEATURE_EXTERNAL_GPS
     /**
@@ -185,13 +230,22 @@ private:
     std::vector<std::unique_ptr<CANDataSource>> mCANDataSources;
     std::unique_ptr<ExternalCANDataSource> mExternalCANDataSource;
     std::unique_ptr<CANDataConsumer> mCANDataConsumer;
+    std::shared_ptr<NamedSignalDataSource> mNamedSignalDataSource;
 
+    std::unique_ptr<TopicConfig> mTopicConfig;
     std::shared_ptr<IConnectivityModule> mConnectivityModule;
-    std::shared_ptr<ISender> mSenderVehicleData;
-    std::shared_ptr<ISender> mSenderCheckin;
+    std::shared_ptr<ISender> mMqttSender;
     std::shared_ptr<IReceiver> mReceiverCollectionSchemeList;
     std::shared_ptr<IReceiver> mReceiverDecoderManifest;
     std::shared_ptr<PayloadManager> mPayloadManager;
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    bool mStoreAndForwardEnabled = true;
+    std::shared_ptr<Aws::IoTFleetWise::Store::StreamManager> mStreamManager;
+    std::shared_ptr<Aws::IoTFleetWise::Store::StreamForwarder> mStreamForwarder;
+#endif
+#ifdef FWE_FEATURE_CUSTOM_FUNCTION_EXAMPLES
+    std::unique_ptr<CustomFunctionMultiRisingEdgeTrigger> mCustomFunctionMultiRisingEdgeTrigger;
+#endif
 
     std::shared_ptr<Schema> mSchemaPtr;
     std::shared_ptr<CheckinSender> mCheckinSender;
@@ -204,9 +258,38 @@ private:
     std::shared_ptr<DataSenderManager> mDataSenderManager;
     std::shared_ptr<DataSenderManagerWorkerThread> mDataSenderManagerWorkerThread;
 
+    std::shared_ptr<DataFetchManager> mDataFetchManager;
+
     std::unique_ptr<RemoteProfiler> mRemoteProfiler;
-    std::shared_ptr<ISender> mSenderMetrics;
-    std::shared_ptr<ISender> mSenderLogs;
+#ifdef FWE_FEATURE_UDS_DTC_EXAMPLE
+    std::shared_ptr<ExampleUDSInterface> mExampleDiagnosticInterface;
+#endif
+#ifdef FWE_FEATURE_UDS_DTC
+    std::shared_ptr<RemoteDiagnosticDataSource> mDiagnosticDataSource;
+    std::shared_ptr<NamedSignalDataSource> mDiagnosticNamedSignalDataSource;
+#endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    std::shared_ptr<DataSenderQueue> mCommandResponses;
+    std::shared_ptr<ActuatorCommandManager> mActuatorCommandManager;
+    std::unique_ptr<CommandSchema> mCommandSchema;
+    std::shared_ptr<CanCommandDispatcher> mCanCommandDispatcher;
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    std::shared_ptr<DataSenderQueue> mLastKnownStateDataReadyToPublish;
+    std::unique_ptr<LastKnownStateSchema> mLastKnownStateSchema;
+    std::shared_ptr<LastKnownStateWorkerThread> mLastKnownStateWorkerThread;
+#endif
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    std::shared_ptr<IReceiver> mReceiverIotJob;
+    std::shared_ptr<IReceiver> mReceiverJobDocumentAccepted;
+    std::shared_ptr<IReceiver> mReceiverJobDocumentRejected;
+    std::shared_ptr<IReceiver> mReceiverPendingJobsAccepted;
+    std::shared_ptr<IReceiver> mReceiverPendingJobsRejected;
+    std::shared_ptr<IReceiver> mReceiverUpdateIotJobStatusAccepted;
+    std::shared_ptr<IReceiver> mReceiverUpdateIotJobStatusRejected;
+    std::shared_ptr<IReceiver> mReceiverCanceledIoTJobs;
+    std::unique_ptr<IoTJobsDataRequestHandler> mIoTJobsDataRequestHandler;
+#endif
 #ifdef FWE_FEATURE_S3
     std::shared_ptr<Aws::Auth::AWSCredentialsProvider> mAwsCredentialsProvider;
     std::shared_ptr<Aws::Utils::Threading::PooledThreadExecutor> mTransferManagerExecutor;
@@ -227,6 +310,15 @@ private:
 #endif
 #ifdef FWE_FEATURE_ROS2
     std::shared_ptr<ROS2DataSource> mROS2DataSource;
+#endif
+#ifdef FWE_FEATURE_SOMEIP
+    std::unique_ptr<SomeipDataSource> mSomeipDataSource;
+    std::vector<std::unique_ptr<SomeipToCanBridge>> mSomeipToCanBridges;
+    // Create one for each SOME/IP interface
+    std::shared_ptr<SomeipCommandDispatcher> mExampleSomeipCommandDispatcher;
+
+    std::shared_ptr<DeviceShadowOverSomeip> mDeviceShadowOverSomeip;
+    std::string mDeviceShadowOverSomeipInstanceName;
 #endif
 };
 

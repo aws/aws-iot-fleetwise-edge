@@ -13,6 +13,8 @@ WITH_GREENGRASSV2_SUPPORT="false"
 SHARED_LIBS="OFF"
 WITH_VISION_SYSTEM_DATA="false"
 WITH_ROS2_SUPPORT="false"
+WITH_SOMEIP_SUPPORT="false"
+WITH_STORE_AND_FORWARD_SUPPORT="false"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -23,6 +25,12 @@ parse_args() {
         --with-ros2-support)
             WITH_ROS2_SUPPORT="true"
             WITH_VISION_SYSTEM_DATA="true"
+            ;;
+        --with-someip-support)
+            WITH_SOMEIP_SUPPORT="true"
+            ;;
+        --with-store-and-forward-support)
+            WITH_STORE_AND_FORWARD_SUPPORT="true"
             ;;
         --prefix)
             PREFIX="$2"
@@ -37,11 +45,13 @@ parse_args() {
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
-            echo "  --with-greengrassv2-support  Install dependencies for Greengrass V2"
-            echo "  --with-ros2-support          Install dependencies for ROS2 support"
-            echo "  --runtime-only               Install only runtime dependencies"
-            echo "  --prefix                     Install prefix"
-            echo "  --shared-libs                Build shared libs, rather than static libs"
+            echo "  --with-greengrassv2-support          Install dependencies for Greengrass V2"
+            echo "  --with-ros2-support                  Install dependencies for ROS2 support"
+            echo "  --with-someip-support                Install dependencies for SOME/IP support"
+            echo "  --with-store-and-forward-support     Install dependencies for store and forward"
+            echo "  --runtime-only                       Install only runtime dependencies"
+            echo "  --prefix                             Install prefix"
+            echo "  --shared-libs                        Build shared libs, rather than static libs"
             exit 0
             ;;
         esac
@@ -52,8 +62,8 @@ parse_args() {
 parse_args "$@"
 
 if ${INSTALL_BUILD_TIME_DEPS}; then
-    apt update -o DPkg::Lock::Timeout=120
-    apt install -y -o DPkg::Lock::Timeout=120 \
+    apt update
+    apt install -y \
         build-essential \
         clang-tidy-12 \
         cmake \
@@ -70,20 +80,27 @@ if ${INSTALL_BUILD_TIME_DEPS}; then
 fi
 
 if ${WITH_ROS2_SUPPORT}; then
-    command -v wget > /dev/null || ( apt update -o DPkg::Lock::Timeout=120 && apt install -y -o DPkg::Lock::Timeout=120 wget)
+    command -v wget > /dev/null || ( apt update && apt install -y wget)
     wget -q https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O /usr/share/keyrings/ros-archive-keyring.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(source /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list
-    apt update -o DPkg::Lock::Timeout=120
-    apt install -y -o DPkg::Lock::Timeout=120 \
+    apt update
+    apt install -y \
         ros-galactic-rclcpp \
         ros-galactic-rosbag2 \
         ros-galactic-ros2topic \
         ros-galactic-sensor-msgs
     if ${INSTALL_BUILD_TIME_DEPS}; then
-        apt install -y -o DPkg::Lock::Timeout=120 \
+        apt install -y \
             ros-galactic-rosidl-default-generators \
             python3-colcon-common-extensions
     fi
+fi
+
+if ${WITH_SOMEIP_SUPPORT}; then
+    apt install -y \
+        default-jre \
+        python3-distutils \
+        libpython3-dev
 fi
 
 if ${INSTALL_BUILD_TIME_DEPS} && [ ! -f /usr/include/linux/can/isotp.h ]; then
@@ -161,6 +178,86 @@ if ${INSTALL_BUILD_TIME_DEPS} && ( ! ${USE_CACHE} || [ ! -d ${PREFIX} ] ); then
         cmake \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+            -DCMAKE_INSTALL_PREFIX=${PREFIX} \
+            ..
+        make install -j`nproc`
+        cd ../..
+    fi
+
+    if ${WITH_SOMEIP_SUPPORT}; then
+        git clone -b ${VERSION_VSOMEIP} https://github.com/COVESA/vsomeip.git
+        cd vsomeip
+        # https://github.com/COVESA/vsomeip/pull/528
+        # https://github.com/COVESA/vsomeip/pull/789
+        git apply ${SCRIPT_DIR}/patches/vsomeip_allow_static_libs_fix_shutdown_segfaults.patch
+        mkdir build && cd build
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -DCMAKE_INSTALL_PREFIX=${PREFIX} \
+            ..
+        make install -j`nproc`
+        cd ../..
+
+        git clone -b ${VERSION_COMMON_API} https://github.com/COVESA/capicxx-core-runtime.git
+        cd capicxx-core-runtime
+        # https://github.com/COVESA/capicxx-core-runtime/pull/42
+        git apply ${SCRIPT_DIR}/patches/capicxx_core_runtime_allow_static_libs.patch
+        mkdir build && cd build
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -DCMAKE_INSTALL_PREFIX=${PREFIX} \
+            ..
+        make install -j`nproc`
+        cd ../..
+
+        git clone -b ${VERSION_COMMON_API_SOMEIP} https://github.com/COVESA/capicxx-someip-runtime.git
+        cd capicxx-someip-runtime
+        # https://github.com/COVESA/capicxx-someip-runtime/pull/27
+        git apply ${SCRIPT_DIR}/patches/capicxx_someip_runtime_allow_static_libs.patch
+        mkdir build && cd build
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -DCMAKE_INSTALL_PREFIX=${PREFIX} \
+            ..
+        make install -j`nproc`
+        cd ../..
+
+        wget -q https://github.com/COVESA/capicxx-core-tools/releases/download/${VERSION_COMMON_API_GENERATOR}/commonapi_core_generator.zip
+        mkdir -p ${PREFIX}/share/commonapi-core-generator
+        unzip -q -o commonapi_core_generator.zip -d ${PREFIX}/share/commonapi-core-generator
+        wget -q https://github.com/COVESA/capicxx-someip-tools/releases/download/${VERSION_COMMON_API_GENERATOR}/commonapi_someip_generator.zip
+        mkdir -p ${PREFIX}/share/commonapi-someip-generator
+        unzip -q -o commonapi_someip_generator.zip -d ${PREFIX}/share/commonapi-someip-generator
+
+        git clone -b ${VERSION_PYBIND11} https://github.com/pybind/pybind11.git
+        cd pybind11
+        mkdir build && cd build
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+            -DBUILD_TESTING=Off \
+            -DCMAKE_INSTALL_PREFIX=${PREFIX} \
+            ..
+        make install -j`nproc`
+        cd ../..
+    fi
+
+    if ${WITH_STORE_AND_FORWARD_SUPPORT}; then
+        git clone -b ${VERSION_DEVICE_STORELIBRARY_CPP} https://github.com/aws/device-storelibrary-cpp.git
+        cd device-storelibrary-cpp
+        mkdir build && cd build
+        cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSTORE_BUILD_TESTS=OFF \
+            -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=On \
             -DCMAKE_INSTALL_PREFIX=${PREFIX} \
             ..
         make install -j`nproc`

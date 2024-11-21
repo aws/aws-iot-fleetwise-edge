@@ -15,12 +15,6 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-enum class QoS
-{
-    AT_MOST_ONCE = 0,
-    AT_LEAST_ONCE = 1,
-};
-
 /**
  * @brief called after the mqtt client is connected
  */
@@ -36,14 +30,10 @@ public:
     /**
      * @brief create a new sender sharing the connection of this module
      *
-     * @param topicName the topic which this sender should publish to
-     * @param publishQoS the QoS level for the publish messages
-     *
      * @return a pointer to the newly created sender. A reference to the newly created sender is also hold inside this
      * module.
      */
-    virtual std::shared_ptr<ISender> createSender( const std::string &topicName,
-                                                   QoS publishQoS = QoS::AT_MOST_ONCE ) = 0;
+    virtual std::shared_ptr<ISender> createSender() = 0;
 
     /**
      * @brief create a new receiver sharing the connection of this module

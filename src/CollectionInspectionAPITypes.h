@@ -24,6 +24,7 @@ namespace IoTFleetWise
 struct ExpressionNode;
 
 static constexpr uint32_t MAX_NUMBER_OF_ACTIVE_CONDITION = 256; /**< More active conditions will be ignored */
+static constexpr uint32_t MAX_NUMBER_OF_ACTIVE_FETCH_CONDITION = 256;
 static constexpr uint32_t ALL_CONDITIONS = 0xFFFFFFFF;
 static constexpr uint32_t MAX_EQUATION_DEPTH =
     10; /**< If the AST of the expression is deeper than this value the equation is not accepted */
@@ -43,6 +44,9 @@ struct PassThroughMetadata
     uint32_t priority{ 0 };
     SyncID decoderID;
     SyncID collectionSchemeID;
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    std::string campaignArn;
+#endif
 };
 
 // As a start these structs are mainly a copy of the data defined in ICollectionScheme but as plain old data structures
@@ -56,6 +60,9 @@ struct InspectionMatrixSignalCollectionInfo
                                        * of samples in the buffer only necessary for condition evaluation
                                        */
     SignalType signalType{ SignalType::UNKNOWN };
+    std::vector<FetchRequestID> fetchRequestIDs; /**< contains all fetch request IDs associated with the signal
+                                                  * for the given campaign
+                                                  */
 };
 
 struct InspectionMatrixCanFrameCollectionInfo
@@ -64,6 +71,22 @@ struct InspectionMatrixCanFrameCollectionInfo
     CANChannelNumericID channelID;
     size_t sampleBufferSize;          /**<  at least this amount of last x raw can frames will be kept in buffer */
     uint32_t minimumSampleIntervalMs; /**<  0 which all frames are recording as seen on the bus */
+};
+
+struct ConditionForFetch
+{
+    const ExpressionNode *condition; /**< points into InspectionMatrix.expressionNodes;
+                                      * Raw pointer is used as needed for efficient AST and ConditionWithCollectedData
+                                      * never exists without the relevant InspectionMatrix */
+    bool triggerOnlyOnRisingEdge;
+    FetchRequestID fetchRequestID;
+};
+
+struct ConditionForForward
+{
+    const ExpressionNode *condition; /**< points into InspectionMatrix.expressionNodes;
+                                      * Raw pointer is used as needed for efficient AST and ConditionWithCollectedData
+                                      * never exists without the relevant InspectionMatrix */
 };
 
 struct ConditionWithCollectedData
@@ -79,8 +102,14 @@ struct ConditionWithCollectedData
     bool includeActiveDtcs{};
     bool triggerOnlyOnRisingEdge{};
     PassThroughMetadata metadata;
+    // Conditions to check for custom fetch configuration
+    std::vector<ConditionForFetch> fetchConditions;
     bool isStaticCondition{ true };
     bool alwaysEvaluateCondition{ false };
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    // Conditions to check for forwarding the stored data
+    std::vector<ConditionForForward> forwardConditions;
+#endif
 };
 
 struct InspectionMatrix
@@ -95,20 +124,53 @@ struct InspectionMatrix
 struct InspectionValue
 {
     InspectionValue() = default;
+    InspectionValue( bool val )
+    {
+        boolVal = val;
+        type = DataType::BOOL;
+    }
+    InspectionValue( double val )
+    {
+        doubleVal = val;
+        type = DataType::DOUBLE;
+    }
+    InspectionValue( int val )
+        : InspectionValue( static_cast<double>( val ) )
+    {
+    }
+    InspectionValue( std::string val )
+    {
+        if ( stringVal == nullptr )
+        {
+            stringVal = std::make_unique<std::string>( std::move( val ) );
+        }
+        else
+        {
+            *stringVal = std::move( val );
+        }
+        type = DataType::STRING;
+    }
+    InspectionValue( const char *val )
+        : InspectionValue( std::string( val ) )
+    {
+    }
     InspectionValue( const InspectionValue & ) = delete;
     InspectionValue &operator=( const InspectionValue & ) = delete;
     InspectionValue( InspectionValue && ) = default;
-    InspectionValue &operator=( InspectionValue && ) = delete;
+    InspectionValue &operator=( InspectionValue && ) = default;
     ~InspectionValue() = default;
     enum class DataType
     {
         UNDEFINED,
         BOOL,
         DOUBLE,
+        STRING
     };
     DataType type = DataType::UNDEFINED;
     bool boolVal{};
     double doubleVal{};
+    std::unique_ptr<std::string> stringVal;
+    SignalID signalID{ INVALID_SIGNAL_ID };
     InspectionValue &
     operator=( bool val )
     {
@@ -129,10 +191,40 @@ struct InspectionValue
         *this = static_cast<double>( val );
         return *this;
     }
+    InspectionValue &
+    operator=( std::string val )
+    {
+        if ( stringVal == nullptr )
+        {
+            stringVal = std::make_unique<std::string>( std::move( val ) );
+        }
+        else
+        {
+            *stringVal = std::move( val );
+        }
+        type = DataType::STRING;
+        return *this;
+    }
+    InspectionValue &
+    operator=( const char *val )
+    {
+        *this = std::string( val );
+        return *this;
+    }
+    bool
+    isUndefined() const
+    {
+        return type == DataType::UNDEFINED;
+    }
     bool
     isBoolOrDouble() const
     {
         return ( type == DataType::BOOL ) || ( type == DataType::DOUBLE );
+    }
+    bool
+    isString() const
+    {
+        return type == DataType::STRING;
     }
     double
     asDouble() const
@@ -347,13 +439,19 @@ struct CollectedSignal
     SignalID signalID{ INVALID_SIGNAL_ID };
     Timestamp receiveTime{ 0 };
     SignalValueWrapper value;
+    FetchRequestID fetchRequestID{ DEFAULT_FETCH_REQUEST_ID };
 
     CollectedSignal() = default;
 
     template <typename T>
-    CollectedSignal( SignalID signalIDIn, Timestamp receiveTimeIn, T sigValue, SignalType sigType )
+    CollectedSignal( SignalID signalIDIn,
+                     Timestamp receiveTimeIn,
+                     T sigValue,
+                     SignalType sigType,
+                     FetchRequestID fetchRequestIDIn = DEFAULT_FETCH_REQUEST_ID )
         : signalID( signalIDIn )
         , receiveTime( receiveTimeIn )
+        , fetchRequestID( fetchRequestIDIn )
     {
         switch ( sigType )
         {
@@ -390,6 +488,10 @@ struct CollectedSignal
         case SignalType::BOOLEAN:
             value.setVal<bool>( static_cast<bool>( sigValue ), sigType );
             break;
+        case SignalType::STRING:
+            // Handles raw buffer handle in the background
+            value.setVal<uint32_t>( static_cast<uint32_t>( sigValue ), sigType );
+            break;
         case SignalType::UNKNOWN:
             // Signal of type UNKNOWN will not be collected
             break;
@@ -405,7 +507,8 @@ struct CollectedSignal
     fromDecodedSignal( SignalID signalIDIn,
                        Timestamp receiveTimeIn,
                        const DecodedSignalValue &decodedSignalValue,
-                       SignalType signalType )
+                       SignalType signalType,
+                       FetchRequestID fetchRequestIDIn = DEFAULT_FETCH_REQUEST_ID )
     {
         switch ( decodedSignalValue.signalType )
         {
@@ -414,7 +517,8 @@ struct CollectedSignal
         case SignalType::INT64:
             return CollectedSignal{ signalIDIn, receiveTimeIn, decodedSignalValue.signalValue.int64Val, signalType };
         default:
-            return CollectedSignal{ signalIDIn, receiveTimeIn, decodedSignalValue.signalValue.doubleVal, signalType };
+            return CollectedSignal{
+                signalIDIn, receiveTimeIn, decodedSignalValue.signalValue.doubleVal, signalType, fetchRequestIDIn };
         }
     }
 
@@ -532,12 +636,40 @@ struct CollectionInspectionEngineOutput
 enum class ExpressionErrorCode
 {
     SUCCESSFUL,
-    SIGNAL_NOT_FOUND,
-    FUNCTION_DATA_NOT_AVAILABLE,
     STACK_DEPTH_REACHED,
     NOT_IMPLEMENTED_TYPE,
     NOT_IMPLEMENTED_FUNCTION,
     TYPE_MISMATCH
+};
+
+using CustomFunctionInvocationID = uint32_t;
+struct CustomFunctionInvokeResult
+{
+    CustomFunctionInvokeResult( ExpressionErrorCode e )
+        : error( e )
+    {
+    }
+    CustomFunctionInvokeResult( ExpressionErrorCode e, InspectionValue v )
+        : error( e )
+        , value( std::move( v ) )
+    {
+    }
+    ExpressionErrorCode error;
+    InspectionValue value;
+};
+using CustomFunctionInvokeCallback =
+    std::function<CustomFunctionInvokeResult( CustomFunctionInvocationID invocationId, // Unique ID for each invocation
+                                              const std::vector<InspectionValue> &args )>;
+using CustomFunctionConditionEndCallback = std::function<void( const std::unordered_set<SignalID> &collectedSignalIds,
+                                                               Timestamp timestamp,
+                                                               CollectionInspectionEngineOutput &output )>;
+using CustomFunctionCleanupCallback = std::function<void( CustomFunctionInvocationID invocationId )>;
+
+struct CustomFunctionCallbacks
+{
+    CustomFunctionInvokeCallback invokeCallback;
+    CustomFunctionConditionEndCallback conditionEndCallback;
+    CustomFunctionCleanupCallback cleanupCallback;
 };
 
 } // namespace IoTFleetWise

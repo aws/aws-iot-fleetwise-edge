@@ -1,0 +1,104 @@
+[
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.actuator1",
+      "description": "Vehicle actuator1",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.actuator2",
+      "description": "Vehicle actuator2",
+      "dataType": "INT64"
+    }
+  },
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.actuator3",
+      "description": "Vehicle actuator3",
+      "dataType": "BOOLEAN"
+    }
+  },
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.actuator4",
+      "description": "Vehicle actuator4",
+      "dataType": "FLOAT"
+    }
+  },
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.actuator5",
+      "description": "Vehicle actuator5",
+      "dataType": "DOUBLE"
+    }
+  },
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.actuator9",
+      "description": "Vehicle actuator9",
+      "dataType": "STRING"
+    }
+  },
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.actuator20",
+      "description": "Vehicle actuator20",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface",
+      "description": "Vehicle.ExampleSomeipInterface"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.X",
+      "description": "Vehicle.ExampleSomeipInterface.X",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1",
+      "description": "Vehicle.ExampleSomeipInterface.A1"
+    }
+  },
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.A",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.A",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.B",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.B",
+      "dataType": "BOOLEAN"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.D",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.D",
+      "dataType": "DOUBLE"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.S",
+      "description": "Vehicle.ExampleSomeipInterface.A1.S",
+      "dataType": "STRING"
+    }
+  }
+]

@@ -6,7 +6,7 @@
 - [Prerequisites](#prerequisites)
 - [Step 1: Set up the Raspberry Pi](#step-1-setup-the-raspberry-pi)
 - [Step 2: Launch your development machine](#step-2-launch-your-development-machine)
-- [Step 3: Compile Edge Agent](#step-3-compile-egde-agent)
+- [Step 3: Compile Edge Agent](#step-3-compile-edge-agent)
 - [Step 4: Provision AWS IoT credentials](#step-4-provision-aws-iot-credentials)
 - [Step 5: Deploy Edge Agent](#step-5-deploy-edge-agent)
 - [Step 6: Deploy a campaign to the Raspberry Pi](#step-6-deploy-a-campaign-to-the-raspberry-pi)
@@ -84,10 +84,14 @@ to take action based on your use of AWS IoT FleetWise._**
   [Coolwell Waveshare 2-Channel Isolated CAN Bus Expansion Hat](https://www.amazon.de/-/en/Waveshare-CAN-HAT-SN65HVD230-Protection/dp/B087PWNMM8/?th=1),
   or the
   [2-Channel Isolated CAN Bus Expansion HAT](https://rarecomponents.com/store/2-ch-can-hat-waveshare).
-- Access to an AWS account with administrator permissions
-- To be signed in to the AWS Management Console with an account in your chosen Region
-  - **Note:** AWS IoT FleetWise is currently available in `us-east-1` and `eu-central-1`.
-- A local Windows, Mac, or Linux machine
+- Access to an AWS Account with administrator privileges.
+- Logged in to the AWS Console in the `us-east-1` region using the account with administrator
+  privileges.
+  - Note: if you would like to use a different region you will need to change `us-east-1` to your
+    desired region in each place that it is mentioned below.
+  - Note: AWS IoT FleetWise is currently available in
+    [these](https://docs.aws.amazon.com/general/latest/gr/iotfleetwise.html) regions.
+- A local Linux or MacOS machine.
 
 ## Step 1: Setup the Raspberry Pi
 
@@ -180,12 +184,10 @@ launch an AWS EC2 Graviton (arm64) instance. For more information about Amazon E
 
 Next, compile FWE for the ARM 64-bit architecture of the processor present in the Raspberry Pi.
 
-1. On your development machine, clone the latest FWE source code from GitHub by running the
-   following:
+1. Run the following _on the development machine_ to clone the latest FWE source code from GitHub.
 
    ```bash
-   git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge \
-   && cd ~/aws-iot-fleetwise-edge
+   git clone https://github.com/aws/aws-iot-fleetwise-edge.git ~/aws-iot-fleetwise-edge
    ```
 
 1. Review, modify and supplement [the FWE source code](../../src/) to ensure it meets your use case
@@ -194,7 +196,8 @@ Next, compile FWE for the ARM 64-bit architecture of the processor present in th
 1. Install the FWE dependencies:
 
    ```bash
-   sudo -H ./tools/install-deps-native.sh
+   cd ~/aws-iot-fleetwise-edge \
+   && sudo -H ./tools/install-deps-native.sh
    ```
 
    The command above installs the following Ubuntu packages for compiling FWE for ARM 64-bit:
@@ -225,6 +228,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 && mkdir -p config \
 && cd config \
 && ../tools/provision.sh \
+   --region us-east-1 \
    --vehicle-name fwdemo-rpi \
    --certificate-pem-outfile certificate.pem \
    --private-key-outfile private-key.key \
@@ -316,6 +320,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 
    ```bash
    ./demo.sh \
+      --region us-east-1 \
       --vehicle-name fwdemo-rpi \
       --node-file obd-nodes.json \
       --decoder-file obd-decoders.json \

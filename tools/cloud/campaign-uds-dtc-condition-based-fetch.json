@@ -1,0 +1,29 @@
+{
+  "compression": "SNAPPY",
+  "spoolingMode": "TO_DISK",
+  "signalsToFetch": [
+    {
+      "fullyQualifiedName": "Vehicle.ECU1.DTC_INFO",
+      "signalFetchConfig": {
+        "conditionBased": {
+          "conditionExpression": "$variable.`Vehicle.ECM.DemoEngineTorque` > 890",
+          "triggerMode": "ALWAYS"
+        }
+      },
+      "actions": ["custom_function(\"DTC_QUERY\", -1, 4, -1)"]
+    }
+  ],
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.ECU1.DTC_INFO"
+    },
+    {
+      "name": "Vehicle.ECM.DemoEngineTorque"
+    }
+  ],
+  "collectionScheme": {
+    "timeBasedCollectionScheme": {
+      "periodMs": 10000
+    }
+  }
+}

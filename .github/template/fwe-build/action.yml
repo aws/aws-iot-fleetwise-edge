@@ -62,7 +62,7 @@ runs:
       shell: bash
       if: inputs.build-arch  == 'native'
       run: |
-        ./tools/test-fwe.sh ${{ inputs.extra-options }} --extra-gtest-filter "-*CANDataSourceTest*:*ISOTPOverCANProtocolTest*:*IoTFleetWiseEngineTest*:*OBDOverCANModuleTest*"
+        ./tools/test-fwe.sh ${{ inputs.extra-options }} --extra-gtest-filter "-*CANDataSourceTest*:*ISOTPOverCANProtocolTest*:*IoTFleetWiseEngineTest*:*OBDOverCANModuleTest*:*CanCommandDispatcherTest*:*UDSTemplateInterfaceTest*"
 
     - name: upload-artifacts
       uses: actions/upload-artifact@v4

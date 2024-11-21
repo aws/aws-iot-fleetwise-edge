@@ -1,0 +1,76 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+option java_package = "com.amazonaws.iot.autobahn.schemas.lastknownstate";
+package Aws.IoTFleetWise.Schemas.CustomerMessage;
+
+message LastKnownState {
+
+  /*
+   * The absolute timestamp in milliseconds since Unix Epoch of when the event was triggered in vehicle.
+   */
+  uint64 time_ms = 1;
+
+  repeated Signal signals = 3;
+
+  repeated ExtraDimension extra_dimensions = 4;
+}
+
+message Signal {
+
+  /*
+   * The Fully Qualified Name of the signal is the path to the signal plus the signal's name.
+   * For example, Vehicle.Chassis.SteeringWheel.HandsOff.HandsOffSteeringState
+   * The fully qualified name can have up to 150 characters. Valid characters: a-z, A-Z, 0-9, : (colon), and _ (underscore).
+   */
+  string name = 1;
+
+  /*
+   * The FWE reported signal value can be one of the following data types.
+   */
+  oneof SignalValue {
+    double double_value = 2;
+
+    bool boolean_value = 3;
+
+    sint32 int8_value = 4;
+
+    uint32 uint8_value = 5;
+
+    sint32 int16_value = 6;
+
+    uint32 uint16_value = 7;
+
+    sint32 int32_value = 8;
+
+    uint32 uint32_value = 9;
+
+    sint64 int64_value = 10;
+
+    uint64 uint64_value = 11;
+
+    float float_value = 12;
+    /*
+     * An UTF-8 encoded or 7-bit ASCII string
+     */
+    string string_value = 13;
+  }
+}
+
+message ExtraDimension {
+  /*
+   * The Fully Qualified Name of the attribute is the path to the attribute plus the attribute's name.
+   * For example, Vehicle.Model.Color
+   * The fully qualified name can have up to 150 characters. Valid characters: a-z, A-Z, 0-9, : (colon), and _ (underscore).
+   */
+  string name = 1;
+
+  oneof ExtraDimensionValue {
+    /*
+     * An UTF-8 encoded or 7-bit ASCII string
+     */
+    string string_value = 2;
+  }
+}

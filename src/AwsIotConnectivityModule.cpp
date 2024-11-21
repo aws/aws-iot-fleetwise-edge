@@ -24,10 +24,12 @@ namespace IoTFleetWise
 AwsIotConnectivityModule::AwsIotConnectivityModule( std::string rootCA,
                                                     std::string clientId,
                                                     std::shared_ptr<MqttClientBuilderWrapper> mqttClientBuilder,
+                                                    const TopicConfig &topicConfig,
                                                     AwsIotConnectivityConfig connectionConfig )
     : mRootCA( std::move( rootCA ) )
     , mClientId( std::move( clientId ) )
     , mMqttClientBuilder( std::move( mqttClientBuilder ) )
+    , mTopicConfig( topicConfig )
     , mConnectionConfig( std::move( connectionConfig ) )
     , mInitialConnectionThread(
           [this]() -> RetryStatus {
@@ -65,20 +67,9 @@ AwsIotConnectivityModule::connect()
 }
 
 std::shared_ptr<ISender>
-AwsIotConnectivityModule::createSender( const std::string &topicName, QoS publishQoS )
+AwsIotConnectivityModule::createSender()
 {
-    auto sdkPublishQoS = Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE;
-    switch ( publishQoS )
-    {
-    case QoS::AT_MOST_ONCE:
-        sdkPublishQoS = Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE;
-        break;
-    case QoS::AT_LEAST_ONCE:
-        sdkPublishQoS = Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_LEAST_ONCE;
-        break;
-    }
-
-    auto sender = std::make_shared<AwsIotSender>( this, mMqttClient, topicName, sdkPublishQoS );
+    auto sender = std::make_shared<AwsIotSender>( this, mMqttClient, mTopicConfig );
     mSenders.emplace_back( sender );
     return sender;
 }

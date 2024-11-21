@@ -22,6 +22,10 @@
 #include <mutex>
 #include <thread>
 
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+#include "LastKnownStateTypes.h"
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -85,6 +89,14 @@ protected:
             [&]( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) {
                 mReceivedInspectionMatrices.emplace_back( inspectionMatrix );
             } );
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+        mCollectionSchemeManager.subscribeToStateTemplatesChange(
+            [&]( std::shared_ptr<StateTemplateList> stateTemplates ) {
+                std::lock_guard<std::mutex> lock( mReceivedStateTemplatesMutex );
+                mReceivedStateTemplates.emplace_back( *stateTemplates );
+            } );
+#endif
     }
 
     void
@@ -97,6 +109,26 @@ protected:
     CollectionSchemeManagerWrapper mCollectionSchemeManager;
     std::vector<std::shared_ptr<const InspectionMatrix>> mReceivedInspectionMatrices;
     std::shared_ptr<const Clock> mTestClock = ClockHandler::getClock();
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    std::vector<StateTemplateList>
+    getReceivedStateTemplates()
+    {
+        std::vector<StateTemplateList> sortedStateTemplates;
+        std::lock_guard<std::mutex> lock( mReceivedStateTemplatesMutex );
+        for ( auto stateTemplateList : mReceivedStateTemplates )
+        {
+            sort( stateTemplateList.begin(), stateTemplateList.end(), []( const auto &a, const auto &b ) {
+                return a->id < b->id;
+            } );
+            sortedStateTemplates.emplace_back( stateTemplateList );
+        }
+        return sortedStateTemplates;
+    };
+
+    std::mutex mReceivedStateTemplatesMutex;
+    std::vector<StateTemplateList> mReceivedStateTemplates;
+#endif
 };
 
 std::vector<SignalID>
@@ -140,6 +172,46 @@ TEST_F( CollectionSchemeManagerTest, StopMain )
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     mCollectionSchemeManager.myInvokeCollectionScheme();
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    auto lastKnownStateIngestionMock = std::make_shared<LastKnownStateIngestionMock>();
+    mCollectionSchemeManager.mLastKnownStateIngestionTest = lastKnownStateIngestionMock;
+    // Build failed:
+    EXPECT_CALL( *lastKnownStateIngestionMock, build() ).WillRepeatedly( Return( false ) );
+    mCollectionSchemeManager.myInvokeStateTemplates();
+    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+    // Build successful, DM out of sync:
+    EXPECT_CALL( *lastKnownStateIngestionMock, build() ).WillRepeatedly( Return( true ) );
+
+    {
+        auto stateTemplate = std::make_shared<StateTemplateInformation>();
+        stateTemplate->id = "LKS1";
+        stateTemplate->decoderManifestID = "DM2";
+        auto stateTemplatesDiff = std::make_shared<StateTemplatesDiff>();
+        stateTemplatesDiff->stateTemplatesToAdd.emplace_back( stateTemplate );
+        EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+            .WillRepeatedly( Return( stateTemplatesDiff ) );
+        mCollectionSchemeManager.myInvokeStateTemplates();
+    }
+
+    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+
+    // DM in sync:
+    {
+        auto stateTemplate = std::make_shared<StateTemplateInformation>();
+        stateTemplate->id = "LKS2";
+        stateTemplate->decoderManifestID = "DM1";
+        auto stateTemplatesDiff = std::make_shared<StateTemplatesDiff>();
+        stateTemplatesDiff->stateTemplatesToAdd.emplace_back( stateTemplate );
+        EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+            .WillRepeatedly( Return( stateTemplatesDiff ) );
+        mCollectionSchemeManager.myInvokeStateTemplates();
+    }
+
+    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+    // Ignore with the same sync id:
+    mCollectionSchemeManager.myInvokeStateTemplates();
+    std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+#endif
 
     /* stopping main thread servicing a collectionScheme ending in 25 seconds */
     WAIT_ASSERT_TRUE( mCollectionSchemeManager.disconnect() );
@@ -185,6 +257,230 @@ TEST_F( CollectionSchemeManagerTest, DecoderManifestUpdateCallBack )
     ASSERT_FALSE( mCollectionSchemeManager.getmDecoderManifestAvailable() );
     ASSERT_TRUE( mCollectionSchemeManager.getmProcessDecoderManifest() );
 }
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+TEST_F( CollectionSchemeManagerTest, StateTemplatesUpdate )
+{
+    auto decoderManifestIngestionMock = std::make_shared<mockDecoderManifest>();
+    EXPECT_CALL( *decoderManifestIngestionMock, build() ).WillRepeatedly( Return( true ) );
+    EXPECT_CALL( *decoderManifestIngestionMock, getID() ).WillRepeatedly( Return( "decoder1" ) );
+    auto lastKnownStateIngestionMock = std::make_shared<LastKnownStateIngestionMock>();
+    EXPECT_CALL( *lastKnownStateIngestionMock, build() ).WillRepeatedly( Return( true ) );
+
+    ASSERT_TRUE( mCollectionSchemeManager.connect() );
+
+    mCollectionSchemeManager.onDecoderManifestUpdate( decoderManifestIngestionMock );
+
+    // This should be an empty list, triggered by the decoder manifest update
+    WAIT_ASSERT_EQ( getReceivedStateTemplates().size(), 1U );
+    auto receivedStateTemplates = getReceivedStateTemplates();
+    auto stateTemplates = receivedStateTemplates[0];
+    ASSERT_EQ( stateTemplates.size(), 0U );
+
+    auto stateTemplateToAdd = std::make_shared<const StateTemplateInformation>(
+        StateTemplateInformation{ "stateTemplate1",
+                                  "decoder1",
+                                  { LastKnownStateSignalInformation{ 1 }, LastKnownStateSignalInformation{ 2 } },
+                                  LastKnownStateUpdateStrategy::PERIODIC,
+                                  500 } );
+
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillOnce(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 456, { stateTemplateToAdd }, {} } ) ) );
+
+    mCollectionSchemeManager.onStateTemplatesChanged( lastKnownStateIngestionMock );
+
+    WAIT_ASSERT_EQ( getReceivedStateTemplates().size(), 2U );
+    receivedStateTemplates = getReceivedStateTemplates();
+
+    stateTemplates = receivedStateTemplates[1];
+    ASSERT_EQ( stateTemplates.size(), 1U );
+    ASSERT_EQ( stateTemplates[0]->id, "stateTemplate1" );
+    ASSERT_EQ( stateTemplates[0]->decoderManifestID, "decoder1" );
+    ASSERT_EQ( stateTemplates[0]->signals.size(), 2U );
+    ASSERT_EQ( stateTemplates[0]->signals[0].signalID, 1 );
+    ASSERT_EQ( stateTemplates[0]->signals[1].signalID, 2 );
+    ASSERT_EQ( stateTemplates[0]->updateStrategy, LastKnownStateUpdateStrategy::PERIODIC );
+    ASSERT_EQ( stateTemplates[0]->periodMs, 500U );
+
+    stateTemplateToAdd = std::make_shared<const StateTemplateInformation>(
+        StateTemplateInformation{ "stateTemplate2",
+                                  "decoder1",
+                                  { LastKnownStateSignalInformation{ 7 } },
+                                  LastKnownStateUpdateStrategy::PERIODIC,
+                                  400 } );
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillOnce(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 456, { stateTemplateToAdd }, {} } ) ) );
+
+    mCollectionSchemeManager.onStateTemplatesChanged( lastKnownStateIngestionMock );
+
+    WAIT_ASSERT_EQ( getReceivedStateTemplates().size(), 3U );
+    receivedStateTemplates = getReceivedStateTemplates();
+
+    stateTemplates = receivedStateTemplates[2];
+    ASSERT_EQ( stateTemplates.size(), 2U );
+
+    ASSERT_EQ( stateTemplates[0]->id, "stateTemplate1" );
+    ASSERT_EQ( stateTemplates[0]->decoderManifestID, "decoder1" );
+    ASSERT_EQ( stateTemplates[0]->signals.size(), 2U );
+    ASSERT_EQ( stateTemplates[0]->signals[0].signalID, 1 );
+    ASSERT_EQ( stateTemplates[0]->signals[1].signalID, 2 );
+    ASSERT_EQ( stateTemplates[0]->updateStrategy, LastKnownStateUpdateStrategy::PERIODIC );
+    ASSERT_EQ( stateTemplates[0]->periodMs, 500U );
+
+    ASSERT_EQ( stateTemplates[1]->id, "stateTemplate2" );
+    ASSERT_EQ( stateTemplates[1]->decoderManifestID, "decoder1" );
+    ASSERT_EQ( stateTemplates[1]->signals.size(), 1U );
+    ASSERT_EQ( stateTemplates[1]->signals[0].signalID, 7 );
+    ASSERT_EQ( stateTemplates[1]->updateStrategy, LastKnownStateUpdateStrategy::PERIODIC );
+    ASSERT_EQ( stateTemplates[1]->periodMs, 400U );
+
+    std::vector<SyncID> stateTemplatesToRemove{ "stateTemplate1" };
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillOnce(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 456, {}, stateTemplatesToRemove } ) ) );
+
+    mCollectionSchemeManager.onStateTemplatesChanged( lastKnownStateIngestionMock );
+
+    WAIT_ASSERT_EQ( getReceivedStateTemplates().size(), 4U );
+    receivedStateTemplates = getReceivedStateTemplates();
+
+    stateTemplates = receivedStateTemplates[3];
+    ASSERT_EQ( stateTemplates.size(), 1U );
+
+    ASSERT_EQ( stateTemplates[0]->id, "stateTemplate2" );
+    ASSERT_EQ( stateTemplates[0]->decoderManifestID, "decoder1" );
+    ASSERT_EQ( stateTemplates[0]->signals.size(), 1U );
+    ASSERT_EQ( stateTemplates[0]->signals[0].signalID, 7 );
+    ASSERT_EQ( stateTemplates[0]->updateStrategy, LastKnownStateUpdateStrategy::PERIODIC );
+    ASSERT_EQ( stateTemplates[0]->periodMs, 400U );
+}
+
+TEST_F( CollectionSchemeManagerTest, StateTemplatesUpdateRejectDiffWithLowerVersion )
+{
+    auto decoderManifestIngestionMock = std::make_shared<mockDecoderManifest>();
+    EXPECT_CALL( *decoderManifestIngestionMock, build() ).WillRepeatedly( Return( true ) );
+    EXPECT_CALL( *decoderManifestIngestionMock, getID() ).WillRepeatedly( Return( "decoder1" ) );
+    auto lastKnownStateIngestionMock = std::make_shared<LastKnownStateIngestionMock>();
+    EXPECT_CALL( *lastKnownStateIngestionMock, build() ).WillRepeatedly( Return( true ) );
+
+    ASSERT_TRUE( mCollectionSchemeManager.connect() );
+
+    mCollectionSchemeManager.onDecoderManifestUpdate( decoderManifestIngestionMock );
+
+    // This should be an empty list, triggered by the decoder manifest update
+    WAIT_ASSERT_EQ( getReceivedStateTemplates().size(), 1U );
+
+    auto stateTemplateToAdd = std::make_shared<const StateTemplateInformation>(
+        StateTemplateInformation{ "stateTemplate1",
+                                  "decoder1",
+                                  { LastKnownStateSignalInformation{ 1 }, LastKnownStateSignalInformation{ 2 } },
+                                  LastKnownStateUpdateStrategy::PERIODIC,
+                                  500 } );
+
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillOnce(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 456, { stateTemplateToAdd }, {} } ) ) );
+
+    mCollectionSchemeManager.onStateTemplatesChanged( lastKnownStateIngestionMock );
+
+    WAIT_ASSERT_EQ( getReceivedStateTemplates().size(), 2U );
+    auto receivedStateTemplates = getReceivedStateTemplates();
+
+    auto stateTemplates = receivedStateTemplates[1];
+    ASSERT_EQ( stateTemplates.size(), 1U );
+    ASSERT_EQ( stateTemplates[0]->id, "stateTemplate1" );
+
+    stateTemplateToAdd = std::make_shared<const StateTemplateInformation>(
+        StateTemplateInformation{ "stateTemplate2",
+                                  "decoder1",
+                                  { LastKnownStateSignalInformation{ 7 } },
+                                  LastKnownStateUpdateStrategy::PERIODIC,
+                                  400 } );
+    // This has a smaller version than the previous received message, it should be ignored.
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillOnce(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 455, { stateTemplateToAdd }, {} } ) ) );
+    auto previousSize = receivedStateTemplates.size();
+    mCollectionSchemeManager.onStateTemplatesChanged( lastKnownStateIngestionMock );
+    DELAY_ASSERT_TRUE( getReceivedStateTemplates().size() == previousSize );
+
+    // This has the same version of the last accepted message, it should be processed normally.
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillOnce(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 456, { stateTemplateToAdd }, {} } ) ) );
+
+    mCollectionSchemeManager.onStateTemplatesChanged( lastKnownStateIngestionMock );
+
+    WAIT_ASSERT_EQ( getReceivedStateTemplates().size(), 3U );
+    receivedStateTemplates = getReceivedStateTemplates();
+
+    stateTemplates = receivedStateTemplates[2];
+    ASSERT_EQ( stateTemplates.size(), 2U );
+
+    ASSERT_EQ( stateTemplates[0]->id, "stateTemplate1" );
+    ASSERT_EQ( stateTemplates[0]->decoderManifestID, "decoder1" );
+    ASSERT_EQ( stateTemplates[0]->signals.size(), 2U );
+    ASSERT_EQ( stateTemplates[0]->signals[0].signalID, 1 );
+    ASSERT_EQ( stateTemplates[0]->signals[1].signalID, 2 );
+    ASSERT_EQ( stateTemplates[0]->updateStrategy, LastKnownStateUpdateStrategy::PERIODIC );
+    ASSERT_EQ( stateTemplates[0]->periodMs, 500U );
+
+    ASSERT_EQ( stateTemplates[1]->id, "stateTemplate2" );
+    ASSERT_EQ( stateTemplates[1]->decoderManifestID, "decoder1" );
+    ASSERT_EQ( stateTemplates[1]->signals.size(), 1U );
+    ASSERT_EQ( stateTemplates[1]->signals[0].signalID, 7 );
+    ASSERT_EQ( stateTemplates[1]->updateStrategy, LastKnownStateUpdateStrategy::PERIODIC );
+    ASSERT_EQ( stateTemplates[1]->periodMs, 400U );
+
+    std::vector<SyncID> stateTemplatesToRemove{ "stateTemplate1" };
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillOnce(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 456, {}, stateTemplatesToRemove } ) ) );
+
+    mCollectionSchemeManager.onStateTemplatesChanged( lastKnownStateIngestionMock );
+
+    WAIT_ASSERT_EQ( getReceivedStateTemplates().size(), 4U );
+    receivedStateTemplates = getReceivedStateTemplates();
+
+    stateTemplates = receivedStateTemplates[3];
+    ASSERT_EQ( stateTemplates.size(), 1U );
+
+    ASSERT_EQ( stateTemplates[0]->id, "stateTemplate2" );
+    ASSERT_EQ( stateTemplates[0]->decoderManifestID, "decoder1" );
+    ASSERT_EQ( stateTemplates[0]->signals.size(), 1U );
+    ASSERT_EQ( stateTemplates[0]->signals[0].signalID, 7 );
+    ASSERT_EQ( stateTemplates[0]->updateStrategy, LastKnownStateUpdateStrategy::PERIODIC );
+    ASSERT_EQ( stateTemplates[0]->periodMs, 400U );
+}
+
+TEST_F( CollectionSchemeManagerTest, StateTemplatesUpdateRemoveNonExistingTemplate )
+{
+    auto lastKnownStateIngestionMock = std::make_shared<LastKnownStateIngestionMock>();
+
+    ASSERT_TRUE( mCollectionSchemeManager.connect() );
+
+    auto decoderManifestIngestionMock = std::make_shared<mockDecoderManifest>();
+    EXPECT_CALL( *decoderManifestIngestionMock, build() ).WillRepeatedly( Return( true ) );
+    EXPECT_CALL( *decoderManifestIngestionMock, getID() ).WillRepeatedly( Return( "decoder1" ) );
+    mCollectionSchemeManager.onDecoderManifestUpdate( decoderManifestIngestionMock );
+
+    // This should be an empty list, triggered by the decoder manifest update
+    WAIT_ASSERT_EQ( getReceivedStateTemplates().size(), 1U );
+
+    std::vector<SyncID> stateTemplatesToRemove{ "stateTemplate1" };
+    EXPECT_CALL( *lastKnownStateIngestionMock, build() ).WillRepeatedly( Return( true ) );
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillOnce(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 456, {}, stateTemplatesToRemove } ) ) );
+
+    auto previousSize = getReceivedStateTemplates().size();
+    mCollectionSchemeManager.onStateTemplatesChanged( lastKnownStateIngestionMock );
+
+    DELAY_ASSERT_TRUE( getReceivedStateTemplates().size() == previousSize );
+}
+#endif
 
 TEST_F( CollectionSchemeManagerTest, MockProducer )
 {
@@ -386,6 +682,56 @@ TEST_F( CollectionSchemeManagerTest, SendCheckinPeriodically )
     ASSERT_EQ( sentDocuments[0], "COLLECTIONSCHEME1" );
     ASSERT_EQ( sentDocuments[1], "COLLECTIONSCHEME2" );
     ASSERT_EQ( sentDocuments[2], "DM1" );
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    auto lastKnownStateIngestionMock = std::make_shared<LastKnownStateIngestionMock>();
+    collectionSchemeManager.mLastKnownStateIngestionTest = lastKnownStateIngestionMock;
+    auto stateTemplate1 = std::make_shared<StateTemplateInformation>();
+    stateTemplate1->id = "LKS1";
+    stateTemplate1->decoderManifestID = "DM1";
+    EXPECT_CALL( *lastKnownStateIngestionMock, build() ).WillRepeatedly( Return( true ) );
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillRepeatedly(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 123, { stateTemplate1 }, {} } ) ) );
+    collectionSchemeManager.myInvokeStateTemplates();
+
+    WAIT_ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), 4 );
+    sort( sentDocuments.begin(), sentDocuments.end() );
+    ASSERT_EQ( sentDocuments[0], "COLLECTIONSCHEME1" );
+    ASSERT_EQ( sentDocuments[1], "COLLECTIONSCHEME2" );
+    ASSERT_EQ( sentDocuments[2], "DM1" );
+    ASSERT_EQ( sentDocuments[3], "LKS1" );
+
+    // Add another template
+    auto stateTemplate2 = std::make_shared<StateTemplateInformation>();
+    stateTemplate2->id = "LKS2";
+    stateTemplate2->decoderManifestID = "DM1";
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillRepeatedly(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 123, { stateTemplate2 }, {} } ) ) );
+    collectionSchemeManager.myInvokeStateTemplates();
+
+    WAIT_ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), 5 );
+    sort( sentDocuments.begin(), sentDocuments.end() );
+    ASSERT_EQ( sentDocuments[0], "COLLECTIONSCHEME1" );
+    ASSERT_EQ( sentDocuments[1], "COLLECTIONSCHEME2" );
+    ASSERT_EQ( sentDocuments[2], "DM1" );
+    ASSERT_EQ( sentDocuments[3], "LKS1" );
+    ASSERT_EQ( sentDocuments[4], "LKS2" );
+
+    // Remove an existing template
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillRepeatedly(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 123, {}, { stateTemplate1->id } } ) ) );
+    collectionSchemeManager.myInvokeStateTemplates();
+
+    WAIT_ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), 4 );
+    sort( sentDocuments.begin(), sentDocuments.end() );
+    ASSERT_EQ( sentDocuments[0], "COLLECTIONSCHEME1" );
+    ASSERT_EQ( sentDocuments[1], "COLLECTIONSCHEME2" );
+    ASSERT_EQ( sentDocuments[2], "DM1" );
+    ASSERT_EQ( sentDocuments[3], "LKS2" );
+#endif
 
     auto numOfMessagesSent = schemaListenerMock->getSentDocuments().size();
 

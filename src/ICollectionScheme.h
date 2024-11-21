@@ -16,6 +16,44 @@ namespace Aws
 namespace IoTFleetWise
 {
 
+struct FetchInformation
+{
+    /**
+     * @brief   ID of signal to be fetched.
+     */
+    SignalID signalID{ 0U };
+
+    /**
+     * @brief   AST root node to specify condition to fetch data (nullptr for time-based fetching).
+     */
+    ExpressionNode *condition{ nullptr };
+
+    /**
+     * @brief   Specify if data fetching should occur only on rising edge of condition (false to true).
+     */
+    bool triggerOnlyOnRisingEdge{ false };
+
+    /**
+     * @brief   Max number of action executions (per action?) can occur per interval (refer executionIntervalMs).
+     */
+    uint64_t maxExecutionPerInterval{ 0U };
+
+    /**
+     * @brief   Action execution period - between consecutive action executions (per action?).
+     */
+    uint64_t executionPeriodMs{ 0U };
+
+    /**
+     * @brief   Action execution interval (per action?) (refer maxExecutionPerInterval).
+     */
+    uint64_t executionIntervalMs{ 0U };
+
+    /**
+     * @brief   Actions to be executed on fetching.
+     */
+    std::vector<ExpressionNode *> actions;
+};
+
 struct SignalCollectionInfo
 {
     /**
@@ -47,6 +85,14 @@ struct SignalCollectionInfo
      * condition logic with its associated fixed_window_period_ms. Default is false.
      */
     bool isConditionOnlySignal{ false };
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    /**
+     * @brief The Id of the partition where this signal should be stored.
+     * This Id will be used to index into the partition configuration array.
+     */
+    uint32_t dataPartitionId{ 0 };
+#endif
 };
 
 struct CanFrameCollectionInfo
@@ -82,6 +128,7 @@ enum class ExpressionNodeType
     FLOAT = 0,
     SIGNAL, // Node_Signal_ID
     BOOLEAN,
+    STRING,
     OPERATOR_SMALLER, // NodeOperator
     OPERATOR_BIGGER,
     OPERATOR_SMALLER_EQUAL,
@@ -96,6 +143,8 @@ enum class ExpressionNodeType
     OPERATOR_ARITHMETIC_MULTIPLY,
     OPERATOR_ARITHMETIC_DIVIDE,
     WINDOW_FUNCTION, // NodeFunction
+    CUSTOM_FUNCTION,
+    IS_NULL_FUNCTION,
     NONE
 };
 
@@ -116,6 +165,13 @@ struct ExpressionFunction
      * @brief   Specify which window function to be used (in case ExpressionNodeType is WINDOW_FUNCTION).
      */
     WindowFunction windowFunction{ WindowFunction::NONE };
+
+    /**
+     * @brief   Specify custom function name and params (in case ExpressionNodeType is CUSTOM_FUNCTION).
+     */
+    std::string customFunctionName;
+    std::vector<ExpressionNode *> customFunctionParams;
+    CustomFunctionInvocationID customFunctionInvocationId{};
 };
 
 // Instead of c style struct an object oriented interface could be implemented with different
@@ -146,6 +202,11 @@ struct ExpressionNode
      * @brief Node Value is boolean
      */
     bool booleanValue{ false };
+
+    /**
+     * @brief Node Value is string
+     */
+    std::string stringValue;
 
     /**
      * @brief Unique Signal ID provided by Cloud
@@ -207,6 +268,52 @@ public:
 };
 #endif
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+struct StorageOptions
+{
+    /**
+     * @brief The total amount of space allocated to this campaign including all overhead. uint64 can support up to 8GB.
+     */
+    uint64_t maximumSizeInBytes{ 0 };
+
+    /**
+     * @brief Specifies where the data should be stored withing the device.
+     * Implementation is defined by the user who integrates FWE with their filesystem library.
+     */
+    std::string storageLocation;
+
+    /**
+     * @brief The minimum amount of time to keep data on disk after it is collected.
+     * When this TTL expires, data may be deleted, but it is not guaranteed to be deleted immediately after expiry.
+     * Can hold TTL more than 132 years.
+     */
+    uint32_t minimumTimeToLiveInSeconds{ 0 };
+};
+
+struct UploadOptions
+{
+    /**
+     * @brief Root condition node for the Abstract Syntax Tree.
+     */
+    ExpressionNode *conditionTree{ nullptr };
+};
+
+struct PartitionConfiguration
+{
+    /**
+     * @brief Optional Store and Forward storage options.
+     * If not specified, data in this partition will be uploaded in realtime.
+     */
+    StorageOptions storageOptions;
+
+    /**
+     * @brief Store and Forward upload options defines when the stored data may be uploaded.
+     * It is only used when spoolingMode=TO_DISK. May be non-null only when spoolingMode=TO_DISK.
+     */
+    UploadOptions uploadOptions;
+};
+#endif
+
 /**
  * @brief ICollectionScheme is used to exchange CollectionScheme between components
  *
@@ -247,11 +354,25 @@ public:
     const S3UploadMetadata INVALID_S3_UPLOAD_METADATA = S3UploadMetadata();
 #endif
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    /**
+     * @brief Configuration of store and forward campaign.
+     */
+    using StoreAndForwardConfig = std::vector<PartitionConfiguration>;
+    const StoreAndForwardConfig INVALID_STORE_AND_FORWARD_CONFIG = std::vector<PartitionConfiguration>();
+#endif
+
     /**
      * @brief ExpressionNode_t is a vector that represents the AST Expression Tree per collectionScheme provided.
      */
     using ExpressionNode_t = std::vector<ExpressionNode>;
     const ExpressionNode_t INVALID_EXPRESSION_NODES = std::vector<ExpressionNode>();
+
+    /**
+     * @brief   FetchInformation_t is a vector that represents all fetch informations in the CollectionScheme.
+     */
+    using FetchInformation_t = std::vector<FetchInformation>;
+    const FetchInformation_t INVALID_FETCH_INFORMATIONS = std::vector<FetchInformation>();
 
     const uint64_t INVALID_COLLECTION_SCHEME_START_TIME = std::numeric_limits<uint64_t>::max();
     const uint64_t INVALID_COLLECTION_SCHEME_EXPIRY_TIME = std::numeric_limits<uint64_t>::max();
@@ -260,6 +381,9 @@ public:
     const uint32_t INVALID_PRIORITY_LEVEL = std::numeric_limits<uint32_t>::max();
     const SyncID INVALID_COLLECTION_SCHEME_ID = SyncID();
     const SyncID INVALID_DECODER_MANIFEST_ID = SyncID();
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    const std::string INVALID_CAMPAIGN_ARN = std::string();
+#endif
 
     virtual bool operator==( const ICollectionScheme &other ) const = 0;
 
@@ -285,6 +409,15 @@ public:
      * @return A string containing the unique ID of this collectionScheme.
      */
     virtual const SyncID &getCollectionSchemeID() const = 0;
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    /**
+     * @brief Get the Amazon Resource Name of the campaign this collectionScheme is part of
+     *
+     * @return A string containing the Campaign Arn of this collectionScheme
+     */
+    virtual const std::string &getCampaignArn() const = 0;
+#endif
 
     /**
      * @brief Get the associated Decoder Manifest ID of this collectionScheme
@@ -400,6 +533,30 @@ public:
      */
     virtual S3UploadMetadata getS3UploadMetadata() const = 0;
 #endif
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    /**
+     * @brief Returns store and forward campaign configuration
+     *
+     * @return if not ready an empty vector
+     */
+    virtual const StoreAndForwardConfig &getStoreAndForwardConfiguration() const = 0;
+#endif
+
+    /**
+     * @brief   Get all expression nodes used for fetching conditions. Return empty vector if it is not ready.
+     */
+    virtual const ExpressionNode_t &getAllExpressionNodesForFetchCondition() const = 0;
+
+    /**
+     * @brief   Get all expression nodes used for fetching actions. Return empty vector if it is not ready.
+     */
+    virtual const ExpressionNode_t &getAllExpressionNodesForFetchAction() const = 0;
+
+    /**
+     * @brief   Get all fetch informations. Return empty vector if it is not ready.
+     */
+    virtual const FetchInformation_t &getAllFetchInformations() const = 0;
 
     virtual ~ICollectionScheme() = default;
 };

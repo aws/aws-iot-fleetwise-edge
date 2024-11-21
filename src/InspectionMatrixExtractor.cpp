@@ -16,6 +16,86 @@ namespace Aws
 namespace IoTFleetWise
 {
 
+void
+CollectionSchemeManager::updateRawDataBufferConfigStringSignals(
+    std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> &updatedSignals )
+{
+    if ( mDecoderManifest == nullptr )
+    {
+        return;
+    }
+    if ( isCollectionSchemesInSyncWithDm() )
+    {
+        // Iterate through enabled collectionScheme lists to locate the string signals to be collected
+        for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); ++it )
+        {
+            const auto &collectionSchemePtr = it->second;
+            for ( const auto &signalInfo : collectionSchemePtr->getCollectSignals() )
+            {
+                SignalID signalId = signalInfo.signalID;
+                RawData::SignalUpdateConfig signalConfig;
+                signalConfig.typeId = signalId;
+
+                auto networkType = mDecoderManifest->getNetworkProtocol( signalId );
+                if ( networkType != VehicleDataSourceProtocol::CUSTOM_DECODING )
+                {
+                    continue;
+                }
+
+                auto customSignalDecoderFormat = mDecoderManifest->getCustomSignalDecoderFormat( signalId );
+                if ( customSignalDecoderFormat == INVALID_CUSTOM_SIGNAL_DECODER_FORMAT )
+                {
+                    continue;
+                }
+
+                if ( customSignalDecoderFormat.mSignalType != SignalType::STRING )
+                {
+                    continue;
+                }
+
+                signalConfig.interfaceId = customSignalDecoderFormat.mInterfaceId;
+                signalConfig.messageId = customSignalDecoderFormat.mDecoder;
+
+                updatedSignals[signalId] = signalConfig;
+            }
+        }
+    }
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    /* TODO: Here we should iterate over all signals from all network interface types looking
+       for string signals that are WRITE or READ_WRITE and add them.
+       But the READ/WRITE/READ_WRITE indication for each signal is not yet available, so until then
+       we only support custom decoded signals with the decoder id being the actuator name. */
+    auto customSignalDecoderFormatMap = mDecoderManifest->getSignalIDToCustomSignalDecoderFormatMap();
+    if ( mGetActuatorNamesCallback && customSignalDecoderFormatMap )
+    {
+        auto actuatorNames = mGetActuatorNamesCallback();
+        for ( const auto &interface : actuatorNames )
+        {
+            for ( const auto &actuatorName : interface.second )
+            {
+                for ( const auto &customSignalDecoderFormat : *customSignalDecoderFormatMap )
+                {
+                    if ( ( interface.first != customSignalDecoderFormat.second.mInterfaceId ) ||
+                         ( actuatorName != customSignalDecoderFormat.second.mDecoder ) )
+                    {
+                        continue;
+                    }
+                    if ( customSignalDecoderFormat.second.mSignalType == SignalType::STRING )
+                    {
+                        auto signalId = customSignalDecoderFormat.first;
+                        updatedSignals[signalId] =
+                            RawData::SignalUpdateConfig{ signalId,
+                                                         customSignalDecoderFormat.second.mInterfaceId,
+                                                         customSignalDecoderFormat.second.mDecoder };
+                    }
+                    break;
+                }
+            }
+        }
+    }
+#endif
+}
+
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 void
 CollectionSchemeManager::updateRawDataBufferConfigComplexSignals(
@@ -81,6 +161,9 @@ CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectio
     conditionData.metadata.priority = collectionScheme->getPriority();
     conditionData.metadata.decoderID = collectionScheme->getDecoderManifestID();
     conditionData.metadata.collectionSchemeID = collectionScheme->getCollectionSchemeID();
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    conditionData.metadata.campaignArn = collectionScheme->getCampaignArn();
+#endif
 
     /*
      * use for loop to copy signalInfo and CANframe over to avoid error or memory issue
@@ -100,30 +183,28 @@ CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectio
         conditionData.signals.emplace_back( inspectionSignal );
     }
 
+    const std::vector<CanFrameCollectionInfo> &collectionCANFrames = collectionScheme->getCollectRawCanFrames();
+    for ( uint32_t i = 0; i < collectionCANFrames.size(); i++ )
     {
-        const std::vector<CanFrameCollectionInfo> &collectionCANFrames = collectionScheme->getCollectRawCanFrames();
-        for ( uint32_t i = 0; i < collectionCANFrames.size(); i++ )
+        InspectionMatrixCanFrameCollectionInfo CANFrame = {};
+        CANFrame.frameID = collectionCANFrames[i].frameID;
+        CANFrame.channelID = mCANIDTranslator.getChannelNumericID( collectionCANFrames[i].interfaceID );
+        CANFrame.sampleBufferSize = collectionCANFrames[i].sampleBufferSize;
+        CANFrame.minimumSampleIntervalMs = collectionCANFrames[i].minimumSampleIntervalMs;
+        if ( CANFrame.channelID == INVALID_CAN_SOURCE_NUMERIC_ID )
         {
-            InspectionMatrixCanFrameCollectionInfo CANFrame = {};
-            CANFrame.frameID = collectionCANFrames[i].frameID;
-            CANFrame.channelID = mCANIDTranslator.getChannelNumericID( collectionCANFrames[i].interfaceID );
-            CANFrame.sampleBufferSize = collectionCANFrames[i].sampleBufferSize;
-            CANFrame.minimumSampleIntervalMs = collectionCANFrames[i].minimumSampleIntervalMs;
-            if ( CANFrame.channelID == INVALID_CAN_SOURCE_NUMERIC_ID )
-            {
-                FWE_LOG_WARN( "Invalid Interface ID provided: " + collectionCANFrames[i].interfaceID );
-            }
-            else
-            {
-                conditionData.canFrames.emplace_back( CANFrame );
-            }
+            FWE_LOG_WARN( "Invalid Interface ID provided: " + collectionCANFrames[i].interfaceID );
         }
-
-        conditionData.minimumPublishIntervalMs = collectionScheme->getMinimumPublishIntervalMs();
-        conditionData.afterDuration = collectionScheme->getAfterDurationMs();
-        conditionData.includeActiveDtcs = collectionScheme->isActiveDTCsIncluded();
-        conditionData.triggerOnlyOnRisingEdge = collectionScheme->isTriggerOnlyOnRisingEdge();
+        else
+        {
+            conditionData.canFrames.emplace_back( CANFrame );
+        }
     }
+
+    conditionData.minimumPublishIntervalMs = collectionScheme->getMinimumPublishIntervalMs();
+    conditionData.afterDuration = collectionScheme->getAfterDurationMs();
+    conditionData.includeActiveDtcs = collectionScheme->isActiveDTCsIncluded();
+    conditionData.triggerOnlyOnRisingEdge = collectionScheme->isTriggerOnlyOnRisingEdge();
 }
 
 static void
@@ -149,6 +230,23 @@ buildExpressionNodeMapAndVector( const ExpressionNode *expressionNode,
         isStaticCondition = false;
     }
 
+    if ( expressionNode->nodeType == ExpressionNodeType::CUSTOM_FUNCTION )
+    {
+        // Custom functions should always be reevaluated
+        alwaysEvaluateCondition = true;
+        for ( const auto &param : expressionNode->function.customFunctionParams )
+        {
+            buildExpressionNodeMapAndVector(
+                param, expressionNodeToIndexMap, expressionNodes, index, isStaticCondition, alwaysEvaluateCondition );
+        }
+    }
+
+    if ( expressionNode->nodeType == ExpressionNodeType::IS_NULL_FUNCTION )
+    {
+        // Null function should always be reevaluated
+        alwaysEvaluateCondition = true;
+    }
+
     buildExpressionNodeMapAndVector( expressionNode->left,
                                      expressionNodeToIndexMap,
                                      expressionNodes,
@@ -164,11 +262,13 @@ buildExpressionNodeMapAndVector( const ExpressionNode *expressionNode,
 }
 
 void
-CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix )
+CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix,
+                                          const std::shared_ptr<FetchMatrix> &fetchMatrix )
 {
     std::map<const ExpressionNode *, uint32_t> expressionNodeToIndexMap;
     std::vector<const ExpressionNode *> expressionNodes;
     uint32_t index = 0U;
+    FetchRequestID fetchRequestID = 0U;
 
     if ( !isCollectionSchemesInSyncWithDm() )
     {
@@ -185,6 +285,145 @@ CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix
                           expressionNodeToIndexMap,
                           index,
                           collectionScheme->getCondition() );
+
+        ConditionWithCollectedData &conditionWithCollectedData = inspectionMatrix->conditions.back();
+
+        // extract FetchInformation
+        const std::vector<FetchInformation> &fetchInformations = collectionScheme->getAllFetchInformations();
+
+        for ( const auto &fetchInformation : fetchInformations )
+        {
+            bool isValid = true;
+
+            auto itFetchRequests =
+                fetchMatrix->fetchRequests.emplace( fetchRequestID, std::vector<FetchRequest>() ).first;
+            std::vector<FetchRequest> &fetchRequests = itFetchRequests->second;
+
+            SignalID signalID = fetchInformation.signalID;
+
+            for ( const auto &action : fetchInformation.actions )
+            {
+                if ( action->nodeType != ExpressionNodeType::CUSTOM_FUNCTION )
+                {
+                    FWE_LOG_WARN( "Ignored fetch information due to unsupported action "
+                                  "(only custom functions are allowed)" );
+                    isValid = false;
+                    break;
+                }
+
+                fetchRequests.emplace_back();
+
+                FetchRequest &fetchRequest = fetchRequests.back();
+
+                fetchRequest.signalID = signalID;
+                fetchRequest.functionName = action->function.customFunctionName;
+
+                for ( const auto &param : action->function.customFunctionParams )
+                {
+                    fetchRequest.args.emplace_back();
+
+                    InspectionValue &arg = fetchRequest.args.back();
+
+                    if ( param->nodeType == ExpressionNodeType::BOOLEAN )
+                    {
+                        arg = param->booleanValue;
+                    }
+                    else if ( param->nodeType == ExpressionNodeType::FLOAT )
+                    {
+                        arg = param->floatingValue;
+                    }
+                    else if ( param->nodeType == ExpressionNodeType::STRING )
+                    {
+                        arg = param->stringValue;
+                    }
+                    else
+                    {
+                        FWE_LOG_WARN( "Ignored fetch information due to unsupported action arguments "
+                                      "(only boolean, double and string value are allowed)" );
+                        isValid = false;
+                        break;
+                    }
+                }
+
+                if ( !isValid )
+                {
+                    break;
+                }
+            }
+
+            if ( ( fetchInformation.condition == nullptr ) && ( fetchInformation.executionPeriodMs == 0 ) )
+            {
+                FWE_LOG_WARN( "Ignored fetch information due to unsupported time based fetch configuration" );
+                isValid = false;
+            }
+
+            if ( !isValid )
+            {
+                // invalid FetchInformation => remove key fetchRequestID from map fetchMatrix->fetchRequests
+                fetchMatrix->fetchRequests.erase( itFetchRequests );
+                continue;
+            }
+
+            if ( fetchInformation.condition == nullptr )
+            {
+                // time-based fetch configuration
+                PeriodicalFetchParameters &periodicalFetchParameters =
+                    fetchMatrix->periodicalFetchRequestSetup[fetchRequestID];
+
+                periodicalFetchParameters.fetchFrequencyMs = fetchInformation.executionPeriodMs;
+                // TODO: below parameters are not yet supported by the cloud and are ignored on edge
+                periodicalFetchParameters.maxExecutionCount = fetchInformation.maxExecutionPerInterval;
+                periodicalFetchParameters.maxExecutionCountResetPeriodMs = fetchInformation.executionIntervalMs;
+            }
+            else
+            {
+                // condition-based fetch configuration
+                ConditionForFetch conditionForFetch;
+
+                conditionForFetch.condition = fetchInformation.condition;
+                conditionForFetch.triggerOnlyOnRisingEdge = fetchInformation.triggerOnlyOnRisingEdge;
+                conditionForFetch.fetchRequestID = fetchRequestID;
+
+                conditionWithCollectedData.fetchConditions.emplace_back( conditionForFetch );
+
+                bool alwaysEvaluateCondition = false;
+                buildExpressionNodeMapAndVector( fetchInformation.condition,
+                                                 expressionNodeToIndexMap,
+                                                 expressionNodes,
+                                                 index,
+                                                 conditionWithCollectedData.isStaticCondition,
+                                                 alwaysEvaluateCondition );
+            }
+
+            for ( auto &signal : conditionWithCollectedData.signals )
+            {
+                if ( signal.signalID == signalID )
+                {
+                    signal.fetchRequestIDs.push_back( fetchRequestID );
+                }
+            }
+
+            fetchRequestID++;
+        }
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        for ( const auto &partition : collectionScheme->getStoreAndForwardConfiguration() )
+        {
+
+            bool alwaysEvaluateCondition = false;
+            ConditionForForward conditionForForward;
+
+            conditionForForward.condition = partition.uploadOptions.conditionTree;
+            conditionWithCollectedData.forwardConditions.emplace_back( conditionForForward );
+
+            buildExpressionNodeMapAndVector( conditionForForward.condition,
+                                             expressionNodeToIndexMap,
+                                             expressionNodes,
+                                             index,
+                                             conditionWithCollectedData.isStaticCondition,
+                                             alwaysEvaluateCondition );
+        }
+#endif
     }
 
     // re-build all ExpressionNodes (for storage) and set ExpressionNode pointer addresses appropriately
@@ -197,9 +436,23 @@ CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix
         inspectionMatrix->expressionNodeStorage[i].nodeType = expressionNodes[i]->nodeType;
         inspectionMatrix->expressionNodeStorage[i].floatingValue = expressionNodes[i]->floatingValue;
         inspectionMatrix->expressionNodeStorage[i].booleanValue = expressionNodes[i]->booleanValue;
+        inspectionMatrix->expressionNodeStorage[i].stringValue = expressionNodes[i]->stringValue;
         inspectionMatrix->expressionNodeStorage[i].signalID = expressionNodes[i]->signalID;
         inspectionMatrix->expressionNodeStorage[i].function.windowFunction =
             expressionNodes[i]->function.windowFunction;
+        inspectionMatrix->expressionNodeStorage[i].function.customFunctionName =
+            expressionNodes[i]->function.customFunctionName;
+        inspectionMatrix->expressionNodeStorage[i].function.customFunctionInvocationId =
+            expressionNodes[i]->function.customFunctionInvocationId;
+
+        for ( const auto &param : expressionNodes[i]->function.customFunctionParams )
+        {
+            uint32_t paramIndex = expressionNodeToIndexMap[param];
+
+            inspectionMatrix->expressionNodeStorage[i].function.customFunctionParams.push_back(
+                &inspectionMatrix->expressionNodeStorage[paramIndex] );
+        }
+
         if ( expressionNodes[i]->left != nullptr )
         {
             uint32_t leftIndex = expressionNodeToIndexMap[expressionNodes[i]->left];
@@ -220,6 +473,13 @@ CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix
             uint32_t conditionIndex = expressionNodeToIndexMap[conditionWithCollectedData.condition];
 
             conditionWithCollectedData.condition = &inspectionMatrix->expressionNodeStorage[conditionIndex];
+        }
+
+        for ( auto &conditionForFetch : conditionWithCollectedData.fetchConditions )
+        {
+            uint32_t conditionIndex = expressionNodeToIndexMap[conditionForFetch.condition];
+
+            conditionForFetch.condition = &inspectionMatrix->expressionNodeStorage[conditionIndex];
         }
     }
 }
@@ -252,6 +512,47 @@ CollectionSchemeManager::inspectionMatrixUpdater( const std::shared_ptr<const In
 {
     mInspectionMatrixChangeListeners.notify( inspectionMatrix );
 }
+
+void
+CollectionSchemeManager::fetchMatrixUpdater( const std::shared_ptr<const FetchMatrix> &fetchMatrix )
+{
+    mFetchMatrixChangeListeners.notify( fetchMatrix );
+}
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+std::shared_ptr<StateTemplateList>
+CollectionSchemeManager::lastKnownStateExtractor()
+{
+    auto extractedStateTemplates = std::make_shared<StateTemplateList>();
+
+    for ( auto &stateTemplate : mStateTemplates )
+    {
+        if ( stateTemplate.second->decoderManifestID != mCurrentDecoderManifestID )
+        {
+            FWE_LOG_INFO( "Decoder manifest out of sync: " + stateTemplate.second->decoderManifestID + " vs. " +
+                          mCurrentDecoderManifestID );
+            continue;
+        }
+
+        // Intentionally copy it because we will need to modify the signals
+        auto newStateTemplate = std::make_shared<StateTemplateInformation>( *stateTemplate.second );
+        for ( auto &signal : newStateTemplate->signals )
+        {
+            signal.signalType = getSignalType( signal.signalID );
+        }
+
+        extractedStateTemplates->emplace_back( newStateTemplate );
+    }
+
+    return extractedStateTemplates;
+}
+
+void
+CollectionSchemeManager::lastKnownStateUpdater( std::shared_ptr<StateTemplateList> stateTemplates )
+{
+    mStateTemplatesChangeListeners.notify( stateTemplates );
+}
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

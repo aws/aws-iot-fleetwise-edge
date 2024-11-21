@@ -19,6 +19,7 @@
 #include "SenderMock.h"
 #include "SignalTypes.h"
 #include "TimeTypes.h"
+#include "TopicConfig.h"
 #include "VehicleDataSourceTypes.h"
 #include "checkin.pb.h"
 #include "collection_schemes.pb.h"
@@ -28,7 +29,6 @@
 #include <aws/crt/Types.h>
 #include <aws/crt/mqtt/Mqtt5Client.h>
 #include <aws/crt/mqtt/Mqtt5Packets.h>
-#include <aws/crt/mqtt/Mqtt5Types.h>
 #include <cstdint>
 #include <functional>
 #include <gmock/gmock.h>
@@ -96,7 +96,10 @@ protected:
     void
     SetUp() override
     {
-        mAwsIotModule = std::make_unique<AwsIotConnectivityModule>( "", "", nullptr );
+        TopicConfigArgs topicConfigArgs;
+        mTopicConfig = std::make_unique<TopicConfig>( "thing-name", topicConfigArgs );
+
+        mAwsIotModule = std::make_unique<AwsIotConnectivityModule>( "", "", nullptr, *mTopicConfig );
 
         std::shared_ptr<MqttClientWrapper> nullMqttClient;
 
@@ -107,8 +110,7 @@ protected:
         mCollectionSchemeIngestion = std::make_unique<Schema>(
             mReceiverDecoderManifest,
             mReceiverCollectionSchemeList,
-            std::make_shared<AwsIotSender>(
-                mAwsIotModule.get(), nullMqttClient, "topic", Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE ) );
+            std::make_shared<AwsIotSender>( mAwsIotModule.get(), nullMqttClient, *mTopicConfig ) );
 
         mCollectionSchemeIngestion->subscribeToDecoderManifestUpdate(
             [&]( const IDecoderManifestPtr &decoderManifest ) {
@@ -135,6 +137,8 @@ protected:
         receiver->onDataReceived( eventData );
     }
 
+    std::string mCheckinTopic = "$aws/iotfleetwise/vehicles/thing-name/checkins";
+    std::unique_ptr<TopicConfig> mTopicConfig;
     std::unique_ptr<AwsIotConnectivityModule> mAwsIotModule;
     std::shared_ptr<AwsIotReceiver> mReceiverDecoderManifest;
     std::shared_ptr<AwsIotReceiver> mReceiverCollectionSchemeList;
@@ -147,7 +151,7 @@ protected:
 TEST_F( SchemaTest, Checkins )
 {
     // Create a dummy AwsIotConnectivityModule object so that we can create dummy IReceiver objects
-    auto awsIotModule = std::make_shared<AwsIotConnectivityModule>( "", "", nullptr );
+    auto awsIotModule = std::make_shared<AwsIotConnectivityModule>( "", "", nullptr, *mTopicConfig );
 
     // Create a mock Sender
     auto senderMock = std::make_shared<StrictMock<Testing::SenderMock>>();
@@ -164,22 +168,22 @@ TEST_F( SchemaTest, Checkins )
     std::vector<SyncID> sampleDocList;
 
     Sequence seq;
-    EXPECT_CALL( *senderMock, mockedSendBuffer( _, Gt( 0 ), _ ) )
+    EXPECT_CALL( *senderMock, mockedSendBuffer( mCheckinTopic, _, Gt( 0 ), _ ) )
         .Times( 3 )
         .InSequence( seq )
-        .WillRepeatedly( InvokeArgument<2>( ConnectivityError::Success ) );
-    EXPECT_CALL( *senderMock, mockedSendBuffer( _, Gt( 0 ), _ ) )
+        .WillRepeatedly( InvokeArgument<3>( ConnectivityError::Success ) );
+    EXPECT_CALL( *senderMock, mockedSendBuffer( mCheckinTopic, _, Gt( 0 ), _ ) )
         .InSequence( seq )
-        .WillOnce( InvokeArgument<2>( ConnectivityError::NoConnection ) );
+        .WillOnce( InvokeArgument<3>( ConnectivityError::NoConnection ) );
 
     MockFunction<void( bool success )> resultCallback;
 
     // Test an empty checkin
     EXPECT_CALL( resultCallback, Call( true ) ).Times( 1 );
     collectionSchemeIngestion.sendCheckin( sampleDocList, resultCallback.AsStdFunction() );
-    ASSERT_EQ( senderMock->getSentBufferData().size(), 1 );
-    ASSERT_NO_FATAL_FAILURE(
-        assertCheckin( senderMock->getSentBufferData()[0].data, sampleDocList, timeBeforeCheckin ) );
+    ASSERT_EQ( senderMock->getSentBufferDataByTopic( mCheckinTopic ).size(), 1 );
+    ASSERT_NO_FATAL_FAILURE( assertCheckin(
+        senderMock->getSentBufferDataByTopic( mCheckinTopic )[0].data, sampleDocList, timeBeforeCheckin ) );
 
     // Add some doc arns
     sampleDocList.emplace_back( "DocArn1" );
@@ -199,9 +203,9 @@ TEST_F( SchemaTest, Checkins )
     // Second call should simulate a offboardconnectivity issue, the checkin message should fail to send.
     EXPECT_CALL( resultCallback, Call( false ) ).Times( 1 );
     collectionSchemeIngestion.sendCheckin( sampleDocList, resultCallback.AsStdFunction() );
-    ASSERT_EQ( senderMock->getSentBufferData().size(), 4 );
-    ASSERT_NO_FATAL_FAILURE(
-        assertCheckin( senderMock->getSentBufferData()[3].data, sampleDocList, timeBeforeCheckin ) );
+    ASSERT_EQ( senderMock->getSentBufferDataByTopic( mCheckinTopic ).size(), 4 );
+    ASSERT_NO_FATAL_FAILURE( assertCheckin(
+        senderMock->getSentBufferDataByTopic( mCheckinTopic )[3].data, sampleDocList, timeBeforeCheckin ) );
 }
 
 /**
@@ -283,6 +287,16 @@ TEST_F( SchemaTest, DecoderManifestIngestion )
     protoOBDPIDSignalB->set_bit_right_shift( 0 );
     protoOBDPIDSignalB->set_bit_mask_length( 8 );
     protoOBDPIDSignalB->set_primitive_type( Schemas::DecoderManifestMsg::PrimitiveType::UINT32 );
+
+    auto protoCustomDecodedSignalA = protoDM.add_custom_decoding_signals();
+    protoCustomDecodedSignalA->set_signal_id( 789 );
+    protoCustomDecodedSignalA->set_interface_id( "456" );
+    protoCustomDecodedSignalA->set_custom_decoding_id( "custom-decoder-0" );
+
+    auto protoCustomDecodedSignalB = protoDM.add_custom_decoding_signals();
+    protoCustomDecodedSignalB->set_signal_id( 111 );
+    protoCustomDecodedSignalB->set_interface_id( "456" );
+    protoCustomDecodedSignalB->set_custom_decoding_id( "custom-decoder-1" );
 
     ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverDecoderManifest, protoDM ) );
 
@@ -368,6 +382,16 @@ TEST_F( SchemaTest, DecoderManifestIngestion )
     ASSERT_EQ( mReceivedDecoderManifest->getNetworkProtocol( 50000 ), VehicleDataSourceProtocol::RAW_SOCKET );
     ASSERT_EQ( mReceivedDecoderManifest->getNetworkProtocol( 123 ), VehicleDataSourceProtocol::OBD );
     ASSERT_EQ( mReceivedDecoderManifest->getNetworkProtocol( 567 ), VehicleDataSourceProtocol::OBD );
+
+    auto customSignalDecoderFormat = mReceivedDecoderManifest->getCustomSignalDecoderFormat( 9999999 );
+    ASSERT_EQ( customSignalDecoderFormat.mInterfaceId, INVALID_INTERFACE_ID );
+    ASSERT_EQ( customSignalDecoderFormat.mDecoder, INVALID_CUSTOM_SIGNAL_DECODER );
+    customSignalDecoderFormat = mReceivedDecoderManifest->getCustomSignalDecoderFormat( 789 );
+    ASSERT_EQ( customSignalDecoderFormat.mInterfaceId, "456" );
+    ASSERT_EQ( customSignalDecoderFormat.mDecoder, "custom-decoder-0" );
+    customSignalDecoderFormat = mReceivedDecoderManifest->getCustomSignalDecoderFormat( 111 );
+    ASSERT_EQ( customSignalDecoderFormat.mInterfaceId, "456" );
+    ASSERT_EQ( customSignalDecoderFormat.mDecoder, "custom-decoder-1" );
 }
 
 /**
@@ -392,6 +416,10 @@ TEST_F( SchemaTest, SchemaInvalidDecoderManifestTest )
 
     ASSERT_FALSE( mReceivedDecoderManifest->build() );
     ASSERT_FALSE( mReceivedDecoderManifest->isReady() );
+
+    auto customSignalDecoderFormat = mReceivedDecoderManifest->getCustomSignalDecoderFormat( 9999999 );
+    ASSERT_EQ( customSignalDecoderFormat.mInterfaceId, INVALID_INTERFACE_ID );
+    ASSERT_EQ( customSignalDecoderFormat.mDecoder, INVALID_CUSTOM_SIGNAL_DECODER );
 }
 
 TEST_F( SchemaTest, CollectionSchemeIngestionList )
@@ -600,6 +628,9 @@ TEST_F( SchemaTest, CollectionSchemeIngestionHeartBeat )
 
 TEST_F( SchemaTest, SchemaCollectionEventBased )
 {
+    const std::string DUMMY_CUSTOM_FUNCTION_NAME = "Dummy_Custom_Function";
+    const std::string NOT_DUMMY_CUSTOM_FUNCTION_NAME = "Not_" + DUMMY_CUSTOM_FUNCTION_NAME;
+
     Schemas::CollectionSchemesMsg::CollectionSchemes protoCollectionSchemesMsg;
     auto collectionSchemeTestMessage = protoCollectionSchemesMsg.add_collection_schemes();
     collectionSchemeTestMessage->set_campaign_sync_id( "arn:aws:iam::2.23606797749:user/Development/product_1235/*" );
@@ -665,7 +696,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     rightOp->set_allocated_right_child( right_right );
     auto *right_rightOp = new Schemas::CommonTypesMsg::ConditionNode_NodeOperator();
     right_right->set_allocated_node_operator( right_rightOp );
-    right_rightOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_SMALLER );
+    right_rightOp->set_operator_( Schemas::CommonTypesMsg::ConditionNode_NodeOperator_Operator_COMPARE_BIGGER_EQUAL );
 
     //----------
 
@@ -742,7 +773,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
 
     auto *right_left_right_right = new Schemas::CommonTypesMsg::ConditionNode();
     right_left_rightOp->set_allocated_right_child( right_left_right_right );
-    right_left_right_right->set_node_double_value( 1 );
+    right_left_right_right->set_node_string_value( "1" );
 
     auto *right_right_left_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_leftOp->set_allocated_left_child( right_right_left_left );
@@ -754,11 +785,35 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
 
     auto *right_right_right_left = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_rightOp->set_allocated_left_child( right_right_right_left );
-    right_right_right_left->set_node_signal_id( SIGNAL_ID_1 );
+    right_right_right_left->set_node_string_value( DUMMY_CUSTOM_FUNCTION_NAME + "_1" );
 
     auto *right_right_right_right = new Schemas::CommonTypesMsg::ConditionNode();
     right_right_rightOp->set_allocated_right_child( right_right_right_right );
-    right_right_right_right->set_node_double_value( 1 );
+
+    auto *right_right_righ_right_nodeFunction = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction();
+    right_right_right_right->set_allocated_node_function( right_right_righ_right_nodeFunction );
+
+    auto *right_right_righ_right_customFunction =
+        new Schemas::CommonTypesMsg::ConditionNode_NodeFunction_CustomFunction();
+    right_right_righ_right_nodeFunction->set_allocated_custom_function( right_right_righ_right_customFunction );
+    right_right_righ_right_customFunction->set_function_name( DUMMY_CUSTOM_FUNCTION_NAME );
+
+    Schemas::CommonTypesMsg::ConditionNode *right_right_righ_right_customFunctionParam =
+        right_right_righ_right_customFunction->add_params();
+
+    auto *right_right_righ_right_customFunctionParam_nodeFunction =
+        new Schemas::CommonTypesMsg::ConditionNode_NodeFunction();
+    right_right_righ_right_customFunctionParam->set_allocated_node_function(
+        right_right_righ_right_customFunctionParam_nodeFunction );
+
+    auto *right_right_righ_right_customFunctionParam_isNullFunction =
+        new Schemas::CommonTypesMsg::ConditionNode_NodeFunction_IsNullFunction();
+    right_right_righ_right_customFunctionParam_nodeFunction->set_allocated_is_null_function(
+        right_right_righ_right_customFunctionParam_isNullFunction );
+
+    auto *right_right_righ_right_left = new Schemas::CommonTypesMsg::ConditionNode();
+    right_right_righ_right_customFunctionParam_isNullFunction->set_allocated_expression( right_right_righ_right_left );
+    right_right_righ_right_left->set_node_signal_id( SIGNAL_ID_1 );
 
     //----------
 
@@ -767,6 +822,82 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     collectionSchemeTestMessage->set_persist_all_collected_data( true );
     collectionSchemeTestMessage->set_compress_collected_data( true );
     collectionSchemeTestMessage->set_priority( 5 );
+
+    // add FetchInformation 1
+    Schemas::CollectionSchemesMsg::FetchInformation *fetchInformation1 =
+        collectionSchemeTestMessage->add_signal_fetch_information();
+    fetchInformation1->set_signal_id( SIGNAL_ID_2 );
+    fetchInformation1->set_condition_language_version( 0 );
+
+    auto *timeBasedFetchConfig1 = new Schemas::CollectionSchemesMsg::TimeBasedFetchConfig();
+    fetchInformation1->set_allocated_time_based( timeBasedFetchConfig1 );
+    timeBasedFetchConfig1->set_max_execution_count( 111 );
+    timeBasedFetchConfig1->set_execution_frequency_ms( 222 );
+    timeBasedFetchConfig1->set_reset_max_execution_count_interval_ms( 333 );
+
+    Schemas::CommonTypesMsg::ConditionNode *fetchInformation1Action1 = fetchInformation1->add_actions();
+
+    auto *fetchInformation1Action1NodeFunction = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction();
+    fetchInformation1Action1->set_allocated_node_function( fetchInformation1Action1NodeFunction );
+
+    auto *fetchInformation1Action1IsNullFunction =
+        new Schemas::CommonTypesMsg::ConditionNode_NodeFunction_IsNullFunction();
+    fetchInformation1Action1NodeFunction->set_allocated_is_null_function( fetchInformation1Action1IsNullFunction );
+
+    auto *fetchInformation1Action1IsNullFunctionExpression = new Schemas::CommonTypesMsg::ConditionNode();
+    fetchInformation1Action1IsNullFunction->set_allocated_expression(
+        fetchInformation1Action1IsNullFunctionExpression );
+    fetchInformation1Action1IsNullFunctionExpression->set_node_signal_id( SIGNAL_ID_3 );
+
+    // add FetchInformation 2
+    Schemas::CollectionSchemesMsg::FetchInformation *fetchInformation2 =
+        collectionSchemeTestMessage->add_signal_fetch_information();
+    fetchInformation2->set_signal_id( SIGNAL_ID_3 );
+    fetchInformation2->set_condition_language_version( 0 );
+
+    auto *conditionBasedFetchConfig2 = new Schemas::CollectionSchemesMsg::ConditionBasedFetchConfig();
+    fetchInformation2->set_allocated_condition_based( conditionBasedFetchConfig2 );
+    conditionBasedFetchConfig2->set_condition_trigger_mode(
+        Schemas::CollectionSchemesMsg::ConditionBasedFetchConfig_ConditionTriggerMode_TRIGGER_ALWAYS );
+
+    auto *conditionBasedFetchConfig2Condition = new Schemas::CommonTypesMsg::ConditionNode();
+    conditionBasedFetchConfig2->set_allocated_condition_tree( conditionBasedFetchConfig2Condition );
+    conditionBasedFetchConfig2Condition->set_node_boolean_value( true );
+
+    Schemas::CommonTypesMsg::ConditionNode *fetchInformation2Action1 = fetchInformation2->add_actions();
+
+    auto *fetchInformation2Action1NodeFunction = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction();
+    fetchInformation2Action1->set_allocated_node_function( fetchInformation2Action1NodeFunction );
+
+    auto *fetchInformation2Action1CustomFunction =
+        new Schemas::CommonTypesMsg::ConditionNode_NodeFunction_CustomFunction();
+    fetchInformation2Action1NodeFunction->set_allocated_custom_function( fetchInformation2Action1CustomFunction );
+    fetchInformation2Action1CustomFunction->set_function_name( DUMMY_CUSTOM_FUNCTION_NAME );
+
+    Schemas::CommonTypesMsg::ConditionNode *fetchInformation2Action2 = fetchInformation2->add_actions();
+
+    auto *fetchInformation2Action2NodeFunction = new Schemas::CommonTypesMsg::ConditionNode_NodeFunction();
+    fetchInformation2Action2->set_allocated_node_function( fetchInformation2Action2NodeFunction );
+
+    auto *fetchInformation2Action2CustomFunction =
+        new Schemas::CommonTypesMsg::ConditionNode_NodeFunction_CustomFunction();
+    fetchInformation2Action2NodeFunction->set_allocated_custom_function( fetchInformation2Action2CustomFunction );
+    fetchInformation2Action2CustomFunction->set_function_name( NOT_DUMMY_CUSTOM_FUNCTION_NAME );
+
+    // add FetchInformation 3
+    Schemas::CollectionSchemesMsg::FetchInformation *fetchInformation3 =
+        collectionSchemeTestMessage->add_signal_fetch_information();
+    fetchInformation3->set_signal_id( SIGNAL_ID_1 );
+    fetchInformation3->set_condition_language_version( 0 );
+
+    auto *conditionBasedFetchConfig3 = new Schemas::CollectionSchemesMsg::ConditionBasedFetchConfig();
+    fetchInformation3->set_allocated_condition_based( conditionBasedFetchConfig3 );
+    conditionBasedFetchConfig3->set_condition_trigger_mode(
+        Schemas::CollectionSchemesMsg::ConditionBasedFetchConfig_ConditionTriggerMode_TRIGGER_ONLY_ON_RISING_EDGE );
+
+    auto *conditionBasedFetchConfig3Condition = new Schemas::CommonTypesMsg::ConditionNode();
+    conditionBasedFetchConfig3->set_allocated_condition_tree( conditionBasedFetchConfig3Condition );
+    conditionBasedFetchConfig3Condition->set_node_boolean_value( false );
 
     // Add 3 Signals
     Schemas::CollectionSchemesMsg::SignalInformation *signal1 = collectionSchemeTestMessage->add_signal_information();
@@ -824,6 +955,56 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     ASSERT_TRUE( collectionSchemeTest->getAfterDurationMs() == 0 );
     ASSERT_TRUE( collectionSchemeTest->isActiveDTCsIncluded() == true );
     ASSERT_TRUE( collectionSchemeTest->isTriggerOnlyOnRisingEdge() == false );
+
+    // check FetchInformation
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().size() == 3 );
+
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 0 ).signalID == SIGNAL_ID_2 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 0 ).triggerOnlyOnRisingEdge == false );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 0 ).maxExecutionPerInterval == 111 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 0 ).executionPeriodMs == 222 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 0 ).executionIntervalMs == 333 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 0 ).condition == nullptr );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 0 ).actions.size() == 1 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 0 ).actions.at( 0 )->nodeType ==
+                 ExpressionNodeType::IS_NULL_FUNCTION );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 0 ).actions.at( 0 )->left->signalID ==
+                 SIGNAL_ID_3 );
+
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).signalID == SIGNAL_ID_3 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).triggerOnlyOnRisingEdge == false );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).maxExecutionPerInterval == 0 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).executionPeriodMs == 0 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).executionIntervalMs == 0 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).condition->nodeType ==
+                 ExpressionNodeType::BOOLEAN );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).condition->booleanValue == true );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).actions.size() == 2 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).actions.at( 0 )->nodeType ==
+                 ExpressionNodeType::CUSTOM_FUNCTION );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).actions.at( 0 )->function.customFunctionName ==
+                 DUMMY_CUSTOM_FUNCTION_NAME );
+    ASSERT_TRUE(
+        collectionSchemeTest->getAllFetchInformations().at( 1 ).actions.at( 0 )->function.customFunctionParams.size() ==
+        0 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).actions.at( 1 )->nodeType ==
+                 ExpressionNodeType::CUSTOM_FUNCTION );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 1 ).actions.at( 1 )->function.customFunctionName ==
+                 NOT_DUMMY_CUSTOM_FUNCTION_NAME );
+    ASSERT_TRUE(
+        collectionSchemeTest->getAllFetchInformations().at( 1 ).actions.at( 1 )->function.customFunctionParams.size() ==
+        0 );
+
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 2 ).signalID == SIGNAL_ID_1 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 2 ).triggerOnlyOnRisingEdge == true );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 2 ).maxExecutionPerInterval == 0 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 2 ).executionPeriodMs == 0 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 2 ).executionIntervalMs == 0 );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 2 ).condition->nodeType ==
+                 ExpressionNodeType::BOOLEAN );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 2 ).condition->booleanValue == false );
+    ASSERT_TRUE( collectionSchemeTest->getAllFetchInformations().at( 2 ).actions.size() == 0 );
+
     // Signals
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().size() == 3 );
     ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).signalID == SIGNAL_ID_1 );
@@ -858,7 +1039,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     ASSERT_TRUE( collectionSchemeTest->getMinimumPublishIntervalMs() == 650 );
 
     // Verify the AST
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().size(), 26 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().size(), 28 );
     //----------
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).nodeType,
                ExpressionNodeType::OPERATOR_LOGICAL_AND );
@@ -875,7 +1056,7 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->nodeType,
                ExpressionNodeType::OPERATOR_SMALLER_EQUAL );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->nodeType,
-               ExpressionNodeType::OPERATOR_SMALLER );
+               ExpressionNodeType::OPERATOR_BIGGER_EQUAL );
     //----------
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).left->left->left->nodeType,
                ExpressionNodeType::SIGNAL );
@@ -916,8 +1097,8 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
                ExpressionNodeType::SIGNAL );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->right->left->signalID, SIGNAL_ID_1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->right->right->nodeType,
-               ExpressionNodeType::FLOAT );
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->right->right->floatingValue, 1 );
+               ExpressionNodeType::STRING );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->left->right->right->stringValue, "1" );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->left->left->nodeType,
                ExpressionNodeType::SIGNAL );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->left->left->signalID, SIGNAL_ID_1 );
@@ -925,11 +1106,33 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
                ExpressionNodeType::FLOAT );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->left->right->floatingValue, 1 );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->left->nodeType,
-               ExpressionNodeType::SIGNAL );
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->left->signalID, SIGNAL_ID_1 );
+               ExpressionNodeType::STRING );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->left->stringValue,
+               DUMMY_CUSTOM_FUNCTION_NAME + "_1" );
     ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->right->nodeType,
-               ExpressionNodeType::FLOAT );
-    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->right->floatingValue, 1 );
+               ExpressionNodeType::CUSTOM_FUNCTION );
+    ASSERT_EQ(
+        collectionSchemeTest->getAllExpressionNodes().at( 0 ).right->right->right->right->function.customFunctionName,
+        DUMMY_CUSTOM_FUNCTION_NAME );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes()
+                   .at( 0 )
+                   .right->right->right->right->function.customFunctionParams.size(),
+               1 );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes()
+                   .at( 0 )
+                   .right->right->right->right->function.customFunctionParams[0]
+                   ->nodeType,
+               ExpressionNodeType::IS_NULL_FUNCTION );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes()
+                   .at( 0 )
+                   .right->right->right->right->function.customFunctionParams[0]
+                   ->left->nodeType,
+               ExpressionNodeType::SIGNAL );
+    ASSERT_EQ( collectionSchemeTest->getAllExpressionNodes()
+                   .at( 0 )
+                   .right->right->right->right->function.customFunctionParams[0]
+                   ->left->signalID,
+               SIGNAL_ID_1 );
     //----------
     ASSERT_TRUE( collectionSchemeTest->getCondition()->booleanValue == false );
 
@@ -942,6 +1145,149 @@ TEST_F( SchemaTest, SchemaCollectionEventBased )
     ASSERT_EQ( collectionSchemeTest->getS3UploadMetadata(), s3UploadMetadata );
 #endif
 }
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+TEST_F( SchemaTest, StoreAndForwardConfiguration )
+{
+    Schemas::CollectionSchemesMsg::CollectionSchemes protoCollectionSchemesMsg;
+    auto *collectionSchemeTestMessage = protoCollectionSchemesMsg.add_collection_schemes();
+    collectionSchemeTestMessage->set_campaign_sync_id( "arn:aws:iam::2.23606797749:user/Development/product_1235/*" );
+    collectionSchemeTestMessage->set_decoder_manifest_sync_id( "model_manifest_13" );
+    collectionSchemeTestMessage->set_start_time_ms_epoch( 162144816000 );
+    collectionSchemeTestMessage->set_expiry_time_ms_epoch( 262144816000 );
+
+    // Create an Event/Condition Based CollectionScheme
+    Schemas::CollectionSchemesMsg::ConditionBasedCollectionScheme *message =
+        collectionSchemeTestMessage->mutable_condition_based_collection_scheme();
+    message->set_condition_minimum_interval_ms( 650 );
+    message->set_condition_language_version( 20 );
+    message->set_condition_trigger_mode(
+        Schemas::CollectionSchemesMsg::ConditionBasedCollectionScheme_ConditionTriggerMode_TRIGGER_ALWAYS );
+
+    // Create store and forward configuration
+    auto *store_and_forward_configuration = collectionSchemeTestMessage->mutable_store_and_forward_configuration();
+    auto *store_and_forward_entry = store_and_forward_configuration->add_partition_configuration();
+    auto *storage_options = store_and_forward_entry->mutable_storage_options();
+    auto *upload_options = store_and_forward_entry->mutable_upload_options();
+    storage_options->set_maximum_size_in_bytes( 1000000 );
+    storage_options->set_storage_location( "/storage" );
+    storage_options->set_minimum_time_to_live_in_seconds( 1000000 );
+
+    //  Build the AST Tree:
+    //----------
+
+    upload_options->mutable_condition_tree()->set_node_signal_id( 10 );
+    message->mutable_condition_tree();
+
+    //----------
+
+    collectionSchemeTestMessage->set_after_duration_ms( 0 );
+    collectionSchemeTestMessage->set_include_active_dtcs( true );
+    collectionSchemeTestMessage->set_persist_all_collected_data( true );
+    collectionSchemeTestMessage->set_compress_collected_data( true );
+    collectionSchemeTestMessage->set_priority( 5 );
+
+    // Add 3 Signals
+    Schemas::CollectionSchemesMsg::SignalInformation *signal1 = collectionSchemeTestMessage->add_signal_information();
+    signal1->set_signal_id( 19 );
+    signal1->set_sample_buffer_size( 5 );
+    signal1->set_minimum_sample_period_ms( 500 );
+    signal1->set_fixed_window_period_ms( 600 );
+    signal1->set_condition_only_signal( true );
+    signal1->set_data_partition_id( 1 );
+
+    Schemas::CollectionSchemesMsg::SignalInformation *signal2 = collectionSchemeTestMessage->add_signal_information();
+    signal2->set_signal_id( 17 );
+    signal2->set_sample_buffer_size( 10000 );
+    signal2->set_minimum_sample_period_ms( 1000 );
+    signal2->set_fixed_window_period_ms( 1000 );
+    signal2->set_condition_only_signal( false );
+    signal2->set_data_partition_id( 1 );
+
+    Schemas::CollectionSchemesMsg::SignalInformation *signal3 = collectionSchemeTestMessage->add_signal_information();
+    signal3->set_signal_id( 3 );
+    signal3->set_sample_buffer_size( 1000 );
+    signal3->set_minimum_sample_period_ms( 100 );
+    signal3->set_fixed_window_period_ms( 100 );
+    signal3->set_condition_only_signal( true );
+    signal3->set_data_partition_id( 1 );
+
+    // Add 1 RAW CAN Messages
+    Schemas::CollectionSchemesMsg::RawCanFrame *can1 = collectionSchemeTestMessage->add_raw_can_frames_to_collect();
+    can1->set_can_interface_id( "1230" );
+    can1->set_can_message_id( 0x1FF );
+    can1->set_sample_buffer_size( 200 );
+    can1->set_minimum_sample_period_ms( 255 );
+
+    ASSERT_NO_FATAL_FAILURE( sendMessageToReceiver( mReceiverCollectionSchemeList, protoCollectionSchemesMsg ) );
+
+    ASSERT_TRUE( mReceivedCollectionSchemeList->build() );
+    ASSERT_EQ( mReceivedCollectionSchemeList->getCollectionSchemes().size(), 1 );
+    auto collectionSchemeTest = mReceivedCollectionSchemeList->getCollectionSchemes().at( 0 );
+
+    // isReady should now evaluate to True
+    ASSERT_TRUE( collectionSchemeTest->isReady() == true );
+
+    // Confirm that the fields now match the set values in the proto message
+    ASSERT_FALSE( collectionSchemeTest->getCollectionSchemeID().compare(
+        "arn:aws:iam::2.23606797749:user/Development/product_1235/*" ) );
+    ASSERT_FALSE( collectionSchemeTest->getDecoderManifestID().compare( "model_manifest_13" ) );
+    ASSERT_TRUE( collectionSchemeTest->getStartTime() == 162144816000 );
+    ASSERT_TRUE( collectionSchemeTest->getExpiryTime() == 262144816000 );
+    ASSERT_TRUE( collectionSchemeTest->getAfterDurationMs() == 0 );
+    ASSERT_TRUE( collectionSchemeTest->isActiveDTCsIncluded() == true );
+    ASSERT_TRUE( collectionSchemeTest->isTriggerOnlyOnRisingEdge() == false );
+
+    // Signals
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().size() == 3 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).signalID == 19 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).sampleBufferSize == 5 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).minimumSampleIntervalMs == 500 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).fixedWindowPeriod == 600 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).isConditionOnlySignal == true );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 0 ).dataPartitionId == 1 );
+
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).signalID == 17 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).sampleBufferSize == 10000 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).minimumSampleIntervalMs == 1000 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).fixedWindowPeriod == 1000 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).isConditionOnlySignal == false );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 1 ).dataPartitionId == 1 );
+
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).signalID == 3 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).sampleBufferSize == 1000 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).minimumSampleIntervalMs == 100 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).fixedWindowPeriod == 100 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).isConditionOnlySignal == true );
+    ASSERT_TRUE( collectionSchemeTest->getCollectSignals().at( 2 ).dataPartitionId == 1 );
+
+    ASSERT_TRUE( collectionSchemeTest->getCollectRawCanFrames().size() == 1 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectRawCanFrames().at( 0 ).minimumSampleIntervalMs == 255 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectRawCanFrames().at( 0 ).sampleBufferSize == 200 );
+    ASSERT_TRUE( collectionSchemeTest->getCollectRawCanFrames().at( 0 ).frameID == 0x1FF );
+    ASSERT_TRUE( collectionSchemeTest->getCollectRawCanFrames().at( 0 ).interfaceID == "1230" );
+
+    ASSERT_TRUE( collectionSchemeTest->isPersistNeeded() == true );
+    ASSERT_TRUE( collectionSchemeTest->isCompressionNeeded() == true );
+    ASSERT_TRUE( collectionSchemeTest->getPriority() == 5 );
+
+    // For Event based collectionScheme the getMinimumPublishIntervalMs is the same as condition_minimum_interval_ms
+    ASSERT_TRUE( collectionSchemeTest->getMinimumPublishIntervalMs() == 650 );
+
+    // StoreAndForward
+    ASSERT_EQ( collectionSchemeTest->getStoreAndForwardConfiguration().at( 0 ).uploadOptions.conditionTree->nodeType,
+               ExpressionNodeType::SIGNAL );
+    ASSERT_EQ( collectionSchemeTest->getStoreAndForwardConfiguration().at( 0 ).uploadOptions.conditionTree->signalID,
+               10 );
+    ASSERT_TRUE( collectionSchemeTest->getStoreAndForwardConfiguration().at( 0 ).storageOptions.maximumSizeInBytes ==
+                 1000000 );
+    ASSERT_TRUE( collectionSchemeTest->getStoreAndForwardConfiguration().at( 0 ).storageOptions.storageLocation ==
+                 "/storage" );
+    ASSERT_TRUE(
+        collectionSchemeTest->getStoreAndForwardConfiguration().at( 0 ).storageOptions.minimumTimeToLiveInSeconds ==
+        1000000 );
+}
+#endif
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 TEST_F( SchemaTest, SchemaCollectionWithComplexTypes )

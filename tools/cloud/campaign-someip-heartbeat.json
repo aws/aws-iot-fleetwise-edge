@@ -1,0 +1,23 @@
+{
+  "compression": "SNAPPY",
+  "spoolingMode": "TO_DISK",
+  "collectionScheme": {
+    "timeBasedCollectionScheme": {
+      "periodMs": 10000
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.ExampleSomeipInterface.X"
+    },
+    {
+      "name": "Vehicle.ExampleSomeipInterface.A1.A2.A"
+    },
+    {
+      "name": "Vehicle.ExampleSomeipInterface.A1.A2.B"
+    },
+    {
+      "name": "Vehicle.ExampleSomeipInterface.A1.A2.D"
+    }
+  ]
+}

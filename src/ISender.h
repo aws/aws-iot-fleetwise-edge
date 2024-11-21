@@ -4,7 +4,10 @@
 #pragma once
 
 #include "IConnectionTypes.h"
+#include "TopicConfig.h"
+#include <boost/optional.hpp>
 #include <functional>
+#include <memory>
 #include <string>
 
 namespace Aws
@@ -40,6 +43,12 @@ using OnDataSentCallback = std::function<void( ConnectivityError result )>;
  */
 using OnConnectionEstablishedCallback = std::function<void()>;
 
+enum class QoS
+{
+    AT_MOST_ONCE = 0,
+    AT_LEAST_ONCE = 1,
+};
+
 /**
  * @brief This interface will be used by all objects sending data to the cloud
  *
@@ -73,6 +82,7 @@ public:
      * function call. It can be called from any thread because the function will if needed
      * copy the buffer.
      *
+     * @param topic the topic to send the data to.
      * @param buf pointer to raw data to send that needs to be at least size long.
      *               The function does not care if the data is a c string, a json or a binary
      *               data stream like proto buf. The data behind buf will not be modified.
@@ -82,15 +92,17 @@ public:
      * @param callback callback that will be called when the operation completes (successfully or not).
      *                 IMPORTANT: The callback can be called by the same thread before sendBuffer even returns
      *                 or a separate thread, depending on whether the results are known synchronously or asynchronously.
+     * @param qos the QoS level for the publish messages
      */
-    virtual void sendBuffer( const std::uint8_t *buf, size_t size, OnDataSentCallback callback ) = 0;
-
-    virtual void sendBufferToTopic( const std::string &topic,
-                                    const std::uint8_t *buf,
-                                    size_t size,
-                                    OnDataSentCallback callback ) = 0;
+    virtual void sendBuffer( const std::string &topic,
+                             const std::uint8_t *buf,
+                             size_t size,
+                             OnDataSentCallback callback,
+                             QoS qos = QoS::AT_LEAST_ONCE ) = 0;
 
     virtual unsigned getPayloadCountSent() const = 0;
+
+    virtual const TopicConfig &getTopicConfig() const = 0;
 };
 
 } // namespace IoTFleetWise

@@ -20,6 +20,10 @@
 #include <thread>
 #include <vector>
 
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+#include "LastKnownStateIngestion.h"
+#endif
+
 #define SECOND_TO_MILLISECOND( x ) ( 1000 ) * ( x )
 
 namespace Aws
@@ -47,8 +51,22 @@ public:
                                     CANInterfaceIDTranslator &canIDTranslator,
                                     std::shared_ptr<CheckinSender> checkinSender,
                                     SyncID decoderManifestID,
-                                    std::shared_ptr<RawData::BufferManager> rawDataBufferManager = nullptr )
-        : CollectionSchemeManager( schemaPersistencyPtr, canIDTranslator, checkinSender, rawDataBufferManager )
+                                    std::shared_ptr<RawData::BufferManager> rawDataBufferManager = nullptr
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+                                    ,
+                                    GetActuatorNamesCallback getActuatorNamesCallback = nullptr
+#endif
+
+                                    )
+        : CollectionSchemeManager( schemaPersistencyPtr,
+                                   canIDTranslator,
+                                   checkinSender,
+                                   rawDataBufferManager
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+                                   ,
+                                   getActuatorNamesCallback
+#endif
+          )
     {
         mCurrentDecoderManifestID = decoderManifestID;
     }
@@ -83,15 +101,22 @@ public:
     }
 
     void
-    matrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix )
+    matrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix,
+                     const std::shared_ptr<FetchMatrix> &fetchMatrix )
     {
-        CollectionSchemeManager::matrixExtractor( inspectionMatrix );
+        CollectionSchemeManager::matrixExtractor( inspectionMatrix, fetchMatrix );
     }
 
     void
     inspectionMatrixUpdater( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
     {
         CollectionSchemeManager::inspectionMatrixUpdater( inspectionMatrix );
+    }
+
+    void
+    fetchMatrixUpdater( const std::shared_ptr<const FetchMatrix> &fetchMatrix )
+    {
+        CollectionSchemeManager::fetchMatrixUpdater( fetchMatrix );
     }
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -104,6 +129,13 @@ public:
                                                                           updatedSignals );
     }
 #endif
+
+    void
+    updateRawDataBufferConfigStringSignals(
+        std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> &updatedSignals )
+    {
+        CollectionSchemeManager::updateRawDataBufferConfigStringSignals( updatedSignals );
+    }
 
     void
     setCollectionSchemePersistency( const std::shared_ptr<CacheAndPersist> &collectionSchemePersistency )
@@ -121,6 +153,34 @@ public:
     {
         mCollectionSchemeList = pl;
     }
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    void
+    myInvokeStateTemplates()
+    {
+        this->onStateTemplatesChanged( mLastKnownStateIngestionTest );
+    }
+
+    bool
+    getmProcessStateTemplates()
+    {
+        return mProcessStateTemplates;
+    }
+
+    void
+    setLastKnownStateIngestion( std::shared_ptr<LastKnownStateIngestion> lastKnownStateIngestion )
+    {
+        mLastKnownStateIngestion = lastKnownStateIngestion;
+    }
+
+    void
+    setStateTemplates( std::shared_ptr<const StateTemplatesDiff> stateTemplates )
+    {
+        for ( auto &stateTemplate : stateTemplates->stateTemplatesToAdd )
+        {
+            mStateTemplates.emplace( stateTemplate->id, stateTemplate );
+        }
+    }
+#endif
 
     void
     setTimeLine( const std::priority_queue<TimeData, std::vector<TimeData>, std::greater<TimeData>> &TimeLine )
@@ -194,6 +254,18 @@ public:
         return CollectionSchemeManager::retrieve( retrieveType );
     }
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    void
+    generateInspectionMatrix( std::shared_ptr<InspectionMatrix> &inspectionMatrix,
+                              std::shared_ptr<FetchMatrix> &fetchMatrix )
+    {
+        inspectionMatrix = std::make_shared<InspectionMatrix>();
+        fetchMatrix = std::make_shared<FetchMatrix>();
+        this->matrixExtractor( inspectionMatrix, fetchMatrix );
+        this->inspectionMatrixUpdater( inspectionMatrix );
+    }
+#endif
+
     void
     setmCollectionSchemeAvailable( bool val )
     {
@@ -243,6 +315,9 @@ public:
 public:
     IDecoderManifestPtr mDmTest;
     std::shared_ptr<ICollectionSchemeListTest> mPlTest;
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    std::shared_ptr<LastKnownStateIngestion> mLastKnownStateIngestionTest;
+#endif
 };
 
 class mockCollectionScheme : public CollectionSchemeIngestion
@@ -311,6 +386,16 @@ public:
     // ErrorCode read( uint8_t *const readBufPtr, size_t size, DataType dataType, const std::string &filename );
     MOCK_METHOD( ErrorCode, read, (uint8_t *const, size_t, DataType, const std::string &), ( override ) );
 };
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+class LastKnownStateIngestionMock : public LastKnownStateIngestion
+{
+public:
+    MOCK_METHOD( bool, build, () );
+    MOCK_METHOD( std::shared_ptr<const StateTemplatesDiff>, getStateTemplatesDiff, (), ( const ) );
+    MOCK_METHOD( const std::vector<uint8_t> &, getData, (), ( const ) );
+};
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

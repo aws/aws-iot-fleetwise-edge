@@ -1,0 +1,209 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+import "platform:/plugin/org.genivi.commonapi.someip/deployment/CommonAPI-4-SOMEIP_deployment_spec.fdepl"
+import "ExampleSomeipInterface.fidl"
+
+define org.genivi.commonapi.someip.deployment for interface commonapi.ExampleSomeipInterface {
+    SomeIpServiceID = 0x1234
+
+    attribute x {
+        SomeIpGetterID = 0x0BB8
+        SomeIpSetterID = 0x0BB9
+        SomeIpNotifierID = 0x80f2
+        SomeIpNotifierEventGroups = { 0x80f2 }
+
+        SomeIpAttributeReliable = false
+    }
+
+    attribute a1 {
+        SomeIpGetterID = 0x0BBA
+        SomeIpSetterID = 0x0BBB
+        SomeIpNotifierID = 0x80f3
+        SomeIpNotifierEventGroups = { 0x80f3 }
+
+        SomeIpAttributeReliable = false
+    }
+
+    method setInt32 {
+        SomeIpMethodID = 0x7530
+    }
+
+    method getInt32 {
+        SomeIpMethodID = 0x7531
+    }
+
+    method setInt64 {
+        SomeIpMethodID = 0x7532
+    }
+
+    method getInt64 {
+        SomeIpMethodID = 0x7533
+    }
+
+    method setBoolean {
+        SomeIpMethodID = 0x7534
+    }
+
+    method getBoolean {
+        SomeIpMethodID = 0x7535
+    }
+
+    method setFloat {
+        SomeIpMethodID = 0x7536
+    }
+
+    method getFloat {
+        SomeIpMethodID = 0x7537
+    }
+
+    method setDouble {
+        SomeIpMethodID = 0x7538
+    }
+
+    method getDouble {
+        SomeIpMethodID = 0x7539
+    }
+
+    method setString {
+        SomeIpMethodID = 0x753A
+    }
+
+    method getString {
+        SomeIpMethodID = 0x753B
+    }
+
+    method setInt32LongRunning {
+        SomeIpMethodID = 0x753C
+    }
+
+    method getInt32LongRunning {
+        SomeIpMethodID = 0x753D
+    }
+
+    broadcast notifyLRCStatus {
+        SomeIpEventID = 0x753E
+        SomeIpEventGroups = { 0x753E }
+
+        out {
+        }
+    }
+}
+
+define org.genivi.commonapi.someip.deployment for typeCollection commonapi.CommonTypes {
+    struct a1Struct {
+    }
+
+    struct a2Struct {
+    }
+
+}
+
+define org.genivi.commonapi.someip.deployment for provider as Service {
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface"
+        SomeIpInstanceID = 0x5678
+    }
+
+    // Add an instance to serve as the routing manager when we want to test multiple SOME/IP
+    // applications running at the same time.
+    // In such situation, the routing manager should be initialized first and kept alive until the
+    // last application is disconnected.
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "RoutingManager"
+        SomeIpInstanceID = 0x5500
+    }
+
+    // Add several instances for ExampleSomeipInterface. Each of these instances can be initialized
+    // after the routing manager and they can be associated to separate FWE processes so that the
+    // data seen by each FWE process is isolated.
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface0"
+        SomeIpInstanceID = 0x5600
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface1"
+        SomeIpInstanceID = 0x5601
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface2"
+        SomeIpInstanceID = 0x5602
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface3"
+        SomeIpInstanceID = 0x5603
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface4"
+        SomeIpInstanceID = 0x5604
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface5"
+        SomeIpInstanceID = 0x5605
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface6"
+        SomeIpInstanceID = 0x5606
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface7"
+        SomeIpInstanceID = 0x5607
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface8"
+        SomeIpInstanceID = 0x5608
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface9"
+        SomeIpInstanceID = 0x5609
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface10"
+        SomeIpInstanceID = 0x560a
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface11"
+        SomeIpInstanceID = 0x560b
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface12"
+        SomeIpInstanceID = 0x560c
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface13"
+        SomeIpInstanceID = 0x560d
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface14"
+        SomeIpInstanceID = 0x560e
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface15"
+        SomeIpInstanceID = 0x560f
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface16"
+        SomeIpInstanceID = 0x5610
+    }
+
+    instance commonapi.ExampleSomeipInterface {
+        InstanceId = "commonapi.ExampleSomeipInterface17"
+        SomeIpInstanceID = 0x5611
+    }
+}

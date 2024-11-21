@@ -344,6 +344,10 @@ public class FweApplication
                     double val = ((Number)propVal.getValue()).doubleValue();
                     sb.append(val);
                     Fwe.setVehicleProperty(signalId, val);
+                } else if (clazz.equals(Long.class)) {
+                    long val = ((Number)propVal.getValue()).longValue();
+                    sb.append(val);
+                    Fwe.setVehicleProperty(signalId, val);
                 } else if (clazz.equals(Integer[].class) || clazz.equals(Long[].class)) {
                     sb.append("[");
                     for (int resultIndex = 0; resultIndex < Array.getLength(propVal.getValue()); resultIndex++) {
@@ -354,7 +358,7 @@ public class FweApplication
                                 break;
                             }
                         }
-                        double val = ((Number)Array.get(propVal.getValue(), resultIndex)).doubleValue();
+                        long val = ((Number)Array.get(propVal.getValue(), resultIndex)).longValue();
                         if (resultIndex > 0) {
                             sb.append(", ");
                         }

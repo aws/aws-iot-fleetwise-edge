@@ -5,6 +5,7 @@
 #include "IConnectionTypes.h"
 #include "LogLevel.h"
 #include "SenderMock.h"
+#include "TopicConfig.h"
 #include "WaitUntil.h"
 #include <atomic>
 #include <functional>
@@ -40,12 +41,14 @@ checkMetrics( const std::string &data )
 std::atomic<int> a( 0 );
 TEST( RemoteProfilerTest, MetricsUpload )
 {
-    auto senderMock = std::make_shared<StrictMock<Testing::SenderMock>>();
-    EXPECT_CALL( *senderMock, mockedSendBuffer( _, Gt( 0 ), _ ) )
-        .WillRepeatedly( InvokeArgument<2>( ConnectivityError::Success ) );
+    TopicConfigArgs topicConfigArgs;
+    topicConfigArgs.metricsTopic = "metrics-topic";
+    TopicConfig topicConfig( "thing-name", topicConfigArgs );
+    auto senderMock = std::make_shared<StrictMock<Testing::SenderMock>>( topicConfig );
+    EXPECT_CALL( *senderMock, mockedSendBuffer( "metrics-topic", _, Gt( 0 ), _ ) )
+        .WillRepeatedly( InvokeArgument<3>( ConnectivityError::Success ) );
 
-    auto mockLogSender = std::make_shared<Testing::SenderMock>();
-    RemoteProfiler profiler( senderMock, mockLogSender, 1000, 1000, LogLevel::Trace, "Test" );
+    RemoteProfiler profiler( senderMock, 1000, 1000, LogLevel::Trace, "Test" );
     profiler.start();
 
     // Generate some cpu load
@@ -54,8 +57,8 @@ TEST( RemoteProfilerTest, MetricsUpload )
         a++;
     }
 
-    WAIT_ASSERT_GT( senderMock->getSentBufferData().size(), 5U );
-    for ( auto sentData : senderMock->getSentBufferData() )
+    WAIT_ASSERT_GT( senderMock->getSentBufferDataByTopic( "metrics-topic" ).size(), 5U );
+    for ( auto sentData : senderMock->getSentBufferDataByTopic( "metrics-topic" ) )
     {
         ASSERT_NO_FATAL_FAILURE( checkMetrics( sentData.data ) );
     }

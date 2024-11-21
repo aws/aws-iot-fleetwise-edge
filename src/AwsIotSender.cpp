@@ -10,7 +10,6 @@
 #include <aws/crt/Types.h>
 #include <aws/crt/mqtt/Mqtt5Packets.h>
 #include <functional>
-#include <utility>
 
 namespace Aws
 {
@@ -19,12 +18,10 @@ namespace IoTFleetWise
 
 AwsIotSender::AwsIotSender( IConnectivityModule *connectivityModule,
                             std::shared_ptr<MqttClientWrapper> &mqttClient,
-                            std::string topicName,
-                            Aws::Crt::Mqtt5::QOS publishQoS )
+                            const TopicConfig &topicConfig )
     : mConnectivityModule( connectivityModule )
     , mMqttClient( mqttClient )
-    , mTopicName( std::move( topicName ) )
-    , mPublishQoS( publishQoS )
+    , mTopicConfig( topicConfig )
 {
 }
 
@@ -52,16 +49,8 @@ AwsIotSender::getMaxSendSize() const
 }
 
 void
-AwsIotSender::sendBuffer( const std::uint8_t *buf, size_t size, OnDataSentCallback callback )
-{
-    sendBufferToTopic( mTopicName, buf, size, callback );
-}
-
-void
-AwsIotSender::sendBufferToTopic( const std::string &topic,
-                                 const uint8_t *buf,
-                                 size_t size,
-                                 OnDataSentCallback callback )
+AwsIotSender::sendBuffer(
+    const std::string &topic, const uint8_t *buf, size_t size, OnDataSentCallback callback, QoS qos )
 {
     std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
     if ( topic.empty() )
@@ -100,14 +89,23 @@ AwsIotSender::sendBufferToTopic( const std::string &topic,
         return;
     }
 
-    publishMessageToTopic( topic, buf, size, callback );
+    auto sdkQos = Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE;
+    switch ( qos )
+    {
+    case QoS::AT_MOST_ONCE:
+        sdkQos = Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_MOST_ONCE;
+        break;
+    case QoS::AT_LEAST_ONCE:
+        sdkQos = Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_LEAST_ONCE;
+        break;
+    }
+
+    publishMessageToTopic( topic, buf, size, callback, sdkQos );
 }
 
 void
-AwsIotSender::publishMessageToTopic( const std::string &topic,
-                                     const uint8_t *buf,
-                                     size_t size,
-                                     OnDataSentCallback callback )
+AwsIotSender::publishMessageToTopic(
+    const std::string &topic, const uint8_t *buf, size_t size, OnDataSentCallback callback, Aws::Crt::Mqtt5::QOS qos )
 {
     auto payload = Aws::Crt::ByteBufFromArray( buf, size );
 
@@ -126,14 +124,22 @@ AwsIotSender::publishMessageToTopic( const std::string &topic,
         else
         {
             auto errorString = Aws::Crt::ErrorDebugString( errorCode );
-            FWE_LOG_ERROR( std::string( "Operation failed with error" ) +
-                           ( errorString != nullptr ? std::string( errorString ) : std::string( "Unknown error" ) ) );
+            auto logMessage = "Publish failed with error: " +
+                              ( errorString != nullptr ? std::string( errorString ) : std::string( "Unknown error" ) );
+            if ( errorCode == AWS_ERROR_MQTT5_USER_REQUESTED_STOP )
+            {
+                FWE_LOG_TRACE( logMessage );
+            }
+            else
+            {
+                FWE_LOG_ERROR( logMessage );
+            }
             callback( ConnectivityError::TransmissionError );
         }
     };
 
     std::shared_ptr<Aws::Crt::Mqtt5::PublishPacket> publishPacket = std::make_shared<Aws::Crt::Mqtt5::PublishPacket>(
-        topic.c_str(), Aws::Crt::ByteCursorFromByteBuf( payload ), mPublishQoS );
+        topic.c_str(), Aws::Crt::ByteCursorFromByteBuf( payload ), qos );
     if ( !mMqttClient->Publish( publishPacket, onPublishComplete ) )
     {
         callback( ConnectivityError::TransmissionError );

@@ -17,6 +17,11 @@
 #include <memory>
 #include <mutex>
 
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+#include "StreamForwarder.h"
+#include "StreamManager.h"
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -53,6 +58,12 @@ public:
                uint32_t idleTimeMs,      /**< if no new data is available sleep for this amount of milliseconds */
                std::shared_ptr<RawData::BufferManager> rawBufferManager =
                    nullptr /**< the raw buffer manager which is informed what data is used */
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+               ,
+               std::shared_ptr<Aws::IoTFleetWise::Store::StreamForwarder> streamForwarder = nullptr,
+               std::shared_ptr<Aws::IoTFleetWise::Store::StreamManager> streamManager = nullptr
+#endif
+
     );
 
     /**
@@ -106,6 +117,10 @@ private:
     uint32_t mIdleTimeMs{ DEFAULT_THREAD_IDLE_TIME_MS };
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     std::shared_ptr<RawData::BufferManager> mRawBufferManager{ nullptr };
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    std::shared_ptr<Aws::IoTFleetWise::Store::StreamForwarder> mStreamForwarder;
+    std::shared_ptr<Aws::IoTFleetWise::Store::StreamManager> mStreamManager;
+#endif
 };
 
 } // namespace IoTFleetWise

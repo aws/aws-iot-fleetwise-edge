@@ -43,8 +43,8 @@ parse_args() {
 
 parse_args "$@"
 
-apt update -o DPkg::Lock::Timeout=1800
-apt install -y -o DPkg::Lock::Timeout=1800 \
+apt update
+apt install -y \
     unzip \
     git \
     wget \

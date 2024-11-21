@@ -8,6 +8,7 @@
 #include "OBDDataTypes.h"
 #include <boost/none.hpp>
 #include <google/protobuf/message.h>
+#include <memory>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include <boost/variant.hpp>
@@ -144,6 +145,29 @@ DecoderManifestIngestion::getComplexDataType( ComplexDataTypeId typeId ) const
 }
 #endif
 
+CustomSignalDecoderFormat
+DecoderManifestIngestion::getCustomSignalDecoderFormat( SignalID signalID ) const
+{
+    if ( !mReady )
+    {
+        return INVALID_CUSTOM_SIGNAL_DECODER_FORMAT;
+    }
+
+    auto it = mSignalToCustomDecoder->find( signalID );
+    if ( it == mSignalToCustomDecoder->end() )
+    {
+        return INVALID_CUSTOM_SIGNAL_DECODER_FORMAT;
+    }
+
+    return it->second;
+}
+
+SignalIDToCustomSignalDecoderFormatMapPtr
+DecoderManifestIngestion::getSignalIDToCustomSignalDecoderFormatMap() const
+{
+    return mSignalToCustomDecoder;
+}
+
 bool
 DecoderManifestIngestion::copyData( const std::uint8_t *inputBuffer, const size_t size )
 {
@@ -210,7 +234,7 @@ DecoderManifestIngestion::build()
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
          && ( mProtoDecoderManifest.complex_signals_size() == 0 )
 #endif
-    )
+         && ( mProtoDecoderManifest.custom_decoding_signals_size() == 0 ) )
     {
         // Error, missing required decoding information in the Decoder mProtoDecoderManifest
         FWE_LOG_ERROR(
@@ -436,6 +460,37 @@ DecoderManifestIngestion::build()
     }
 #endif
 
+    // Reserve Map memory upfront as program already know the number of signals.
+    // This optimization can avoid multiple rehashes and improve overall build performance
+    SignalIDToCustomSignalDecoderFormatMap signalToCustomDecoderMap;
+    signalToCustomDecoderMap.reserve( static_cast<size_t>( mProtoDecoderManifest.custom_decoding_signals_size() ) );
+    for ( int i = 0; i < mProtoDecoderManifest.custom_decoding_signals_size(); i++ )
+    {
+        const auto &customDecodedSignal = mProtoDecoderManifest.custom_decoding_signals( i );
+        auto signalId = customDecodedSignal.signal_id();
+        mSignalToVehicleDataSourceProtocol[signalId] = VehicleDataSourceProtocol::CUSTOM_DECODING;
+
+        if ( customDecodedSignal.interface_id().empty() )
+        {
+            FWE_LOG_WARN( "Custom signal with empty interface_id and signal id:" + std::to_string( signalId ) );
+        }
+        else
+        {
+            // For backward compatibility, default to double
+            auto signalType = convertPrimitiveTypeToSignalType( customDecodedSignal.primitive_type() )
+                                  .get_value_or( SignalType::DOUBLE );
+            mSignalIDToTypeMap[signalId] = signalType;
+            signalToCustomDecoderMap[signalId] = CustomSignalDecoderFormat{
+                customDecodedSignal.interface_id(), customDecodedSignal.custom_decoding_id(), signalId, signalType };
+
+            FWE_LOG_TRACE( "Adding custom signal with id: " + std::to_string( signalId ) + " with interface ID: '" +
+                           customDecodedSignal.interface_id() + "' custom decoding size: '" +
+                           std::to_string( customDecodedSignal.custom_decoding_id().size() ) + "'" );
+        }
+    }
+    mSignalToCustomDecoder =
+        std::make_shared<const SignalIDToCustomSignalDecoderFormatMap>( std::move( signalToCustomDecoderMap ) );
+
     FWE_LOG_TRACE( "Decoder Manifest build succeeded" );
     // Set our ready flag to true
     mReady = true;
@@ -469,6 +524,8 @@ DecoderManifestIngestion::convertPrimitiveTypeToSignalType( Schemas::DecoderMani
         return SignalType::FLOAT;
     case Schemas::DecoderManifestMsg::PrimitiveType::FLOAT64:
         return SignalType::DOUBLE;
+    case Schemas::DecoderManifestMsg::PrimitiveType::STRING:
+        return SignalType::STRING;
     case Schemas::DecoderManifestMsg::PrimitiveType::NULL_:
         return SignalType::DOUBLE;
     default:

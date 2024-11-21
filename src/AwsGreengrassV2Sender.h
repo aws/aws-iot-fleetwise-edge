@@ -5,6 +5,7 @@
 
 #include "IConnectivityModule.h"
 #include "ISender.h"
+#include "TopicConfig.h"
 #include <atomic>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <cstddef>
@@ -31,8 +32,7 @@ class AwsGreengrassV2Sender : public ISender
 public:
     AwsGreengrassV2Sender( IConnectivityModule *connectivityModule,
                            std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &greengrassClient,
-                           std::string topicName,
-                           Aws::Greengrass::QOS publishQoS );
+                           const TopicConfig &topicConfig );
     ~AwsGreengrassV2Sender() override = default;
 
     AwsGreengrassV2Sender( const AwsGreengrassV2Sender & ) = delete;
@@ -44,12 +44,11 @@ public:
 
     size_t getMaxSendSize() const override;
 
-    void sendBuffer( const std::uint8_t *buf, size_t size, OnDataSentCallback callback ) override;
-
-    void sendBufferToTopic( const std::string &topic,
-                            const uint8_t *buf,
-                            size_t size,
-                            OnDataSentCallback callback ) override;
+    void sendBuffer( const std::string &topic,
+                     const uint8_t *buf,
+                     size_t size,
+                     OnDataSentCallback callback,
+                     QoS qos = QoS::AT_LEAST_ONCE ) override;
 
     void
     invalidateConnection()
@@ -68,13 +67,15 @@ public:
         return mPayloadCountSent;
     }
 
+    const TopicConfig &
+    getTopicConfig() const override
+    {
+        return mTopicConfig;
+    }
+
 private:
     bool isAliveNotThreadSafe();
-    bool
-    isTopicValid()
-    {
-        return !mTopicName.empty();
-    };
+
     /** See "Message size" : "The payload for every publish request can be no larger
      * than 128 KB. AWS IoT Core rejects publish and connect requests larger than this size."
      * https://docs.aws.amazon.com/general/latest/gr/iot-core.html#limits_iot
@@ -84,10 +85,9 @@ private:
 
     std::mutex mConnectivityMutex;
     std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &mGreengrassClient;
-    Aws::Greengrass::QOS mPublishQoS;
     std::atomic<unsigned> mPayloadCountSent{};
 
-    std::string mTopicName;
+    const TopicConfig &mTopicConfig;
 };
 
 } // namespace IoTFleetWise

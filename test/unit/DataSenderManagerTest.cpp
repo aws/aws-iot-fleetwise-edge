@@ -46,6 +46,17 @@
 #include <sstream>
 #include <type_traits>
 #endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+#include "CommandResponseDataSender.h"
+#include "CommandTypes.h"
+#include "ICommandDispatcher.h"
+#include "command_response.pb.h"
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+#include "LastKnownStateDataSender.h"
+#include "LastKnownStateTypes.h"
+#include "last_known_state_data.pb.h"
+#endif
 
 namespace Aws
 {
@@ -87,8 +98,8 @@ public:
         EXPECT_CALL( *mMqttSender, getMaxSendSize() )
             .Times( AnyNumber() )
             .WillRepeatedly( Return( MAXIMUM_PAYLOAD_SIZE ) );
-        ON_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) )
-            .WillByDefault( InvokeArgument<2>( ConnectivityError::Success ) );
+        ON_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) )
+            .WillByDefault( InvokeArgument<3>( ConnectivityError::Success ) );
 
         auto mProtoWriter = std::make_shared<DataSenderProtoWriter>( mCANIDTranslator, mRawDataBufferManager );
         auto telemetryDataSender = std::make_shared<TelemetryDataSender>(
@@ -110,6 +121,22 @@ public:
             std::make_shared<VisionSystemDataSender>( mUploadedS3Objects, mS3Sender, mIonWriter, "" );
         dataSenders[SenderDataType::VISION_SYSTEM] = mVisionSystemDataSender;
 #endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+        mCommandResponseSender = std::make_shared<StrictMock<Testing::SenderMock>>();
+        EXPECT_CALL( *mCommandResponseSender, isAlive() ).Times( AnyNumber() ).WillRepeatedly( Return( true ) );
+        ON_CALL( *mCommandResponseSender, mockedSendBuffer( _, _, _, _ ) )
+            .WillByDefault( InvokeArgument<3>( ConnectivityError::Success ) );
+        mCommandResponseDataSender = std::make_shared<CommandResponseDataSender>( mCommandResponseSender );
+        dataSenders[SenderDataType::COMMAND_RESPONSE] = mCommandResponseDataSender;
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+        mLastKnownStateMqttSender = std::make_shared<StrictMock<Testing::SenderMock>>();
+        ON_CALL( *mLastKnownStateMqttSender, mockedSendBuffer( mLastKnownStateDataTopic, _, _, _ ) )
+            .WillByDefault( InvokeArgument<3>( ConnectivityError::Success ) );
+        mLastKnownStateDataSender =
+            std::make_shared<LastKnownStateDataSender>( mLastKnownStateMqttSender, mMaxMessagesPerPayload );
+        dataSenders[SenderDataType::LAST_KNOWN_STATE] = mLastKnownStateDataSender;
+#endif
 
         mDataSenderManager =
             std::make_unique<DataSenderManager>( std::move( dataSenders ), mMqttSender, mPayloadManager );
@@ -119,19 +146,31 @@ public:
     TearDown() override
     {
     }
+
     void
     processCollectedData( std::shared_ptr<DataToSend> data )
     {
         mDataSenderManager->processData( std::const_pointer_cast<const DataToSend>( data ) );
     }
 
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    std::string
+    getCommandResponseTopic( const std::string &commandID ) const
+    {
+        return "$aws/commands/things/thing-name/executions/" + commandID + "/response/protobuf";
+    }
+#endif
+
 protected:
     static constexpr unsigned MAXIMUM_PAYLOAD_SIZE = 400;
     static constexpr unsigned CAN_DATA_SIZE = 8;
     PayloadAdaptionConfig mPayloadAdaptionConfigUncompressed{ 80, 70, 90, 10 };
     PayloadAdaptionConfig mPayloadAdaptionConfigCompressed{ 80, 70, 90, 10 };
+    unsigned mMaxMessagesPerPayload{ 5 }; // Only used by LastKnownStateDataSender
+
     unsigned mCanChannelID{ 0 };
     std::shared_ptr<TriggeredCollectionSchemeData> mTriggeredCollectionSchemeData;
+    std::string mTelemetryDataTopic = "$aws/iotfleetwise/vehicles/thing-name/signals";
     std::shared_ptr<StrictMock<Testing::SenderMock>> mMqttSender;
     std::shared_ptr<CacheAndPersist> mPersistency;
     std::shared_ptr<PayloadManager> mPayloadManager;
@@ -146,13 +185,52 @@ protected:
     std::shared_ptr<ActiveCollectionSchemes> mActiveCollectionSchemes;
     std::shared_ptr<DataSenderQueue> mUploadedS3Objects;
 #endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    std::shared_ptr<StrictMock<Testing::SenderMock>> mCommandResponseSender;
+    std::shared_ptr<CommandResponseDataSender> mCommandResponseDataSender;
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    std::string mLastKnownStateDataTopic = "$aws/iotfleetwise/vehicles/thing-name/last_known_states/data";
+    std::shared_ptr<StrictMock<Testing::SenderMock>> mLastKnownStateMqttSender;
+    std::shared_ptr<LastKnownStateDataSender> mLastKnownStateDataSender;
+#endif
 };
+
+template <typename T>
+std::vector<double>
+getSignalValues( const T &signals )
+{
+    std::vector<double> signalValues;
+    for ( const auto &signal : signals )
+    {
+        signalValues.push_back( signal.double_value() );
+    }
+    return signalValues;
+}
+
+template <typename T>
+std::vector<double>
+getSignalIds( const T &signals )
+{
+    std::vector<double> signalIds;
+    for ( const auto &signal : signals )
+    {
+        signalIds.push_back( signal.signal_id() );
+    }
+    return signalIds;
+}
 
 TEST_F( DataSenderManagerTest, senderDataTypeToString )
 {
     EXPECT_EQ( senderDataTypeToString( SenderDataType::TELEMETRY ), "Telemetry" );
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     EXPECT_EQ( senderDataTypeToString( SenderDataType::VISION_SYSTEM ), "VisionSystem" );
+#endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    EXPECT_EQ( senderDataTypeToString( SenderDataType::COMMAND_RESPONSE ), "CommandResponse" );
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    EXPECT_EQ( senderDataTypeToString( SenderDataType::LAST_KNOWN_STATE ), "LastKnownState" );
 #endif
     EXPECT_EQ( senderDataTypeToString( static_cast<SenderDataType>( -1 ) ), "" );
 }
@@ -166,12 +244,20 @@ TEST_F( DataSenderManagerTest, stringToSenderDataType )
     EXPECT_TRUE( stringToSenderDataType( "VisionSystem", output ) );
     EXPECT_EQ( output, SenderDataType::VISION_SYSTEM );
 #endif
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+    EXPECT_TRUE( stringToSenderDataType( "CommandResponse", output ) );
+    EXPECT_EQ( output, SenderDataType::COMMAND_RESPONSE );
+#endif
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    EXPECT_TRUE( stringToSenderDataType( "LastKnownState", output ) );
+    EXPECT_EQ( output, SenderDataType::LAST_KNOWN_STATE );
+#endif
     EXPECT_FALSE( stringToSenderDataType( "Invalid", output ) );
 }
 
 TEST_F( DataSenderManagerTest, ProcessEmptyData )
 {
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) ).Times( 0 );
 
     // It should just not crash
     processCollectedData( nullptr );
@@ -182,12 +268,12 @@ TEST_F( DataSenderManagerTest, ProcessSingleSignal )
     auto signal1 = CollectedSignal( 1234, 789654, 40.5, SignalType::DOUBLE );
     mTriggeredCollectionSchemeData->signals.push_back( signal1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -214,12 +300,12 @@ TEST_F( DataSenderManagerTest, ProcessMultipleSignals )
     mTriggeredCollectionSchemeData->signals.push_back( signal2 );
     mTriggeredCollectionSchemeData->signals.push_back( signal3 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -263,14 +349,14 @@ TEST_F( DataSenderManagerTest, ProcessMultipleSignalsBeyondTransmitThreshold )
                                              CollectedSignal( 1234, 789654, 40.5, SignalType::DOUBLE ) };
     mTriggeredCollectionSchemeData->signals = signals;
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
         .Times( 2 )
-        .WillRepeatedly( InvokeArgument<2>( ConnectivityError::Success ) );
+        .WillRepeatedly( InvokeArgument<3>( ConnectivityError::Success ) );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 2 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 2 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -302,12 +388,12 @@ TEST_F( DataSenderManagerTest, ProcessSingleCanFrame )
     auto canFrame1 = CollectedCanRawFrame( 0x380, mCanChannelID, 789654, canBuf1, CAN_DATA_SIZE );
     mTriggeredCollectionSchemeData->canFrames.push_back( canFrame1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -340,12 +426,12 @@ TEST_F( DataSenderManagerTest, ProcessMultipleCanFrames )
     mTriggeredCollectionSchemeData->canFrames.push_back( canFrame2 );
     mTriggeredCollectionSchemeData->canFrames.push_back( canFrame3 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -394,12 +480,12 @@ TEST_F( DataSenderManagerTest, ProcessMultipleCanFramesBeyondTransmitThreshold )
         CollectedCanRawFrame( 0x380, mCanChannelID, 789654, canBuf1, CAN_DATA_SIZE ) };
     mTriggeredCollectionSchemeData->canFrames = canFrames;
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 2 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 2 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 2 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 2 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -433,12 +519,12 @@ TEST_F( DataSenderManagerTest, ProcessSingleDtcCode )
     dtcInfo.mDTCCodes.emplace_back( "P0143" );
     mTriggeredCollectionSchemeData->mDTCInfo = dtcInfo;
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -465,12 +551,12 @@ TEST_F( DataSenderManagerTest, ProcessMultipleDtcCodes )
     dtcInfo.mDTCCodes.emplace_back( "C0196" );
     mTriggeredCollectionSchemeData->mDTCInfo = dtcInfo;
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -508,12 +594,12 @@ TEST_F( DataSenderManagerTest, ProcessMultipleDtcCodesBeyondTransmitThreshold )
     dtcInfo.mDTCCodes = dtcCodes;
     mTriggeredCollectionSchemeData->mDTCInfo = dtcInfo;
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 2 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 2 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 2 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 2 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -547,12 +633,12 @@ TEST_F( DataSenderManagerTest, ProcessSingleUploadedS3Object )
     auto uploadedS3Object1 = UploadedS3Object{ "uploaded/object/key1", UploadedS3ObjectDataFormat::Cdr };
     mTriggeredCollectionSchemeData->uploadedS3Objects.push_back( uploadedS3Object1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -580,12 +666,12 @@ TEST_F( DataSenderManagerTest, ProcessMultipleUploadedS3Objects )
     mTriggeredCollectionSchemeData->uploadedS3Objects.push_back( uploadedS3Object2 );
     mTriggeredCollectionSchemeData->uploadedS3Objects.push_back( uploadedS3Object3 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -628,12 +714,12 @@ TEST_F( DataSenderManagerTest, ProcessMultipleUploadedS3ObjectsBeyondTransmitThr
     };
     mTriggeredCollectionSchemeData->uploadedS3Objects = uploadedS3Objects;
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 2 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 2 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 2 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 2 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -666,7 +752,7 @@ TEST_F( DataSenderManagerTest, ProcessRawDataSignalNoActiveCampaigns )
     auto signal1 = CollectedSignal( 1234, 789654, 10000, SignalType::COMPLEX_SIGNAL );
     mTriggeredVisionSystemData->signals.push_back( signal1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) ).Times( 0 );
     EXPECT_CALL( *mIonWriter, setupVehicleData( _ ) ).Times( 1 );
     EXPECT_CALL( *mIonWriter, mockedAppend( _ ) ).Times( 1 );
     EXPECT_CALL( *mIonWriter, getStreambufBuilder() ).Times( 0 );
@@ -676,7 +762,7 @@ TEST_F( DataSenderManagerTest, ProcessRawDataSignalNoActiveCampaigns )
 
 TEST_F( DataSenderManagerTest, ProcessVisionSystemDataWithoutRawData )
 {
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) ).Times( 0 );
     EXPECT_CALL( *mIonWriter, setupVehicleData( _ ) ).Times( 0 );
     EXPECT_CALL( *mIonWriter, mockedAppend( _ ) ).Times( 0 );
     EXPECT_CALL( *mIonWriter, getStreambufBuilder() ).Times( 0 );
@@ -698,7 +784,7 @@ TEST_F( DataSenderManagerTest, ProcessSingleRawDataSignal )
         std::make_shared<ICollectionSchemeTest>( "TESTCOLLECTIONSCHEME", "TESTDECODERID", 0, 10, s3UploadMetadata );
     mActiveCollectionSchemes->activeCollectionSchemes.push_back( collectionScheme1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) ).Times( 0 );
     EXPECT_CALL( *mIonWriter, setupVehicleData( _ ) ).Times( 1 );
     EXPECT_CALL( *mIonWriter, mockedAppend( _ ) ).Times( 1 );
     EXPECT_CALL( *mIonWriter, getStreambufBuilder() ).WillOnce( []() {
@@ -760,7 +846,7 @@ TEST_F( DataSenderManagerTest, ProcessMultipleRawDataSignals )
         std::make_shared<ICollectionSchemeTest>( "TESTCOLLECTIONSCHEME", "TESTDECODERID", 0, 10, s3UploadMetadata );
     mActiveCollectionSchemes->activeCollectionSchemes.push_back( collectionScheme1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) ).Times( 0 );
     EXPECT_CALL( *mIonWriter, setupVehicleData( _ ) ).Times( 1 );
     EXPECT_CALL( *mIonWriter, mockedAppend( _ ) ).Times( 2 );
     EXPECT_CALL( *mIonWriter, getStreambufBuilder() ).WillOnce( []() {
@@ -813,7 +899,7 @@ TEST_F( DataSenderManagerTest, ProcessRawDataSignalFailure )
         std::make_shared<ICollectionSchemeTest>( "TESTCOLLECTIONSCHEME", "TESTDECODERID", 0, 10, s3UploadMetadata );
     mActiveCollectionSchemes->activeCollectionSchemes.push_back( collectionScheme1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) ).Times( 0 );
     EXPECT_CALL( *mIonWriter, setupVehicleData( _ ) ).Times( 1 );
     EXPECT_CALL( *mIonWriter, mockedAppend( _ ) ).Times( 1 );
     EXPECT_CALL( *mIonWriter, getStreambufBuilder() ).WillOnce( []() {
@@ -853,7 +939,7 @@ TEST_F( DataSenderManagerTest, ProcessRawDataSignalFailureWithPersistency )
     mActiveCollectionSchemes->activeCollectionSchemes.push_back( collectionScheme1 );
     std::string payload = "fake ion file";
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) ).Times( 0 );
     EXPECT_CALL( *mIonWriter, setupVehicleData( _ ) ).Times( 1 );
     EXPECT_CALL( *mIonWriter, mockedAppend( _ ) ).Times( 1 );
     EXPECT_CALL( *mIonWriter, getStreambufBuilder() ).WillOnce( [payload]() {
@@ -900,7 +986,7 @@ TEST_F( DataSenderManagerTest, ProcessSingleSignalWithoutRawData )
         std::make_shared<ICollectionSchemeTest>( "TESTCOLLECTIONSCHEME", "TESTDECODERID", 0, 10, s3UploadMetadata );
     mActiveCollectionSchemes->activeCollectionSchemes.push_back( collectionScheme1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
     EXPECT_CALL( *mS3Sender, sendStream( _, _, _, _ ) ).Times( 0 );
 
     mVisionSystemDataSender->onChangeCollectionSchemeList( mActiveCollectionSchemes );
@@ -909,7 +995,7 @@ TEST_F( DataSenderManagerTest, ProcessSingleSignalWithoutRawData )
     std::shared_ptr<const DataToSend> senderData;
     ASSERT_FALSE( mUploadedS3Objects->pop( senderData ) );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
 }
 #endif
 
@@ -919,12 +1005,12 @@ TEST_F( DataSenderManagerTest, ProcessSingleSignalWithCompression )
     mTriggeredCollectionSchemeData->signals.push_back( signal1 );
     mTriggeredCollectionSchemeData->metadata.compress = true;
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     std::string uncompressedData;
@@ -946,7 +1032,7 @@ TEST_F( DataSenderManagerTest, ProcessSingleSignalWithCompression )
 
 TEST_F( DataSenderManagerTest, PersistencyNoFiles )
 {
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) ).Times( 0 );
 
     mDataSenderManager->checkAndSendRetrievedData();
 }
@@ -967,7 +1053,7 @@ TEST_F( DataSenderManagerTest, PersistencyUnsupportedFile )
     mPayloadManager->storeData(
         reinterpret_cast<const uint8_t *>( payload.data() ), payload.size(), metadata, filename );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) ).Times( 0 );
 
     mDataSenderManager->checkAndSendRetrievedData();
 }
@@ -986,7 +1072,7 @@ TEST_F( DataSenderManagerTest, PersistencyMissingPayloadFile )
 
     mPersistency->addMetadata( metadata );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) ).Times( 0 );
 
     mDataSenderManager->checkAndSendRetrievedData();
 }
@@ -997,8 +1083,8 @@ TEST_F( DataSenderManagerTest, PersistencyForTelemetryDisabled )
     auto signal1 = CollectedSignal( 1234, 789654, 40.5, SignalType::DOUBLE );
     mTriggeredCollectionSchemeData->signals.push_back( signal1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
-        .WillOnce( InvokeArgument<2>( ConnectivityError::TransmissionError ) );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::TransmissionError ) );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
@@ -1006,7 +1092,7 @@ TEST_F( DataSenderManagerTest, PersistencyForTelemetryDisabled )
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 }
 
 TEST_F( DataSenderManagerTest, PersistencyForTelemetryLegacyMetadata )
@@ -1022,22 +1108,22 @@ TEST_F( DataSenderManagerTest, PersistencyForTelemetryLegacyMetadata )
     mPayloadManager->storeData(
         reinterpret_cast<const uint8_t *>( payload.data() ), payload.size(), metadata, filename );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) ).Times( 1 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     ASSERT_EQ( sentBufferData[0].data, payload );
 
     // Ensure that there is no more data persisted
     mMqttSender->clearSentBufferData();
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 }
 
 TEST_F( DataSenderManagerTest, PersistencyForTelemetrySingleFile )
@@ -1046,20 +1132,20 @@ TEST_F( DataSenderManagerTest, PersistencyForTelemetrySingleFile )
     auto signal1 = CollectedSignal( 1234, 789654, 40.5, SignalType::DOUBLE );
     mTriggeredCollectionSchemeData->signals.push_back( signal1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
-        .WillOnce( InvokeArgument<2>( ConnectivityError::TransmissionError ) );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::TransmissionError ) );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
     mMqttSender->clearSentBufferData();
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
-        .WillOnce( InvokeArgument<2>( ConnectivityError::Success ) );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::Success ) );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -1078,11 +1164,11 @@ TEST_F( DataSenderManagerTest, PersistencyForTelemetrySingleFile )
 
     // Ensure that there is no more data persisted
     mMqttSender->clearSentBufferData();
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 }
 
 TEST_F( DataSenderManagerTest, PersistencyKeepFilesWhenRestarting )
@@ -1092,8 +1178,8 @@ TEST_F( DataSenderManagerTest, PersistencyKeepFilesWhenRestarting )
     auto signal1 = CollectedSignal( 1234, 789654, 40.5, SignalType::DOUBLE );
     mTriggeredCollectionSchemeData->signals.push_back( signal1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
-        .WillOnce( InvokeArgument<2>( ConnectivityError::TransmissionError ) );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::TransmissionError ) );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
@@ -1110,14 +1196,14 @@ TEST_F( DataSenderManagerTest, PersistencyKeepFilesWhenRestarting )
     mDataSenderManager = std::make_unique<DataSenderManager>( dataSenders, mMqttSender, mPayloadManager );
 
     mMqttSender->clearSentBufferData();
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
-        .WillOnce( InvokeArgument<2>( ConnectivityError::Success ) );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::Success ) );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -1136,11 +1222,11 @@ TEST_F( DataSenderManagerTest, PersistencyKeepFilesWhenRestarting )
 
     // Ensure that there is no more data persisted
     mMqttSender->clearSentBufferData();
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 }
 
 TEST_F( DataSenderManagerTest, PersistencyForTelemetryPersistAgainOnFailure )
@@ -1149,29 +1235,29 @@ TEST_F( DataSenderManagerTest, PersistencyForTelemetryPersistAgainOnFailure )
     auto signal1 = CollectedSignal( 1234, 789654, 40.5, SignalType::DOUBLE );
     mTriggeredCollectionSchemeData->signals.push_back( signal1 );
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
-        .WillOnce( InvokeArgument<2>( ConnectivityError::NoConnection ) );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::NoConnection ) );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
     mMqttSender->clearSentBufferData();
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
-        .WillOnce( InvokeArgument<2>( ConnectivityError::TransmissionError ) );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::TransmissionError ) );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
     mMqttSender->clearSentBufferData();
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 
     // Now the next attempt succeeds
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
-        .WillOnce( InvokeArgument<2>( ConnectivityError::Success ) );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::Success ) );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 1 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 1 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -1190,11 +1276,11 @@ TEST_F( DataSenderManagerTest, PersistencyForTelemetryPersistAgainOnFailure )
 
     // Ensure that there is no more data persisted
     mMqttSender->clearSentBufferData();
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 }
 
 TEST_F( DataSenderManagerTest, PersistencyForTelemetryMultipleFiles )
@@ -1213,22 +1299,22 @@ TEST_F( DataSenderManagerTest, PersistencyForTelemetryMultipleFiles )
         estimatedSize += 20;
     }
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
         .Times( 2 )
-        .WillRepeatedly( InvokeArgument<2>( ConnectivityError::NoConnection ) );
+        .WillRepeatedly( InvokeArgument<3>( ConnectivityError::NoConnection ) );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
     mMqttSender->clearSentBufferData();
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
         .Times( 2 )
-        .WillRepeatedly( InvokeArgument<2>( ConnectivityError::Success ) );
+        .WillRepeatedly( InvokeArgument<3>( ConnectivityError::Success ) );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 2 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 2 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[0].data ) );
@@ -1268,11 +1354,11 @@ TEST_F( DataSenderManagerTest, PersistencyForTelemetryMultipleFiles )
 
     // Ensure that there is no more data persisted
     mMqttSender->clearSentBufferData();
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 
     mDataSenderManager->checkAndSendRetrievedData();
 
-    ASSERT_EQ( mMqttSender->getSentBufferData().size(), 0 );
+    ASSERT_EQ( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 0 );
 }
 
 TEST_F( DataSenderManagerTest, splitAndDecreaseThresholdWhenOverLimit )
@@ -1287,14 +1373,14 @@ TEST_F( DataSenderManagerTest, splitAndDecreaseThresholdWhenOverLimit )
         mTriggeredCollectionSchemeData->signals.push_back( CollectedSignal( 1234, 789654, 40.5, SignalType::DOUBLE ) );
     }
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
         .Times( AtLeast( 12 ) )
-        .WillRepeatedly( InvokeArgument<2>( ConnectivityError::Success ) );
+        .WillRepeatedly( InvokeArgument<3>( ConnectivityError::Success ) );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_GE( mMqttSender->getSentBufferData().size(), 12 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_GE( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 12 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
 
@@ -1349,14 +1435,14 @@ TEST_F( DataSenderManagerTest, increaseThresholdWhenBelowLimit )
         mTriggeredCollectionSchemeData->signals.push_back( CollectedSignal( 1234, 789654, 40.5, SignalType::DOUBLE ) );
     }
 
-    EXPECT_CALL( *mMqttSender, mockedSendBuffer( _, Gt( 0 ), _ ) )
+    EXPECT_CALL( *mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) )
         .Times( AtLeast( 9 ) )
-        .WillRepeatedly( InvokeArgument<2>( ConnectivityError::Success ) );
+        .WillRepeatedly( InvokeArgument<3>( ConnectivityError::Success ) );
 
     processCollectedData( mTriggeredCollectionSchemeData );
 
-    ASSERT_GE( mMqttSender->getSentBufferData().size(), 9 );
-    auto sentBufferData = mMqttSender->getSentBufferData();
+    ASSERT_GE( mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 9 );
+    auto sentBufferData = mMqttSender->getSentBufferDataByTopic( mTelemetryDataTopic );
 
     Schemas::VehicleDataMsg::VehicleData vehicleData;
     // Increasing threshold:
@@ -1388,6 +1474,352 @@ TEST_F( DataSenderManagerTest, increaseThresholdWhenBelowLimit )
     ASSERT_TRUE( vehicleData.ParseFromString( sentBufferData[8].data ) );
     EXPECT_EQ( vehicleData.captured_signals_size(), 29 );
 }
+
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+/**
+ * Helper struct to map our internal status enum to the proto enum and use it in parameterized tests
+ */
+struct InternalStatusToProto
+{
+    CommandStatus internalStatus;
+    Schemas::Commands::Status protoStatus;
+};
+
+inline std::string
+statusToString( const testing::TestParamInfo<InternalStatusToProto> &info )
+{
+    return commandStatusToString( info.param.internalStatus );
+}
+
+class DataSenderManagerTestWithAllCommandStatuses : public DataSenderManagerTest,
+                                                    public testing::WithParamInterface<InternalStatusToProto>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    AllCommandStatuses,
+    DataSenderManagerTestWithAllCommandStatuses,
+    ::testing::Values(
+        InternalStatusToProto{ CommandStatus::SUCCEEDED, Schemas::Commands::COMMAND_STATUS_SUCCEEDED },
+        InternalStatusToProto{ CommandStatus::EXECUTION_TIMEOUT, Schemas::Commands::COMMAND_STATUS_EXECUTION_TIMEOUT },
+        InternalStatusToProto{ CommandStatus::EXECUTION_FAILED, Schemas::Commands::COMMAND_STATUS_EXECUTION_FAILED },
+        InternalStatusToProto{ CommandStatus::IN_PROGRESS, Schemas::Commands::COMMAND_STATUS_IN_PROGRESS } ),
+    statusToString );
+
+TEST_P( DataSenderManagerTestWithAllCommandStatuses, ProcessSingleCommandResponse )
+{
+    auto status = GetParam();
+    EXPECT_CALL( *mCommandResponseSender, mockedSendBuffer( getCommandResponseTopic( "command123" ), _, Gt( 0 ), _ ) )
+        .Times( 1 );
+
+    mDataSenderManager->processData(
+        std::make_shared<CommandResponse>( "command123", status.internalStatus, 0x1234, "status456" ) );
+
+    ASSERT_EQ( mCommandResponseSender->getSentBufferDataByTopic( getCommandResponseTopic( "command123" ) ).size(), 1 );
+    auto sentBufferData = mCommandResponseSender->getSentBufferDataByTopic( getCommandResponseTopic( "command123" ) );
+
+    Schemas::Commands::CommandResponse commandResponse;
+    ASSERT_TRUE( commandResponse.ParseFromString( sentBufferData[0].data ) );
+
+    ASSERT_EQ( commandResponse.command_id(), "command123" );
+    ASSERT_EQ( commandResponse.status(), status.protoStatus );
+    ASSERT_EQ( commandResponse.reason_code(), 0x1234 );
+    ASSERT_EQ( commandResponse.reason_description(), "status456" );
+}
+
+TEST_P( DataSenderManagerTestWithAllCommandStatuses, PersistencyForCommandResponse )
+{
+    auto status = GetParam();
+    EXPECT_CALL( *mCommandResponseSender, mockedSendBuffer( getCommandResponseTopic( "command123" ), _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::NoConnection ) );
+
+    mDataSenderManager->processData(
+        std::make_shared<CommandResponse>( "command123", status.internalStatus, 0x1234, "status456" ) );
+    mCommandResponseSender->clearSentBufferData();
+
+    EXPECT_CALL( *mCommandResponseSender, mockedSendBuffer( getCommandResponseTopic( "command123" ), _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::Success ) );
+    mDataSenderManager->checkAndSendRetrievedData();
+
+    ASSERT_EQ( mCommandResponseSender->getSentBufferDataByTopic( getCommandResponseTopic( "command123" ) ).size(), 1 );
+    auto sentBufferData = mCommandResponseSender->getSentBufferDataByTopic( getCommandResponseTopic( "command123" ) );
+
+    Schemas::Commands::CommandResponse commandResponse;
+    ASSERT_TRUE( commandResponse.ParseFromString( sentBufferData[0].data ) );
+
+    ASSERT_EQ( commandResponse.command_id(), "command123" );
+    ASSERT_EQ( commandResponse.status(), status.protoStatus );
+    ASSERT_EQ( commandResponse.reason_code(), 0x1234 );
+    ASSERT_EQ( commandResponse.reason_description(), "status456" );
+}
+
+TEST_F( DataSenderManagerTest, PersistencyForCommandResponsePersistAgainOnFailure )
+{
+    EXPECT_CALL( *mCommandResponseSender, mockedSendBuffer( getCommandResponseTopic( "command123" ), _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::NoConnection ) );
+
+    mDataSenderManager->processData(
+        std::make_shared<CommandResponse>( "command123", CommandStatus::EXECUTION_FAILED, 0x1234, "status456" ) );
+
+    mCommandResponseSender->clearSentBufferData();
+    ASSERT_EQ( mCommandResponseSender->getSentBufferDataByTopic( getCommandResponseTopic( "command123" ) ).size(), 0 );
+    EXPECT_CALL( *mCommandResponseSender, mockedSendBuffer( getCommandResponseTopic( "command123" ), _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::TransmissionError ) );
+
+    mDataSenderManager->checkAndSendRetrievedData();
+
+    mCommandResponseSender->clearSentBufferData();
+    ASSERT_EQ( mCommandResponseSender->getSentBufferDataByTopic( getCommandResponseTopic( "command123" ) ).size(), 0 );
+    EXPECT_CALL( *mCommandResponseSender, mockedSendBuffer( getCommandResponseTopic( "command123" ), _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::Success ) );
+
+    mDataSenderManager->checkAndSendRetrievedData();
+
+    ASSERT_EQ( mCommandResponseSender->getSentBufferDataByTopic( getCommandResponseTopic( "command123" ) ).size(), 1 );
+    auto sentBufferData = mCommandResponseSender->getSentBufferDataByTopic( getCommandResponseTopic( "command123" ) );
+
+    Schemas::Commands::CommandResponse commandResponse;
+    ASSERT_TRUE( commandResponse.ParseFromString( sentBufferData[0].data ) );
+
+    ASSERT_EQ( commandResponse.command_id(), "command123" );
+    ASSERT_EQ( commandResponse.status(), Schemas::Commands::COMMAND_STATUS_EXECUTION_FAILED );
+    ASSERT_EQ( commandResponse.reason_code(), 0x1234 );
+    ASSERT_EQ( commandResponse.reason_description(), "status456" );
+}
+
+TEST_F( DataSenderManagerTest, InvalidSenderWhenProcessingCommand )
+{
+    std::unordered_map<SenderDataType, std::shared_ptr<DataSender>> dataSenders;
+    mDataSenderManager = std::make_unique<DataSenderManager>( std::move( dataSenders ), mMqttSender, mPayloadManager );
+
+    EXPECT_CALL( *mCommandResponseSender, mockedSendBuffer( getCommandResponseTopic( "command123" ), _, _, _ ) )
+        .Times( 0 );
+
+    mDataSenderManager->processData(
+        std::make_shared<CommandResponse>( "command123", CommandStatus::SUCCEEDED, 0x1234, "status456" ) );
+
+    ASSERT_EQ( mCommandResponseSender->getSentBufferDataByTopic( getCommandResponseTopic( "command123" ) ).size(), 0 );
+}
+#endif
+
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+class DataSenderManagerTestWithAllSignalTypes : public DataSenderManagerTest,
+                                                public testing::WithParamInterface<SignalType>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P( AllSignalTypes,
+                          DataSenderManagerTestWithAllSignalTypes,
+                          allSignalTypes,
+                          signalTypeParamInfoToString );
+
+void
+assertLastKnownStateSignalValue( const Schemas::LastKnownState::CapturedSignal &capturedSignal,
+                                 double expectedSignalValue,
+                                 SignalType expectedSignalType )
+{
+    switch ( expectedSignalType )
+    {
+    case SignalType::UINT8:
+        ASSERT_EQ( capturedSignal.uint8_value(), static_cast<uint8_t>( expectedSignalValue ) );
+        break;
+    case SignalType::INT8:
+        ASSERT_EQ( capturedSignal.int8_value(), static_cast<int8_t>( expectedSignalValue ) );
+        break;
+    case SignalType::UINT16:
+        ASSERT_EQ( capturedSignal.uint16_value(), static_cast<uint16_t>( expectedSignalValue ) );
+        break;
+    case SignalType::INT16:
+        ASSERT_EQ( capturedSignal.int16_value(), static_cast<int16_t>( expectedSignalValue ) );
+        break;
+    case SignalType::UINT32:
+        ASSERT_EQ( capturedSignal.uint32_value(), static_cast<uint32_t>( expectedSignalValue ) );
+        break;
+    case SignalType::INT32:
+        ASSERT_EQ( capturedSignal.int32_value(), static_cast<int32_t>( expectedSignalValue ) );
+        break;
+    case SignalType::UINT64:
+        ASSERT_EQ( capturedSignal.uint64_value(), static_cast<uint64_t>( expectedSignalValue ) );
+        break;
+    case SignalType::INT64:
+        ASSERT_EQ( capturedSignal.int64_value(), static_cast<int64_t>( expectedSignalValue ) );
+        break;
+    case SignalType::FLOAT:
+        ASSERT_EQ( capturedSignal.float_value(), static_cast<float>( expectedSignalValue ) );
+        break;
+    case SignalType::DOUBLE:
+        ASSERT_EQ( capturedSignal.double_value(), expectedSignalValue );
+        break;
+    case SignalType::BOOLEAN:
+        ASSERT_EQ( capturedSignal.boolean_value(), static_cast<bool>( expectedSignalValue ) );
+        break;
+    default:
+        FAIL() << "Unsupported signal type";
+    }
+}
+
+bool
+parseLastKnownStateData( const std::string &data, Schemas::LastKnownState::LastKnownStateData *lastKnownStateData )
+{
+    std::string uncompressedData;
+    snappy::Uncompress( data.c_str(), data.size(), &uncompressedData );
+    return lastKnownStateData->ParseFromString( uncompressedData );
+}
+
+TEST_P( DataSenderManagerTestWithAllSignalTypes, ProcessSingleLastKnownStateSignal )
+{
+    auto signalType = GetParam();
+    EXPECT_CALL( *mLastKnownStateMqttSender, mockedSendBuffer( mLastKnownStateDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
+
+    auto collectedData = std::make_shared<LastKnownStateCollectedData>();
+    collectedData->triggerTime = 1000;
+    collectedData->stateTemplateCollectedSignals.emplace_back(
+        StateTemplateCollectedSignals{ "lks1", { { CollectedSignal( 1234, 789654, 40, signalType ) } } } );
+    mDataSenderManager->processData( collectedData );
+
+    ASSERT_EQ( mLastKnownStateMqttSender->getSentBufferDataByTopic( mLastKnownStateDataTopic ).size(), 1 );
+    auto sentBufferData = mLastKnownStateMqttSender->getSentBufferDataByTopic( mLastKnownStateDataTopic );
+
+    Schemas::LastKnownState::LastKnownStateData lastKnownStateProto;
+    ASSERT_TRUE( parseLastKnownStateData( sentBufferData[0].data, &lastKnownStateProto ) );
+
+    ASSERT_EQ( lastKnownStateProto.collection_event_time_ms_epoch(), 1000 );
+    ASSERT_EQ( lastKnownStateProto.captured_state_template_signals_size(), 1 );
+    auto &capturedStateTemplateSignals = lastKnownStateProto.captured_state_template_signals()[0];
+    ASSERT_EQ( capturedStateTemplateSignals.state_template_sync_id(), "lks1" );
+    ASSERT_EQ( capturedStateTemplateSignals.captured_signals_size(), 1 );
+
+    ASSERT_NO_FATAL_FAILURE(
+        assertLastKnownStateSignalValue( capturedStateTemplateSignals.captured_signals()[0], 40, signalType ) );
+    ASSERT_EQ( capturedStateTemplateSignals.captured_signals()[0].signal_id(), 1234 );
+}
+
+TEST_F( DataSenderManagerTest, ProcessMultipleLastKnownStateSignals )
+{
+    EXPECT_CALL( *mLastKnownStateMqttSender, mockedSendBuffer( mLastKnownStateDataTopic, _, Gt( 0 ), _ ) ).Times( 1 );
+
+    auto collectedData = std::make_shared<LastKnownStateCollectedData>();
+    collectedData->triggerTime = 1000;
+    collectedData->stateTemplateCollectedSignals.emplace_back( StateTemplateCollectedSignals{
+        "lks1",
+        { { CollectedSignal( 1234, 789654, 40.5, SignalType::DOUBLE ) },
+          { CollectedSignal( 5678, 789700, 97, SignalType::UINT16 ) } },
+    } );
+    mDataSenderManager->processData( collectedData );
+
+    ASSERT_EQ( mLastKnownStateMqttSender->getSentBufferDataByTopic( mLastKnownStateDataTopic ).size(), 1 );
+    auto sentBufferData = mLastKnownStateMqttSender->getSentBufferDataByTopic( mLastKnownStateDataTopic );
+
+    Schemas::LastKnownState::LastKnownStateData lastKnownStateProto;
+    ASSERT_TRUE( parseLastKnownStateData( sentBufferData[0].data, &lastKnownStateProto ) );
+
+    ASSERT_EQ( lastKnownStateProto.collection_event_time_ms_epoch(), 1000 );
+    ASSERT_EQ( lastKnownStateProto.captured_state_template_signals_size(), 1 );
+    auto &capturedStateTemplateSignals = lastKnownStateProto.captured_state_template_signals()[0];
+    ASSERT_EQ( capturedStateTemplateSignals.state_template_sync_id(), "lks1" );
+
+    ASSERT_EQ( capturedStateTemplateSignals.captured_signals_size(), 2 );
+
+    ASSERT_EQ( capturedStateTemplateSignals.captured_signals()[0].double_value(), 40.5 );
+    ASSERT_EQ( capturedStateTemplateSignals.captured_signals()[0].signal_id(), 1234 );
+
+    ASSERT_EQ( capturedStateTemplateSignals.captured_signals()[1].uint16_value(), 97 );
+    ASSERT_EQ( capturedStateTemplateSignals.captured_signals()[1].signal_id(), 5678 );
+}
+
+TEST_F( DataSenderManagerTest, ProcessMultipleLastKnownStateSignalsBeyondTransmitThreshold )
+{
+    auto collectedData = std::make_shared<LastKnownStateCollectedData>();
+    collectedData->triggerTime = 1000;
+    auto stateTemplate1 = StateTemplateCollectedSignals{
+        "lks1",
+        { CollectedSignal( 1234, 788001, 41, SignalType::DOUBLE ),
+          CollectedSignal( 1234, 788002, 42, SignalType::DOUBLE ),
+          CollectedSignal( 1234, 788003, 43, SignalType::DOUBLE ),
+          CollectedSignal( 1234, 788004, 44, SignalType::DOUBLE ),
+          CollectedSignal( 1234, 788005, 45, SignalType::DOUBLE ),
+          CollectedSignal( 1234, 788006, 46, SignalType::DOUBLE ) },
+    };
+    collectedData->stateTemplateCollectedSignals.emplace_back( stateTemplate1 );
+    auto stateTemplate2 = StateTemplateCollectedSignals{
+        "lks2",
+        { CollectedSignal( 1234, 788007, 47, SignalType::DOUBLE ),
+          CollectedSignal( 1234, 788008, 48, SignalType::DOUBLE ),
+          CollectedSignal( 1234, 788009, 49, SignalType::DOUBLE ),
+          CollectedSignal( 1234, 788010, 50, SignalType::DOUBLE ),
+          CollectedSignal( 1234, 788011, 51, SignalType::DOUBLE ) },
+    };
+    collectedData->stateTemplateCollectedSignals.emplace_back( stateTemplate2 );
+
+    EXPECT_CALL( *mLastKnownStateMqttSender, mockedSendBuffer( mLastKnownStateDataTopic, _, Gt( 0 ), _ ) ).Times( 3 );
+    mDataSenderManager->processData( collectedData );
+
+    // Since mMaxMessagesPerPayload is 5, the 11 signals should be split in 3 messages
+    ASSERT_EQ( mLastKnownStateMqttSender->getSentBufferDataByTopic( mLastKnownStateDataTopic ).size(), 3 );
+    auto sentBufferData = mLastKnownStateMqttSender->getSentBufferDataByTopic( mLastKnownStateDataTopic );
+
+    Schemas::LastKnownState::LastKnownStateData lastKnownStateProto;
+    ASSERT_TRUE( parseLastKnownStateData( sentBufferData[0].data, &lastKnownStateProto ) );
+
+    ASSERT_EQ( lastKnownStateProto.collection_event_time_ms_epoch(), 1000 );
+    ASSERT_EQ( lastKnownStateProto.captured_state_template_signals_size(), 1 );
+    auto &capturedStateTemplateSignals = lastKnownStateProto.captured_state_template_signals()[0];
+    ASSERT_EQ( capturedStateTemplateSignals.state_template_sync_id(), "lks1" );
+
+    auto &capturedSignals = capturedStateTemplateSignals.captured_signals();
+
+    ASSERT_EQ( getSignalValues( capturedSignals ), ( std::vector<double>{ 41, 42, 43, 44, 45 } ) );
+
+    // Now just ensure that when number of signals is multiple of mMaxMessagesPerPayload, we don't
+    // send an empty message.
+    mLastKnownStateMqttSender->clearSentBufferData();
+    collectedData = std::make_shared<LastKnownStateCollectedData>();
+    collectedData->triggerTime = 1000;
+    stateTemplate2.signals.pop_back();
+    // Sanity check
+    ASSERT_EQ( stateTemplate1.signals.size() + stateTemplate2.signals.size(), 10 );
+    collectedData->stateTemplateCollectedSignals.emplace_back( stateTemplate1 );
+    collectedData->stateTemplateCollectedSignals.emplace_back( stateTemplate2 );
+    EXPECT_CALL( *mLastKnownStateMqttSender, mockedSendBuffer( mLastKnownStateDataTopic, _, Gt( 0 ), _ ) ).Times( 2 );
+
+    mDataSenderManager->processData( collectedData );
+
+    ASSERT_EQ( mLastKnownStateMqttSender->getSentBufferDataByTopic( mLastKnownStateDataTopic ).size(), 2 );
+}
+
+TEST_P( DataSenderManagerTestWithAllSignalTypes, PersistencyForLastKnownState )
+{
+    auto signalType = GetParam();
+    EXPECT_CALL( *mLastKnownStateMqttSender, mockedSendBuffer( mLastKnownStateDataTopic, _, Gt( 0 ), _ ) )
+        .WillOnce( InvokeArgument<3>( ConnectivityError::NoConnection ) );
+
+    auto collectedData = std::make_shared<LastKnownStateCollectedData>();
+    collectedData->triggerTime = 1000;
+    collectedData->stateTemplateCollectedSignals.emplace_back(
+        StateTemplateCollectedSignals{ "lks1", { { CollectedSignal( 1234, 789654, 40, signalType ) } } } );
+    mDataSenderManager->processData( collectedData );
+
+    mLastKnownStateMqttSender->clearSentBufferData();
+
+    // We don't want to persist LKS data, since old data is not very useful. So nothing should be sent.
+    mDataSenderManager->checkAndSendRetrievedData();
+
+    ASSERT_EQ( mLastKnownStateMqttSender->getSentBufferDataByTopic( mLastKnownStateDataTopic ).size(), 0 );
+}
+
+TEST_F( DataSenderManagerTest, InvalidSenderWhenProcessingLastKnownState )
+{
+    std::unordered_map<SenderDataType, std::shared_ptr<DataSender>> dataSenders;
+    mDataSenderManager = std::make_unique<DataSenderManager>( std::move( dataSenders ), mMqttSender, mPayloadManager );
+
+    EXPECT_CALL( *mCommandResponseSender, mockedSendBuffer( getCommandResponseTopic( "command123" ), _, _, _ ) )
+        .Times( 0 );
+
+    mDataSenderManager->processData( std::make_shared<LastKnownStateCollectedData>() );
+
+    ASSERT_EQ( mCommandResponseSender->getSentBufferDataByTopic( getCommandResponseTopic( "command123" ) ).size(), 0 );
+}
+#endif
 
 } // namespace IoTFleetWise
 } // namespace Aws

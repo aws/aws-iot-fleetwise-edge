@@ -1,0 +1,9 @@
+[
+  {
+    "interfaceId": "LOCATION",
+    "type": "CUSTOM_DECODING_INTERFACE",
+    "customDecodingInterface": {
+      "name": "NamedSignalInterface"
+    }
+  }
+]

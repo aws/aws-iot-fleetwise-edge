@@ -145,6 +145,8 @@ TraceModule::getVariableName( TraceVariable variable )
         return "MqttHeapSize";
     case TraceVariable::SIGNAL_BUFFER_SIZE:
         return "SigBufSize";
+    case TraceVariable::LAST_KNOWN_STATE_SIGNAL_HISTORY_BUFFER_SIZE:
+        return "LastKnownStateSigHistoryBufSize";
     case TraceVariable::RAW_DATA_OVERWRITTEN_DATA_WITH_USED_HANDLE:
         return "RawOverw_id62";
     case TraceVariable::RAW_DATA_BUFFER_ELEMENTS_PER_TYPE:
@@ -157,8 +159,48 @@ TraceModule::getVariableName( TraceVariable variable )
         return "CEProcessedDataFrames";
     case TraceVariable::CE_PROCESSED_DTCS:
         return "CEProcessedDTCs";
+    case TraceVariable::MQTT_COMMAND_RESPONSE_MESSAGE_SENT_OUT:
+        return "MqttCommandResponseMessage";
+    case TraceVariable::COMMAND_REQUESTS_RECEIVED:
+        return "CommandRequestReceived";
+    case TraceVariable::COMMAND_EXECUTION_FAILURE:
+        return "CommandExecutionFailure";
+    case TraceVariable::COMMAND_PRECONDITION_CHECK_FAILURE:
+        return "CommandPreconditionFailure";
+    case TraceVariable::COMMAND_EXECUTION_TIMEOUT:
+        return "CommandExecutionTimeout";
+    case TraceVariable::COMMAND_DECODER_MANIFEST_FAILURE:
+        return "CommandDecoderFailure";
+    case TraceVariable::STATE_TEMPLATES_RECEIVED:
+        return "LastKnownStateReceived";
+    case TraceVariable::LAST_KNOWN_STATE_COLLECTION_TRIGGERS:
+        return "LastKnownStateCollectionTriggered";
+    case TraceVariable::MQTT_LAST_KNOWN_STATE_MESSAGE_SENT_OUT:
+        return "MqttLastKnownStateResponseMessage";
+    case TraceVariable::MQTT_LAST_KNOWN_STATE_MESSAGE_FAILED_TO_BE_SENT:
+        return "MqttLastKnownStateResponseMessageFailed";
+    case TraceVariable::LAST_KNOWN_STATE_PERIODIC_UPDATES:
+        return "LastKnownStatePeriodicUpdates";
+    case TraceVariable::LAST_KNOWN_STATE_ON_CHANGE_UPDATES:
+        return "LastKnownStateOnChangeUpdates";
+    case TraceVariable::LAST_KNOWN_STATE_NO_SIGNAL_CHANGE_ON_PERIODIC_UPDATE:
+        return "LastKnownStateNoSignalChangeOnPeriodicUpdate";
+    case TraceVariable::DATA_STORE_BYTES:
+        return "DataStoreBytes";
+    case TraceVariable::DATA_STORE_SIGNAL_COUNT:
+        return "DataStoreSignalSampleCount";
     case TraceVariable::DATA_FORWARD_BYTES:
         return "DataForwardBytes";
+    case TraceVariable::DATA_FORWARD_SIGNAL_COUNT:
+        return "DataForwardSignalSampleCount";
+    case TraceVariable::DATA_EXPIRED_BYTES:
+        return "DataExpiredBytes";
+    case TraceVariable::DATA_DROPPED_BYTES:
+        return "DataDroppedBytes";
+    case TraceVariable::DATA_STORE_ERROR:
+        return "DataStoreError";
+    case TraceVariable::DATA_FORWARD_ERROR:
+        return "DataForwardError";
     case TraceVariable::VEHICLE_DATA_PUBLISH_COUNT:
         return "VehicleDataPublishCount";
         // Intentionally omit default so that we can use compiler warnings to remind us about missing values
@@ -183,6 +225,14 @@ TraceModule::getAtomicVariableName( TraceAtomicVariable variable )
         return "QueueConsumerToInspectionDataFrames";
     case TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS:
         return "QueueConsumerToInspectionDtcs";
+    case TraceAtomicVariable::QUEUE_PENDING_COMMAND_REQUESTS:
+        return "QueuePendingCommandRequests";
+    case TraceAtomicVariable::QUEUE_PENDING_COMMAND_RESPONSES:
+        return "QueuePendingCommandResponses";
+    case TraceAtomicVariable::QUEUE_CONSUMER_TO_LAST_KNOWN_STATE_INSPECTION:
+        return "QueueConsumerToLastKnownStateInspection";
+    case TraceAtomicVariable::QUEUE_LAST_KNOWN_STATE_INSPECTION_TO_SENDER:
+        return "QueueLastKnownStateInspectionToSender";
     case TraceAtomicVariable::QUEUE_INSPECTION_TO_SENDER:
         return "QStS_id40";
     case TraceAtomicVariable::NOT_TIME_MONOTONIC_FRAMES:
@@ -201,6 +251,8 @@ TraceModule::getAtomicVariableName( TraceAtomicVariable variable )
         return "ConRes_id8";
     case TraceAtomicVariable::COLLECTION_SCHEME_ERROR:
         return "CampaignFailures";
+    case TraceAtomicVariable::STATE_TEMPLATE_ERROR:
+        return "StateTemplateFailures";
         // Intentionally omit default so that we can use compiler warnings to remind us about missing values
     }
     return nullptr;
@@ -225,6 +277,8 @@ TraceModule::getSectionName( TraceSection section )
         return "DEC_BUILD_id3";
     case TraceSection::MANAGER_COLLECTION_BUILD:
         return "COL_BUILD_id4";
+    case TraceSection::MANAGER_LAST_KNOWN_STATE_BUILD:
+        return "StateTemplatesBuild";
     case TraceSection::MANAGER_EXTRACTION:
         return "EXTRACT_id5";
     case TraceSection::CAN_DECODER_CYCLE_0:

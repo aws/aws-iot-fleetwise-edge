@@ -1,0 +1,18 @@
+[
+  {
+    "fullyQualifiedName": "Vehicle.CurrentLocation.Longitude",
+    "interfaceId": "LOCATION",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.CurrentLocation.Longitude"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.CurrentLocation.Latitude",
+    "interfaceId": "LOCATION",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.CurrentLocation.Latitude"
+    }
+  }
+]

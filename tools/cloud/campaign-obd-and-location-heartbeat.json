@@ -1,0 +1,36 @@
+{
+  "compression": "SNAPPY",
+  "diagnosticsMode": "SEND_ACTIVE_DTCS",
+  "spoolingMode": "TO_DISK",
+  "collectionScheme": {
+    "timeBasedCollectionScheme": {
+      "periodMs": 10000
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.OBD.EngineSpeed"
+    },
+    {
+      "name": "Vehicle.OBD.Speed"
+    },
+    {
+      "name": "Vehicle.OBD.AmbientAirTemperature"
+    },
+    {
+      "name": "Vehicle.OBD.EngineCoolantTemperature"
+    },
+    {
+      "name": "Vehicle.OBD.ThrottlePosition"
+    },
+    {
+      "name": "Vehicle.OBD.FuelLevel"
+    },
+    {
+      "name": "Vehicle.CurrentLocation.Latitude"
+    },
+    {
+      "name": "Vehicle.CurrentLocation.Longitude"
+    }
+  ]
+}

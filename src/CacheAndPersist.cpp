@@ -24,6 +24,10 @@ CacheAndPersist::CacheAndPersist( const std::string &partitionPath, size_t maxPa
                              PERSISTENCY_WORKSPACE }
     , mDecoderManifestFile( mPersistencyWorkspace + DECODER_MANIFEST_FILE )
     , mCollectionSchemeListFile( mPersistencyWorkspace + COLLECTION_SCHEME_LIST_FILE )
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    , mStateTemplateListFile( mPersistencyWorkspace + STATE_TEMPLATE_LIST_FILE )
+    , mStateTemplateListMetadataFile( mPersistencyWorkspace + STATE_TEMPLATE_LIST_METADATA_FILE )
+#endif
     , mPayloadMetadataFile( mPersistencyWorkspace + PAYLOAD_METADATA_FILE )
     , mCollectedDataPath( mPersistencyWorkspace + COLLECTED_DATA_FOLDER )
     , mMaxPersistencePartitionSize( maxPartitionSize )
@@ -447,6 +451,12 @@ CacheAndPersist::getFileName( DataType dataType )
 
     case DataType::EDGE_TO_CLOUD_PAYLOAD:
         return mCollectedDataPath;
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+    case DataType::STATE_TEMPLATE_LIST:
+        return mStateTemplateListFile;
+    case DataType::STATE_TEMPLATE_LIST_METADATA:
+        return mStateTemplateListMetadataFile;
+#endif
 
     default:
         FWE_LOG_ERROR( "Invalid data type specified" );
@@ -532,6 +542,9 @@ CacheAndPersist::cleanupPersistedData()
                 std::string filename = it->path().string();
                 if ( filename != mDecoderManifestFile && filename != mCollectionSchemeListFile &&
                      filename != mPayloadMetadataFile &&
+#ifdef FWE_FEATURE_LAST_KNOWN_STATE
+                     filename != mStateTemplateListFile && filename != mStateTemplateListMetadataFile &&
+#endif
                      ( std::find( filenames.begin(), filenames.end(), filename ) == filenames.end() ) )
                 {
                     // Delete files after iterating over directory

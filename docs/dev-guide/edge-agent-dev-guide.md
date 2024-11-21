@@ -1,6 +1,7 @@
 # Edge Agent Developer Guide
 
-**Note:** AWS IoT FleetWise is currently available in `us-east-1` and `eu-central-1`.
+**Note:** AWS IoT FleetWise is currently available in
+[these](https://docs.aws.amazon.com/general/latest/gr/iotfleetwise.html) regions.
 
 **Topics**
 
@@ -95,9 +96,13 @@ If you are interested in exploring AWS IoT FleetWise with ROS2 support, see the
 ## Prerequisites for quick start demo
 
 - Access to an AWS Account with administrator privileges.
-- Logged in to the AWS Console in your desired region using the account with administrator
+- Logged in to the AWS Console in the `us-east-1` region using the account with administrator
   privileges.
-  - **Note:** AWS IoT FleetWise is currently available in `us-east-1` and `eu-central-1`.
+  - Note: if you would like to use a different region you will need to change `us-east-1` to your
+    desired region in each place that it is mentioned below.
+  - Note: AWS IoT FleetWise is currently available in
+    [these](https://docs.aws.amazon.com/general/latest/gr/iotfleetwise.html) regions.
+- A local Windows, Linux or MacOS machine.
 
 ## Deploy Edge Agent
 
@@ -109,7 +114,7 @@ instance.
    [**Launch CloudFormation Template**](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-iot-fleetwise.s3.us-west-2.amazonaws.com%2Flatest%2Fcfn-templates%2Ffwdemo.yml&stackName=fwdemo).
 1. (Optional) You can increase the number of simulated vehicles by updating the `FleetSize`
    parameter. You can also specify the region IoT Things are created in by updating the
-   `IoTCoreRegion` parameter.
+   `IoTCoreRegion` parameter, by default it is `us-east-1`.
 1. Select the checkbox next to _'I acknowledge that AWS CloudFormation might create IAM resources
    with custom names.'_
 1. Choose **Create stack**.
@@ -128,7 +133,8 @@ vehicle model, register the virtual vehicle created in the previous section and 
 collect data from it.
 
 1. Open the AWS CloudShell: [Launch CloudShell](https://console.aws.amazon.com/cloudshell/home)
-1. Copy and paste the following commands to clone the latest FWE software from GitHub and install
+
+1. Copy and paste the following commands to clone the latest FWE source code from GitHub and install
    the dependencies of the demo script.
 
    ```bash
@@ -150,6 +156,7 @@ collect data from it.
 
    ```bash
    ./demo.sh \
+      --region us-east-1 \
       --vehicle-name fwdemo \
       --node-file can-nodes.json \
       --decoder-file can-decoders.json \
@@ -160,37 +167,19 @@ collect data from it.
    - (Optional) To enable S3 upload, append the option `--data-destination S3`. By default the
      upload format will be JSON. You can change this to Parquet format for S3 by passing
      `--s3-format PARQUET`.
-
-     ```bash
-     ./demo.sh \
-        --vehicle-name fwdemo \
-        --node-file can-nodes.json \
-        --decoder-file can-decoders.json \
-        --network-interface-file network-interface-can.json \
-        --campaign-file campaign-brake-event.json \
-        --data-destination S3
-     ```
-
+   - (Optional) To enable IoT topic as destination, add the flag `--data-destination IOT_TOPIC`. To
+     define the custom IoT topic use the flag `--iot-topic <TOPIC_NAME>`. Note: The IoT topic data
+     destination is a "gated" feature of AWS IoT FleetWise for which you will need to request
+     access. See
+     [here](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/fleetwise-regions.html)
+     for more information, or contact the
+     [AWS Support Center](https://console.aws.amazon.com/support/home#/).
    - (Optional) If you selected a `FleetSize` of greater than one above, append the option
      `--fleet-size <SIZE>`, where `<SIZE>` is the number selected.
-   - (Optional) If you changed `IoTCoreRegion` above, append the option `--region <REGION>`, where
+   - (Optional) If you changed `IoTCoreRegion` above, change the option `--region <REGION>`, where
      `<REGION>` is the selected region.
    - (Optional) If you changed `Stack name` when creating the stack above, pass the new stack name
      to the `--vehicle-name` option.
-
-     For example, if you chose to create two AWS IoT things in Europe (Frankfurt) with a stack named
-     `myfwdemo`, you must pass those values when calling `demo.sh`:
-
-     ```bash
-     ./demo.sh \
-        --vehicle-name myfwdemo \
-        --node-file can-nodes.json \
-        --decoder-file can-decoders.json \
-        --network-interface-file network-interface-can.json \
-        --campaign-file campaign-brake-event.json \
-        --fleet-size 2 \
-        --region eu-central-1
-     ```
 
    The demo script:
 
@@ -216,12 +205,12 @@ collect data from it.
    1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
    1. Saves the data to an HTML file.
 
-   If S3 upload is enabled, the demo script will additionally:
+   If S3 upload is enabled, the demo script will instead:
 
    1. Create an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
       bucket.
-   1. Creates an additional campaign from `campaign-brake-event.json` to upload the data to S3 in
-      JSON format, or Parquet format if the `--s3-format PARQUET` option is passed.
+   1. Creates a campaign from `campaign-brake-event.json` to upload the data to S3 in JSON format,
+      or Parquet format if the `--s3-format PARQUET` option is passed.
    1. Wait 20 minutes for the data to propagate to S3 and then download it.
    1. Save the data to an HTML file.
 
@@ -306,9 +295,12 @@ This section describes how to get started on a development machine.
 ### Prerequisites for development machine
 
 - Access to an AWS Account with administrator privileges.
-- Logged in to the AWS Console in your desired region using the account with administrator
+- Logged in to the AWS Console in the `us-east-1` region using the account with administrator
   privileges.
-  - **Note:** AWS IoT FleetWise is currently available in`us-east-1` and `eu-central-1`.
+  - Note: if you would like to use a different region you will need to change `us-east-1` to your
+    desired region in each place that it is mentioned below.
+  - Note: AWS IoT FleetWise is currently available in
+    [these](https://docs.aws.amazon.com/general/latest/gr/iotfleetwise.html) regions.
 - A local Linux or MacOS machine.
 
 ### Launch your development machine
@@ -381,12 +373,10 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
 1. Run the following _on the development machine_ to provision an AWS IoT Thing with credentials and
    install your Edge Agent as a service.
 
-   **Note** To create AWS IoT things in Europe (Frankfurt), configure `--region` to `eu-central-1`
-   in the call to `provision.sh`
-
    ```bash
    sudo mkdir -p /etc/aws-iot-fleetwise \
    && sudo ./tools/provision.sh \
+      --region us-east-1 \
       --vehicle-name fwdemo-ec2 \
       --certificate-pem-outfile /etc/aws-iot-fleetwise/certificate.pem \
       --private-key-outfile /etc/aws-iot-fleetwise/private-key.key \
@@ -450,6 +440,7 @@ collect data from it.
 
    ```bash
    ./demo.sh \
+      --region us-east-1 \
       --vehicle-name fwdemo-ec2 \
       --node-file can-nodes.json \
       --decoder-file can-decoders.json \
@@ -460,31 +451,15 @@ collect data from it.
    - (Optional) To enable S3 upload, append the option `--data-destination S3`. By default the
      upload format will be JSON. You can change this to Parquet format by passing
      `--s3-format PARQUET`.
-
-     ```bash
-     ./demo.sh \
-        --vehicle-name fwdemo-ec2 \
-        --node-file can-nodes.json \
-        --decoder-file can-decoders.json \
-        --network-interface-file network-interface-can.json \
-        --campaign-file campaign-brake-event.json \
-        --data-destination S3
-     ```
-
-   - (Optional) If you changed the `--region` option to `provision.sh` above, append the option
-     `--region <REGION>`, where `<REGION>` is the selected region. For example, if you chose to
-     create the AWS IoT thing in Europe (Frankfurt), you must configure `--region` to `eu-central-1`
-     in the demo.sh file.
-
-     ```bash
-     ./demo.sh \
-        --vehicle-name fwdemo-ec2 \
-        --node-file can-nodes.json \
-        --decoder-file can-decoders.json \
-        --network-interface-file network-interface-can.json \
-        --campaign-file campaign-brake-event.json \
-        --region eu-central-1
-     ```
+   - (Optional) To enable IoT topic as destination, add the flag `--data-destination IOT_TOPIC` To
+     define the custom IoT topic use the flag `--iot-topic <TOPIC_NAME>`. Note: The IoT topic data
+     destination is a "gated" feature of AWS IoT FleetWise for which you will need to request
+     access. See
+     [here](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/fleetwise-regions.html)
+     for more information, or contact the
+     [AWS Support Center](https://console.aws.amazon.com/support/home#/).
+   - (Optional) If you changed the `--region` option to `provision.sh` above, change the option
+     `--region <REGION>`, where `<REGION>` is the selected region.
 
    The demo script:
 
@@ -542,6 +517,7 @@ collect data from it.
 
    ```bash
    ./demo.sh \
+      --region us-east-1 \
       --vehicle-name fwdemo-ec2 \
       --node-file obd-nodes.json \
       --decoder-file obd-decoders.json \
@@ -557,6 +533,7 @@ collect data from it.
    python3 dbc-to-nodes.py <DBC_FILE> can-nodes.json \
    && python3 dbc-to-decoders.py <DBC_FILE> can-decoders.json \
    && ./demo.sh \
+      --region us-east-1 \
       --vehicle-name fwdemo-ec2 \
       --node-file can-nodes.json \
       --decoder-file can-decoders.json \
@@ -610,7 +587,7 @@ for AWS IoT FleetWise ("FWE").
 - [Architecture Overview](#architecture-overview)
   - [User Flow](#user-flow)
   - [Software Layers](#software-layers)
-  - [Overview of the software libraries](#overview-of-the-software-libraries)
+  - [Overview of the software libraries](#overview-of-the-software-modules)
 - [Programming and execution model](#programming-and-execution-model)
 - [Data models](#data-models)
   - [Device to cloud communication](#device-to-cloud-communication)
@@ -995,6 +972,16 @@ FWE sends the following artifacts to the Cloud services:
     CDR format and packed them in Amazon ION file format and directly upload to S3. Refer to
     [vision_system_data.isl](../../interfaces/protobuf/schemas/edgeToCloud/vision_system_data.isl).
 
+- **Command Response:** After a command is executed, FWE sends this message to inform the cloud
+  about the execution status of a requested command. Refer to
+  [command_response.proto](../../interfaces/protobuf/schemas/edgeToCloud/command_response.proto)
+
+- **Last Known State:** This message is sent conditionally to the cloud data plane services once a
+  rule defined by a state template is met. The message will contain the last value of each signal
+  that was collected based on state template rules. By default, FWE sends this payload compressed
+  with Snappy. Refer to
+  [last_known_state_data.proto](../../interfaces/protobuf/schemas/edgeToCloud/last_known_state_data.proto)
+
 ### Cloud to Device communication
 
 The Cloud Control plane services publish to FWE dedicated MQTT Topic the following artifacts:
@@ -1008,6 +995,20 @@ The Cloud Control plane services publish to FWE dedicated MQTT Topic the followi
   apply on the network traffic it receives. Using the decoder manifest, the Inspection module will
   apply the rules defined in the collection schemes to generate data snapshots. Refer to
   [collection_schemes.proto](../../interfaces/protobuf/schemas/cloudToEdge/collection_schemes.proto).
+
+- **Command Request:** This artifact describes a command that FWE should execute to change an
+  actuator's state or a state template. Refer to
+  [command_request.proto](../../interfaces/protobuf/schemas/cloudToEdge/command_request.proto).
+
+  Note: The Last Known State commands change the activation status of a state template. This status
+  will be reset (meaning that state templates will be deactivated) when FWE is restarted unless
+  persistency is enabled. In such situation, if persistency is disabled, a new command needs to be
+  sent to activate the state template again.
+
+- **State Templates:** This artifact describes the signals to be collected for last known state
+  feature. The list of signals is derived from state templates created in the Cloud, although it is
+  presented to FWE as a single list of signals. Refer to
+  [state_templates.proto](../../interfaces/protobuf/schemas/cloudToEdge/state_templates.proto).
 
 ## Data Persistency
 
@@ -1089,12 +1090,29 @@ described below in the configuration section. Each log entry includes the follow
 |                             | introspectionLibraryCompare                 | Error handling when local ROS2 introspection library mismatches with Cloud decoder manifest: "ErrorAndFail", "Warn","Ignore".                                                                                                                                                                                                                                                   | string   |
 |                             | interfaceId                                 | A unique network interface ID used by AWS IoT FleetWise service                                                                                                                                                                                                                                                                                                                 | string   |
 |                             | type                                        | Specifies if the interface carries ROS2 signals over this channel.                                                                                                                                                                                                                                                                                                              | string   |
+| someipToCanBridgeInterface  | someipServiceId                             | The Service ID that provides the CAN over SOME/IP service.                                                                                                                                                                                                                                                                                                                      | string   |
+|                             | someipInstanceId                            | The Instance ID that provides the CAN over SOME/IP.service.                                                                                                                                                                                                                                                                                                                     | string   |
+|                             | someipEventId                               | The Event ID of the CAN over SOME/IP data.service.                                                                                                                                                                                                                                                                                                                              | string   |
+|                             | someipEventGroupId                          | The Event Group ID that FWE should subscribe to for the CAN over SOME/IP data.service.                                                                                                                                                                                                                                                                                          | string   |
+|                             | someipApplicationName                       | Name of the SOME/IP application                                                                                                                                                                                                                                                                                                                                                 | string   |
+| someipCollectionInterface   | someipApplicationName                       | Name of the SOME/IP application                                                                                                                                                                                                                                                                                                                                                 | string   |
+|                             | cyclicUpdatePeriodMs                        | Cyclic update period in milliseconds that FWE will periodically push the last available signal values. Set to zero to only collect values on change.                                                                                                                                                                                                                            | integer  |
+| someipCommandInterface      | someipCommandInterface                      | Name of the SOME/IP application                                                                                                                                                                                                                                                                                                                                                 | string   |
+| exampleUDSInterface         | configs                                     |                                                                                                                                                                                                                                                                                                                                                                                 | array    |
+|                             | - targetAddress                             | ECU address                                                                                                                                                                                                                                                                                                                                                                     | string   |
+|                             | - name                                      | Name of of the target                                                                                                                                                                                                                                                                                                                                                           | string   |
+|                             | - can                                       | CAN Interfaces                                                                                                                                                                                                                                                                                                                                                                  | object   |
+|                             | -- interfaceName                            | Can interface name                                                                                                                                                                                                                                                                                                                                                              | string   |
+|                             | -- functionalAddress                        | Functional address for UDS request                                                                                                                                                                                                                                                                                                                                              | string   |
+|                             | -- physicalRequestID                        | Physical request ID for UDS request                                                                                                                                                                                                                                                                                                                                             | string   |
+|                             | -- physicalResponseID                       | Physical response ID for UDS response                                                                                                                                                                                                                                                                                                                                           | string   |
 | bufferSizes                 | dtcBufferSize                               | Deprecated: decodedSignalsBufferSize is used for all signals. This option will be ignored.                                                                                                                                                                                                                                                                                      | integer  |
 |                             | decodedSignalsBufferSize                    | Max size of the buffer shared between data collection module (Collection Engine) and Vehicle Data Consumer for OBD and CAN signals. This buffer receives the raw packets from the Vehicle Data e.g. CAN bus and stores the decoded/filtered data according to the signal decoding information provided in decoder manifest. This is a multiple producer single consumer buffer. | integer  |
 |                             | rawCANFrameBufferSize                       | Deprecated: decodedSignalsBufferSize is used for all signals. This option will be ignored.                                                                                                                                                                                                                                                                                      | integer  |
 | threadIdleTimes             | inspectionThreadIdleTimeMs                  | Sleep time for inspection engine thread if no new data is available (in milliseconds)                                                                                                                                                                                                                                                                                           | integer  |
 |                             | socketCANThreadIdleTimeMs                   | Sleep time for CAN interface if no new data is available (in milliseconds)                                                                                                                                                                                                                                                                                                      | integer  |
 |                             | canDecoderThreadIdleTimeMs                  | Sleep time for CAN decoder thread if no new data is available (in milliseconds)                                                                                                                                                                                                                                                                                                 | integer  |
+|                             | lastKnownStateThreadIdleTimeMs              | Sleep time for last known state inspection engine thread (in milliseconds)                                                                                                                                                                                                                                                                                                      | integer  |
 | persistency                 | persistencyPath                             | Local storage path to persist Collection Scheme, decoder manifest and data snapshot                                                                                                                                                                                                                                                                                             | string   |
 |                             | persistencyPartitionMaxSize                 | Maximum size allocated for persistency (Bytes)                                                                                                                                                                                                                                                                                                                                  | integer  |
 |                             | persistencyUploadRetryIntervalMs            | Interval to wait before retrying to upload persisted signal data (in milliseconds). After successfully uploading, the persisted signal data will be cleared. Only signal data that could not be uploaded will be persisted. (in milliseconds)                                                                                                                                   | integer  |
@@ -1103,15 +1121,17 @@ described below in the configuration section. Each log entry includes the follow
 |                             | logColor                                    | Whether logs should be colored: `Auto`, `Yes`, `No`. Default to `Auto`, meaning FWE will try to detect whether colored output is supported (for example when connected to a tty)                                                                                                                                                                                                | string   |
 |                             | maximumAwsSdkHeapMemoryBytes                | The maximum size of AWS SDK heap memory                                                                                                                                                                                                                                                                                                                                         | integer  |
 |                             | metricsCyclicPrintIntervalMs                | Sets the interval in milliseconds how often the application metrics should be printed to stdout. Default 0 means never                                                                                                                                                                                                                                                          | string   |
+|                             | minFetchTriggerIntervalMs                   | Minimum time after fetch condition can be retriggered memory                                                                                                                                                                                                                                                                                                                    | integer  |
 | publishToCloudParameters    | maxPublishMessageCount                      | Maximum messages that can be published to the cloud in one payload                                                                                                                                                                                                                                                                                                              | integer  |
+|                             | maxPublishLastKnownStateMessageCount        | Maximum Last Known State messages that can be published to the cloud as one payload                                                                                                                                                                                                                                                                                             | integer  |
 |                             | collectionSchemeManagementCheckinIntervalMs | Time interval between collection schemes checkins(in milliseconds)                                                                                                                                                                                                                                                                                                              | integer  |
 | mqttConnection              | endpointUrl                                 | AWS account's IoT device endpoint                                                                                                                                                                                                                                                                                                                                               | string   |
 |                             | connectionType                              | The connection module type. It can be `iotCore`, or `iotGreengrassV2` when `FWE_FEATURE_GREENGRASSV2` is enabled.                                                                                                                                                                                                                                                               | string   |
 |                             | clientId                                    | The ID that uniquely identifies this device in the AWS Region                                                                                                                                                                                                                                                                                                                   | string   |
-|                             | collectionSchemeListTopic                   | Topic for subscribing to Collection Scheme                                                                                                                                                                                                                                                                                                                                      | string   |
-|                             | decoderManifestTopic                        | Topic for subscribing to Decoder Manifest                                                                                                                                                                                                                                                                                                                                       | string   |
-|                             | canDataTopic                                | Topic for sending collected data to cloud                                                                                                                                                                                                                                                                                                                                       | string   |
-|                             | checkinTopic                                | Topic for sending checkins to the cloud                                                                                                                                                                                                                                                                                                                                         | string   |
+|                             | iotFleetWiseTopicPrefix                     | The prefix for AWS IoT FleetWise topics. All topics from other services such as commands, jobs, device shadow will be unaffected by this option. If omitted, it defaults to `$aws/iotfleetwise/`                                                                                                                                                                                | string   |
+|                             | commandsTopicPrefix                         | The prefix for AWS IoT Commands topics. If omitted, it defaults to `$aws/commands/`                                                                                                                                                                                                                                                                                             | string   |
+|                             | deviceShadowTopicPrefix                     | The prefix for AWS IoT Device Shadow topics. If omitted, it defaults to `$aws/things/`                                                                                                                                                                                                                                                                                          | string   |
+|                             | jobsTopicPrefix                             | The prefix for AWS IoT Jobs topics. If omitted, it defaults to `$aws/things/`                                                                                                                                                                                                                                                                                                   | string   |
 |                             | certificateFilename                         | The path to the device's certificate file (either `certificateFilename` or `certificate` must be provided)                                                                                                                                                                                                                                                                      | string   |
 |                             | privateKeyFilename                          | The path to the device's private key file (either `privateKeyFilename` or `privateKey` must be provided)                                                                                                                                                                                                                                                                        | string   |
 |                             | rootCAFilename                              | The path to the root CA certificate file (optional, either `rootCAFilename` or `rootCA` can be provided)                                                                                                                                                                                                                                                                        | string   |
@@ -1175,8 +1195,8 @@ step/safety cores.
 You can use the cmake build option, `FWE_SECURITY_COMPILE_FLAGS`, to enable security-related compile
 options when building the binary. Consult the compiler manual for the effect of each option in
 `./cmake/compiler_gcc.cmake`. This flag is already enabled in the default
-[native compilation script](./tools/build-fwe-native.sh) and
-[cross compilation script for ARM64](./tools/build-fwe-cross-arm64.sh)
+[native compilation script](../../tools/build-fwe-native.sh) and
+[cross compilation script for ARM64](../../tools/build-fwe-cross-arm64.sh)
 
 Customers are encouraged to store key materials on hardware modules, such as hardware security
 module (HSM), Trusted Platform Modules (TPM), or other cryptographic elements. A HSM is a removable
