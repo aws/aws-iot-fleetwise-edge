@@ -136,6 +136,8 @@ DataSenderProtoWriter::append( const CollectedSignal &msg )
         auto data = loanedRawDataFrame.getData();
         auto stringSize = loanedRawDataFrame.getSize();
         capturedSignal.set_string_value( reinterpret_cast<const char *>( data ), stringSize );
+        mRawDataBufferManager->decreaseHandleUsageHint(
+            msg.signalID, signalValue.value.uint32Val, RawData::BufferHandleUsageStage::HANDED_OVER_TO_SENDER );
         size += STRING_OVERHEAD + stringSize;
         break;
     }

@@ -57,8 +57,8 @@ struct Frame
              // being referenced somewhere. Each element in the array means
              // a different type of usage so that the BufferManager can
              // prioritize some types of usage when it needs to free up
-             // space. As long as mDataInUseCounter is 0, the data can be
-             // deleted regardless of the mUsageHintCountersPerStage value.
+             // space. The data can be deleted only when both
+             // mDataInUseCounter and mUsageHintCountersPerStage are 0
 
     Frame( BufferHandle handleID, Timestamp timestamp, RawDataType rawData )
         : mHandleID( handleID )
