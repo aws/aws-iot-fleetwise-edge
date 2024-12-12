@@ -276,7 +276,7 @@ The following steps will send a CAN command via the AWS IoT FleetWise 'remote co
    'actuator' node `Vehicle.actuator6` in the signal catalog.
 
    ```bash
-   aws iot create-command --command-id actuator6-command --namespace "AWS-IoTFleetWise" \
+   aws iot create-command --command-id actuator6-command --namespace "AWS-IoT-FleetWise" \
       --region us-east-1 \
       --role-arn ${SERVICE_ROLE_ARN} \
       --mandatory-parameters '[{
@@ -365,7 +365,7 @@ and can also be obtained by calling the `aws iot get-command-execution` API.
 1. Run the following to create the long-running command:
 
    ```bash
-   aws iot create-command --command-id actuator7-command --namespace "AWS-IoTFleetWise" \
+   aws iot create-command --command-id actuator7-command --namespace "AWS-IoT-FleetWise" \
       --region us-east-1 \
       --role-arn ${SERVICE_ROLE_ARN} \
       --mandatory-parameters '[{

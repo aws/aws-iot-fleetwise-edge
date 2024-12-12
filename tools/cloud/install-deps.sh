@@ -24,4 +24,4 @@ python3 -m pip install \
     boto3==1.18.60 \
     protobuf==3.20.2 \
     awsiotsdk==1.17.0 \
-    packaging==20.3
+    packaging==24.0

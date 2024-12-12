@@ -285,7 +285,7 @@ the LKS data topic to receive the collected data for the given state template.
          --region us-east-1 \
          --role-arn ${SERVICE_ROLE_ARN} \
          --command-id fwdemo-lks-command \
-         --namespace "AWS-IoTFleetWise" \
+         --namespace "AWS-IoT-FleetWise" \
          --mandatory-parameters '[
              {"name":"$stateTemplate.name"},
              {"name":"$stateTemplate.operation"}
@@ -319,7 +319,7 @@ the LKS data topic to receive the collected data for the given state template.
          --region us-east-1 \
          --role-arn ${SERVICE_ROLE_ARN} \
          --command-id fwdemo-lks-command-activate \
-         --namespace "AWS-IoTFleetWise" \
+         --namespace "AWS-IoT-FleetWise" \
          --mandatory-parameters '[
              {"name":"$stateTemplate.name"},
              {"name":"$stateTemplate.operation"},
