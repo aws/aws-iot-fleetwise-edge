@@ -286,7 +286,7 @@ feature.
    mapped via the decoder manifest to the 'actuator' node `Vehicle.actuator1` in the signal catalog.
 
    ```bash
-   aws iot create-command --command-id actuator1-command --namespace "AWS-IoTFleetWise" \
+   aws iot create-command --command-id actuator1-command --namespace "AWS-IoT-FleetWise" \
       --region us-east-1 \
       --role-arn ${SERVICE_ROLE_ARN} \
       --mandatory-parameters '[{
@@ -376,7 +376,7 @@ API.
 1. Run the following to create the long-running command:
 
    ```bash
-   aws iot create-command --command-id actuator20-command --namespace "AWS-IoTFleetWise" \
+   aws iot create-command --command-id actuator20-command --namespace "AWS-IoT-FleetWise" \
       --region us-east-1 \
       --role-arn ${SERVICE_ROLE_ARN} \
       --mandatory-parameters '[{
