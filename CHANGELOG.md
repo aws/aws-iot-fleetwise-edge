@@ -1,5 +1,51 @@
 # Change Log
 
+## v1.2.1 (2025-02-27)
+
+New features:
+
+- Added Python support in expressions with
+  [custom function](./docs/dev-guide/custom-function-dev-guide.md#python-custom-function)
+  implementation for both [CPython](https://github.com/python/cpython) and
+  [MicroPython](https://github.com/micropython/micropython).
+- Added support for IEEE 754 floating-point signals for CAN and OBD.
+- Added support for signed OBD PID signals.
+- Added support for using FWE as an external library, see the [examples](./examples/README.md).
+
+Bug fixes:
+
+- Fixed deletion of buffer after hand over to sender.
+- Fixed memory leak when generating Ion files for Vision System Data. This was caused by
+  [a known issue in the ion-c library](https://github.com/amazon-ion/ion-c/issues/264). To avoid
+  that all `ion-c` function calls now happen in the same thread.
+- Fixed possible thread lockups in rare cases when system time jumps to the future, or due to a
+  [`stdlibc++` issue](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=41861). Includes the addition of
+  the new option `collectionSchemeManagerThreadIdleTimeMs`.
+- Fixed sporadic SOME/IP build failures due to concurrent file generation.
+- Fixed possible hang during shutdown when feature `FWE_FEATURE_UDS_DTC_EXAMPLE` was enabled.
+
+Improvements:
+
+- Add checksum for persisted files (e.g Collection scheme, Decoder manifest, Telemetry data). Now
+  when writing a file, the persistency layer calculates the SHA1 for the content and write it to a
+  file alongside the content file with a `.sha1` extension. When reading the file, if the `.sha1`
+  file doesn't exist it just logs a warning. This is intended to keep backward compatibility with
+  files that were written by older FWE versions. Otherwise if the `.sha1` file exists, a mismatch in
+  the SHA1 when reading the content will cause both the content file and the `.sha1` file to be
+  deleted.
+- Store and forward optimized for systems with slow write speed to persistent storage.
+- Update `GoogleTest` to `1.15.2`.
+- Removed unsupported raw CAN frame collection.
+- Added optional `awsSdkLogLevel` field to the config file. Valid values are `Off`, `Fatal`,
+  `Error`, `Warn`, `Info`, `Debug`, `Trace`. Previously the AWS SDK logs were always disabled. This
+  allows the logs to be configured in [AwsBootstrap.cpp](./src/AwsBootstrap.cpp) (see the
+  [SDK docs](https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/logging.html) for more
+  details). If this is set to some level different than `Off`, the SDK logs will be redirected to
+  FWE's logger. Since FWE doesn't provide all levels, `Fatal` is mapped to FWE's `Error` and `Debug`
+  to FWE's `Trace`.
+- IMDS is now disabled when creating an S3 client. In some situations this could cause delays when
+  creating a new client (for more details see https://github.com/aws/aws-sdk-cpp/issues/1511).
+
 ## v1.2.0 (2024-11-21)
 
 New features:
@@ -144,7 +190,7 @@ Improvements:
 
 - Add support for building as a library exported by CMake. Set the CMake option
   `FWE_BUILD_EXECUTABLE` to `OFF`, then use `find_package(AwsIotFwe)`, `${AwsIotFwe_INCLUDE_DIR}`
-  and link with `AwsIotFwe::AwsIotFwe`.
+  and link with `AwsIotFwe::aws-iot-fleetwise-edge`.
 - Non-functional source code improvements:
   - Simplify `src/` folder structure, removing sub-namespaces & sub-libraries, and moving unit test
     files to `test/unit/`.

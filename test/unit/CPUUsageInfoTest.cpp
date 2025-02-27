@@ -2,8 +2,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CPUUsageInfo.h"
-#include <Thread.h>
+#include "aws/iotfleetwise/CPUUsageInfo.h"
+#include "aws/iotfleetwise/Thread.h"
 #include <chrono>
 #include <cstdint>
 #include <gtest/gtest.h>

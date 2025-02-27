@@ -1,20 +1,21 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CommandResponseDataSender.h"
-#include "CommandTypes.h"
-#include "ICommandDispatcher.h"
-#include "IConnectionTypes.h"
-#include "LoggingModule.h"
-#include "TopicConfig.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/CommandResponseDataSender.h"
+#include "aws/iotfleetwise/CommandTypes.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TopicConfig.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <boost/variant.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <istream>
+#include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace Aws
 {
@@ -79,30 +80,27 @@ internalCommandStatusToProto( CommandStatus status )
     return Schemas::Commands::COMMAND_STATUS_UNSPECIFIED;
 }
 
-CommandResponseDataSender::CommandResponseDataSender( std::shared_ptr<ISender> commandResponseSender )
-    : mCommandResponseSender( std::move( commandResponseSender ) )
+CommandResponseDataSender::CommandResponseDataSender( ISender &sender )
+    : mMqttSender( sender )
 {
 }
 
-void
-CommandResponseDataSender::processData( std::shared_ptr<const DataToSend> data, OnDataProcessedCallback callback )
+bool
+CommandResponseDataSender::isAlive()
 {
-    if ( data == nullptr )
-    {
-        FWE_LOG_WARN( "Nothing to send as the input is empty" );
-        return;
-    }
+    return mMqttSender.isAlive();
+}
 
-    auto commandResponse = std::dynamic_pointer_cast<const CommandResponse>( data );
+void
+CommandResponseDataSender::processData( const DataToSend &data, OnDataProcessedCallback callback )
+{
+    // coverity[autosar_cpp14_a5_2_1_violation] Cast by design as we want the sender to know the concrete type.
+    // coverity[autosar_cpp14_m5_2_3_violation] Cast by design as we want the sender to know the concrete type.
+    // coverity[misra_cpp_2008_rule_5_2_3_violation] Cast by design as we want the sender to know the concrete type.
+    auto commandResponse = dynamic_cast<const CommandResponse *>( &data );
     if ( commandResponse == nullptr )
     {
         FWE_LOG_WARN( "Nothing to send as the input is not a valid CommandResponse" );
-        return;
-    }
-
-    if ( mCommandResponseSender == nullptr )
-    {
-        FWE_LOG_ERROR( "No sender for command response provided" );
         return;
     }
 
@@ -128,8 +126,8 @@ CommandResponseDataSender::processData( std::shared_ptr<const DataToSend> data, 
         return;
     }
 
-    mCommandResponseSender->sendBuffer(
-        mCommandResponseSender->getTopicConfig().commandResponseTopic( commandResponse->id ),
+    mMqttSender.sendBuffer(
+        mMqttSender.getTopicConfig().commandResponseTopic( commandResponse->id ),
         reinterpret_cast<const uint8_t *>( protoOutput->data() ),
         protoOutput->size(),
         [protoOutput, commandId = commandResponse->id, callback]( ConnectivityError result ) {
@@ -153,37 +151,23 @@ CommandResponseDataSender::processData( std::shared_ptr<const DataToSend> data, 
 }
 
 void
-CommandResponseDataSender::processPersistedData( std::istream &data,
+CommandResponseDataSender::processPersistedData( const uint8_t *buf,
+                                                 size_t size,
                                                  const Json::Value &metadata,
                                                  OnPersistedDataProcessedCallback callback )
 {
     auto commandID = metadata["commandID"].asString();
 
-    if ( !mCommandResponseSender->isAlive() )
+    if ( !mMqttSender.isAlive() )
     {
         callback( false );
         return;
     }
 
-    data.seekg( 0, std::ios::end );
-    auto size = data.tellg();
-    auto dataAsArray = std::vector<char>( static_cast<size_t>( size ) );
-    data.seekg( 0, std::ios::beg );
-    data.read( dataAsArray.data(), static_cast<std::streamsize>( size ) );
-
-    if ( !data.good() )
-    {
-        FWE_LOG_ERROR( "Failed to read persisted command response for commandID '" + commandID + "'" );
-        callback( false );
-        return;
-    }
-
-    auto buf = reinterpret_cast<const uint8_t *>( dataAsArray.data() );
-    auto bufSize = static_cast<size_t>( size );
-    mCommandResponseSender->sendBuffer(
-        mCommandResponseSender->getTopicConfig().commandResponseTopic( commandID ),
+    mMqttSender.sendBuffer(
+        mMqttSender.getTopicConfig().commandResponseTopic( commandID ),
         buf,
-        bufSize,
+        size,
         [callback, size]( ConnectivityError result ) {
             if ( result != ConnectivityError::Success )
             {

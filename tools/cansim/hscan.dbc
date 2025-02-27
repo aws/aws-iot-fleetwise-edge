@@ -45,6 +45,12 @@ BO_ 532 ABS: 6 Vector__XXX
 BO_ 1217 BCM: 8 Vector__XXX
  SG_ DemoEngineCoolantTemperature : 23|8@0+ (1,-40) [-40|215] "deg C" Vector__XXX
 
+BO_ 1343 VEI: 6 Vector__XXX
+ SG_ DemoSpeed : 3|32@1+ (1,0) [-300.0|300.0] "km / h" Vector__XXX
+
+BO_ 1452 BMS: 8 Vector__XXX
+ SG_ DemoVoltage : 7|64@0+ (1,0) [0.0|192.0] "V" Vector__XXX
+
 BA_DEF_ SG_  "SignalType" STRING ;
 BA_DEF_ SG_  "SignalLongName" STRING ;
 BA_DEF_ BO_  "GenMsgCycleTime" INT 0 10000;
@@ -55,3 +61,8 @@ BA_ "GenMsgCycleTime" BO_ 769 1000;
 BA_ "GenMsgCycleTime" BO_ 401 12;
 BA_ "GenMsgCycleTime" BO_ 532 50;
 BA_ "GenMsgCycleTime" BO_ 1217 500;
+BA_ "GenMsgCycleTime" BO_ 1343 50;
+BA_ "GenMsgCycleTime" BO_ 1452 50;
+
+SIG_VALTYPE_ 1343 DemoSpeed : 1;
+SIG_VALTYPE_ 1452 DemoVoltage : 2;

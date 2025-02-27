@@ -1,0 +1,10 @@
+[
+  {
+    "fullyQualifiedName": "Vehicle.FileSize",
+    "interfaceId": "NAMED_SIGNAL",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.FileSize"
+    }
+  }
+]

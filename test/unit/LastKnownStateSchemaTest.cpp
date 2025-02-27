@@ -1,14 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "LastKnownStateSchema.h"
-#include "AwsIotConnectivityModule.h"
-#include "AwsIotReceiver.h"
-#include "LastKnownStateIngestion.h"
-#include "LastKnownStateTypes.h"
-#include "MqttClientWrapper.h"
-#include "SignalTypes.h"
-#include "TopicConfig.h"
+#include "aws/iotfleetwise/LastKnownStateSchema.h"
+#include "MqttClientWrapperMock.h"
+#include "aws/iotfleetwise/AwsIotReceiver.h"
+#include "aws/iotfleetwise/LastKnownStateIngestion.h"
+#include "aws/iotfleetwise/LastKnownStateTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include "state_templates.pb.h"
 #include <aws/crt/Types.h>
 #include <aws/crt/mqtt/Mqtt5Client.h>
@@ -33,21 +31,16 @@ using ::testing::StrictMock;
 class LastKnownStateSchemaTest : public ::testing::Test
 {
 protected:
+    LastKnownStateSchemaTest()
+        : mReceiverLastKnownState( mMqttClientWrapper, "topic" )
+        , mLastKnownStateSchema( mReceiverLastKnownState )
+    {
+    }
+
     void
     SetUp() override
     {
-        TopicConfigArgs topicConfigArgs;
-        mTopicConfig = std::make_unique<TopicConfig>( "thing-name", topicConfigArgs );
-
-        mAwsIotModule = std::make_unique<AwsIotConnectivityModule>( "", "", nullptr, *mTopicConfig );
-
-        std::shared_ptr<MqttClientWrapper> nullMqttClient;
-
-        mReceiverLastKnownState = std::make_shared<AwsIotReceiver>( mAwsIotModule.get(), nullMqttClient, "topic" );
-
-        mLastKnownStateSchema = std::make_unique<LastKnownStateSchema>( mReceiverLastKnownState );
-
-        mLastKnownStateSchema->subscribeToLastKnownStateReceived(
+        mLastKnownStateSchema.subscribeToLastKnownStateReceived(
             [&]( std::shared_ptr<LastKnownStateIngestion> lastKnownStateIngestion ) {
                 mReceivedLastKnownStateIngestion = lastKnownStateIngestion;
             } );
@@ -65,10 +58,10 @@ protected:
         return eventData;
     }
 
-    std::unique_ptr<TopicConfig> mTopicConfig;
-    std::unique_ptr<AwsIotConnectivityModule> mAwsIotModule;
-    std::shared_ptr<AwsIotReceiver> mReceiverLastKnownState;
-    std::unique_ptr<LastKnownStateSchema> mLastKnownStateSchema;
+    MqttClientBuilderWrapperMock mMqttClientBuilderWrapper;
+    StrictMock<MqttClientWrapperMock> mMqttClientWrapper;
+    AwsIotReceiver mReceiverLastKnownState;
+    LastKnownStateSchema mLastKnownStateSchema;
 
     std::shared_ptr<LastKnownStateIngestion> mReceivedLastKnownStateIngestion;
 };
@@ -77,7 +70,7 @@ TEST_F( LastKnownStateSchemaTest, ingestEmptyLastKnownState )
 {
     std::string protoSerializedBuffer;
 
-    mReceiverLastKnownState->onDataReceived( createPublishEvent( protoSerializedBuffer ) );
+    mReceiverLastKnownState.onDataReceived( createPublishEvent( protoSerializedBuffer ) );
 
     // It is possible to receive an empty message, because an empty state template list in protobuf
     // would be just empty data.
@@ -88,7 +81,7 @@ TEST_F( LastKnownStateSchemaTest, ingestLastKnownStateLargerThanLimit )
 {
     std::string protoSerializedBuffer( LAST_KNOWN_STATE_BYTE_SIZE_LIMIT + 1, 'X' );
 
-    mReceiverLastKnownState->onDataReceived( createPublishEvent( protoSerializedBuffer ) );
+    mReceiverLastKnownState.onDataReceived( createPublishEvent( protoSerializedBuffer ) );
 
     ASSERT_EQ( mReceivedLastKnownStateIngestion, nullptr );
 }
@@ -101,7 +94,7 @@ TEST_F( LastKnownStateSchemaTest, ingestLastKnownStateWithoutStateTemplates )
     ASSERT_TRUE( protoLastKnownState.SerializeToString( &protoSerializedBuffer ) );
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
-    mReceiverLastKnownState->onDataReceived( publishEvent );
+    mReceiverLastKnownState.onDataReceived( publishEvent );
 
     // This should be false because we just copied the data and it needs to be built first
     ASSERT_FALSE( mReceivedLastKnownStateIngestion->isReady() );
@@ -137,7 +130,7 @@ TEST_F( LastKnownStateSchemaTest, ingestLastKnownStateWithSignals )
     ASSERT_TRUE( protoLastKnownState.SerializeToString( &protoSerializedBuffer ) );
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
-    mReceiverLastKnownState->onDataReceived( publishEvent );
+    mReceiverLastKnownState.onDataReceived( publishEvent );
 
     ASSERT_TRUE( mReceivedLastKnownStateIngestion->build() );
 
@@ -182,7 +175,7 @@ TEST_F( LastKnownStateSchemaTest, ingestLastKnownStateWithInvalidDecoderManifest
     std::string protoSerializedBuffer;
     ASSERT_TRUE( protoLastKnownState.SerializeToString( &protoSerializedBuffer ) );
 
-    mReceiverLastKnownState->onDataReceived( createPublishEvent( protoSerializedBuffer ) );
+    mReceiverLastKnownState.onDataReceived( createPublishEvent( protoSerializedBuffer ) );
 
     ASSERT_FALSE( mReceivedLastKnownStateIngestion->build() );
     ASSERT_FALSE( mReceivedLastKnownStateIngestion->isReady() );
@@ -208,7 +201,7 @@ TEST_F( LastKnownStateSchemaTest, ingestLastKnownStateWithInvalidStateTemplate )
     std::string protoSerializedBuffer;
     ASSERT_TRUE( protoLastKnownState.SerializeToString( &protoSerializedBuffer ) );
 
-    mReceiverLastKnownState->onDataReceived( createPublishEvent( protoSerializedBuffer ) );
+    mReceiverLastKnownState.onDataReceived( createPublishEvent( protoSerializedBuffer ) );
 
     ASSERT_TRUE( mReceivedLastKnownStateIngestion->build() );
 

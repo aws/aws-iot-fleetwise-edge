@@ -135,6 +135,104 @@ indicate that these were the cause of the data collection:
 ["ALARM1", "ALARM3"]
 ```
 
+### Python custom function
+
+FWE can support either [MicroPython](https://github.com/micropython/micropython) or
+[CPython](https://github.com/python/cpython) called via a custom function.
+
+- MicroPython is a partial implementation of Python 3.5 that is configured at compile time to enable
+  or disable many features. The configuration for FWE is near to the
+  `MICROPY_CONFIG_ROM_LEVEL_MINIMUM` configuration with the following additional features enabled:
+
+  - Import of external modules from the filesystem
+  - Built-in module support: `json`, `sys`
+  - Double-precision floating point number support
+  - Additional error reporting (including line numbers)
+  - Compilation of scripts to bytecode
+  - Garbage collection
+
+  This means scripts **do not** have network or filesystem access and the 'threading' module is not
+  supported.
+
+- CPython is the standard implementation of Python 3, and the interpreter configuration for FWE
+  enables all features including filesystem and network access. As such, **THIS IMPLEMENTATION
+  SHOULD BE USED FOR TESTING PURPOSES ONLY, AND SHOULD NOT BE USED IN PRODUCTION SYSTEMS.**
+
+The custom function signature for both implementations is identical and as follows:
+
+```php
+variant                   // Return value of 'invoke' function, see below
+custom_function('python',
+    string s3Prefix,      // S3 prefix to download the scripts from
+    string moduleName,    // Top-level Python module to import containing the 'invoke' function
+    ...                   // Remaining args are passed to 'invoke' function
+);
+```
+
+The imported Python module must contain a function called `invoke` and can optionally contain a
+function called `cleanup`.
+
+- The `invoke` function will be called each time the campaign expression is evaluated. The return
+  value can either be a single primitive result of type `None`, `bool`, `float` or `str` (string),
+  or it can be a tuple with the first member being the primitive result and the second being a
+  `dict` containing collected data. The keys of the `dict` are fully-qualified-name of signals, and
+  the values of the `dict` must be string values. See below for an example.
+
+- The `cleanup` function is called when the invocation instance is no longer used. Each invocation
+  instance of the custom function is independent of the others, hence it is possible to use the same
+  Python module multiple times within the same or different campaigns, and any global variables in
+  the scripts will be independent.
+
+Examples:
+
+```python
+# Example Python custom function to sum the two arguments
+
+
+def invoke(a, b):
+    return a + b
+```
+
+```python
+# Example Python custom function to return true on a rising edge with collected data of the number of rising edges
+
+last_level = True
+rising_edge_count = 0
+
+
+def invoke(level):
+    global last_level
+    global rising_edge_count
+    rising_edge = level and not last_level
+    last_level = level
+    if rising_edge:
+        rising_edge_count += 1
+        return True, {"Vehicle.RisingEdgeCount": str(rising_edge_count)}
+    return False
+```
+
+If the example script above were uploaded to an S3 bucket with the prefix
+`python-campaign-1/rising_edge_count.py`, then the following campaign could be used to count the
+rising edges of signal `Vehicle.DriverDoorOpen` collecting the result in `Vehicle.RisingEdgeCount`:
+
+```json
+{
+  "compression": "SNAPPY",
+  "collectionScheme": {
+    "conditionBasedCollectionScheme": {
+      "conditionLanguageVersion": 1,
+      "expression": "custom_function('python', 'python-campaign-1', 'rising_edge_count', $variable.`Vehicle.DriverDoorOpen`)",
+      "triggerMode": "RISING_EDGE"
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.RisingEdgeCount"
+    }
+  ]
+}
+```
+
 ## Step-by-step guide
 
 This section of the guide goes through building and running FWE with support for the example custom
@@ -221,14 +319,21 @@ If you already downloaded the binary above, skip to the next section.
    ```bash
    cd ~/aws-iot-fleetwise-edge \
    && sudo -H ./tools/install-deps-native.sh \
+       --with-micropython-support \
    && sudo ldconfig
    ```
 
-1. Compile FWE with the custom function examples:
+1. Compile FWE with the custom function examples and MicroPython support:
 
    ```bash
-   ./tools/build-fwe-native.sh --with-custom-function-examples
+   ./tools/build-fwe-native.sh \
+       --with-custom-function-examples \
+       --with-micropython-support
    ```
+
+**Note: If you want to try the CPython integration, you should instead run `install-deps-native.sh`
+and `build-fwe-native.sh` with the option `--with-cpython-support` and later run `configure-fwe.sh`
+with the option `--enable-cpython`.**
 
 ### Install the CAN simulator
 
@@ -240,7 +345,85 @@ If you already downloaded the binary above, skip to the next section.
    && sudo -H ./tools/install-cansim.sh
    ```
 
-### Provision and run FWE
+### Provision FWE
+
+If you **do not** want to evaluate the scripting examples below, skip to the
+[next](#provision-fwe-without-scripting-support) section.
+
+#### Provision FWE with scripting support
+
+The scripting examples make use of the
+[`CustomFunctionScriptEngine`](../../include/aws/iotfleetwise/CustomFunctionScriptEngine.h) to
+download the scripts from an S3 bucket configured in the static configuration file. The custom
+function argument `s3Prefix` is used to either download all files under a directory prefix, or if
+the prefix ends in `.tar.gz` only that file is downloaded and the archive is extracted. The
+`CustomFunctionScriptEngine` will cache downloaded files based on the campaign. If you change the
+files in the S3 bucket, you will need to deploy a new campaign for FWE to re-download the files.
+
+1. In order to execute the scripting examples below, run the following commands _on the development
+   machine_ to create a new S3 bucket for storing the scripts, and an IAM role and IoT Credentials
+   Provider role alias (via a CloudFormation stack) for FWE to access the S3 bucket.
+
+   ```bash
+   cd ~/aws-iot-fleetwise-edge \
+   && REGION="us-east-1" \
+   && UUID=`cat /proc/sys/kernel/random/uuid` \
+   && DISAMBIGUATOR=${UUID:0:8} \
+   && S3_BUCKET_NAME="custom-function-demo-bucket-${DISAMBIGUATOR}" \
+   && STACK_NAME="custom-function-demo-credentials-provider-${DISAMBIGUATOR}" \
+   && ROLE_ALIAS="custom-function-demo-role-alias-${DISAMBIGUATOR}" \
+   && ACCOUNT_ID=`aws sts get-caller-identity | jq -r .Account` \
+   && echo "S3_BUCKET_NAME=${S3_BUCKET_NAME}" > tools/cloud/demo.env \
+   && aws s3 mb s3://${S3_BUCKET_NAME} --region ${REGION} \
+   && aws cloudformation create-stack \
+       --region ${REGION} \
+       --stack-name ${STACK_NAME} \
+       --template-body file://tools/cfn-templates/iot-credentials-provider.yml \
+       --parameters ParameterKey=RoleAlias,ParameterValue=${ROLE_ALIAS} \
+           ParameterKey=S3BucketName,ParameterValue=${S3_BUCKET_NAME} \
+           ParameterKey=IoTCoreRegion,ParameterValue=${REGION} \
+           ParameterKey=S3BucketPrefixPattern,ParameterValue='"*"' \
+           ParameterKey=S3Actions,ParameterValue='"s3:ListBucket,s3:GetObject"' \
+       --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM
+   ```
+
+1. Run the following to provision an AWS IoT Thing with credentials:
+
+   ```bash
+   mkdir -p build_config \
+   && ./tools/provision.sh \
+       --region us-east-1 \
+       --vehicle-name fwdev-custom-functions \
+       --certificate-pem-outfile build_config/certificate.pem \
+       --private-key-outfile build_config/private-key.key \
+       --endpoint-url-outfile build_config/endpoint.txt \
+       --vehicle-name-outfile build_config/vehicle-name.txt \
+       --creds-role-alias ${ROLE_ALIAS} \
+       --creds-role-alias-outfile build_config/creds-role-alias.txt \
+       --creds-endpoint-url-outfile build_config/creds-endpoint.txt \
+   && ./tools/configure-fwe.sh \
+       --input-config-file configuration/static-config.json \
+       --output-config-file build_config/config-0.json \
+       --log-color Yes \
+       --log-level Trace \
+       --vehicle-name `cat build_config/vehicle-name.txt` \
+       --endpoint-url `cat build_config/endpoint.txt` \
+       --can-bus0 vcan0 \
+       --certificate-file `realpath build_config/certificate.pem` \
+       --private-key-file `realpath build_config/private-key.key` \
+       --creds-role-alias `cat build_config/creds-role-alias.txt` \
+       --creds-endpoint-url `cat build_config/creds-endpoint.txt` \
+       --persistency-path `realpath build_config` \
+       --enable-named-signal-interface \
+       --script-engine-bucket-name ${S3_BUCKET_NAME} \
+       --script-engine-bucket-region ${REGION} \
+       --script-engine-bucket-owner ${ACCOUNT_ID} \
+       --enable-micropython
+   ```
+
+#### Provision FWE without scripting support
+
+**If you already provisioned FWE with scripting support above, skip to the next section.**
 
 1. Run the following _on the development machine_ to provision an AWS IoT Thing with credentials:
 
@@ -267,6 +450,8 @@ If you already downloaded the binary above, skip to the next section.
        --persistency-path `realpath build_config` \
        --enable-named-signal-interface
    ```
+
+### Run FWE
 
 1. Run FWE:
 
@@ -300,7 +485,7 @@ collect data from it.
    1. To evaluate the math functions, run this command. The campaign treats the signals
       `Vehicle.ECM.DemoEngineTorque` and `Vehicle.ABS.DemoBrakePedalPressure` as components of a
       2-dimensional vector and triggers data collection when the magnitude of the vector is greater
-      than 100. See [campaign-math.json](../../tools/cloud/campaign-math.json).
+      than 100. See [`campaign-math.json`](../../tools/cloud/campaign-math.json).
 
       ```bash
       ./demo.sh \
@@ -316,7 +501,7 @@ collect data from it.
    1. To evaluate the `MULTI_RISING_EDGE_TRIGGER` custom function, run this command. The campaign
       will be triggered when either the signal `Vehicle.ECM.DemoEngineTorque` is greater than 500
       (`ALARM1`) or signal `Vehicle.ABS.DemoBrakePedalPressure` is greater than 7000 (`ALARM2`). See
-      [campaign-multi-rising-edge-trigger.json](../../tools/cloud/campaign-multi-rising-edge-trigger.json).
+      [`campaign-multi-rising-edge-trigger.json`](../../tools/cloud/campaign-multi-rising-edge-trigger.json).
 
       ```bash
       ./demo.sh \
@@ -332,8 +517,36 @@ collect data from it.
          --data-destination IOT_TOPIC
       ```
 
-1. When the script completes, a path to an HTML file is given. _On your local machine_, use `scp` to
-   download it, then open it in your web browser:
+   1. Scripting examples - you must have
+      [provisioned FWE with scripting support](#provision-fwe-with-scripting-support) above.
+
+      1. To evaluate the Python custom function, run these commands to copy the example script
+         [`histogram.py`](../../tools/cloud/custom-function-python-histogram/histogram.py) to the S3
+         bucket and deploy the campaign. The campaign will calculate a histogram of the signal
+         `Vehicle.ECM.DemoEngineTorque`, collecting the histogram data as a JSON serialized string
+         for the signal `Vehicle.Histogram`. See
+         [`campaign-python-histogram.json`](../../tools/cloud/campaign-python-histogram.json).
+
+         ```bash
+         source demo.env \
+         && aws s3 cp \
+             ../../tools/cloud/custom-function-python-histogram/histogram.py \
+             s3://${S3_BUCKET_NAME}/custom-function-python-histogram/histogram.py \
+         && ./demo.sh \
+           --region us-east-1 \
+           --vehicle-name fwdev-custom-functions \
+           --node-file can-nodes.json \
+           --decoder-file can-decoders.json \
+           --network-interface-file network-interface-can.json \
+           --node-file custom-nodes-histogram.json \
+           --decoder-file custom-decoders-histogram.json \
+           --network-interface-file network-interface-custom-named-signal.json \
+           --campaign-file campaign-python-histogram.json \
+           --data-destination IOT_TOPIC
+         ```
+
+1. When the `demo.sh` script completes, a path to an HTML file is given. _On your local machine_,
+   use `scp` to download it, then open it in your web browser:
 
    ```bash
    scp -i <PATH_TO_PEM> ubuntu@<EC2_IP_ADDRESS>:<PATH_TO_HTML_FILE> .
@@ -387,41 +600,38 @@ For example, the following would implement a `sin` function to calculate the mat
 the argument:
 
 ```cpp
-#include "CollectionInspectionAPITypes.h"
+#include <aws/iotfleetwise/CollectionInspectionAPITypes.h>
 #include <cmath>
 #include <vector>
 
-namespace Aws
+Aws::IoTFleetWise::CustomFunctionInvokeResult
+customFunctionSin( Aws::IoTFleetWise::CustomFunctionInvocationID invocationId,
+                   const std::vector<Aws::IoTFleetWise::InspectionValue> &args )
 {
-namespace IoTFleetWise
-{
-
-CustomFunctionInvokeResult customFunctionSin(
-    CustomFunctionInvocationID invocationId,
-    const std::vector<InspectionValue> &args) {
-    static_cast<void>(invocationId);
-    if (args.size() != 1) {
-        return ExpressionErrorCode::TYPE_MISMATCH;
+    static_cast<void>( invocationId );
+    if ( args.size() != 1 )
+    {
+        return Aws::IoTFleetWise::ExpressionErrorCode::TYPE_MISMATCH;
     }
-    if (args[0].isUndefined()) {
-        return ExpressionErrorCode::SUCCESSFUL; // Undefined result
+    if ( args[0].isUndefined() )
+    {
+        return Aws::IoTFleetWise::ExpressionErrorCode::SUCCESSFUL; // Undefined result
     }
-    if (!args[0].isBoolOrDouble()){
-        return ExpressionErrorCode::TYPE_MISMATCH;
+    if ( !args[0].isBoolOrDouble() )
+    {
+        return Aws::IoTFleetWise::ExpressionErrorCode::TYPE_MISMATCH;
     }
-    return {ExpressionErrorCode::SUCCESSFUL, std::sin(args[0].asDouble())};
+    return { Aws::IoTFleetWise::ExpressionErrorCode::SUCCESSFUL, std::sin( args[0].asDouble() ) };
 }
-
-} // namespace IoTFleetWise
-} // namespace Aws
 ```
 
-Then the custom function can be registered in your bootstrap code as follows:
+Then the custom function can be registered in your bootstrap code via
+`IoTFleetWiseEngine::setStartupConfigHook` as follows:
 
 ```cpp
-mCollectionInspectionEngine->registerCustomFunction(
+engine.mCollectionInspectionEngine->registerCustomFunction(
     "sin",
-    {customFunctionSin, nullptr, nullptr}
+    { customFunctionSin, nullptr, nullptr }
 );
 ```
 
@@ -435,85 +645,102 @@ you would like to implement a function that returns the file size of a given fil
 to the collected data with the signal name `Vehicle.FileSize`:
 
 ```cpp
-#include "CollectionInspectionAPITypes.h"
-#include "LoggingModule.h"
-#include "NamedSignalDataSource.h"
-#include "SignalTypes.h"
-#include "TimeTypes.h"
+#include <aws/iotfleetwise/CollectionInspectionAPITypes.h>
+#include <aws/iotfleetwise/LoggingModule.h>
+#include <aws/iotfleetwise/NamedSignalDataSource.h>
+#include <aws/iotfleetwise/SignalTypes.h>
+#include <aws/iotfleetwise/TimeTypes.h>
 #include <boost/filesystem.hpp>
+#include <exception>
+#include <memory>
+#include <stdexcept>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
-namespace Aws
-{
-namespace IoTFleetWise
-{
-
 class CustomFunctionFileSize
 {
 public:
-    CustomFunctionFileSize(std::shared_ptr<NamedSignalDataSource> namedSignalDataSource)
-        : mNamedSignalDataSource(std::move(namedSignalDataSource)) {}
-    CustomFunctionInvokeResult invoke(
-        CustomFunctionInvocationID invocationId,
-        const std::vector<InspectionValue> &args) {
-        static_cast<void>(invocationId);
-        if ((args.size() != 1) || (!args[0].isString()))
+    CustomFunctionFileSize(
+        std::shared_ptr<Aws::IoTFleetWise::NamedSignalDataSource> namedSignalDataSource )
+        : mNamedSignalDataSource( std::move( namedSignalDataSource ) )
+    {
+        if ( mNamedSignalDataSource == nullptr )
         {
-            return ExpressionErrorCode::TYPE_MISMATCH;
+            throw std::runtime_error( "namedSignalInterface is not configured" );
         }
-        boost::filesystem::path filePath(*args[0].stringVal);
-        mFileSize = static_cast<int>(boost::filesystem::file_size(filePath));
-        return {ExpressionErrorCode::SUCCESSFUL, mFileSize};
     }
-    void conditionEnd(
-        const std::unordered_set<SignalID> &collectedSignalIds,
-        Timestamp timestamp,
-        CollectionInspectionEngineOutput &output) {
+    Aws::IoTFleetWise::CustomFunctionInvokeResult
+    invoke( Aws::IoTFleetWise::CustomFunctionInvocationID invocationId,
+            const std::vector<Aws::IoTFleetWise::InspectionValue> &args )
+    {
+        static_cast<void>( invocationId );
+        if ( ( args.size() != 1 ) || ( !args[0].isString() ) )
+        {
+            return Aws::IoTFleetWise::ExpressionErrorCode::TYPE_MISMATCH;
+        }
+        try
+        {
+            boost::filesystem::path filePath( *args[0].stringVal );
+            mFileSize = static_cast<int>( boost::filesystem::file_size( filePath ) );
+        }
+        catch ( const std::exception &e )
+        {
+            return Aws::IoTFleetWise::ExpressionErrorCode::TYPE_MISMATCH;
+        }
+        return { Aws::IoTFleetWise::ExpressionErrorCode::SUCCESSFUL, mFileSize };
+    }
+    void
+    conditionEnd( const std::unordered_set<Aws::IoTFleetWise::SignalID> &collectedSignalIds,
+                  Aws::IoTFleetWise::Timestamp timestamp,
+                  Aws::IoTFleetWise::CollectionInspectionEngineOutput &output )
+    {
         // Only add to the collected data if we have a valid value:
-        if (mFileSize < 0) {
+        if ( mFileSize < 0 )
+        {
             return;
         }
         // Clear the current value:
         auto size = mFileSize;
         mFileSize = -1;
         // Only add to the collected data if collection was triggered:
-        if (!output.triggeredCollectionSchemeData) {
+        if ( !output.triggeredCollectionSchemeData )
+        {
             return;
         }
-        auto signalId = mNamedSignalDataSource->getNamedSignalID("Vehicle.FileSize");
-        if (signalId == INVALID_SIGNAL_ID) {
-            FWE_LOG_WARN("Vehicle.FileSize not present in decoder manifest");
+        auto signalId = mNamedSignalDataSource->getNamedSignalID( "Vehicle.FileSize" );
+        if ( signalId == Aws::IoTFleetWise::INVALID_SIGNAL_ID )
+        {
+            FWE_LOG_WARN( "Vehicle.FileSize not present in decoder manifest" );
             return;
         }
-        if (collectedSignalIds.find(signalId) == collectedSignalIds.end()) {
+        if ( collectedSignalIds.find( signalId ) == collectedSignalIds.end() )
+        {
             return;
         }
         output.triggeredCollectionSchemeData->signals.emplace_back(
-            CollectedSignal{signalId, timestamp, size, SignalType::DOUBLE});
+            Aws::IoTFleetWise::CollectedSignal{ signalId, timestamp, size, Aws::IoTFleetWise::SignalType::DOUBLE } );
     }
-private:
-    std::shared_ptr<NamedSignalDataSource> mNamedSignalDataSource;
-    int mFileSize{-1};
-};
 
-} // namespace IoTFleetWise
-} // namespace Aws
+private:
+    std::shared_ptr<Aws::IoTFleetWise::NamedSignalDataSource> mNamedSignalDataSource;
+    int mFileSize{ -1 };
+};
 ```
 
-Then the custom function can be registered in your bootstrap code as follows:
+Then the custom function can be registered in your bootstrap code via
+`IoTFleetWiseEngine::setStartupConfigHook` as follows:
 
 ```cpp
-auto fileSizeFunc = std::make_shared<CustomFunctionFileSize>(mNamedSignalDataSource);
-mCollectionInspectionEngine->registerCustomFunction(
+auto fileSizeFunc = std::make_shared<CustomFunctionFileSize>( engine.mNamedSignalDataSource );
+engine.mCollectionInspectionEngine->registerCustomFunction(
     "file_size",
     {
-        [fileSizeFunc](auto invocationId, const auto &args) -> CustomFunctionInvokeResult {
-            return fileSizeFunc->invoke(invocationId, args);
+        [fileSizeFunc]( auto invocationId, const auto &args ) {
+            return fileSizeFunc->invoke( invocationId, args );
         },
-        [fileSizeFunc](const auto &collectedSignalIds, auto timestamp, auto &collectedData) {
-            fileSizeFunc->conditionEnd(collectedSignalIds, timestamp, collectedData);
+        [fileSizeFunc]( const auto &collectedSignalIds, auto timestamp, auto &collectedData ) {
+            fileSizeFunc->conditionEnd( collectedSignalIds, timestamp, collectedData );
         },
         nullptr
     }
@@ -530,50 +757,47 @@ function is called for the lifetime of the campaign. For example, if you would l
 custom function that returns a counter that is incremented each time the function is called:
 
 ```cpp
-#include "CollectionInspectionAPITypes.h"
+#include <aws/iotfleetwise/CollectionInspectionAPITypes.h>
 #include <unordered_map>
 #include <vector>
-
-namespace Aws
-{
-namespace IoTFleetWise
-{
 
 class CustomFunctionCounter
 {
 public:
-    CustomFunctionInvokeResult invoke(
-        CustomFunctionInvocationID invocationId,
-        const std::vector<InspectionValue> &args) {
-        static_cast<void>(args);
+    Aws::IoTFleetWise::CustomFunctionInvokeResult
+    invoke( Aws::IoTFleetWise::CustomFunctionInvocationID invocationId,
+            const std::vector<Aws::IoTFleetWise::InspectionValue> &args )
+    {
+        static_cast<void>( args );
         // Create a new counter if the invocationId is new, or get the existing counter:
-        auto &counter = mCounters.emplace(invocationId, 0).first->second;
-        return {ExpressionErrorCode::SUCCESSFUL, counter++};
+        auto &counter = mCounters.emplace( invocationId, 0 ).first->second;
+        return { Aws::IoTFleetWise::ExpressionErrorCode::SUCCESSFUL, counter++ };
     }
-    void cleanup(CustomFunctionInvocationID invocationId) {
-        mCounters.erase(invocationId);
+    void
+    cleanup( Aws::IoTFleetWise::CustomFunctionInvocationID invocationId )
+    {
+        mCounters.erase( invocationId );
     }
-private:
-    std::unordered_map<CustomFunctionInvocationID, int> mCounters;
-};
 
-} // namespace IoTFleetWise
-} // namespace Aws
+private:
+    std::unordered_map<Aws::IoTFleetWise::CustomFunctionInvocationID, int> mCounters;
+};
 ```
 
-Then the custom function can be registered in your bootstrap code as follows:
+Then the custom function can be registered in your bootstrap code via
+`IoTFleetWiseEngine::setStartupConfigHook` as follows:
 
 ```cpp
 auto counterFunc = std::make_shared<CustomFunctionCounter>();
-mCollectionInspectionEngine->registerCustomFunction(
+engine.mCollectionInspectionEngine->registerCustomFunction(
     "counter",
     {
-        [counterFunc](auto invocationId, const auto &args) -> CustomFunctionInvokeResult {
-            return counterFunc->invoke(invocationId, args);
+        [counterFunc]( auto invocationId, const auto &args ) {
+            return counterFunc->invoke( invocationId, args );
         },
         nullptr,
-        [counterFunc](auto invocationId) {
-            counterFunc->cleanup(invocationId);
+        [counterFunc]( auto invocationId ) {
+            counterFunc->cleanup( invocationId );
         }
     }
 );

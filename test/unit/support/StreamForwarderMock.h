@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "StreamForwarder.h"
 #include "StreamManagerMock.h"
+#include "aws/iotfleetwise/snf/StreamForwarder.h"
 #include <gmock/gmock.h>
 #include <string>
 
@@ -18,11 +18,26 @@ namespace Testing
 class StreamForwarderMock : public Aws::IoTFleetWise::Store::StreamForwarder
 {
 public:
-    explicit StreamForwarderMock( std::shared_ptr<StreamManagerMock> streamManager,
-                                  std::shared_ptr<TelemetryDataSender> dataSender )
-        : StreamForwarder( streamManager, dataSender, nullptr ){};
+    explicit StreamForwarderMock( StreamManagerMock &streamManager,
+                                  TelemetryDataSender &dataSender,
+                                  RateLimiter &rateLimiter )
+        : StreamForwarder( streamManager, dataSender, rateLimiter ){};
 
     MOCK_METHOD( void, registerJobCompletionCallback, ( JobCompletionCallback callback ), ( override ) );
+
+    MOCK_METHOD( void,
+                 beginForward,
+                 ( const Aws::IoTFleetWise::Store::CampaignName &campaignID,
+                   Aws::IoTFleetWise::Store::PartitionID pID,
+                   Aws::IoTFleetWise::Store::StreamForwarder::Source source ),
+                 ( override ) );
+
+    MOCK_METHOD( void,
+                 cancelForward,
+                 ( const Aws::IoTFleetWise::Store::CampaignName &campaignID,
+                   Aws::IoTFleetWise::Store::PartitionID pID,
+                   Aws::IoTFleetWise::Store::StreamForwarder::Source source ),
+                 ( override ) );
 };
 
 } // namespace Testing

@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CustomFunctionMultiRisingEdgeTrigger.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/CustomFunctionMultiRisingEdgeTrigger.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <cstddef>
 #include <cstdint>
 #include <json/json.h>
@@ -14,10 +14,9 @@ namespace IoTFleetWise
 {
 
 CustomFunctionMultiRisingEdgeTrigger::CustomFunctionMultiRisingEdgeTrigger(
-    std::shared_ptr<NamedSignalDataSource> namedSignalDataSource,
-    std::shared_ptr<RawData::BufferManager> rawBufferManager )
+    std::shared_ptr<NamedSignalDataSource> namedSignalDataSource, RawData::BufferManager *rawDataBufferManager )
     : mNamedSignalDataSource( std::move( namedSignalDataSource ) )
-    , mRawBufferManager( std::move( rawBufferManager ) )
+    , mRawDataBufferManager( rawDataBufferManager )
 {
 }
 
@@ -90,7 +89,7 @@ CustomFunctionMultiRisingEdgeTrigger::conditionEnd( const std::unordered_set<Sig
     {
         return;
     }
-    if ( ( mRawBufferManager == nullptr ) || ( mNamedSignalDataSource == nullptr ) )
+    if ( ( mRawDataBufferManager == nullptr ) || ( mNamedSignalDataSource == nullptr ) )
     {
         FWE_LOG_WARN( "namedSignalInterface missing from config or raw buffer manager disabled" );
         return;
@@ -113,14 +112,14 @@ CustomFunctionMultiRisingEdgeTrigger::conditionEnd( const std::unordered_set<Sig
     Json::StreamWriterBuilder builder;
     builder["indentation"] = "";
     auto jsonString = Json::writeString( builder, root );
-    auto bufferHandle = mRawBufferManager->push(
+    auto bufferHandle = mRawDataBufferManager->push(
         reinterpret_cast<const uint8_t *>( jsonString.data() ), jsonString.size(), timestamp, signalId );
     if ( bufferHandle == RawData::INVALID_BUFFER_HANDLE )
     {
         return;
     }
     // immediately set usage hint so buffer handle does not get directly deleted again
-    mRawBufferManager->increaseHandleUsageHint(
+    mRawDataBufferManager->increaseHandleUsageHint(
         signalId, bufferHandle, RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD );
     output.triggeredCollectionSchemeData->signals.emplace_back(
         CollectedSignal{ signalId, timestamp, bufferHandle, SignalType::STRING } );

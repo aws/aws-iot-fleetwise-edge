@@ -1,16 +1,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CollectionSchemeIngestionList.h"
-#include "CollectionSchemeManager.h" // IWYU pragma: associated
-#include "DecoderManifestIngestion.h"
-#include "EnumUtility.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/CollectionSchemeIngestionList.h"
+#include "aws/iotfleetwise/CollectionSchemeManager.h" // IWYU pragma: associated
+#include "aws/iotfleetwise/DecoderManifestIngestion.h"
+#include "aws/iotfleetwise/EnumUtility.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <cstddef>
 #include <cstdint>
 #include <string>
 
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
+#include "state_templates.pb.h"
 #include <utility>
 #endif
 

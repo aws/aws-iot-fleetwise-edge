@@ -142,20 +142,6 @@ Resources:
             systemctl stop unattended-upgrades
             systemctl disable unattended-upgrades
 
-            # Wait for any existing package install to finish
-            i=0
-            while true; do
-              if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
-                i=0
-              else
-                i=`expr $i + 1`
-                if expr $i \>= 10 > /dev/null; then
-                  break
-                fi
-              fi
-              sleep 1
-            done
-
             print_process_list() {
               ps aux # Print processes on error in case apt lock was still taken
             }
@@ -237,7 +223,7 @@ Resources:
             echo -n "${IoTThing.certificatePem}" > /etc/aws-iot-fleetwise/certificate.pem
             echo -n "${IoTThing.privateKey}" > /etc/aws-iot-fleetwise/private-key.key
             if ${EnableROS2}; then
-              VISION_SYSTEM_DATA_OPTIONS=" --creds-role-alias ${CredentialsProviderRoleAlias} --creds-endpoint-url ${IoTThing.credsEndpoint} --raw-data-buffer-size ${RawDataBufferSize}"
+              VISION_SYSTEM_DATA_OPTIONS=" --creds-role-alias ${CredentialsProviderRoleAlias} --creds-endpoint-url ${IoTThing.credsEndpoint} --raw-data-buffer-size ${RawDataBufferSize} --enable-ros2-interface"
             else
               VISION_SYSTEM_DATA_OPTIONS=""
             fi

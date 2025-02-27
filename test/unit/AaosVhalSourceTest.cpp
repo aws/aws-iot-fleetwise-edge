@@ -1,14 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "AaosVhalSource.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IDecoderDictionary.h"
-#include "IDecoderManifest.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "VehicleDataSourceTypes.h"
+#include "aws/iotfleetwise/AaosVhalSource.h"
 #include "WaitUntil.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/IDecoderDictionary.h"
+#include "aws/iotfleetwise/IDecoderManifest.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/VehicleDataSourceTypes.h"
 #include <array>
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -49,8 +49,8 @@ protected:
 TEST_F( AaosVhalSourceTest, testDecoding ) // NOLINT
 {
     auto signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
+    SignalBufferDistributor signalBufferDistributor;
+    signalBufferDistributor.registerQueue( signalBuffer );
     AaosVhalSource vhalSource( "AAOS-VHAL", signalBufferDistributor );
 
     CollectedDataFrame collectedDataFrame;

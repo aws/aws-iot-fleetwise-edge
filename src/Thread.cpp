@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "Thread.h"
+#include "aws/iotfleetwise/Thread.h"
 #include <string>
 #include <sys/prctl.h>
 
@@ -20,11 +20,10 @@ extern "C"
 }
 
 bool
-Thread::create( WorkerFunction workerFunction, void *execParam )
+Thread::create( WorkerFunction workerFunction )
 {
     mExecParams.mSelf = this;
     mExecParams.mWorkerFunction = workerFunction;
-    mExecParams.mParams = execParam;
 
     mDone.store( false );
     mTerminateSignal = std::make_unique<Signal>();
@@ -77,6 +76,7 @@ Thread::isValid() const
 }
 
 void *
+// coverity[autosar_cpp14_a8_4_10_violation] raw pointer needed to match the expected signature
 Thread::workerFunctionWrapper( void *params )
 {
     ThreadSettings *threadSettings = static_cast<ThreadSettings *>( params );
@@ -84,7 +84,7 @@ Thread::workerFunctionWrapper( void *params )
 
     if ( !self->mDone.load() )
     {
-        self->mExecParams.mWorkerFunction( self->mExecParams.mParams );
+        self->mExecParams.mWorkerFunction();
     }
 
     self->mDone.store( true );

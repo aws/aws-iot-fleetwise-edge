@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "OBDDataDecoder.h"
-#include "EnumUtility.h"
-#include "LoggingModule.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/OBDDataDecoder.h"
+#include "aws/iotfleetwise/EnumUtility.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -22,7 +22,7 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-OBDDataDecoder::OBDDataDecoder( std::shared_ptr<OBDDecoderDictionary> &decoderDictionary )
+OBDDataDecoder::OBDDataDecoder( const OBDDecoderDictionary &decoderDictionary )
     : mDecoderDictionary{ decoderDictionary }
 {
     mTimer.reset();
@@ -115,7 +115,7 @@ OBDDataDecoder::decodeEmissionPIDs( const SID sid,
         FWE_LOG_WARN( "Invalid response to PID request" );
         return false;
     }
-    if ( mDecoderDictionary == nullptr )
+    if ( mDecoderDictionary.empty() )
     {
         FWE_LOG_WARN( "Invalid Decoder Dictionary" );
         return false;
@@ -136,11 +136,11 @@ OBDDataDecoder::decodeEmissionPIDs( const SID sid,
         auto pid = inputData[byteCounter];
         byteCounter++;
         // first check whether the decoder dictionary contains this PID
-        if ( mDecoderDictionary->find( pid ) != mDecoderDictionary->end() )
+        if ( mDecoderDictionary.find( pid ) != mDecoderDictionary.end() )
         {
             // The expected number of bytes returned from PID
-            auto expectedResponseLength = mDecoderDictionary->at( pid ).mSizeInBytes;
-            auto formulas = mDecoderDictionary->at( pid ).mSignals;
+            auto expectedResponseLength = mDecoderDictionary.at( pid ).mSizeInBytes;
+            auto formulas = mDecoderDictionary.at( pid ).mSignals;
             // first check whether we have received enough bytes for this PID
             if ( byteCounter + expectedResponseLength <= inputData.size() )
             {
@@ -288,10 +288,10 @@ OBDDataDecoder::isPIDResponseValid( const std::vector<PID> &pids, const std::vec
             return false;
         }
         *foundPid = INVALID_PID; // for every time a PID is requested only one response is expected
-        if ( mDecoderDictionary->find( pid ) != mDecoderDictionary->end() )
+        if ( mDecoderDictionary.find( pid ) != mDecoderDictionary.end() )
         {
             // Move Index into the next PID
-            responseByteIndex += ( mDecoderDictionary->at( pid ).mSizeInBytes + 1 );
+            responseByteIndex += ( mDecoderDictionary.at( pid ).mSizeInBytes + 1 );
         }
         else
         {
@@ -328,42 +328,44 @@ OBDDataDecoder::calculateValueFromFormula( PID pid,
         return;
     }
 
+    switch ( formula.mRawSignalType )
+    {
+    case RawSignalType::INTEGER: {
+        info.mPIDsToValues.emplace( formula.mSignalID, decodeIntegerValue( formula, inputData, byteCounter ) );
+        break;
+    }
+    case RawSignalType::FLOATING_POINT: {
+        if ( ( formula.mSizeInBits != 32 ) && ( formula.mSizeInBits != 64 ) )
+        {
+            FWE_LOG_ERROR( "Floating point signal must be 32 or 64 bits but got " +
+                           std::to_string( formula.mSizeInBits ) );
+            return;
+        }
+        info.mPIDsToValues.emplace( formula.mSignalID, decodeFloatingPointValue( formula, inputData, byteCounter ) );
+        break;
+    }
+    }
+}
+
+DecodedSignalValue
+OBDDataDecoder::decodeIntegerValue( const CANSignalFormat &formula,
+                                    const std::vector<uint8_t> &inputData,
+                                    size_t byteCounter )
+{
     // In J1979 spec, longest value has 4-byte.
     // Allocate 64-bit here in case signal value increased in the future.
-    // Currently we always consider the raw value is positive. There are cases where a raw
-    // value itself is a negative integer as 2-complement. In those cases, the raw value will also
-    // be interpreted as positive because we store it in a 64-bit type without looking at the sign.
-    // In the future we have to know whether a raw value is signed and then extend the sign (filling
-    // all left-side bits with 1 instead of 0).
-    uint64_t rawData = 0;
-    size_t byteIdx = byteCounter + ( formula.mFirstBitPosition / BYTE_SIZE );
-    // If the signal length is less than 8-bit, we need to perform bit field operation
-    if ( formula.mSizeInBits < BYTE_SIZE )
+    uint64_t rawData = extractRawSignal<uint64_t>( formula, inputData, byteCounter );
+    // perform sign extension
+    if ( formula.mIsSigned )
     {
-        // bit manipulation performed here: shift first, then apply mask
-        // e.g. If signal are bit 4 ~ 7 in Byte A.
-        // we firstly right shift by 4, then apply bit mask 0b1111
-        rawData = inputData[byteIdx];
-        rawData >>= formula.mFirstBitPosition % BYTE_SIZE;
-        rawData &= static_cast<uint64_t>( 0xFFULL ) >> ( BYTE_SIZE - formula.mSizeInBits );
-    }
-    else
-    {
-        // This signal contain greater or equal than one byte, concatenate raw bytes
-        auto numOfBytes = formula.mSizeInBits / BYTE_SIZE;
-        // This signal contains multiple bytes, concatenate the bytes
-        while ( numOfBytes != 0 )
-        {
-            --numOfBytes;
-            rawData = ( rawData << BYTE_SIZE ) | static_cast<uint64_t>( inputData[byteIdx] );
-            byteIdx++;
-        }
+        uint64_t msbSignMask = static_cast<uint64_t>( 1U ) << ( formula.mSizeInBits - 1 );
+        rawData = ( ( rawData ^ msbSignMask ) - msbSignMask );
     }
 
     const auto signalType = formula.mSignalType;
     switch ( signalType )
     {
-    case ( SignalType::UINT64 ): {
+    case SignalType::UINT64: {
         uint64_t calculatedValue = 0;
         if ( ( formula.mFactor > 0.0 ) && ( floor( formula.mFactor ) == formula.mFactor ) &&
              ( floor( formula.mOffset ) == formula.mOffset ) )
@@ -385,10 +387,9 @@ OBDDataDecoder::calculateValueFromFormula( PID pid,
                 static_cast<uint64_t>( static_cast<double>( rawData ) * formula.mFactor + formula.mOffset );
             TraceModule::get().incrementVariable( TraceVariable::OBD_POSSIBLE_PRECISION_LOSS_UINT64 );
         }
-        info.mPIDsToValues.emplace( formula.mSignalID, DecodedSignalValue( calculatedValue, signalType ) );
-        break;
+        return { calculatedValue, signalType };
     }
-    case ( SignalType::INT64 ): {
+    case SignalType::INT64: {
         int64_t calculatedValue = 0;
         if ( ( floor( formula.mFactor ) == formula.mFactor ) && ( floor( formula.mOffset ) == formula.mOffset ) )
         {
@@ -401,17 +402,71 @@ OBDDataDecoder::calculateValueFromFormula( PID pid,
                 static_cast<int64_t>( static_cast<double>( rawData ) * formula.mFactor + formula.mOffset );
             TraceModule::get().incrementVariable( TraceVariable::OBD_POSSIBLE_PRECISION_LOSS_INT64 );
         }
-        info.mPIDsToValues.emplace( formula.mSignalID, DecodedSignalValue( calculatedValue, signalType ) );
-        break;
+        return { calculatedValue, signalType };
     }
     // For any other type, we can safely cast everything to double as only int64 and uint64 can't
     // fit in a double.
     default: {
         double calculatedValue =
             static_cast<double>( static_cast<int64_t>( rawData ) ) * formula.mFactor + formula.mOffset;
-        info.mPIDsToValues.emplace( formula.mSignalID, DecodedSignalValue( calculatedValue, signalType ) );
+        return { calculatedValue, signalType };
     }
     }
+}
+
+DecodedSignalValue
+OBDDataDecoder::decodeFloatingPointValue( const CANSignalFormat &formula,
+                                          const std::vector<uint8_t> &inputData,
+                                          size_t byteCounter )
+{
+    const auto signalType = formula.mSignalType;
+    if ( formula.mSizeInBits == 32 )
+    {
+        uint32_t rawData = extractRawSignal<uint32_t>( formula, inputData, byteCounter );
+        float *floatValue = reinterpret_cast<float *>( &rawData );
+        auto calculatedValue = static_cast<double>( *floatValue ) * formula.mFactor + formula.mOffset;
+        return { calculatedValue, signalType };
+    }
+    else
+    {
+        uint64_t rawData = extractRawSignal<uint64_t>( formula, inputData, byteCounter );
+        double *doubleValue = reinterpret_cast<double *>( &rawData );
+        auto calculatedValue = static_cast<double>( *doubleValue ) * formula.mFactor + formula.mOffset;
+        return { calculatedValue, signalType };
+    }
+}
+
+template <typename T>
+auto
+OBDDataDecoder::extractRawSignal( const CANSignalFormat &formula,
+                                  const std::vector<uint8_t> &inputData,
+                                  size_t byteCounter ) -> T
+{
+    T rawData = 0;
+    size_t byteIdx = byteCounter + ( formula.mFirstBitPosition / BYTE_SIZE );
+    // If the signal length is less than 8-bit, we need to perform bit field operation
+    if ( formula.mSizeInBits < BYTE_SIZE )
+    {
+        // bit manipulation performed here: shift first, then apply mask
+        // e.g. If signal are bit 4 ~ 7 in Byte A.
+        // we firstly right shift by 4, then apply bit mask 0b1111
+        rawData = inputData[byteIdx];
+        rawData >>= formula.mFirstBitPosition % BYTE_SIZE;
+        rawData &= static_cast<T>( 0xFFULL ) >> ( BYTE_SIZE - formula.mSizeInBits );
+    }
+    else
+    {
+        // This signal contain greater or equal than one byte, concatenate raw bytes
+        auto numOfBytes = formula.mSizeInBits / BYTE_SIZE;
+        // This signal contains multiple bytes, concatenate the bytes
+        while ( numOfBytes != 0 )
+        {
+            --numOfBytes;
+            rawData = ( rawData << BYTE_SIZE ) | static_cast<T>( inputData[byteIdx] );
+            byteIdx++;
+        }
+    }
+    return rawData;
 }
 
 bool
@@ -423,10 +478,9 @@ OBDDataDecoder::isFormulaValid( PID pid, const CANSignalFormat &formula )
     // 2. Last Bit Position (first bit + sizeInBits) has to be less than or equal to last bit position of PID response
     // length
     // 3. If mSizeInBits are greater or equal than 8, both mSizeInBits and first bit position has to be multiple of 8
-    if ( ( mDecoderDictionary->find( pid ) != mDecoderDictionary->end() ) &&
-         ( formula.mFirstBitPosition < mDecoderDictionary->at( pid ).mSizeInBytes * BYTE_SIZE ) &&
-         ( formula.mSizeInBits + formula.mFirstBitPosition <=
-           mDecoderDictionary->at( pid ).mSizeInBytes * BYTE_SIZE ) &&
+    if ( ( mDecoderDictionary.find( pid ) != mDecoderDictionary.end() ) &&
+         ( formula.mFirstBitPosition < mDecoderDictionary.at( pid ).mSizeInBytes * BYTE_SIZE ) &&
+         ( formula.mSizeInBits + formula.mFirstBitPosition <= mDecoderDictionary.at( pid ).mSizeInBytes * BYTE_SIZE ) &&
          ( ( formula.mSizeInBits < 8 ) ||
            ( ( ( formula.mSizeInBits & 0x7 ) == 0 ) && ( ( formula.mFirstBitPosition & 0x7 ) == 0 ) ) ) )
     {

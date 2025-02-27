@@ -1,18 +1,19 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-#include "ROS2DataSource.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IDecoderDictionary.h"
-#include "MessageTypes.h"
-#include "QueueTypes.h"
-#include "RawDataManager.h"
-#include "SignalTypes.h"
-#include "TimeTypes.h"
-#include "VehicleDataSourceTypes.h"
+#include "aws/iotfleetwise/ROS2DataSource.h"
 #include "WaitUntil.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/IDecoderDictionary.h"
+#include "aws/iotfleetwise/MessageTypes.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/RawDataManager.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
+#include "aws/iotfleetwise/VehicleDataSourceTypes.h"
 #include <array>
 #include <atomic>
 #include <boost/optional/optional.hpp>
+#include <boost/optional/optional_io.hpp> // IWYU pragma: keep
 #include <boost/variant.hpp>
 #include <chrono>
 #include <cstdint>
@@ -89,7 +90,7 @@ protected:
         rclcpp::multiThreadedExecutorMock = &multiThreadedExecutorMock;
         rclcpp::nodeMock = &nodeMock;
         rclcpp::typeSupportMock = &typeSupportMock;
-        signalBufferDistributor->registerQueue( signalBuffer );
+        signalBufferDistributor.registerQueue( signalBuffer );
     }
 
     void
@@ -347,11 +348,10 @@ protected:
     NiceMock<rclcpp::MultiThreadedExecutorMock> multiThreadedExecutorMock;
     NiceMock<rclcpp::NodeMock> nodeMock;
     NiceMock<rclcpp::TypeSupportMock> typeSupportMock;
-    std::shared_ptr<NiceMock<RawBufferManagerMock>> rawBufferManagerMock =
-        std::make_shared<NiceMock<RawBufferManagerMock>>();
+    NiceMock<RawBufferManagerMock> rawBufferManagerMock;
     const int MINIMUM_WAIT_TIME_ONE_CYCLE_MS = 300;
     SignalBufferPtr signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
-    SignalBufferDistributorPtr signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
+    SignalBufferDistributor signalBufferDistributor;
 
 public:
     std::atomic<int> subscribeCallsCounter{ 0 };
@@ -683,7 +683,7 @@ TEST_F( ROS2DataSourceTest, SuccessfullyDecodeComplexMessage )
 {
     ROS2DataSourceConfig config{
         InterfaceID( "interface1" ), 50, CompareToIntrospection::ERROR_AND_FAIL_ON_DIFFERENCE, 100 };
-    ROS2DataSource ros2DataSource( config, signalBufferDistributor, rawBufferManagerMock );
+    ROS2DataSource ros2DataSource( config, signalBufferDistributor, &rawBufferManagerMock );
     ros2DataSource.connect();
     auto dictionary = std::make_shared<ComplexDataDecoderDictionary>();
 
@@ -694,7 +694,7 @@ TEST_F( ROS2DataSourceTest, SuccessfullyDecodeComplexMessage )
     typeSupportReturnDefaultMessage( "messageIdTypeTest" );
 
     std::vector<std::pair<SignalID, size_t>> dataElements;
-    EXPECT_CALL( *rawBufferManagerMock, push( _, _, _, _ ) )
+    EXPECT_CALL( rawBufferManagerMock, push( _, _, _, _ ) )
         .Times( AtLeast( 1 ) )
         .WillRepeatedly( ( [&dataElements]( const uint8_t *data,
                                             size_t size,

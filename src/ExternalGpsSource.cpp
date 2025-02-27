@@ -1,9 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ExternalGpsSource.h"
-#include "LoggingModule.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/ExternalGpsSource.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include <utility>
 #include <vector>
 

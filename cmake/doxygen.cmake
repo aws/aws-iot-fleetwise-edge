@@ -19,7 +19,7 @@ if(DOXYGEN_FOUND)
 
   set(DOXYGEN_HIDE_UNDOC_RELATIONS NO)
   set(DOXYGEN_HTML_DYNAMIC_SECTIONS YES)
-  set(DOXYGEN_INCLUDE_PATH "/usr/local/include")
+  set(DOXYGEN_INCLUDE_PATH "/usr/local/include;${PROJECT_SOURCE_DIR}/include")
   set(DOXYGEN_INTERACTIVE_SVG YES)
   set(DOXYGEN_JAVADOC_AUTOBRIEF YES)
   set(DOXYGEN_MACRO_EXPANSION YES)
@@ -42,6 +42,7 @@ if(DOXYGEN_FOUND)
   doxygen_add_docs(
     doc_doxygen
     ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/include
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Generating API documentation with Doxygen"
   )

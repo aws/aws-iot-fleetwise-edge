@@ -1,0 +1,16 @@
+{
+  "compression": "SNAPPY",
+  "collectionScheme": {
+    "conditionBasedCollectionScheme": {
+      "conditionLanguageVersion": 1,
+      "expression": "custom_function('counter') < 1000",
+      "minimumTriggerIntervalMs": 1000,
+      "triggerMode": "ALWAYS"
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.ABS.DemoBrakePedalPressure"
+    }
+  ]
+}

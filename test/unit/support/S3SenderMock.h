@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "S3Sender.h"
+#include "aws/iotfleetwise/S3Sender.h"
 #include <functional>
 #include <gmock/gmock.h>
 #include <memory>
@@ -21,7 +21,12 @@ class S3SenderMock : public S3Sender
 {
 public:
     S3SenderMock()
-        : S3Sender( nullptr, 0 )
+        : S3Sender(
+              []( Aws::Client::ClientConfiguration &,
+                  Aws::Transfer::TransferManagerConfiguration & ) -> std::shared_ptr<TransferManagerWrapper> {
+                  return nullptr;
+              },
+              0 )
     {
     }
 

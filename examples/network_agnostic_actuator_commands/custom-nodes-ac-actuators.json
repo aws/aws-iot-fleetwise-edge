@@ -1,0 +1,15 @@
+[
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle",
+      "description": "Vehicle"
+    }
+  },
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.ActivateAC",
+      "description": "Vehicle.ActivateAC",
+      "dataType": "BOOLEAN"
+    }
+  }
+]

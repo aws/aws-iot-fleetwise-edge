@@ -2,16 +2,16 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CANDataSource.h"
-#include "CANDataConsumer.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IDecoderDictionary.h"
-#include "MessageTypes.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "VehicleDataSourceTypes.h"
+#include "aws/iotfleetwise/CANDataSource.h"
+#include "Testing.h"
 #include "WaitUntil.h"
-#include <array>
+#include "aws/iotfleetwise/CANDataConsumer.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/IDecoderDictionary.h"
+#include "aws/iotfleetwise/MessageTypes.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/VehicleDataSourceTypes.h"
 #include <cstdint>
 #include <cstring>
 #include <gtest/gtest.h>
@@ -39,10 +39,10 @@ cleanUp( int mSocketFD )
 }
 
 static int
-setup( bool fd = false )
+setup( const std::string &canInterface, bool fd = false )
 {
     // Setup a socket
-    std::string socketCANIFName( "vcan0" );
+    std::string socketCANIFName( canInterface );
     struct sockaddr_can interfaceAddress;
     struct ifreq interfaceRequest;
 
@@ -139,14 +139,13 @@ protected:
     void
     SetUp() override
     {
-        mSocketFD = setup();
+        mSocketFD = setup( mCanInterfaceName );
         if ( mSocketFD == -1 )
         {
             GTEST_FAIL() << "Test failed due to unavailability of socket";
         }
         std::unordered_map<CANRawFrameID, CANMessageDecoderMethod> frameMap;
         CANMessageDecoderMethod decoderMethod;
-        decoderMethod.collectType = CANMessageCollectType::RAW_AND_DECODE;
 
         decoderMethod.format.mMessageID = 0x123;
         decoderMethod.format.mSizeInBytes = 8;
@@ -186,30 +185,20 @@ protected:
         cleanUp( mSocketFD );
     }
 
+    std::string mCanInterfaceName = getCanInterfaceName();
     int mSocketFD;
     std::shared_ptr<CANDecoderDictionary> mDictionary;
 };
-
-TEST_F( CANDataSourceTest, invalidInit )
-{
-    auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
-    CANDataConsumer consumer{ signalBufferDistributor };
-    CANDataSource dataSource{
-        INVALID_CAN_SOURCE_NUMERIC_ID, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
-    ASSERT_FALSE( dataSource.init() );
-}
 
 TEST_F( CANDataSourceTest, testNoDecoderDictionary )
 {
     ASSERT_TRUE( mSocketFD != -1 );
     auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
+    SignalBufferDistributor signalBufferDistributor;
+    signalBufferDistributor.registerQueue( signalBuffer );
     CANDataConsumer consumer{ signalBufferDistributor };
-    CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
-    ASSERT_TRUE( dataSource.init() );
+    CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, mCanInterfaceName, false, 100, consumer };
+    ASSERT_TRUE( dataSource.connect() );
     ASSERT_TRUE( dataSource.isAlive() );
     CollectedDataFrame collectedDataFrame;
     DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD ) && signalBuffer->pop( collectedDataFrame ) );
@@ -221,12 +210,12 @@ TEST_F( CANDataSourceTest, testValidDecoderDictionary )
     ASSERT_TRUE( mSocketFD != -1 );
     auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
 
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
+    SignalBufferDistributor signalBufferDistributor;
+    signalBufferDistributor.registerQueue( signalBuffer );
 
     CANDataConsumer consumer{ signalBufferDistributor };
-    CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
-    ASSERT_TRUE( dataSource.init() );
+    CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, mCanInterfaceName, false, 100, consumer };
+    ASSERT_TRUE( dataSource.connect() );
     ASSERT_TRUE( dataSource.isAlive() );
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     CollectedDataFrame collectedDataFrame;
@@ -239,14 +228,6 @@ TEST_F( CANDataSourceTest, testValidDecoderDictionary )
     ASSERT_EQ( signal.signalID, 7 );
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x4050607 );
-    auto frame = collectedDataFrame.mCollectedCanRawFrame;
-    ASSERT_EQ( frame->channelId, 0 );
-    ASSERT_EQ( frame->frameID, 0x123 );
-    ASSERT_EQ( frame->size, 8 );
-    for ( auto i = 0; i < 8; i++ )
-    {
-        ASSERT_EQ( frame->data[i], i );
-    }
 
     // Test message a different message ID is not received
     DELAY_ASSERT_FALSE( sendTestMessage( mSocketFD, 0x456 ) && signalBuffer->pop( collectedDataFrame ) );
@@ -263,16 +244,16 @@ TEST_F( CANDataSourceTest, testValidDecoderDictionary )
 TEST_F( CANDataSourceTest, testCanFDSocketMode )
 {
     cleanUp( mSocketFD );
-    mSocketFD = setup( true );
+    mSocketFD = setup( mCanInterfaceName, true );
     ASSERT_TRUE( mSocketFD != -1 );
     auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
 
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
+    SignalBufferDistributor signalBufferDistributor;
+    signalBufferDistributor.registerQueue( signalBuffer );
 
     CANDataConsumer consumer{ signalBufferDistributor };
-    CANDataSource dataSource{ 0, CanTimestampType::KERNEL_SOFTWARE_TIMESTAMP, "vcan0", false, 100, consumer };
-    ASSERT_TRUE( dataSource.init() );
+    CANDataSource dataSource{ 0, CanTimestampType::KERNEL_SOFTWARE_TIMESTAMP, mCanInterfaceName, false, 100, consumer };
+    ASSERT_TRUE( dataSource.connect() );
     ASSERT_TRUE( dataSource.isAlive() );
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     CollectedDataFrame collectedDataFrame;
@@ -285,14 +266,6 @@ TEST_F( CANDataSourceTest, testCanFDSocketMode )
     ASSERT_EQ( signal.signalID, 7 );
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x4050607 );
-    auto frame = collectedDataFrame.mCollectedCanRawFrame;
-    ASSERT_EQ( frame->channelId, 0 );
-    ASSERT_EQ( frame->frameID, 0x123 );
-    ASSERT_EQ( frame->size, 64 );
-    for ( auto i = 0; i < 64; i++ )
-    {
-        ASSERT_EQ( frame->data[i], i );
-    }
     ASSERT_TRUE( dataSource.disconnect() );
 }
 
@@ -301,12 +274,12 @@ TEST_F( CANDataSourceTest, testExtractExtendedID )
     ASSERT_TRUE( mSocketFD != -1 );
     auto signalBuffer = std::make_shared<SignalBuffer>( 10, "Signal Buffer" );
 
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
+    SignalBufferDistributor signalBufferDistributor;
+    signalBufferDistributor.registerQueue( signalBuffer );
 
     CANDataConsumer consumer{ signalBufferDistributor };
-    CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, "vcan0", false, 100, consumer };
-    ASSERT_TRUE( dataSource.init() );
+    CANDataSource dataSource{ 0, CanTimestampType::KERNEL_HARDWARE_TIMESTAMP, mCanInterfaceName, false, 100, consumer };
+    ASSERT_TRUE( dataSource.connect() );
     ASSERT_TRUE( dataSource.isAlive() );
     dataSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     CollectedDataFrame collectedDataFrame;
@@ -319,14 +292,6 @@ TEST_F( CANDataSourceTest, testExtractExtendedID )
     ASSERT_EQ( signal.signalID, 7 );
     ASSERT_EQ( signal.value.type, SignalType::DOUBLE );
     ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x4050607 );
-    auto frame = collectedDataFrame.mCollectedCanRawFrame;
-    ASSERT_EQ( frame->channelId, 0 );
-    ASSERT_EQ( frame->frameID, 0x123 );
-    ASSERT_EQ( frame->size, 8 );
-    for ( auto i = 0; i < 8; i++ )
-    {
-        ASSERT_EQ( frame->data[i], i );
-    }
     ASSERT_TRUE( dataSource.disconnect() );
 }
 

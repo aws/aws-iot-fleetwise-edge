@@ -419,7 +419,7 @@
             },
             "decodedSignalsBufferSize": {
               "type": "integer",
-              "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer for OBD and CAN signals, raw CAN frames, active DTCs, and Vision System Data. This is a multiple producer single consumer buffer."
+              "description": "Max size of the buffer shared between data collection module (Collection Engine) and Network Channel Consumer for OBD and CAN signals, active DTCs, and Vision System Data. This is a multiple producer single consumer buffer."
             },
             "rawCANFrameBufferSize": {
               "type": "integer",
@@ -435,6 +435,10 @@
             "inspectionThreadIdleTimeMs": {
               "type": "integer",
               "description": "Sleep time for inspection engine thread if no new data is available (in milliseconds)"
+            },
+            "collectionSchemeManagerThreadIdleTimeMs": {
+              "type": "integer",
+              "description": "Sleep time for collection scheme manager thread (in milliseconds). This is the max time the thread will wait for until the next iteration to check whether there is any collection scheme to be started or expired. This is most important in situations where the system time jumps. In such case you should expect collection schemes to start/expire with a delay of up to this value."
             },
             "socketCANThreadIdleTimeMs": {
               "type": "integer",
@@ -484,7 +488,13 @@
             },
             "systemWideLogLevel": {
               "type": "string",
-              "description": "Set log level severity- Trace, Info, Warning, Error"
+              "description": "Set log level severity for all the logs. Please note that this can also suppress AWS SDK logs (e.g. if 'systemWideLogLevel' is 'Info', AWS SDK log level will be 'Info' even if 'awsSdkLogLevel' is more verbose).",
+              "enum": ["Error", "Warning", "Info", "Trace"]
+            },
+            "awsSdkLogLevel": {
+              "type": "string",
+              "description": "Set log level severity for AWS SDK. Default to Warn. The logs will be redirected to FWE logs, so the log level in the output might be different since FWE doesn't provide the same number of levels. In particular, Fatal is mapped to FWE's Error and Debug to FWE's Trace",
+              "enum": ["Off", "Fatal", "Error", "Warn", "Info", "Debug", "Trace"]
             },
             "logColor": {
               "type": "string",
@@ -510,6 +520,10 @@
             "minFetchTriggerIntervalMs": {
               "type": "integer",
               "description": "Minimum interval between two fetch requests in milliseconds"
+            },
+            "maxFetchQueueSize": {
+              "type": "integer",
+              "description": "Maximum number of fetch requests that can be queued for executing when condition evaluates to true. Default to 1000"
             }
           },
           "required": ["readyToPublishDataBufferSize", "systemWideLogLevel"]

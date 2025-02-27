@@ -1,11 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CANDataSource.h"
-#include "Assert.h"
-#include "EnumUtility.h"
-#include "LoggingModule.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/CANDataSource.h"
+#include "aws/iotfleetwise/Assert.h"
+#include "aws/iotfleetwise/EnumUtility.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <cerrno>
 #include <cstring>
 #include <ctime> // IWYU pragma: keep
@@ -48,20 +48,6 @@ CANDataSource::~CANDataSource()
 }
 
 bool
-CANDataSource::init()
-{
-    if ( mChannelId == INVALID_CAN_SOURCE_NUMERIC_ID )
-    {
-        FWE_LOG_ERROR( "Invalid can channel id" );
-        return false;
-    }
-
-    mTimer.reset();
-
-    return connect();
-}
-
-bool
 CANDataSource::start()
 {
     // Prevent concurrent stop/init
@@ -69,7 +55,9 @@ CANDataSource::start()
     // On multi core systems the shared variable mShouldStop must be updated for
     // all cores before starting the thread otherwise thread will directly end
     mShouldStop.store( false );
-    if ( !mThread.create( doWork, this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "CAN Data Source Thread failed to start" );
     }
@@ -101,13 +89,13 @@ CANDataSource::shouldStop() const
 }
 
 Timestamp
-CANDataSource::extractTimestamp( struct msghdr *msgHeader )
+CANDataSource::extractTimestamp( struct msghdr &msgHeader )
 {
     // This is a Linux header macro
     // coverity[misra_cpp_2008_rule_5_2_9_violation]
     // coverity[autosar_cpp14_m5_2_9_violation]
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast)
-    struct cmsghdr *currentHeader = CMSG_FIRSTHDR( msgHeader );
+    struct cmsghdr *currentHeader = CMSG_FIRSTHDR( &msgHeader );
     Timestamp timestamp = 0;
     if ( mTimestampTypeToUse != CanTimestampType::POLLING_TIME )
     {
@@ -133,7 +121,7 @@ CANDataSource::extractTimestamp( struct msghdr *msgHeader )
                                                 ( static_cast<Timestamp>( timestampArray->ts[0].tv_nsec ) / 1000000 ) );
                 }
             }
-            currentHeader = CMSG_NXTHDR( msgHeader, currentHeader );
+            currentHeader = CMSG_NXTHDR( &msgHeader, currentHeader );
         }
         TraceModule::get().setVariable( TraceVariable::MAX_SYSTEMTIME_KERNELTIME_DIFF,
                                         static_cast<uint64_t>( mClock->systemTimeSinceEpochMs() ) -
@@ -148,11 +136,8 @@ CANDataSource::extractTimestamp( struct msghdr *msgHeader )
 }
 
 void
-CANDataSource::doWork( void *data )
+CANDataSource::doWork()
 {
-
-    CANDataSource *dataSource = static_cast<CANDataSource *>( data );
-
     Timestamp lastFrameTime = 0;
     uint32_t activations = 0;
     bool wokeUpFromSleep =
@@ -162,16 +147,16 @@ CANDataSource::doWork( void *data )
     while ( true )
     {
         activations++;
-        if ( dataSource->mDecoderDictionary == nullptr )
+        if ( mDecoderDictionary == nullptr )
         {
             // We either just started or there was a decoder manifest update that we can't use
             // We should sleep
             FWE_LOG_TRACE( "No valid decoding dictionary available, Channel going to sleep" );
-            dataSource->mWait.wait( Signal::WaitWithPredicate );
+            mWait.wait( Signal::WaitWithPredicate );
             wokeUpFromSleep = true;
         }
 
-        dataSource->mTimer.reset();
+        mTimer.reset();
         struct canfd_frame frame[PARALLEL_RECEIVED_FRAMES_FROM_KERNEL];
         struct iovec frame_buffer[PARALLEL_RECEIVED_FRAMES_FROM_KERNEL];
         struct mmsghdr msg[PARALLEL_RECEIVED_FRAMES_FROM_KERNEL];
@@ -191,7 +176,7 @@ CANDataSource::doWork( void *data )
             msg[i].msg_hdr.msg_controllen = sizeof( cmsgReturnBuffer[i] );
         }
         // In one syscall receive up to PARALLEL_RECEIVED_FRAMES_FROM_KERNEL frames in parallel
-        int nmsgs = recvmmsg( dataSource->mSocket, &msg[0], PARALLEL_RECEIVED_FRAMES_FROM_KERNEL, 0, nullptr );
+        int nmsgs = recvmmsg( mSocket, &msg[0], PARALLEL_RECEIVED_FRAMES_FROM_KERNEL, 0, nullptr );
         // coverity[autosar_cpp14_m19_3_1_violation]
         // coverity[misra_cpp_2008_rule_19_3_1_violation] errno needs to be used to recognize network down
         FWE_GRACEFUL_FATAL_ASSERT( ( nmsgs != -1 ) || ( errno != ENODEV ), "Network interface was removed", );
@@ -212,26 +197,22 @@ CANDataSource::doWork( void *data )
             // After waking up the Socket Can old messages in the kernel queue need to be ignored
             if ( !wokeUpFromSleep )
             {
-                Timestamp timestamp = dataSource->extractTimestamp( &msg[i].msg_hdr );
+                Timestamp timestamp = extractTimestamp( msg[i].msg_hdr );
                 if ( timestamp < lastFrameTime )
                 {
                     TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::NOT_TIME_MONOTONIC_FRAMES );
                 }
                 lastFrameTime = timestamp;
-                dataSource->mReceivedMessages++;
-                TraceVariable traceFrames = static_cast<TraceVariable>(
-                    dataSource->mChannelId + toUType( TraceVariable::READ_SOCKET_FRAMES_0 ) );
+                mReceivedMessages++;
+                TraceVariable traceFrames =
+                    static_cast<TraceVariable>( mChannelId + toUType( TraceVariable::READ_SOCKET_FRAMES_0 ) );
                 TraceModule::get().setVariable( ( traceFrames < TraceVariable::READ_SOCKET_FRAMES_19 )
                                                     ? traceFrames
                                                     : TraceVariable::READ_SOCKET_FRAMES_19,
-                                                dataSource->mReceivedMessages );
-                std::lock_guard<std::mutex> lock( dataSource->mDecoderDictMutex );
-                dataSource->mConsumer.processMessage( dataSource->mChannelId,
-                                                      dataSource->mDecoderDictionary,
-                                                      frame[i].can_id,
-                                                      frame[i].data,
-                                                      frame[i].len,
-                                                      timestamp );
+                                                mReceivedMessages );
+                std::lock_guard<std::mutex> lock( mDecoderDictMutex );
+                mConsumer.processMessage(
+                    mChannelId, mDecoderDictionary.get(), frame[i].can_id, frame[i].data, frame[i].len, timestamp );
             }
         }
         if ( nmsgs < PARALLEL_RECEIVED_FRAMES_FROM_KERNEL )
@@ -239,17 +220,16 @@ CANDataSource::doWork( void *data )
             if ( logTimer.getElapsedMs().count() > static_cast<int64_t>( LoggingModule::LOG_AGGREGATION_TIME_MS ) )
             {
                 // Nothing is in the ring buffer to consume. Go to idle mode for some time.
-                FWE_LOG_TRACE(
-                    "Activations: " + std::to_string( activations ) +
-                    ". Waiting for some data to come. Idling for: " + std::to_string( dataSource->mIdleTimeMs ) +
-                    " ms, processed " + std::to_string( dataSource->mReceivedMessages ) + " frames" );
+                FWE_LOG_TRACE( "Activations: " + std::to_string( activations ) +
+                               ". Waiting for some data to come. Idling for: " + std::to_string( mIdleTimeMs ) +
+                               " ms, processed " + std::to_string( mReceivedMessages ) + " frames" );
                 activations = 0;
                 logTimer.reset();
             }
-            dataSource->mWait.wait( static_cast<uint32_t>( dataSource->mIdleTimeMs ) );
+            mWait.wait( static_cast<uint32_t>( mIdleTimeMs ) );
             wokeUpFromSleep = false;
         }
-        if ( dataSource->shouldStop() )
+        if ( shouldStop() )
         {
             break;
         }
@@ -259,6 +239,8 @@ CANDataSource::doWork( void *data )
 bool
 CANDataSource::connect()
 {
+    mTimer.reset();
+
     // Socket CAN parameters
     struct sockaddr_can interfaceAddress = {};
     struct ifreq interfaceRequest = {};

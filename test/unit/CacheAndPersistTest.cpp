@@ -1,11 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CacheAndPersist.h"
+#include "aws/iotfleetwise/CacheAndPersist.h"
 #include "Testing.h"
 #include <boost/filesystem.hpp>
 #include <cstdint>
 #include <cstdlib>
+#include <fstream> // IWYU pragma: keep
 #include <gtest/gtest.h>
 #include <iostream>
 #include <memory>
@@ -16,6 +17,263 @@ namespace Aws
 {
 namespace IoTFleetWise
 {
+
+boost::filesystem::path
+getFullPathForFile( DataType dataType, const std::string &filename )
+{
+    auto baseDir = getTempDir() / "FWE_Persistency";
+    if ( dataType == DataType::EDGE_TO_CLOUD_PAYLOAD )
+    {
+        baseDir /= "CollectedData";
+    }
+    return baseDir / filename;
+}
+
+boost::filesystem::path
+getSha1PathForFile( DataType dataType, const std::string &filename )
+{
+    auto sha1FilePath = getFullPathForFile( dataType, filename );
+    sha1FilePath += ".sha1";
+    return sha1FilePath;
+}
+
+std::string
+getFileContent( const boost::filesystem::path &filename )
+{
+    std::ifstream ifs( filename.c_str() );
+    std::stringstream buffer;
+    buffer << ifs.rdbuf();
+    return buffer.str();
+}
+
+TEST( CacheAndPersistTest, generateChecksumFile )
+{
+    auto storage = createCacheAndPersist();
+
+    // create a test obj
+    std::string testString = "Store this data - 1";
+    size_t size = testString.size();
+    std::cout << "String size: " << size << std::endl;
+
+    std::string filename = "testfile.bin";
+    ASSERT_EQ(
+        storage->write(
+            reinterpret_cast<const uint8_t *>( testString.c_str() ), size, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ),
+        ErrorCode::SUCCESS );
+
+    auto sha1FilePath = getSha1PathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
+    ASSERT_TRUE( boost::filesystem::exists( sha1FilePath ) );
+
+    ASSERT_EQ( getFileContent( sha1FilePath ), "63ead68a5e69d980daeced67a8e2eb19dff75edb" );
+}
+
+TEST( CacheAndPersistTest, generateChecksumFileWhenWritingSmallStreambuf )
+{
+    auto storage = createCacheAndPersist();
+
+    // create a test obj
+    std::string testString = "Store this data - 1";
+    size_t size = testString.size();
+
+    std::string filename = "testfile.bin";
+    std::stringbuf testStringbuf( testString );
+    ASSERT_EQ( storage->write( testStringbuf, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ), ErrorCode::SUCCESS );
+    ASSERT_EQ( storage->getSize( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ), size );
+
+    auto sha1FilePath = getSha1PathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
+    ASSERT_TRUE( boost::filesystem::exists( sha1FilePath ) );
+
+    ASSERT_EQ( getFileContent( sha1FilePath ), "63ead68a5e69d980daeced67a8e2eb19dff75edb" );
+}
+
+TEST( CacheAndPersistTest, generateChecksumFileWhenWritingLargeStreambuf )
+{
+    auto storage = createCacheAndPersist();
+
+    // create a test obj
+    std::string testString;
+    {
+        std::stringstream stream;
+        for ( int i = 0; i < 100000; i++ )
+        {
+            stream << "1234567890" << std::endl;
+        }
+        testString = stream.str();
+    }
+    size_t size = testString.size();
+
+    std::string filename = "testfile.bin";
+    std::stringbuf testStringbuf( testString );
+    ASSERT_EQ( storage->write( testStringbuf, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ), ErrorCode::SUCCESS );
+    ASSERT_EQ( storage->getSize( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ), size );
+
+    auto sha1FilePath = getSha1PathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
+    ASSERT_TRUE( boost::filesystem::exists( sha1FilePath ) );
+
+    ASSERT_EQ( getFileContent( sha1FilePath ), "8589bba4c1cd34101cc5ab92ad3c32e752efa973" );
+}
+
+TEST( CacheAndPersistTest, rejectCorruptedCollectionScheme )
+{
+    auto storage = createCacheAndPersist();
+    // create a test obj
+    std::string testString = "Test CollectionScheme";
+    size_t size = testString.size();
+
+    ASSERT_EQ( storage->write(
+                   reinterpret_cast<const uint8_t *>( testString.c_str() ), size, DataType::COLLECTION_SCHEME_LIST ),
+               ErrorCode::SUCCESS );
+    ASSERT_EQ( storage->getSize( DataType::COLLECTION_SCHEME_LIST ), size );
+
+    auto collectionSchemePath = getFullPathForFile( DataType::COLLECTION_SCHEME_LIST, "CollectionSchemeList.bin" );
+    ASSERT_TRUE( boost::filesystem::exists( collectionSchemePath ) );
+
+    // Change just a single char and save the file
+    testString = testString.substr( 0, size - 1 ) + "x";
+    {
+        std::ofstream ofs( collectionSchemePath.c_str() );
+        ofs.write( testString.c_str(), testString.size() );
+    }
+
+    std::unique_ptr<uint8_t[]> readBufPtr( new uint8_t[size]() );
+    ASSERT_EQ( storage->read( readBufPtr.get(), size, DataType::COLLECTION_SCHEME_LIST ), ErrorCode::INVALID_DATA );
+
+    // When it fails to read due to a checksum mismatch, the files should be deleted
+    ASSERT_FALSE( boost::filesystem::exists( collectionSchemePath ) );
+    ASSERT_FALSE( boost::filesystem::exists(
+        getSha1PathForFile( DataType::COLLECTION_SCHEME_LIST, "CollectionSchemeList.bin" ) ) );
+}
+
+TEST( CacheAndPersistTest, rejectCorruptedEdgeToCloudPayload )
+{
+    auto storage = createCacheAndPersist();
+
+    // create a test obj
+    std::string testString = "Store this data - 1";
+    size_t size = testString.size();
+
+    std::string filename = "testfile.bin";
+    ASSERT_EQ(
+        storage->write(
+            reinterpret_cast<const uint8_t *>( testString.c_str() ), size, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ),
+        ErrorCode::SUCCESS );
+    ASSERT_EQ( storage->getSize( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ), size );
+
+    auto payloadPath = getFullPathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
+    ASSERT_TRUE( boost::filesystem::exists( payloadPath ) );
+
+    // Change just a single char and save the file
+    testString = "x" + testString.substr( 1, size );
+    {
+        std::ofstream ofs( payloadPath.c_str() );
+        ofs.write( testString.c_str(), testString.size() );
+    }
+
+    std::unique_ptr<uint8_t[]> readBufPtr( new uint8_t[size]() );
+    ASSERT_EQ( storage->read( readBufPtr.get(), size, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ),
+               ErrorCode::INVALID_DATA );
+
+    // When it fails to read due to a checksum mismatch, the files should be deleted
+    ASSERT_FALSE( boost::filesystem::exists( payloadPath ) );
+    ASSERT_FALSE( boost::filesystem::exists( getSha1PathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ) ) );
+}
+
+TEST( CacheAndPersistTest, rejectCorruptedEdgeToCloudPayloadWrittenAsStreambuf )
+{
+    auto storage = createCacheAndPersist();
+
+    // create a test obj
+    std::string testString = "Store this data - 1";
+    size_t size = testString.size();
+
+    std::string filename = "testfile.bin";
+    std::stringbuf testStringbuf( testString );
+    ASSERT_EQ( storage->write( testStringbuf, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ), ErrorCode::SUCCESS );
+    ASSERT_EQ( storage->getSize( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ), size );
+
+    auto payloadPath = getFullPathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
+    ASSERT_TRUE( boost::filesystem::exists( payloadPath ) );
+
+    // Change just a single char and save the file
+    testString = "x" + testString.substr( 1, size );
+    {
+        std::ofstream ofs( payloadPath.c_str() );
+        ofs.write( testString.c_str(), testString.size() );
+    }
+
+    std::unique_ptr<uint8_t[]> readBufPtr( new uint8_t[size]() );
+    ASSERT_EQ( storage->read( readBufPtr.get(), size, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ),
+               ErrorCode::INVALID_DATA );
+
+    // When it fails to read due to a checksum mismatch, the files should be deleted
+    ASSERT_FALSE( boost::filesystem::exists( payloadPath ) );
+    ASSERT_FALSE( boost::filesystem::exists( getSha1PathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ) ) );
+}
+
+TEST( CacheAndPersistTest, rejectFileWithInvalidChecksum )
+{
+    auto storage = createCacheAndPersist();
+
+    // create a test obj
+    std::string testString = "Store this data - 1";
+    size_t size = testString.size();
+
+    std::string filename = "testfile.bin";
+    ASSERT_EQ(
+        storage->write(
+            reinterpret_cast<const uint8_t *>( testString.c_str() ), size, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ),
+        ErrorCode::SUCCESS );
+    ASSERT_EQ( storage->getSize( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ), size );
+
+    auto payloadPath = getFullPathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
+    ASSERT_TRUE( boost::filesystem::exists( payloadPath ) );
+
+    // Modify the checksum file to make it invalid. This simulates the situation where the checksum
+    // file itself wasn't written correctly.
+    {
+        std::ofstream ofs( getSha1PathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ).c_str() );
+        ofs.write( "invalid", 7 );
+    }
+
+    std::unique_ptr<uint8_t[]> readBufPtr( new uint8_t[size]() );
+    ASSERT_EQ( storage->read( readBufPtr.get(), size, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ),
+               ErrorCode::INVALID_DATA );
+
+    // When it fails to read due to a checksum mismatch, the files should be deleted
+    ASSERT_FALSE( boost::filesystem::exists( payloadPath ) );
+    ASSERT_FALSE( boost::filesystem::exists( getSha1PathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ) ) );
+}
+
+TEST( CacheAndPersistTest, readFileWithoutChecksum )
+{
+    auto storage = createCacheAndPersist();
+
+    // create a test obj
+    std::string testString = "Store this data - 1";
+    size_t size = testString.size();
+
+    std::string filename = "testfile.bin";
+    ASSERT_EQ(
+        storage->write(
+            reinterpret_cast<const uint8_t *>( testString.c_str() ), size, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ),
+        ErrorCode::SUCCESS );
+    ASSERT_EQ( storage->getSize( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ), size );
+
+    auto payloadPath = getFullPathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
+    ASSERT_TRUE( boost::filesystem::exists( payloadPath ) );
+
+    // Now we remove the generate checksum file to simulate a persisted file that already existed
+    // before we added checksum support. This should allow us to read the payload file successfully
+    // to keep backward compatibility.
+    ASSERT_TRUE( boost::filesystem::remove( getSha1PathForFile( DataType::EDGE_TO_CLOUD_PAYLOAD, filename ) ) );
+
+    std::unique_ptr<uint8_t[]> readBufPtr( new uint8_t[size]() );
+    ASSERT_EQ( storage->read( readBufPtr.get(), size, DataType::EDGE_TO_CLOUD_PAYLOAD, filename ), ErrorCode::SUCCESS );
+
+    std::string out( reinterpret_cast<char *>( readBufPtr.get() ), size );
+
+    ASSERT_STREQ( out.c_str(), testString.c_str() );
+}
 
 // Unit Tests for the collectionScheme persistency
 TEST( CacheAndPersistTest, testCollectionSchemePersistency )

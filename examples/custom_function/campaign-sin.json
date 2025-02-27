@@ -1,0 +1,18 @@
+{
+  "compression": "SNAPPY",
+  "collectionScheme": {
+    "conditionBasedCollectionScheme": {
+      "conditionLanguageVersion": 1,
+      "expression": "custom_function('sin', $variable.`Vehicle.ABS.DemoBrakePedalPressure` / $variable.`Vehicle.ECM.DemoEngineTorque`) > 0.5",
+      "triggerMode": "RISING_EDGE"
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.ABS.DemoBrakePedalPressure"
+    },
+    {
+      "name": "Vehicle.ECM.DemoEngineTorque"
+    }
+  ]
+}

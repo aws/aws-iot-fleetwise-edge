@@ -1,9 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "PayloadManager.h"
-#include "CacheAndPersist.h"
+#include "aws/iotfleetwise/PayloadManager.h"
 #include "Testing.h"
+#include "aws/iotfleetwise/CacheAndPersist.h"
 #include <boost/filesystem.hpp>
 #include <cstdint>
 #include <gtest/gtest.h>

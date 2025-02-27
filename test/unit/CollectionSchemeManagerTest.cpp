@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "CollectionSchemeManagerTest.h"
-#include "CANInterfaceIDTranslator.h"
-#include "CacheAndPersist.h"
-#include "CheckinSender.h"
-#include "Clock.h"
-#include "ClockHandler.h"
 #include "CollectionSchemeManagerMock.h"
-#include "SchemaListener.h"
 #include "Testing.h"
-#include "TimeTypes.h"
 #include "WaitUntil.h"
+#include "aws/iotfleetwise/CANInterfaceIDTranslator.h"
+#include "aws/iotfleetwise/CacheAndPersist.h"
+#include "aws/iotfleetwise/CheckinSender.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/SchemaListener.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include "collection_schemes.pb.h"
 #include "decoder_manifest.pb.h"
 #include <chrono>
@@ -23,7 +23,7 @@
 #include <thread>
 
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
-#include "LastKnownStateTypes.h"
+#include "aws/iotfleetwise/LastKnownStateTypes.h"
 #endif
 
 namespace Aws
@@ -86,7 +86,7 @@ protected:
     SetUp() override
     {
         mCollectionSchemeManager.subscribeToInspectionMatrixChange(
-            [&]( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix ) {
+            [&]( std::shared_ptr<const InspectionMatrix> inspectionMatrix ) {
                 mReceivedInspectionMatrices.emplace_back( inspectionMatrix );
             } );
 
@@ -152,15 +152,14 @@ TEST_F( CollectionSchemeManagerTest, StopMain )
     /* build DMs */
     ASSERT_TRUE( mCollectionSchemeManager.connect() );
     IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
-    std::vector<ICollectionSchemePtr> testList1;
+    std::vector<std::shared_ptr<ICollectionScheme>> testList1;
 
     /* build collectionScheme list1 */
     /* mock currTime, and 3 collectionSchemes */
     TimePoint currTime = mTestClock->timeSinceEpoch();
     Timestamp startTime = currTime.systemTimeMs + SECOND_TO_MILLISECOND( 1 );
     Timestamp stopTime = startTime + SECOND_TO_MILLISECOND( 25 );
-    ICollectionSchemePtr collectionScheme =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startTime, stopTime );
+    auto collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startTime, stopTime );
     testList1.emplace_back( collectionScheme );
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
@@ -219,7 +218,7 @@ TEST_F( CollectionSchemeManagerTest, StopMain )
 
 TEST_F( CollectionSchemeManagerTest, CollectionSchemeUpdateCallBack )
 {
-    std::vector<ICollectionSchemePtr> emptyList;
+    std::vector<std::shared_ptr<ICollectionScheme>> emptyList;
     mCollectionSchemeManager.setmCollectionSchemeAvailable( false );
     mCollectionSchemeManager.setmProcessCollectionScheme( false );
     // pl is null
@@ -517,14 +516,15 @@ TEST_F( CollectionSchemeManagerTest, MockProducer )
     /* build DMs */
     IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
     IDecoderManifestPtr testDM2 = std::make_shared<IDecoderManifestTest>( "DM2" );
-    std::vector<ICollectionSchemePtr> testList1, testList2, testList3;
+    std::vector<std::shared_ptr<ICollectionScheme>> testList1;
+    std::vector<std::shared_ptr<ICollectionScheme>> testList2;
+    std::vector<std::shared_ptr<ICollectionScheme>> testList3;
 
     /* build collectionScheme list1 */
     TimePoint currTime = mTestClock->timeSinceEpoch();
     Timestamp startTime = currTime.systemTimeMs + 100;
     Timestamp stopTime = startTime + 500;
-    ICollectionSchemePtr collectionScheme =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startTime, stopTime );
+    auto collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startTime, stopTime );
     testList1.emplace_back( collectionScheme );
 
     startTime = currTime.systemTimeMs + 300;
@@ -609,15 +609,14 @@ TEST_F( CollectionSchemeManagerTest, getCollectionSchemeArns )
 
     /* build DMs */
     IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
-    std::vector<ICollectionSchemePtr> testList1;
+    std::vector<std::shared_ptr<ICollectionScheme>> testList1;
 
     /* build collectionScheme list1 */
     /* mock currTime, and 3 collectionSchemes */
     TimePoint currTime = mTestClock->timeSinceEpoch();
     Timestamp startTime = currTime.systemTimeMs + SECOND_TO_MILLISECOND( 1 );
     Timestamp stopTime = startTime + SECOND_TO_MILLISECOND( 25 );
-    ICollectionSchemePtr collectionScheme =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startTime, stopTime );
+    auto collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startTime, stopTime );
     testList1.emplace_back( collectionScheme );
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
@@ -663,7 +662,7 @@ TEST_F( CollectionSchemeManagerTest, SendCheckinPeriodically )
 
     /* build DMs */
     IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
-    std::vector<ICollectionSchemePtr> testList1;
+    std::vector<std::shared_ptr<ICollectionScheme>> testList1;
     /* build collectionScheme list1 */
     TimePoint currTime = mTestClock->timeSinceEpoch();
     Timestamp startTime = currTime.systemTimeMs + SECOND_TO_MILLISECOND( 1 );
@@ -871,7 +870,6 @@ TEST_F( CollectionSchemeManagerTest, ReceiveCollectionSchemeUpdateWithExistingSc
                                                                          startTimeInNearFuture,
                                                                          stopTimeInDistantFuture,
                                                                          signals1,
-                                                                         std::vector<CanFrameCollectionInfo>{},
                                                                          partialSignalIDLookup1 );
 
     std::vector<SignalCollectionInfo> signals2 = { SignalCollectionInfo{ 0xFFFF0002 },
@@ -884,11 +882,10 @@ TEST_F( CollectionSchemeManagerTest, ReceiveCollectionSchemeUpdateWithExistingSc
                                                                             startTimeInThePast,
                                                                             stopTimeInDistantFuture,
                                                                             signals2,
-                                                                            std::vector<CanFrameCollectionInfo>{},
                                                                             partialSignalIDLookup2 );
 
     mCollectionSchemeManager.onCollectionSchemeUpdate( std::make_shared<ICollectionSchemeListTest>(
-        std::vector<ICollectionSchemePtr>{ idleCollectionScheme, enabledCollectionScheme } ) );
+        std::vector<std::shared_ptr<ICollectionScheme>>{ idleCollectionScheme, enabledCollectionScheme } ) );
 
     WAIT_ASSERT_EQ( mReceivedInspectionMatrices.size(), 2U );
 
@@ -903,7 +900,6 @@ TEST_F( CollectionSchemeManagerTest, ReceiveCollectionSchemeUpdateWithExistingSc
                                                                     startTimeInNearFuture,
                                                                     stopTimeInDistantFuture,
                                                                     signals1,
-                                                                    std::vector<CanFrameCollectionInfo>{},
                                                                     partialSignalIDLookup1 );
 
     enabledCollectionScheme = std::make_shared<ICollectionSchemeTest>( "EnabledCollectionScheme",
@@ -911,10 +907,9 @@ TEST_F( CollectionSchemeManagerTest, ReceiveCollectionSchemeUpdateWithExistingSc
                                                                        startTimeInThePast,
                                                                        stopTimeInDistantFuture,
                                                                        signals2,
-                                                                       std::vector<CanFrameCollectionInfo>{},
                                                                        partialSignalIDLookup2 );
     mCollectionSchemeManager.onCollectionSchemeUpdate( std::make_shared<ICollectionSchemeListTest>(
-        std::vector<ICollectionSchemePtr>{ enabledCollectionScheme, idleCollectionScheme } ) );
+        std::vector<std::shared_ptr<ICollectionScheme>>{ enabledCollectionScheme, idleCollectionScheme } ) );
 
     WAIT_ASSERT_EQ( mReceivedInspectionMatrices.size(), 3U );
 
@@ -929,7 +924,6 @@ TEST_F( CollectionSchemeManagerTest, ReceiveCollectionSchemeUpdateWithExistingSc
                                                  startTimeInNearFuture,
                                                  stopTimeInDistantFuture,
                                                  signals1,
-                                                 std::vector<CanFrameCollectionInfo>{},
                                                  partialSignalIDLookup1 );
 
     signals2 = { SignalCollectionInfo{ 0xFFFF0012 }, SignalCollectionInfo{ 0xFFFF0013 } };
@@ -940,10 +934,9 @@ TEST_F( CollectionSchemeManagerTest, ReceiveCollectionSchemeUpdateWithExistingSc
                                                                        startTimeInThePast,
                                                                        stopTimeInDistantFuture,
                                                                        signals2,
-                                                                       std::vector<CanFrameCollectionInfo>{},
                                                                        partialSignalIDLookup2 );
     mCollectionSchemeManager.onCollectionSchemeUpdate( std::make_shared<ICollectionSchemeListTest>(
-        std::vector<ICollectionSchemePtr>{ enabledCollectionScheme, idleCollectionScheme } ) );
+        std::vector<std::shared_ptr<ICollectionScheme>>{ enabledCollectionScheme, idleCollectionScheme } ) );
 
     WAIT_ASSERT_EQ( mReceivedInspectionMatrices.size(), 4U );
 

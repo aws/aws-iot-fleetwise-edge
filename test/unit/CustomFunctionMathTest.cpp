@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CustomFunctionMath.h"
-#include "CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/CustomFunctionMath.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
 #include <gtest/gtest.h>
 #include <vector>
 

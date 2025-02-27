@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // coverity[autosar_cpp14_a16_2_2_violation] False positive - header is required to declare constants below
-#include "IoTFleetWiseVersion.h"
+#include "aws/iotfleetwise/IoTFleetWiseVersion.h"
 
 // This file will be filled by CMAKE configure_file with the right values and placed in the build folder
-const char VERSION_GIT_COMMIT_SHA[] = "@VERSION_GIT_SHA@";
-const char VERSION_GIT_TAG[] = "@VERSION_GIT_TAG@";
-const char VERSION_BUILD_TIME[] = "@VERSION_CURRENT_TIME@";
-const char VERSION_PROJECT_VERSION[] = "@PROJECT_VERSION@";
+const char FWE_VERSION_GIT_COMMIT_SHA[] = "@FWE_VERSION_GIT_SHA@";
+const char FWE_VERSION_GIT_TAG[] = "@FWE_VERSION_GIT_TAG@";
+const char FWE_VERSION_BUILD_TIME[] = "@FWE_VERSION_CURRENT_TIME@";
+const char FWE_VERSION_PROJECT_VERSION[] = "@PROJECT_VERSION@";
 
-const char VERSION_PROJECT_VERSION_MAJOR[] = "@PROJECT_VERSION_MAJOR@";
-const char VERSION_PROJECT_VERSION_MINOR[] = "@PROJECT_VERSION_MINOR@";
-const char VERSION_PROJECT_VERSION_PATCH[] = "@PROJECT_VERSION_PATCH@";
+const char FWE_VERSION_PROJECT_VERSION_MAJOR[] = "@PROJECT_VERSION_MAJOR@";
+const char FWE_VERSION_PROJECT_VERSION_MINOR[] = "@PROJECT_VERSION_MINOR@";
+const char FWE_VERSION_PROJECT_VERSION_PATCH[] = "@PROJECT_VERSION_PATCH@";

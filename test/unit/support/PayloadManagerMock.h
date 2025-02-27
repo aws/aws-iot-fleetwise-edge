@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "PayloadManager.h"
+#include "aws/iotfleetwise/PayloadManager.h"
 #include <cstdint>
 #include <gmock/gmock.h>
 #include <json/json.h>

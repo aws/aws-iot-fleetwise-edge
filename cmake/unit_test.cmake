@@ -1,9 +1,29 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-function(add_unit_test TEST_NAME)
+function(add_unit_tests)
+    list(JOIN ARGN "_" TEST_NAME)
+    add_pytest_cpp_unit_tests(${TEST_NAME} ${ARGN})
+endfunction()
+
+function(add_parallel_unit_tests)
+    list(JOIN ARGN "_" TEST_NAME)
+    add_pytest_cpp_unit_tests(${TEST_NAME} -n auto --dist worksteal --random-order-bucket=global ${ARGN})
+endfunction()
+
+function(add_pytest_cpp_unit_tests TEST_NAME)
     add_test(
         NAME ${TEST_NAME}
-        COMMAND ./${TEST_NAME} --gtest_output=xml:report-${TEST_NAME}.xml
+        # This uses the pytest-cpp plugin, which can discover GoogleTest tests:
+        # https://github.com/pytest-dev/pytest-cpp
+        # We use it mostly for parallelizing the tests but also it is nice to get the other benefits
+        # from pytest like only showing output for failed tests and the html report.
+        COMMAND pytest
+            -vvv
+            -ra
+            --color=yes
+            --junit-xml=report-${TEST_NAME}.xml
+            --html=html_report/${TEST_NAME}/index.html
+            ${ARGN}
     )
 endfunction()
 
@@ -20,7 +40,7 @@ function(add_unit_test_with_faketime TEST_NAME)
         message(FATAL_ERROR "faketime library not found. Either install it or disable the tests that depend on it.")
     endif ()
 
-    add_unit_test(${TEST_NAME})
+    add_unit_tests(${TEST_NAME})
     set_tests_properties(${TEST_NAME}
         PROPERTIES
             # If the build env is different than the env where the test will run, the path might be different than

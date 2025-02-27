@@ -1,21 +1,21 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CollectionInspectionEngine.h"
-#include "CANDataTypes.h"
-#include "CollectionInspectionAPITypes.h"
-#include "CollectionSchemeIngestion.h"
+#include "aws/iotfleetwise/CollectionInspectionEngine.h"
 #include "CollectionSchemeManagerTest.h"
-#include "ICollectionScheme.h"
-#include "ICollectionSchemeList.h"
-#include "LogLevel.h"
-#include "OBDDataTypes.h"
-#include "RawDataManager.h"
-#include "SignalTypes.h"
 #include "Testing.h"
-#include "TimeTypes.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/CollectionSchemeIngestion.h"
+#include "aws/iotfleetwise/DataFetchManagerAPITypes.h"
+#include "aws/iotfleetwise/ICollectionScheme.h"
+#include "aws/iotfleetwise/ICollectionSchemeList.h"
+#include "aws/iotfleetwise/LogLevel.h"
+#include "aws/iotfleetwise/OBDDataTypes.h"
+#include "aws/iotfleetwise/RawDataManager.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
+#include "collection_schemes.pb.h"
 #include <algorithm>
-#include <array>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstdint>
@@ -32,13 +32,21 @@
 #include <vector>
 
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
-#include "CANInterfaceIDTranslator.h"
-#include "CheckinSender.h"
-#include "Clock.h"
-#include "ClockHandler.h"
 #include "CollectionSchemeManagerMock.h"
-#include "DataFetchManagerAPITypes.h"
-#include "IDecoderManifest.h"
+#include "SenderMock.h"
+#include "StreamForwarderMock.h"
+#include "StreamManagerMock.h"
+#include "aws/iotfleetwise/CANInterfaceIDTranslator.h"
+#include "aws/iotfleetwise/CheckinSender.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/DataSenderProtoWriter.h"
+#include "aws/iotfleetwise/IDecoderManifest.h"
+#include "aws/iotfleetwise/ISender.h"
+#include "aws/iotfleetwise/TelemetryDataSender.h"
+#include "aws/iotfleetwise/snf/RateLimiter.h"
+#include "aws/iotfleetwise/snf/StreamForwarder.h"
+#include "common_types.pb.h"
 #endif
 
 namespace Aws
@@ -49,6 +57,7 @@ namespace IoTFleetWise
 using ::testing::_;
 using ::testing::Invoke;
 using ::testing::MockFunction;
+using ::testing::StrictMock;
 using signalTypes =
     ::testing::Types<uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t, float, double>;
 
@@ -59,12 +68,41 @@ protected:
     std::shared_ptr<InspectionMatrix> collectionSchemes;
     std::shared_ptr<const InspectionMatrix> consCollectionSchemes;
     std::vector<std::shared_ptr<ExpressionNode>> expressionNodes;
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    CANInterfaceIDTranslator mCANIDTranslator;
+    ::testing::StrictMock<Testing::StreamManagerMock> mStreamManager;
+    RateLimiter mRateLimiter;
+    ::testing::StrictMock<Testing::SenderMock> mMqttSender;
+    PayloadAdaptionConfig mPayloadAdaptionConfigUncompressed{ 80, 70, 90, 10 };
+    PayloadAdaptionConfig mPayloadAdaptionConfigCompressed{ 80, 70, 90, 10 };
+    TelemetryDataSender mTelemetryDataSender;
+    Testing::StreamForwarderMock mStreamForwarder;
+    static constexpr unsigned MAXIMUM_PAYLOAD_SIZE = 400;
+#endif
+
+    CollectionInspectionEngineTest()
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        : mStreamManager( std::make_unique<DataSenderProtoWriter>( mCANIDTranslator, nullptr ) )
+        , mTelemetryDataSender(
+              [this]() -> ISender & {
+                  EXPECT_CALL( mMqttSender, getMaxSendSize() )
+                      .Times( ::testing::AnyNumber() )
+                      .WillRepeatedly( ::testing::Return( MAXIMUM_PAYLOAD_SIZE ) );
+                  return mMqttSender;
+              }(),
+              std::make_unique<DataSenderProtoWriter>( mCANIDTranslator, nullptr ),
+              mPayloadAdaptionConfigUncompressed,
+              mPayloadAdaptionConfigCompressed )
+        , mStreamForwarder( mStreamManager, mTelemetryDataSender, mRateLimiter )
+#endif
+    {
+    }
 
     static void
     convertSchemes( std::vector<Schemas::CollectionSchemesMsg::CollectionScheme> schemes,
                     std::shared_ptr<ICollectionSchemeList> &result )
     {
-        std::vector<ICollectionSchemePtr> collectionSchemes;
+        std::vector<std::shared_ptr<ICollectionScheme>> collectionSchemes;
         for ( auto scheme : schemes )
         {
             auto campaign = std::make_shared<CollectionSchemeIngestion>(
@@ -532,7 +570,7 @@ TYPED_TEST_SUITE( CollectionInspectionEngineTest, signalTypes );
 
 TYPED_TEST( CollectionInspectionEngineTest, TwoSignalsInConditionAndOneSignalToCollect )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1;
     s1.sampleBufferSize = 50;
@@ -609,6 +647,10 @@ TYPED_TEST( CollectionInspectionEngineTest, TwoSignalsInConditionAndOneSignalToC
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
 TYPED_TEST( CollectionInspectionEngineTest, ForwardConditionOnly )
 {
+    EXPECT_CALL( this->mStreamForwarder, beginForward( "arn:1/T0123", 0, Store::StreamForwarder::Source::CONDITION ) )
+        .Times( 1 );
+    EXPECT_CALL( this->mStreamForwarder, cancelForward( "arn:1/T0123", 0, testing::_ ) ).Times( testing::AtLeast( 1 ) );
+
     // 1. Define some signals (type, id) which can exist
     InspectionMatrixSignalCollectionInfo s1{ 1, 50, 10, 77777, true, SignalType::DOUBLE, {} };
     InspectionMatrixSignalCollectionInfo s2{ 2, 50, 10, 77777, true, SignalType::DOUBLE, {} };
@@ -631,17 +673,9 @@ TYPED_TEST( CollectionInspectionEngineTest, ForwardConditionOnly )
 
     // 3. Boot up the inspection engine
     TimePoint timestamp = { 160000000, 100 };
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr, MIN_FETCH_TRIGGER_MS, nullptr, true, &this->mStreamForwarder );
     engine.onChangeInspectionMatrix( this->consCollectionSchemes, timestamp );
     ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
-
-    // 3a. Verify our campaign and forward condition is present and has not triggered
-    auto currentForwardCampaigns = engine.forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    ASSERT_EQ( currentForwardCampaigns[campaignID].size(), 1 );
-    auto campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
 
     // 4. Send in some signals which should not cause the condition to trigger
     timestamp += 1000;
@@ -649,43 +683,23 @@ TYPED_TEST( CollectionInspectionEngineTest, ForwardConditionOnly )
     engine.addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -1000.0 );
     ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
 
-    // 4a. Verify our forward condition still has not triggered
-    currentForwardCampaigns = engine.forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    ASSERT_EQ( currentForwardCampaigns[campaignID].size(), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
-
     // 5. Send in some signals which should cause the condition to trigger
     timestamp += 1000;
     engine.addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -480.0 );
     ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
 
-    // 5a. Verify the forward condition has now triggered
-    currentForwardCampaigns = engine.forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    ASSERT_EQ( currentForwardCampaigns[campaignID].size(), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), true );
-
     // 6. Send in some signals which should cause the condition to go back to not triggered
     timestamp += 1000;
     engine.addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -520.0 );
     ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
-
-    // 6a. Verify our forward condition is now not triggered
-    currentForwardCampaigns = engine.forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    ASSERT_EQ( currentForwardCampaigns[campaignID].size(), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
 }
 
 TYPED_TEST( CollectionInspectionEngineTest, OneCampaignWithForwardAndCollectionConditions )
 {
+    EXPECT_CALL( this->mStreamForwarder, beginForward( "arn:1/T0123", 0, Store::StreamForwarder::Source::CONDITION ) )
+        .Times( 1 );
+    EXPECT_CALL( this->mStreamForwarder, cancelForward( "arn:1/T0123", 0, testing::_ ) ).Times( testing::AtLeast( 1 ) );
+
     // 1. Define some signals (type, id) which can exist
     InspectionMatrixSignalCollectionInfo s1{ 1, 50, 10, 77777, false, SignalType::DOUBLE, {} };
     InspectionMatrixSignalCollectionInfo s2{ 2, 50, 10, 77777, true, SignalType::DOUBLE, {} };
@@ -708,18 +722,9 @@ TYPED_TEST( CollectionInspectionEngineTest, OneCampaignWithForwardAndCollectionC
 
     // Boot up the inspection engine
     TimePoint timestamp = { 160000000, 100 };
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr, MIN_FETCH_TRIGGER_MS, nullptr, true, &this->mStreamForwarder );
     engine.onChangeInspectionMatrix( this->consCollectionSchemes, timestamp );
     ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
-
-    // Verify the forward condition is present and has not triggered
-    auto currentForwardCampaigns = engine.forwardConditionForCampaignPartitions();
-
-    ASSERT_EQ( currentForwardCampaigns.size(), 2 );
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    auto campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates[0], false );
 
     // Verify the collection condition has not collected anything
     uint32_t waitTimeMs = 0;
@@ -730,15 +735,6 @@ TYPED_TEST( CollectionInspectionEngineTest, OneCampaignWithForwardAndCollectionC
     engine.addNewSignal<double>( s1.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -90.0 );
     engine.addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -1000.0 );
     ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
-
-    // Verify our forward condition still has not triggered
-    currentForwardCampaigns = engine.forwardConditionForCampaignPartitions();
-
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    ASSERT_EQ( currentForwardCampaigns[campaignID].size(), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates[0], false );
 
     // Verify we have collected the signal
     auto collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData;
@@ -753,31 +749,17 @@ TYPED_TEST( CollectionInspectionEngineTest, OneCampaignWithForwardAndCollectionC
     engine.addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -480.0 );
     ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
 
-    // 5a. Verify the forward condition has now triggered
-    currentForwardCampaigns = engine.forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    ASSERT_EQ( currentForwardCampaigns[campaignID].size(), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates[0], true );
-
     // 6. Send in some signals which should cause the condition to go back to not triggered
     timestamp += 1000;
     engine.addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -520.0 );
     engine.addNewSignal<double>( s1.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -110.0 );
     ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
-
-    // 6a. Verify our forward condition is now not triggered
-    currentForwardCampaigns = engine.forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    ASSERT_EQ( currentForwardCampaigns[campaignID].size(), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates[0], false );
 }
 
 TYPED_TEST( CollectionInspectionEngineTest, ForwardConditionDefaultsToFalse )
 {
+    EXPECT_CALL( this->mStreamForwarder, beginForward( "arn:1/T0123", 0, testing::_ ) ).Times( 0 );
+
     // 1. Define some signals (type, id) which can exist
     InspectionMatrixSignalCollectionInfo s1{ 1, 50, 10, 77777, false, SignalType::DOUBLE, {} };
     InspectionMatrixSignalCollectionInfo s2{ 2, 50, 10, 77777, true, SignalType::DOUBLE, {} };
@@ -798,16 +780,8 @@ TYPED_TEST( CollectionInspectionEngineTest, ForwardConditionDefaultsToFalse )
 
     // Boot up the inspection engine
     TimePoint timestamp = { 160000000, 100 };
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr, MIN_FETCH_TRIGGER_MS, nullptr, true, &this->mStreamForwarder );
     engine.onChangeInspectionMatrix( this->consCollectionSchemes, timestamp );
-
-    // engine.evaluateConditions hasn't been called, ensure forward conditions exist and are not triggered
-    auto currentForwardCampaigns = engine.forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 2 );
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    auto campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates[0], false );
 
     // Verify the collection condition has not collected anything
     uint32_t waitTimeMs = 0;
@@ -816,6 +790,9 @@ TYPED_TEST( CollectionInspectionEngineTest, ForwardConditionDefaultsToFalse )
 
 TYPED_TEST( CollectionInspectionEngineTest, RealCampaignWithForwardAndCollectionConditions )
 {
+    EXPECT_CALL( this->mStreamForwarder, beginForward( "arn:1/T0123", 0, testing::_ ) ).Times( 1 );
+    EXPECT_CALL( this->mStreamForwarder, cancelForward( "arn:1/T0123", 0, testing::_ ) ).Times( testing::AtLeast( 1 ) );
+
     const SignalID signalID1 = 1;
     const SignalID signalID2 = 2;
     uint32_t sampleBufferSize = 50;
@@ -945,17 +922,10 @@ TYPED_TEST( CollectionInspectionEngineTest, RealCampaignWithForwardAndCollection
 
     // Boot up the inspection engine
     TimePoint timestamp = { 160000000, 100 };
-    std::shared_ptr<CollectionInspectionEngine> engine = std::make_shared<CollectionInspectionEngine>();
+    std::shared_ptr<CollectionInspectionEngine> engine = std::make_shared<CollectionInspectionEngine>(
+        nullptr, MIN_FETCH_TRIGGER_MS, nullptr, true, &this->mStreamForwarder );
     engine->onChangeInspectionMatrix( matrix, timestamp );
     engine->evaluateConditions( timestamp );
-
-    // Verify the forward condition is present and has not triggered
-    auto currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 1 );
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    auto campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
 
     // Verify the collection condition has not collected anything
     uint32_t waitTimeMs = 0;
@@ -967,14 +937,6 @@ TYPED_TEST( CollectionInspectionEngineTest, RealCampaignWithForwardAndCollection
     engine->addNewSignal<double>(
         s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -1000.0 );
     ASSERT_TRUE( engine->evaluateConditions( timestamp ) );
-
-    // Verify our forward condition still has not triggered
-    currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 1 );
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
 
     // Verify we have collected the signal
     auto collectedData = engine->collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData;
@@ -989,26 +951,10 @@ TYPED_TEST( CollectionInspectionEngineTest, RealCampaignWithForwardAndCollection
     engine->addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -480.0 );
     engine->evaluateConditions( timestamp );
 
-    // 5a. Verify the forward condition has now triggered
-    currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 1 );
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), true );
-
     // 6. Send in some signals which should cause the condition to go back to not triggered
     timestamp += 1000;
     engine->addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -520.0 );
     engine->evaluateConditions( timestamp );
-
-    // 6a. Verify our forward condition is now not triggered
-    currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 1 );
-    ASSERT_EQ( currentForwardCampaigns.count( campaignID ), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 1 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
 }
 
 TYPED_TEST( CollectionInspectionEngineTest, MultipleCampaignsAndPartitionsWithForwardAndTimedCollectionConditions )
@@ -1142,8 +1088,6 @@ TYPED_TEST( CollectionInspectionEngineTest, MultipleCampaignsAndPartitionsWithFo
         signalInformation->set_fixed_window_period_ms( fixedWindowPeriod );
         signalInformation->set_condition_only_signal( true );
 
-        scheme.add_raw_can_frames_to_collect();
-
         scheme1 = scheme;
     }
 
@@ -1260,14 +1204,20 @@ TYPED_TEST( CollectionInspectionEngineTest, MultipleCampaignsAndPartitionsWithFo
         signalInformation->set_fixed_window_period_ms( fixedWindowPeriod );
         signalInformation->set_condition_only_signal( true );
 
-        scheme.add_raw_can_frames_to_collect();
-
         scheme2 = scheme;
     }
 
+    EXPECT_CALL( this->mStreamForwarder, beginForward( "arn:1/T0123", testing::AnyOf( 0, 1 ), testing::_ ) ).Times( 4 );
+    EXPECT_CALL( this->mStreamForwarder, beginForward( "arn:2/T0456", testing::AnyOf( 0, 1 ), testing::_ ) ).Times( 2 );
+    EXPECT_CALL( this->mStreamForwarder, cancelForward( "arn:1/T0123", testing::AnyOf( 0, 1 ), testing::_ ) )
+        .Times( ( 12 ) );
+    EXPECT_CALL( this->mStreamForwarder, cancelForward( "arn:2/T0456", testing::AnyOf( 0, 1 ), testing::_ ) )
+        .Times( ( 6 ) );
+
     // Boot up the inspection engine
     TimePoint timestamp = { 160000000, 100 };
-    std::shared_ptr<CollectionInspectionEngine> engine = std::make_shared<CollectionInspectionEngine>();
+    std::shared_ptr<CollectionInspectionEngine> engine = std::make_shared<CollectionInspectionEngine>(
+        nullptr, MIN_FETCH_TRIGGER_MS, nullptr, true, &this->mStreamForwarder );
 
     // add decoder manifest
     const std::string decoderManifestID = "DM1";
@@ -1291,16 +1241,6 @@ TYPED_TEST( CollectionInspectionEngineTest, MultipleCampaignsAndPartitionsWithFo
     engine->onChangeInspectionMatrix( matrix, timestamp );
     engine->evaluateConditions( timestamp );
 
-    // Verify the forward condition is present and has not triggered
-    auto currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 2 );
-    auto campaignForwardConditionStates = currentForwardCampaigns[campaignID1];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID2];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
-
     // Verify the collection condition has not collected anything
     uint32_t waitTimeMs = 0;
     ASSERT_EQ( engine->collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData, nullptr );
@@ -1311,16 +1251,6 @@ TYPED_TEST( CollectionInspectionEngineTest, MultipleCampaignsAndPartitionsWithFo
     engine->addNewSignal<double>(
         s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -1000.0 );
     engine->evaluateConditions( timestamp );
-
-    // Verify our forward condition still has not triggered
-    currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 2 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID1];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID2];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
 
     // Verify we have collected the signal
     auto collectedData = engine->collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData;
@@ -1335,30 +1265,10 @@ TYPED_TEST( CollectionInspectionEngineTest, MultipleCampaignsAndPartitionsWithFo
     engine->addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -480.0 );
     engine->evaluateConditions( timestamp );
 
-    // 5a. Verify the forward condition has now triggered
-    currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 2 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID1];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), true );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID2];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), true );
-
     // 6. Send in some signals which should cause the condition to go back to not triggered
     timestamp += 1000;
     engine->addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -520.0 );
     engine->evaluateConditions( timestamp );
-
-    // 6a. Verify our forward condition is now not triggered
-    currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 2 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID1];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID2];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
 
     // remove a campaign from matrix
 
@@ -1372,13 +1282,6 @@ TYPED_TEST( CollectionInspectionEngineTest, MultipleCampaignsAndPartitionsWithFo
     engine->onChangeInspectionMatrix( matrix, timestamp );
     engine->evaluateConditions( timestamp );
 
-    // Verify the forward condition is present and has not triggered
-    currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID1];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
-
     // Verify the collection condition has not collected anything
     waitTimeMs = 0;
     ASSERT_EQ( engine->collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData, nullptr );
@@ -1389,13 +1292,6 @@ TYPED_TEST( CollectionInspectionEngineTest, MultipleCampaignsAndPartitionsWithFo
     engine->addNewSignal<double>(
         s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -1000.0 );
     engine->evaluateConditions( timestamp );
-
-    // Verify our forward condition still has not triggered
-    currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID1];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
 
     // Verify we have collected the signal
     collectedData = engine->collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData;
@@ -1410,30 +1306,16 @@ TYPED_TEST( CollectionInspectionEngineTest, MultipleCampaignsAndPartitionsWithFo
     engine->addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -480.0 );
     engine->evaluateConditions( timestamp );
 
-    // 5a. Verify the forward condition has now triggered
-    currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID1];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), true );
-
     // 6. Send in some signals which should cause the condition to go back to not triggered
     timestamp += 1000;
     engine->addNewSignal<double>( s2.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, -520.0 );
     engine->evaluateConditions( timestamp );
-
-    // 6a. Verify our forward condition is now not triggered
-    currentForwardCampaigns = engine->forwardConditionForCampaignPartitions();
-    ASSERT_EQ( currentForwardCampaigns.size(), 1 );
-    campaignForwardConditionStates = currentForwardCampaigns[campaignID1];
-    ASSERT_EQ( campaignForwardConditionStates.size(), 2 );
-    ASSERT_EQ( campaignForwardConditionStates.front(), false );
 }
 #endif
 
 TEST_F( CollectionInspectionEngineDoubleTest, EndlessCondition )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     // minimumSampleIntervalMs=0 means no subsampling
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
@@ -1463,7 +1345,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, EndlessCondition )
 
 TEST_F( CollectionInspectionEngineDoubleTest, TooBigForSignalBuffer )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     // minimumSampleIntervalMs=0 means no subsampling
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 3072;
@@ -1499,7 +1381,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TooBigForSignalBuffer )
 
 TEST_F( CollectionInspectionEngineDoubleTest, TooBigForSignalBufferOverflow )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     // minimumSampleIntervalMs=0 means no subsampling
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
@@ -1508,12 +1390,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, TooBigForSignalBufferOverflow )
     s1.fixedWindowPeriod = 77777;
     s1.signalType = SignalType::DOUBLE;
     addSignalToCollect( collectionSchemes->conditions[0], s1 );
-    InspectionMatrixCanFrameCollectionInfo c1;
-    c1.frameID = 0x380;
-    c1.channelID = 3;
-    c1.sampleBufferSize = 536870912;
-    c1.minimumSampleIntervalMs = 0;
-    collectionSchemes->conditions[0].canFrames.push_back( c1 );
 
     collectionSchemes->conditions[0].minimumPublishIntervalMs = 500;
     // Condition is static by default
@@ -1539,7 +1415,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TooBigForSignalBufferOverflow )
 
 TEST_F( CollectionInspectionEngineDoubleTest, SignalBufferErasedAfterNewConditions )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     // minimumSampleIntervalMs=0 means no subsampling
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
@@ -1580,7 +1456,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, SignalBufferErasedAfterNewConditio
 
 TEST_F( CollectionInspectionEngineDoubleTest, CollectBurstWithoutSubsampling )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     // minimumSampleIntervalMs=0 means no subsampling
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
@@ -1614,7 +1490,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, CollectBurstWithoutSubsampling )
 
 TEST_F( CollectionInspectionEngineDoubleTest, IllegalSignalID )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 0xFFFFFFFF;
     s1.sampleBufferSize = 50;
@@ -1632,7 +1508,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, IllegalSignalID )
 
 TEST_F( CollectionInspectionEngineDoubleTest, IllegalSampleSize )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 0; // Not allowed
@@ -1649,7 +1525,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, IllegalSampleSize )
 
 TEST_F( CollectionInspectionEngineDoubleTest, ZeroSignalsOnlyDTCCollection )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     collectionSchemes->conditions[0].includeActiveDtcs = true;
     // Condition is static by default
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
@@ -1658,7 +1534,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, ZeroSignalsOnlyDTCCollection )
     engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
     DTCInfo dtcInfo;
-    dtcInfo.mDTCCodes.push_back( "B1217" );
+    dtcInfo.mDTCCodes.emplace_back( "B1217" );
     dtcInfo.mSID = SID::STORED_DTC;
     dtcInfo.receiveTime = timestamp.systemTimeMs;
     engine.setActiveDTCs( dtcInfo );
@@ -1670,127 +1546,9 @@ TEST_F( CollectionInspectionEngineDoubleTest, ZeroSignalsOnlyDTCCollection )
     EXPECT_EQ( collectedData->mDTCInfo.mDTCCodes[0], "B1217" );
 }
 
-TEST_F( CollectionInspectionEngineDoubleTest, CollectRawCanFrames )
-{
-    CollectionInspectionEngine engine;
-    // minimumSampleIntervalMs=0 means no subsampling
-    InspectionMatrixCanFrameCollectionInfo c1;
-    c1.frameID = 0x380;
-    c1.channelID = 3;
-    c1.sampleBufferSize = 10;
-    c1.minimumSampleIntervalMs = 0;
-    collectionSchemes->conditions[0].canFrames.push_back( c1 );
-    // Condition is static by default
-    collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-
-    TimePoint timestamp = { 160000000, 100 };
-    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
-
-    std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = { 0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0 };
-    engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp, buf, sizeof( buf ) );
-
-    ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
-
-    uint32_t waitTimeMs = 0;
-    auto collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData;
-    ASSERT_NE( collectedData, nullptr );
-    ASSERT_EQ( collectedData->canFrames.size(), 1 );
-
-    EXPECT_EQ( collectedData->canFrames[0].frameID, c1.frameID );
-    EXPECT_EQ( collectedData->canFrames[0].channelId, c1.channelID );
-    EXPECT_EQ( collectedData->canFrames[0].size, sizeof( buf ) );
-    EXPECT_TRUE( 0 == std::memcmp( collectedData->canFrames[0].data.data(), buf.data(), sizeof( buf ) ) );
-}
-
-TEST_F( CollectionInspectionEngineDoubleTest, CollectRawCanFDFrames )
-{
-    CollectionInspectionEngine engine;
-    // minimumSampleIntervalMs=0 means no subsampling
-    InspectionMatrixCanFrameCollectionInfo c1;
-    c1.frameID = 0x380;
-    c1.channelID = 3;
-    c1.sampleBufferSize = 10;
-    c1.minimumSampleIntervalMs = 0;
-    collectionSchemes->conditions[0].canFrames.push_back( c1 );
-    // Condition is static by default
-    collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-
-    TimePoint timestamp = { 160000000, 100 };
-    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
-
-    std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = {
-        0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0, 0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0 };
-    engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp, buf, sizeof( buf ) );
-
-    ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
-
-    uint32_t waitTimeMs = 0;
-    auto collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData;
-    ASSERT_NE( collectedData, nullptr );
-    ASSERT_EQ( collectedData->canFrames.size(), 1 );
-
-    EXPECT_EQ( collectedData->canFrames[0].frameID, c1.frameID );
-    EXPECT_EQ( collectedData->canFrames[0].channelId, c1.channelID );
-    EXPECT_EQ( collectedData->canFrames[0].size, sizeof( buf ) );
-    EXPECT_TRUE( 0 == std::memcmp( collectedData->canFrames[0].data.data(), buf.data(), sizeof( buf ) ) );
-}
-
-TEST_F( CollectionInspectionEngineDoubleTest, MultipleCanSubsampling )
-{
-    CollectionInspectionEngine engine;
-    InspectionMatrixCanFrameCollectionInfo c1;
-    c1.frameID = 0x380;
-    c1.channelID = 3;
-    c1.sampleBufferSize = 10;
-    c1.minimumSampleIntervalMs = 100;
-    collectionSchemes->conditions[0].canFrames.push_back( c1 );
-
-    InspectionMatrixCanFrameCollectionInfo c2;
-    c2.frameID = 0x380;
-    c2.channelID = 3;
-    c2.sampleBufferSize = 10;
-    // Same frame id but different subsampling Interval
-    c2.minimumSampleIntervalMs = 500;
-    collectionSchemes->conditions[0].canFrames.push_back( c2 );
-
-    // Add to a second collectionScheme. this should reuse the same buffers
-    collectionSchemes->conditions[1].canFrames.push_back( c1 );
-    collectionSchemes->conditions[1].canFrames.push_back( c2 );
-
-    // Condition is static by default
-    collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-
-    TimePoint timestamp = { 160000000, 100 };
-    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
-
-    std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = { 0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0 };
-    engine.addNewRawCanFrame( c1.frameID,
-                              c1.channelID,
-                              timestamp,
-                              buf,
-                              sizeof( buf ) ); // this message in  goes with both subsampling
-    engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp + 100, buf, sizeof( buf ) ); // 100 ms subsampling
-    engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp + 200, buf, sizeof( buf ) ); // 100 ms subsampling
-    engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp + 250, buf, sizeof( buf ) ); // ignored
-    engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp + 300, buf, sizeof( buf ) ); // 100 ms subsampling
-    engine.addNewRawCanFrame( c1.frameID, c1.channelID, timestamp + 400, buf, sizeof( buf ) ); // 100 ms subsampling
-    engine.addNewRawCanFrame( c1.frameID,
-                              c1.channelID,
-                              timestamp + 500,
-                              buf,
-                              sizeof( buf ) ); // this message in  goes with both subsampling
-
-    ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
-
-    uint32_t waitTimeMs = 0;
-    auto collectedData = engine.collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData;
-    ASSERT_NE( collectedData, nullptr );
-    ASSERT_EQ( collectedData->canFrames.size(), 8 );
-}
-
 TEST_F( CollectionInspectionEngineDoubleTest, MultipleSubsamplingOfSameSignalUsedInConditions )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
 
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
@@ -1850,7 +1608,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleSubsamplingOfSameSignalUse
     TimePoint timestamp = { 160000000, 100 };
     engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
-    for ( int i = 0; i < 100; i++ )
+    for ( unsigned int i = 0; i < 100; i++ )
     {
         engine.addNewSignal<double>(
             s1.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp + i * 10, timestamp.monotonicTimeMs + i * 10, i * 2 );
@@ -1898,7 +1656,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleSubsamplingOfSameSignalUse
 
 TEST_F( CollectionInspectionEngineDoubleTest, MultipleFixedWindowsOfSameSignalUsedInConditions )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
 
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
@@ -1942,7 +1700,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleFixedWindowsOfSameSignalUs
     TimePoint timestamp = { 160000000, 100 };
     engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
-    for ( int i = 0; i < 300; i++ )
+    for ( unsigned int i = 0; i < 300; i++ )
     {
         engine.addNewSignal<double>( s1.signalID,
                                      DEFAULT_FETCH_REQUEST_ID,
@@ -1998,7 +1756,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleFixedWindowsOfSameSignalUs
 
 TEST_F( CollectionInspectionEngineDoubleTest, Subsampling )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -2040,7 +1798,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, Subsampling )
 // Only valid when sendDataOnlyOncePerCondition is defined true
 TEST_F( CollectionInspectionEngineDoubleTest, SendOutEverySignalOnlyOnce )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -2080,7 +1838,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, SendOutEverySignalOnlyOnce )
 
 TYPED_TEST( CollectionInspectionEngineTest, HeartbeatInterval )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -2128,10 +1886,8 @@ TYPED_TEST( CollectionInspectionEngineTest, HeartbeatInterval )
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 TEST_F( CollectionInspectionEngineDoubleTest, RawBufferHandleUsageHints )
 {
-    CollectionInspectionEngine engine;
-    std::shared_ptr<RawData::BufferManager> rawDataManager =
-        std::make_shared<RawData::BufferManager>( RawData::BufferManagerConfig::create().get() );
-    engine.setRawDataBufferManager( rawDataManager );
+    RawData::BufferManager rawDataBufferManager( RawData::BufferManagerConfig::create().get() );
+    CollectionInspectionEngine engine( &rawDataBufferManager );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 10;
@@ -2143,7 +1899,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, RawBufferHandleUsageHints )
     RawData::SignalUpdateConfig signalConfig;
     signalConfig.typeId = s1.signalID;
 
-    rawDataManager->updateConfig( { { signalConfig.typeId, signalConfig } } );
+    rawDataBufferManager.updateConfig( { { signalConfig.typeId, signalConfig } } );
 
     this->collectionSchemes->conditions[0].minimumPublishIntervalMs = 10000000;
     // Condition is static by default
@@ -2152,34 +1908,34 @@ TEST_F( CollectionInspectionEngineDoubleTest, RawBufferHandleUsageHints )
     TimePoint timestamp = { 160000000, 100 };
     engine.onChangeInspectionMatrix( this->consCollectionSchemes, timestamp );
 
-    for ( int i = 0; i < 10; i++ )
+    for ( unsigned int i = 0; i < 10; i++ )
     {
         timestamp++;
         uint8_t dummyData[] = { 0xDE, 0xAD };
-        auto handle = rawDataManager->push( dummyData, sizeof( dummyData ), timestamp.systemTimeMs, s1.signalID );
+        auto handle = rawDataBufferManager.push( dummyData, sizeof( dummyData ), timestamp.systemTimeMs, s1.signalID );
         engine.addNewSignal<RawData::BufferHandle>(
             s1.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, handle );
     }
-    auto statistics = rawDataManager->getStatistics( s1.signalID );
+    auto statistics = rawDataBufferManager.getStatistics( s1.signalID );
     EXPECT_EQ( statistics.numOfSamplesCurrentlyInMemory, 10 );
     EXPECT_EQ( statistics.overallNumOfSamplesReceived, 10 );
 
-    for ( int i = 0; i < 10; i++ )
+    for ( unsigned int i = 0; i < 10; i++ )
     {
         timestamp++;
         uint8_t dummyData[] = { 0xDE, 0xAD };
-        auto handle = rawDataManager->push( dummyData, sizeof( dummyData ), timestamp.systemTimeMs, s1.signalID );
+        auto handle = rawDataBufferManager.push( dummyData, sizeof( dummyData ), timestamp.systemTimeMs, s1.signalID );
         engine.addNewSignal<RawData::BufferHandle>(
             s1.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, handle );
     }
-    auto statistics2 = rawDataManager->getStatistics( s1.signalID );
+    auto statistics2 = rawDataBufferManager.getStatistics( s1.signalID );
     EXPECT_EQ( statistics2.numOfSamplesCurrentlyInMemory, 10 ); //
     EXPECT_EQ( statistics2.overallNumOfSamplesReceived, 20 );
 }
 
 TEST_F( CollectionInspectionEngineDoubleTest, HearbeatIntervalWithVisionSystemData )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -2235,7 +1991,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, HearbeatIntervalWithVisionSystemDa
 
 TEST_F( CollectionInspectionEngineDoubleTest, TwoCollectionSchemesWithDifferentNumberOfSamplesToCollect )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -2275,7 +2031,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TwoCollectionSchemesWithDifferentN
     TimePoint timestamp = { 160000000, 100 };
     engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
-    for ( int i = 0; i < 10000; i++ )
+    for ( unsigned int i = 0; i < 10000; i++ )
     {
         timestamp++;
         engine.addNewSignal<double>(
@@ -2301,7 +2057,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TwoCollectionSchemesWithDifferentN
 
 TEST_F( CollectionInspectionEngineDoubleTest, TwoSignalsInConditionAndOneSignalToCollect )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1;
     s1.sampleBufferSize = 50;
@@ -2371,7 +2127,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TwoSignalsInConditionAndOneSignalT
 
 TEST_F( CollectionInspectionEngineDoubleTest, RisingEdgeTrigger )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1;
     s1.sampleBufferSize = 50;
@@ -2431,7 +2187,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, RisingEdgeTrigger )
 // Default is to send data only out once per collectionScheme
 TYPED_TEST( CollectionInspectionEngineTest, SendOutEverySignalOnlyOncePerCollectionScheme )
 {
-    CollectionInspectionEngine engine( true );
+    CollectionInspectionEngine engine( nullptr, MIN_FETCH_TRIGGER_MS, nullptr, true );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -2471,7 +2227,7 @@ TYPED_TEST( CollectionInspectionEngineTest, SendOutEverySignalOnlyOncePerCollect
 
 TEST_F( CollectionInspectionEngineDoubleTest, SendOutEverySignalNotOnlyOncePerCollectionScheme )
 {
-    CollectionInspectionEngine engine( 1000, false );
+    CollectionInspectionEngine engine( nullptr, 1000, nullptr, false );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -2511,7 +2267,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, SendOutEverySignalNotOnlyOncePerCo
 
 TEST_F( CollectionInspectionEngineDoubleTest, MoreCollectionSchemesThanSupported )
 {
-    CollectionInspectionEngine engine( false );
+    CollectionInspectionEngine engine( nullptr, MIN_FETCH_TRIGGER_MS, nullptr, false );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -2532,18 +2288,18 @@ TEST_F( CollectionInspectionEngineDoubleTest, MoreCollectionSchemesThanSupported
     uint32_t waitTimeMs = 0;
     engine.addNewSignal<double>( s1.signalID, DEFAULT_FETCH_REQUEST_ID, timestamp, timestamp.monotonicTimeMs, 0.1 );
     ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
-    engine.collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData;
+    engine.collectNextDataToSend( timestamp, waitTimeMs );
     timestamp += 10000;
     ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
-    engine.collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData;
+    engine.collectNextDataToSend( timestamp, waitTimeMs );
     timestamp += 10000;
     ASSERT_TRUE( engine.evaluateConditions( timestamp ) );
-    engine.collectNextDataToSend( timestamp, waitTimeMs ).triggeredCollectionSchemeData;
+    engine.collectNextDataToSend( timestamp, waitTimeMs );
 }
 
 TYPED_TEST( CollectionInspectionEngineTest, CollectWithAfterTime )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1;
     s1.sampleBufferSize = 50;
@@ -2647,7 +2403,7 @@ TYPED_TEST( CollectionInspectionEngineTest, CollectWithAfterTime )
 
 TEST_F( CollectionInspectionEngineDoubleTest, AvgWindowCondition )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     // fixedWindowPeriod means that we collect data over 300 seconds
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
@@ -2698,7 +2454,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, AvgWindowCondition )
 
 TEST_F( CollectionInspectionEngineDoubleTest, PrevLastAvgWindowCondition )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     // fixedWindowPeriod means that we collect data over 300 seconds
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
@@ -2735,7 +2491,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, PrevLastAvgWindowCondition )
 
 TEST_F( CollectionInspectionEngineDoubleTest, MultiWindowCondition )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     // fixedWindowPeriod means that we collect data over 300 seconds
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
@@ -2777,7 +2533,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultiWindowCondition )
 
 TEST_F( CollectionInspectionEngineDoubleTest, TestNotEqualOperator )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 123;
     s1.sampleBufferSize = 50;
@@ -2823,7 +2579,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TestNotEqualOperator )
 
 TEST_F( CollectionInspectionEngineDoubleTest, TestStringOperations )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 123;
     s1.sampleBufferSize = 50;
@@ -2868,7 +2624,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TestStringOperations )
 
 TEST_F( CollectionInspectionEngineDoubleTest, TestTypeMismatch )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 123;
     s1.sampleBufferSize = 50;
@@ -2907,7 +2663,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TestTypeMismatch )
 
 TEST_F( CollectionInspectionEngineDoubleTest, TestBoolToDoubleImplicitCast )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 123;
     s1.sampleBufferSize = 50;
@@ -2957,7 +2713,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TestBoolToDoubleImplicitCast )
 
 TEST_F( CollectionInspectionEngineDoubleTest, TestDoubleToBoolImplicitCast )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 123;
     s1.sampleBufferSize = 50;
@@ -2996,7 +2752,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TestDoubleToBoolImplicitCast )
 
 TEST_F( CollectionInspectionEngineDoubleTest, TwoSignalsRatioCondition )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 123;
     s1.sampleBufferSize = 50;
@@ -3049,7 +2805,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TwoSignalsRatioCondition )
 
 TEST_F( CollectionInspectionEngineDoubleTest, UnknownExpressionNode )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 123;
     s1.sampleBufferSize = 50;
@@ -3075,7 +2831,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, UnknownExpressionNode )
 
 TEST_F( CollectionInspectionEngineDoubleTest, RequestTooMuchMemorySignals )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     // for each of the .sampleBufferSize=1000000 multiple bytes have to be allocated
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
@@ -3090,29 +2846,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, RequestTooMuchMemorySignals )
     engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 }
 
-TEST_F( CollectionInspectionEngineDoubleTest, RequestTooMuchMemoryFrames )
-{
-    CollectionInspectionEngine engine;
-    InspectionMatrixCanFrameCollectionInfo c1;
-    c1.frameID = 0x380;
-    c1.channelID = 3;
-    c1.sampleBufferSize = 1000000;
-    c1.minimumSampleIntervalMs = 0;
-    collectionSchemes->conditions[0].canFrames.push_back( c1 );
-    // Condition is static by default
-    collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    TimePoint timestamp = { 0, 0 };
-    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
-}
-
-/*
- * This test is also used for performance analysis. The add new signal takes > 100ns
- * The performance varies if number of signal, number of conditions is changed.
- */
 TEST_F( CollectionInspectionEngineDoubleTest, RandomDataTest )
 {
-    const int NUMBER_OF_COLLECTION_SCHEMES = 200;
-    const int NUMBER_OF_SIGNALS = 20000;
+    const int NUMBER_OF_COLLECTION_SCHEMES = 10;
+    const int NUMBER_OF_SIGNALS = 10;
 
     // Keep the seed static so multiple runs are comparable
     std::default_random_engine eng{ static_cast<long unsigned int>( 1620336094 ) };
@@ -3120,7 +2857,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, RandomDataTest )
     std::uniform_int_distribution<> uniformDistribution( 0, NUMBER_OF_COLLECTION_SCHEMES - 1 );
     std::normal_distribution<> normalDistribution{ 10, 4 };
 
-    for ( int i = 0; i < NUMBER_OF_COLLECTION_SCHEMES; i++ )
+    for ( unsigned int i = 0; i < NUMBER_OF_COLLECTION_SCHEMES; i++ )
     {
 
         ConditionWithCollectedData collectionScheme;
@@ -3129,14 +2866,14 @@ TEST_F( CollectionInspectionEngineDoubleTest, RandomDataTest )
         collectionSchemes->conditions[i].condition = getAlwaysTrueCondition().get();
     }
 
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     // for each of the .sampleBufferSize=1000000 multiple bytes have to be allocated
     std::normal_distribution<> fixedWindowSizeGenerator( 300000, 100000 );
     int minWindow = std::numeric_limits<int>::max();
     int maxWindow = std::numeric_limits<int>::min();
     const int MINIMUM_WINDOW_SIZE = 500000; // should be 500000
     int withoutWindow = 0;
-    for ( int i = 0; i < NUMBER_OF_SIGNALS; i++ )
+    for ( unsigned int i = 0; i < NUMBER_OF_SIGNALS; i++ )
     {
 
         int windowSize = static_cast<int>( fixedWindowSizeGenerator( gen ) );
@@ -3210,7 +2947,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, RandomDataTest )
     std::default_random_engine eng2{ static_cast<long unsigned int>( 1620337567 ) };
     std::mt19937 gen2{ eng() };
     std::uniform_int_distribution<> signalIDGenerator( 0, NUMBER_OF_SIGNALS - 1 );
-    for ( int i = 0; i < TIME_TO_SIMULATE_IN_MS * SIGNALS_PER_MS; i++ )
+    for ( unsigned int i = 0; i < TIME_TO_SIMULATE_IN_MS * SIGNALS_PER_MS; i++ )
     {
         if ( i % ( ( TIME_TO_SIMULATE_IN_MS * SIGNALS_PER_MS ) / 100 ) == 0 )
         {
@@ -3224,7 +2961,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, RandomDataTest )
             counter = 0;
             tickIncreased = true;
         }
-        engine.addNewSignal<double>( signalIDGenerator( gen2 ),
+        engine.addNewSignal<double>( static_cast<SignalID>( signalIDGenerator( gen2 ) ),
                                      DEFAULT_FETCH_REQUEST_ID,
                                      timestamp,
                                      timestamp.monotonicTimeMs,
@@ -3247,7 +2984,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, RandomDataTest )
 
 TEST_F( CollectionInspectionEngineDoubleTest, NoCollectionSchemes )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     TimePoint timestamp = { 160000000, 100 };
     engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
     ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
@@ -3255,7 +2992,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, NoCollectionSchemes )
 
 TEST_F( CollectionInspectionEngineDoubleTest, CollectStringSignal )
 {
-    CollectionInspectionEngine engine;
     TimePoint timestamp = { 160000000, 100 };
     uint32_t waitTimeMs = 0;
     std::string stringData = "1BDD00";
@@ -3274,7 +3010,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, CollectStringSignal )
     collectionSchemes->conditions[0].signals.push_back( s1 );
     // Condition is static be default
     collectionSchemes->conditions[0].condition = getAlwaysTrueCondition().get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
     stringSignal.signalID = 101;
     stringSignal.value.type = SignalType::STRING;
@@ -3298,14 +3033,16 @@ TEST_F( CollectionInspectionEngineDoubleTest, CollectStringSignal )
 
     updatedSignals = { { signalUpdateConfig1.typeId, signalUpdateConfig1 } };
 
-    std::shared_ptr<RawData::BufferManager> rawDataBufferManager =
-        std::make_shared<RawData::BufferManager>( rawDataBufferManagerConfig.get() );
-    rawDataBufferManager->updateConfig( updatedSignals );
+    RawData::BufferManager rawDataBufferManager( rawDataBufferManagerConfig.get() );
+    rawDataBufferManager.updateConfig( updatedSignals );
 
-    engine.setRawDataBufferManager( rawDataBufferManager );
+    CollectionInspectionEngine engine( &rawDataBufferManager );
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
-    auto handle = rawDataBufferManager->push(
-        (uint8_t *)stringData.c_str(), stringData.length(), timestamp.systemTimeMs, stringSignal.signalID );
+    auto handle = rawDataBufferManager.push( reinterpret_cast<const uint8_t *>( stringData.c_str() ),
+                                             stringData.length(),
+                                             timestamp.systemTimeMs,
+                                             stringSignal.signalID );
 
     stringSignal.value.value.uint32Val = static_cast<uint32_t>( handle );
     engine.addNewSignal<RawData::BufferHandle>( stringSignal.signalID,
@@ -3321,7 +3058,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, CollectStringSignal )
     ASSERT_EQ( collectedData.triggeredCollectionSchemeData->signals.size(), 1 );
     EXPECT_EQ( collectedData.triggeredCollectionSchemeData->signals[0].signalID, stringSignal.signalID );
 
-    auto loanedRawDataFrame = rawDataBufferManager->borrowFrame(
+    auto loanedRawDataFrame = rawDataBufferManager.borrowFrame(
         stringSignal.signalID,
         static_cast<RawData::BufferHandle>(
             collectedData.triggeredCollectionSchemeData->signals[0].value.value.uint32Val ) );
@@ -3332,7 +3069,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, CollectStringSignal )
 
 TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignal )
 {
-    CollectionInspectionEngine engine;
     TimePoint timestamp = { 160000000, 100 };
     uint32_t waitTimeMs = 0;
     std::string stringData = "1BDD00";
@@ -3359,7 +3095,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignal )
     // Condition contains signals
     collectionSchemes->conditions[0].isStaticCondition = false;
     collectionSchemes->conditions[0].condition = getEqualCondition( s1.signalID, s2.signalID ).get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
     CollectedSignal stringSignal1;
     stringSignal1.signalID = 101;
@@ -3405,13 +3140,16 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignal )
     updatedSignals = { { signalUpdateConfig1.typeId, signalUpdateConfig1 },
                        { signalUpdateConfig2.typeId, signalUpdateConfig2 } };
 
-    std::shared_ptr<RawData::BufferManager> rawDataBufferManager =
-        std::make_shared<RawData::BufferManager>( rawDataBufferManagerConfig.get() );
-    rawDataBufferManager->updateConfig( updatedSignals );
-    engine.setRawDataBufferManager( rawDataBufferManager );
+    RawData::BufferManager rawDataBufferManager( rawDataBufferManagerConfig.get() );
+    rawDataBufferManager.updateConfig( updatedSignals );
 
-    auto handle1 = rawDataBufferManager->push(
-        (uint8_t *)stringData.c_str(), stringData.length(), timestamp.systemTimeMs, stringSignal1.signalID );
+    CollectionInspectionEngine engine( &rawDataBufferManager );
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
+    auto handle1 = rawDataBufferManager.push( reinterpret_cast<const uint8_t *>( stringData.c_str() ),
+                                              stringData.length(),
+                                              timestamp.systemTimeMs,
+                                              stringSignal1.signalID );
     stringSignal1.value.value.uint32Val = static_cast<uint32_t>( handle1 );
     engine.addNewSignal<RawData::BufferHandle>( stringSignal1.signalID,
                                                 DEFAULT_FETCH_REQUEST_ID,
@@ -3422,8 +3160,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignal )
     // Second signal is still not available for the inspection
     ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
 
-    auto handle2 = rawDataBufferManager->push(
-        (uint8_t *)stringData.c_str(), stringData.length(), timestamp.systemTimeMs, stringSignal2.signalID );
+    auto handle2 = rawDataBufferManager.push( reinterpret_cast<const uint8_t *>( stringData.c_str() ),
+                                              stringData.length(),
+                                              timestamp.systemTimeMs,
+                                              stringSignal2.signalID );
     stringSignal2.value.value.uint32Val = static_cast<uint32_t>( handle2 );
     engine.addNewSignal<RawData::BufferHandle>( stringSignal2.signalID,
                                                 DEFAULT_FETCH_REQUEST_ID,
@@ -3439,7 +3179,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignal )
     ASSERT_NE( collectedData.triggeredCollectionSchemeData, nullptr );
     ASSERT_EQ( collectedData.triggeredCollectionSchemeData->signals.size(), 2 );
 
-    auto loanedRawDataFrame = rawDataBufferManager->borrowFrame(
+    auto loanedRawDataFrame = rawDataBufferManager.borrowFrame(
         stringSignal1.signalID,
         static_cast<RawData::BufferHandle>(
             collectedData.triggeredCollectionSchemeData->signals[0].value.value.uint32Val ) );
@@ -3453,7 +3193,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignal )
 
 TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignalBufferHandleDeleted )
 {
-    CollectionInspectionEngine engine;
     TimePoint timestamp = { 160000000, 100 };
     uint32_t waitTimeMs = 0;
     std::string stringData = "1BDD00";
@@ -3480,7 +3219,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignalBufferHandleD
     // Condition contains signals
     collectionSchemes->conditions[0].isStaticCondition = false;
     collectionSchemes->conditions[0].condition = getEqualCondition( s1.signalID, s2.signalID ).get();
-    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
 
     CollectedSignal stringSignal1;
     stringSignal1.signalID = 101;
@@ -3527,13 +3265,16 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignalBufferHandleD
     updatedSignals = { { signalUpdateConfig1.typeId, signalUpdateConfig1 },
                        { signalUpdateConfig2.typeId, signalUpdateConfig2 } };
 
-    std::shared_ptr<RawData::BufferManager> rawDataBufferManager =
-        std::make_shared<RawData::BufferManager>( rawDataBufferManagerConfig.get() );
-    rawDataBufferManager->updateConfig( updatedSignals );
-    engine.setRawDataBufferManager( rawDataBufferManager );
+    RawData::BufferManager rawDataBufferManager( rawDataBufferManagerConfig.get() );
+    rawDataBufferManager.updateConfig( updatedSignals );
 
-    auto handle1 = rawDataBufferManager->push(
-        (uint8_t *)stringData.c_str(), stringData.length(), timestamp.systemTimeMs, stringSignal1.signalID );
+    CollectionInspectionEngine engine( &rawDataBufferManager );
+    engine.onChangeInspectionMatrix( consCollectionSchemes, timestamp );
+
+    auto handle1 = rawDataBufferManager.push( reinterpret_cast<const uint8_t *>( stringData.c_str() ),
+                                              stringData.length(),
+                                              timestamp.systemTimeMs,
+                                              stringSignal1.signalID );
     stringSignal1.value.value.uint32Val = static_cast<uint32_t>( handle1 );
     engine.addNewSignal<RawData::BufferHandle>( stringSignal1.signalID,
                                                 DEFAULT_FETCH_REQUEST_ID,
@@ -3541,8 +3282,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignalBufferHandleD
                                                 timestamp.monotonicTimeMs,
                                                 stringSignal1.value.value.uint32Val );
 
-    auto handle2 = rawDataBufferManager->push(
-        (uint8_t *)stringData.c_str(), stringData.length(), timestamp.systemTimeMs, stringSignal2.signalID );
+    auto handle2 = rawDataBufferManager.push( reinterpret_cast<const uint8_t *>( stringData.c_str() ),
+                                              stringData.length(),
+                                              timestamp.systemTimeMs,
+                                              stringSignal2.signalID );
     stringSignal2.value.value.uint32Val = static_cast<uint32_t>( handle2 );
     engine.addNewSignal<RawData::BufferHandle>( stringSignal2.signalID,
                                                 DEFAULT_FETCH_REQUEST_ID,
@@ -3551,8 +3294,10 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnStringSignalBufferHandleD
                                                 stringSignal2.value.value.uint32Val );
 
     // This should force handle1 data to be deleted before new handle is accessible by CIE
-    rawDataBufferManager->push(
-        (uint8_t *)stringData.c_str(), stringData.length(), timestamp.systemTimeMs, stringSignal1.signalID );
+    rawDataBufferManager.push( reinterpret_cast<const uint8_t *>( stringData.c_str() ),
+                               stringData.length(),
+                               timestamp.systemTimeMs,
+                               stringSignal1.signalID );
     // Buffer handle was deleted
     ASSERT_FALSE( engine.evaluateConditions( timestamp + 20 ) );
 
@@ -3564,7 +3309,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleFetchRequests )
 {
     // Collection Scheme 1 collects signal with two different fetch request IDs
     // They should be collected in the same signal buffer
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -3620,7 +3365,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, MultipleFetchRequests )
 TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnConditionWithCustomFetchLogic )
 {
     // Collection Scheme 1 collects signal without custom fetch logic
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -3692,7 +3437,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnConditionWithCustomFetchL
 TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnConditionWithCustomFetchLogicIsNullFunction )
 {
     // Collection Scheme 1 collects signal without custom fetch logic
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -3766,7 +3511,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnConditionWithCustomFetchL
 
 TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnIsNullFunctionSignalMissing )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -3806,7 +3551,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnIsNullFunctionSignalMissi
 
 TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnIsNullFunctionNoSignal )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -3839,7 +3584,8 @@ TEST_F( CollectionInspectionEngineDoubleTest, TriggerOnIsNullFunctionNoSignal )
 
 TEST_F( CollectionInspectionEngineDoubleTest, FetchConfigOnRisingEdgeTest )
 {
-    CollectionInspectionEngine engine;
+    auto testFetchQueue = std::make_shared<FetchRequestQueue>( 10, "Test Fetch Queue" );
+    CollectionInspectionEngine engine( nullptr, 1000, testFetchQueue );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -3867,7 +3613,6 @@ TEST_F( CollectionInspectionEngineDoubleTest, FetchConfigOnRisingEdgeTest )
 
     // None of the condition should evaluate to true
     ASSERT_FALSE( engine.evaluateConditions( timestamp ) );
-
     // Test fetch condition trigger but no campaign condition
     engine.addNewSignal<double>( s1.signalID, 1, timestamp + 10000, timestamp.monotonicTimeMs + 10000, -50.0 );
 
@@ -3892,7 +3637,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, FetchConfigOnRisingEdgeTest )
 
 TEST_F( CollectionInspectionEngineDoubleTest, FetchConfigTriggerOnDifferentSignalTest )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -3977,7 +3722,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, FetchConfigTriggerOnDifferentSigna
 // Test to assert that a signal buffer is not allocated for a signal not known to DM
 TEST_F( CollectionInspectionEngineDoubleTest, UnknownSignalNoSignalBuffer )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -4001,7 +3746,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, UnknownSignalNoSignalBuffer )
 
 TEST_F( CollectionInspectionEngineDoubleTest, UnknownSignalInExpression )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 123;
     s1.sampleBufferSize = 50;
@@ -4040,7 +3785,7 @@ TEST_F( CollectionInspectionEngineDoubleTest, UnknownSignalInExpression )
 
 TEST_F( CollectionInspectionEngineDoubleTest, CustomFunction )
 {
-    CollectionInspectionEngine engine;
+    CollectionInspectionEngine engine( nullptr );
     InspectionMatrixSignalCollectionInfo s1{};
     s1.signalID = 1234;
     s1.sampleBufferSize = 50;
@@ -4103,8 +3848,8 @@ TEST_F( CollectionInspectionEngineDoubleTest, CustomFunction )
             {
                 return;
             }
-            collectedData.triggeredCollectionSchemeData->signals.push_back(
-                CollectedSignal{ s2.signalID, timestamp, 7890.0, SignalType::DOUBLE } );
+            collectedData.triggeredCollectionSchemeData->signals.emplace_back(
+                s2.signalID, timestamp, 7890.0, SignalType::DOUBLE );
         } ) );
     MockFunction<void( CustomFunctionInvocationID )> cleanup;
     EXPECT_CALL( cleanup, Call( _ ) ).Times( 1 );

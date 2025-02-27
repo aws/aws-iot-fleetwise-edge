@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CANDecoder.h"
-#include "CANDataTypes.h"
-#include "MessageTypes.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/CANDecoder.h"
+#include "aws/iotfleetwise/CANDataTypes.h"
+#include "aws/iotfleetwise/MessageTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -17,17 +17,10 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-TEST( CANDecoderTest, CANDecoderTestSimpleMessage )
+TEST( CANDecoderTest, SimpleMessage )
 {
     // Test for Basic Decoding UseCase
-    std::vector<uint8_t> frameData;
-    frameData.emplace_back( 0x08 );
-    frameData.emplace_back( 0x46 );
-    frameData.emplace_back( 0xFF );
-    frameData.emplace_back( 0x4B );
-    frameData.emplace_back( 0x00 );
-    frameData.emplace_back( 0xD0 );
-    frameData.emplace_back( 0x00 );
+    std::vector<uint8_t> frameData{ 0x08, 0x46, 0xFF, 0x4B, 0x00, 0xD0, 0x00 };
 
     CANSignalFormat sigFormat1;
     sigFormat1.mSignalID = 1;
@@ -62,18 +55,10 @@ TEST( CANDecoderTest, CANDecoderTestSimpleMessage )
     ASSERT_DOUBLE_EQ( decodedSignals[1].mPhysicalValue.signalValue.doubleVal, 408.4 );
 }
 
-TEST( CANDecoderTest, CANDecoderTestSimpleMessage2 )
+TEST( CANDecoderTest, SimpleMessage2 )
 {
     // Test for Signed Numbers
-    std::vector<uint8_t> frameData;
-    frameData.emplace_back( 0x09 );
-    frameData.emplace_back( 0x28 );
-    frameData.emplace_back( 0x54 );
-    frameData.emplace_back( 0xF9 );
-    frameData.emplace_back( 0x6E );
-    frameData.emplace_back( 0x23 );
-    frameData.emplace_back( 0x6E );
-    frameData.emplace_back( 0xA6 );
+    std::vector<uint8_t> frameData{ 0x09, 0x28, 0x54, 0xF9, 0x6E, 0x23, 0x6E, 0xA6 };
 
     CANSignalFormat sigFormat1;
     sigFormat1.mSignalID = 1;
@@ -202,16 +187,10 @@ TEST( CANDecoderTest, CANDecoderPrecisionSignedTest )
     ASSERT_EQ( decodedSignals[0].mPhysicalValue.signalValue.int64Val, minSignedVal );
 }
 
-TEST( CANDecoderTest, CANDecoderTestSimpleMessage3 )
+TEST( CANDecoderTest, SimpleMessage3 )
 {
     // Test for BigEndian & LittleEndian Signals
-    std::vector<uint8_t> frameData;
-    frameData.emplace_back( 0x01 );
-    frameData.emplace_back( 0x23 );
-    frameData.emplace_back( 0x45 );
-    frameData.emplace_back( 0x67 );
-    frameData.emplace_back( 0x89 );
-    frameData.emplace_back( 0xAB );
+    std::vector<uint8_t> frameData{ 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB };
 
     CANSignalFormat sigFormat1;
     sigFormat1.mSignalID = 1;
@@ -256,7 +235,7 @@ TEST( CANDecoderTest, CANDecoderTestSimpleMessage3 )
     EXPECT_EQ( decodedSignals[1].mPhysicalValue.signalValue.doubleVal, 0x4567 );
     EXPECT_EQ( decodedSignals[2].mPhysicalValue.signalValue.doubleVal, 0x89AB );
 }
-TEST( CANDecoderTest, CANDecoderTestSimpleCanFdMessage )
+TEST( CANDecoderTest, SimpleCanFdMessage )
 {
     // Test for BigEndian & LittleEndian Signals
     std::vector<uint8_t> frameData;
@@ -323,16 +302,10 @@ TEST( CANDecoderTest, CANDecoderTestSimpleCanFdMessage )
     EXPECT_EQ( decodedSignals[3].mPhysicalValue.signalValue.doubleVal, 0x7012 );
 }
 
-TEST( CANDecoderTest, CANDecoderTestOnlyDecodeSomeSignals )
+TEST( CANDecoderTest, OnlyDecodeSomeSignals )
 {
     // Test for BigEndian & LittleEndian Signals
-    std::vector<uint8_t> frameData;
-    frameData.emplace_back( 0x01 );
-    frameData.emplace_back( 0x23 );
-    frameData.emplace_back( 0x45 );
-    frameData.emplace_back( 0x67 );
-    frameData.emplace_back( 0x89 );
-    frameData.emplace_back( 0xAB );
+    std::vector<uint8_t> frameData{ 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB };
 
     CANSignalFormat sigFormat1;
     sigFormat1.mSignalID = 1;
@@ -378,18 +351,10 @@ TEST( CANDecoderTest, CANDecoderTestOnlyDecodeSomeSignals )
     EXPECT_EQ( decodedSignals[1].mPhysicalValue.signalValue.doubleVal, 0x89AB );
 }
 
-TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage1 )
+TEST( CANDecoderTest, MultiplexedMessage1 )
 {
     // Multiplexed Frame
-    std::vector<uint8_t> frameData;
-    frameData.emplace_back( 0x05 );
-    frameData.emplace_back( 0x02 );
-    frameData.emplace_back( 0x0B );
-    frameData.emplace_back( 0x00 );
-    frameData.emplace_back( 0xD3 );
-    frameData.emplace_back( 0x00 );
-    frameData.emplace_back( 0x4B );
-    frameData.emplace_back( 0x18 );
+    std::vector<uint8_t> frameData{ 0x05, 0x02, 0x0B, 0x00, 0xD3, 0x00, 0x4B, 0x18 };
 
     // Definition of the MUX Signal
     CANSignalFormat multiplexorSignal;
@@ -456,18 +421,10 @@ TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage1 )
     EXPECT_EQ( decodedSignals[3].mPhysicalValue.signalValue.doubleVal, 0xD3 );
 }
 
-TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage2 )
+TEST( CANDecoderTest, MultiplexedMessage2 )
 {
     // Multiplexed Frame
-    std::vector<uint8_t> frameData;
-    frameData.emplace_back( 0x06 );
-    frameData.emplace_back( 0x03 );
-    frameData.emplace_back( 0xEB );
-    frameData.emplace_back( 0x0E );
-    frameData.emplace_back( 0x3B );
-    frameData.emplace_back( 0x00 );
-    frameData.emplace_back( 0x1B );
-    frameData.emplace_back( 0x18 );
+    std::vector<uint8_t> frameData{ 0x06, 0x03, 0xEB, 0x0E, 0x3B, 0x00, 0x1B, 0x18 };
 
     // Definition of the MUX Signal
     CANSignalFormat multiplexorSignal;
@@ -548,13 +505,12 @@ TEST( CANDecoderTest, CANDecoderTestMultiplexedMessage2 )
     EXPECT_EQ( decodedSignals[3].mPhysicalValue.signalValue.doubleVal, 0xE3B );
 }
 
-TEST( CANDecoderTest, CANDecoderTestInvalidSignalLayout )
+TEST( CANDecoderTest, InvalidSignalLayout )
 {
     // Test for a shorter CAN frame than Signal layout.
     // Message has only 1 byte while the signal 2 to collect locates at bit 8.
     uint8_t frameSize = 1;
-    std::vector<uint8_t> frameData;
-    frameData.emplace_back( 0x01 );
+    std::vector<uint8_t> frameData{ 0x01 };
 
     CANSignalFormat sigFormat1;
     sigFormat1.mSignalID = 1;
@@ -589,14 +545,13 @@ TEST( CANDecoderTest, CANDecoderTestInvalidSignalLayout )
     ASSERT_EQ( decodedSignals.size(), 1 ); // we are expecting the signal 1 only.
 }
 
-TEST( CANDecoderTest, CANDecoderTestSkippingOutOfBoundSignals1 )
+TEST( CANDecoderTest, SkippingOutOfBoundSignals1 )
 {
     // skip signals when mSizeInBits > frameSize
     // skip signals when mSizeInBits < 1
 
     uint8_t frameSize = 1;
-    std::vector<uint8_t> frameData;
-    frameData.emplace_back( 0x01 );
+    std::vector<uint8_t> frameData{ 0x01 };
 
     CANSignalFormat sigFormat1;
     sigFormat1.mSignalID = 1;
@@ -630,12 +585,11 @@ TEST( CANDecoderTest, CANDecoderTestSkippingOutOfBoundSignals1 )
     ASSERT_EQ( decodedSignals.size(), 0 );
 }
 
-TEST( CANDecoderTest, CANDecoderTestSkippingOutOfBoundSignals2 )
+TEST( CANDecoderTest, SkippingOutOfBoundSignals2 )
 {
     // skip signals when mFirstBitPosition + mSizeInBits > mSizeInBits  for when mIsBigEndian is False
     uint8_t frameSize = 1;
-    std::vector<uint8_t> frameData;
-    frameData.emplace_back( 0x01 );
+    std::vector<uint8_t> frameData{ 0x01 };
 
     CANSignalFormat sigFormat1;
     sigFormat1.mSignalID = 1;
@@ -667,6 +621,130 @@ TEST( CANDecoderTest, CANDecoderTestSkippingOutOfBoundSignals2 )
     ASSERT_FALSE(
         decoder.decodeCANMessage( frameData.data(), frameSize, msgFormat, signalIDsToCollect, decodedSignals ) );
     ASSERT_EQ( decodedSignals.size(), 1 );
+}
+
+TEST( CANDecoderTest, SkipWrongFloatingPointSize )
+{
+    // skip signals when mFirstBitPosition + mSizeInBits > mSizeInBits  for when mIsBigEndian is False
+    std::vector<uint8_t> frameData{ 0x08, 0x46, 0xFF, 0x4B, 0x00, 0xD0, 0x00 };
+
+    CANSignalFormat sigFormat1;
+    sigFormat1.mSignalID = 1;
+    sigFormat1.mIsBigEndian = true;
+    sigFormat1.mIsSigned = false;
+    sigFormat1.mFirstBitPosition = 44;
+    sigFormat1.mSizeInBits = 4;
+    sigFormat1.mSignalType = SignalType::DOUBLE;
+    sigFormat1.mRawSignalType = RawSignalType::INTEGER;
+    sigFormat1.mOffset = 0.0;
+    sigFormat1.mFactor = 1.0;
+
+    CANSignalFormat sigFormat2;
+    sigFormat2.mSignalID = 7;
+    sigFormat2.mIsBigEndian = true;
+    sigFormat2.mIsSigned = false;
+    sigFormat2.mFirstBitPosition = 28;
+    sigFormat2.mSizeInBits = 12;
+    sigFormat2.mSignalType = SignalType::DOUBLE;
+    // A raw floating point must be 32 or 64 bits. So this signal should be skipped.
+    sigFormat2.mRawSignalType = RawSignalType::FLOATING_POINT;
+    sigFormat2.mOffset = 0.0;
+    sigFormat2.mFactor = 0.1;
+
+    CANMessageFormat msgFormat;
+    msgFormat.mMessageID = 0x101;
+    msgFormat.mSizeInBytes = 7;
+    msgFormat.mSignals.emplace_back( sigFormat1 );
+    msgFormat.mSignals.emplace_back( sigFormat2 );
+
+    CANDecoder decoder;
+    std::vector<CANDecodedSignal> decodedSignals;
+    std::unordered_set<SignalID> signalIDsToCollect = { 1, 7 };
+    ASSERT_FALSE( decoder.decodeCANMessage( frameData.data(), 8, msgFormat, signalIDsToCollect, decodedSignals ) );
+    // Only the first signal should have been decoded
+    ASSERT_EQ( decodedSignals.size(), 1 );
+    ASSERT_EQ( decodedSignals[0].mPhysicalValue.signalValue.doubleVal, 13 );
+}
+
+TEST( CANDecoderTest, DecodeRawFloatingPointSignals )
+{
+    std::vector<uint8_t> frameData{ 0x08,
+                                    0x46,
+                                    // float 145.35215 (0x43115a27) in little endian shifted 3 bits to the right
+                                    0x38,
+                                    0xD1,
+                                    0x8A,
+                                    0x18,
+                                    0x02,
+                                    // float 145.35215 in big endian
+                                    0x43,
+                                    0x11,
+                                    0x5A,
+                                    0x27,
+                                    // double 47.29873879 (0x4047A63D129A8C5E) in big endian
+                                    0x40,
+                                    0x47,
+                                    0xA6,
+                                    0x3D,
+                                    0x12,
+                                    0x9A,
+                                    0x8C,
+                                    0x5E };
+
+    CANSignalFormat formatFloatLittleEndian;
+    formatFloatLittleEndian.mSignalID = 1;
+    formatFloatLittleEndian.mIsBigEndian = false;
+    formatFloatLittleEndian.mIsSigned = false;
+    formatFloatLittleEndian.mFirstBitPosition = 19;
+    formatFloatLittleEndian.mSizeInBits = 32;
+    formatFloatLittleEndian.mSignalType = SignalType::DOUBLE;
+    formatFloatLittleEndian.mRawSignalType = RawSignalType::FLOATING_POINT;
+    formatFloatLittleEndian.mOffset = -10.0;
+    formatFloatLittleEndian.mFactor = 2.0;
+
+    CANSignalFormat formatFloatBigEndian;
+    formatFloatBigEndian.mSignalID = 12;
+    formatFloatBigEndian.mIsBigEndian = true;
+    formatFloatBigEndian.mIsSigned = false;
+    formatFloatBigEndian.mFirstBitPosition = 80;
+    formatFloatBigEndian.mSizeInBits = 32;
+    formatFloatBigEndian.mSignalType = SignalType::DOUBLE;
+    formatFloatBigEndian.mRawSignalType = RawSignalType::FLOATING_POINT;
+    formatFloatBigEndian.mOffset = 32.0;
+    formatFloatBigEndian.mFactor = 0.1;
+
+    CANSignalFormat formatDoubleBigEndian;
+    formatDoubleBigEndian.mSignalID = 17;
+    formatDoubleBigEndian.mIsBigEndian = true;
+    formatDoubleBigEndian.mIsSigned = false;
+    formatDoubleBigEndian.mFirstBitPosition = 144;
+    formatDoubleBigEndian.mSizeInBits = 64;
+    formatDoubleBigEndian.mSignalType = SignalType::DOUBLE;
+    formatDoubleBigEndian.mRawSignalType = RawSignalType::FLOATING_POINT;
+    formatDoubleBigEndian.mOffset = 100.0;
+    formatDoubleBigEndian.mFactor = 10.0;
+
+    CANMessageFormat msgFormat;
+    msgFormat.mMessageID = 0x101;
+    msgFormat.mSizeInBytes = 18;
+    msgFormat.mSignals.emplace_back( formatFloatLittleEndian );
+    msgFormat.mSignals.emplace_back( formatFloatBigEndian );
+    msgFormat.mSignals.emplace_back( formatDoubleBigEndian );
+
+    CANDecoder decoder;
+    std::vector<CANDecodedSignal> decodedSignals;
+    std::unordered_set<SignalID> signalIDsToCollect = { 1, 12, 17 };
+    ASSERT_TRUE( decoder.decodeCANMessage( frameData.data(), 19, msgFormat, signalIDsToCollect, decodedSignals ) );
+    ASSERT_EQ( decodedSignals.size(), 3 );
+    ASSERT_FLOAT_EQ( static_cast<float>( decodedSignals[0].mPhysicalValue.signalValue.doubleVal ),
+                     // (145.35215 * 2) - 10
+                     280.7043f );
+    ASSERT_FLOAT_EQ( static_cast<float>( decodedSignals[1].mPhysicalValue.signalValue.doubleVal ),
+                     // (145.35215 * 0.1) + 32
+                     46.535215f );
+    ASSERT_DOUBLE_EQ( decodedSignals[2].mPhysicalValue.signalValue.doubleVal,
+                      // (47.29873879 * 10) + 100
+                      572.9873879 );
 }
 
 } // namespace IoTFleetWise

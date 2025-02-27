@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "v1/commonapi/CommonTypes.hpp"
 #include "v1/commonapi/ExampleSomeipInterfaceStubDefault.hpp"
 #include <atomic>
 #include <boost/any.hpp>

@@ -1,11 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CanCommandDispatcher.h"
-#include "Clock.h"
-#include "ClockHandler.h"
-#include "LoggingModule.h"
-#include "Thread.h"
+#include "aws/iotfleetwise/CanCommandDispatcher.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/Thread.h"
 #include <boost/system/error_code.hpp>
 #include <chrono>
 #include <cstring>
@@ -24,11 +24,11 @@ namespace IoTFleetWise
 
 CanCommandDispatcher::CanCommandDispatcher( const std::unordered_map<std::string, CommandConfig> &config,
                                             std::string canInterfaceName,
-                                            std::shared_ptr<RawData::BufferManager> rawBufferManager )
+                                            RawData::BufferManager *rawDataBufferManager )
     : mConfig{ config }
     , mCanInterfaceName{ std::move( canInterfaceName ) }
     , mIoStream( mIoContext )
-    , mRawBufferManager( std::move( rawBufferManager ) )
+    , mRawDataBufferManager( rawDataBufferManager )
 {
 }
 
@@ -114,8 +114,8 @@ CanCommandDispatcher::pushArgument( struct canfd_frame &canFrame, const SignalVa
     case SignalType::DOUBLE:
         return pushNetworkByteOrder( canFrame, signalValue.value.doubleVal );
     case SignalType::STRING: {
-        auto loanedFrame = mRawBufferManager->borrowFrame( signalValue.value.rawDataVal.signalId,
-                                                           signalValue.value.rawDataVal.handle );
+        auto loanedFrame = mRawDataBufferManager->borrowFrame( signalValue.value.rawDataVal.signalId,
+                                                               signalValue.value.rawDataVal.handle );
         if ( loanedFrame.isNull() )
         {
             return false;

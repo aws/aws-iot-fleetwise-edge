@@ -2,8 +2,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "LoggingModule.h"
-#include "ConsoleLogger.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/ConsoleLogger.h"
 #include <cstdio>
 #include <gtest/gtest.h>
 

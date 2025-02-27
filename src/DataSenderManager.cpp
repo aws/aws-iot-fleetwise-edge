@@ -1,87 +1,85 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DataSenderManager.h"
-#include "CacheAndPersist.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/DataSenderManager.h"
+#include "aws/iotfleetwise/CacheAndPersist.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <boost/variant.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
+#include <iosfwd>
 #include <json/json.h>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-DataSenderManager::DataSenderManager( std::unordered_map<SenderDataType, std::shared_ptr<DataSender>> dataSenders,
-                                      std::shared_ptr<ISender> mqttSender,
-                                      std::shared_ptr<PayloadManager> payloadManager )
-    : mDataSenders( std::move( dataSenders ) )
-    , mMQTTSender( std::move( mqttSender ) )
-    , mPayloadManager( std::move( payloadManager ) )
+DataSenderManager::DataSenderManager(
+    const std::unordered_map<SenderDataType, std::unique_ptr<DataSender>> &dataSenders, PayloadManager *payloadManager )
+    : mDataSenders( dataSenders )
+    , mPayloadManager( payloadManager )
 {
 }
 
 void
-DataSenderManager::processData( std::shared_ptr<const DataToSend> data )
+DataSenderManager::processData( const DataToSend &data )
 {
-    if ( data == nullptr )
-    {
-        FWE_LOG_WARN( "Nothing to send as the input is empty" );
-        return;
-    }
-    auto sender = mDataSenders.find( data->getDataType() );
+    auto sender = mDataSenders.find( data.getDataType() );
     if ( sender == mDataSenders.end() )
     {
         FWE_LOG_ERROR( "No sender configured for data type: " +
-                       std::to_string( static_cast<int>( data->getDataType() ) ) );
+                       std::to_string( static_cast<int>( data.getDataType() ) ) );
         return;
     }
 
-    sender->second->processData( data, [this]( bool success, std::shared_ptr<const DataToPersist> dataToPersist ) {
-        if ( success )
-        {
-            FWE_LOG_TRACE( "Data successfully sent" );
-        }
-        else if ( dataToPersist != nullptr )
-        {
-            FWE_LOG_ERROR( "Failed to send data, persisting it" );
-            if ( mPayloadManager != nullptr )
+    sender->second->processData(
+        data,
+        // coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
+        [this]( bool success, std::shared_ptr<const DataToPersist> dataToPersist ) {
+            if ( success )
             {
-                auto dataVariant = dataToPersist->getData();
-                if ( dataVariant.type() == typeid( std::shared_ptr<std::string> ) )
+                FWE_LOG_TRACE( "Data successfully sent" );
+            }
+            else if ( dataToPersist != nullptr )
+            {
+                FWE_LOG_ERROR( "Failed to send data, persisting it" );
+                if ( mPayloadManager != nullptr )
                 {
-                    auto rawData = boost::get<std::shared_ptr<std::string>>( dataVariant );
+                    auto dataVariant = dataToPersist->getData();
+                    if ( dataVariant.type() == typeid( std::shared_ptr<std::string> ) )
+                    {
+                        auto rawData = boost::get<std::shared_ptr<std::string>>( dataVariant );
 
-                    Json::Value metadata;
-                    metadata["type"] = senderDataTypeToString( dataToPersist->getDataType() );
-                    Json::Value payloadSpecificMetadata = dataToPersist->getMetadata();
-                    payloadSpecificMetadata["filename"] = dataToPersist->getFilename();
-                    payloadSpecificMetadata["payloadSize"] = static_cast<Json::Value::UInt64>( rawData->size() );
-                    metadata["payload"] = payloadSpecificMetadata;
+                        Json::Value metadata;
+                        metadata["type"] = senderDataTypeToString( dataToPersist->getDataType() );
+                        Json::Value payloadSpecificMetadata = dataToPersist->getMetadata();
+                        payloadSpecificMetadata["filename"] = dataToPersist->getFilename();
+                        payloadSpecificMetadata["payloadSize"] = static_cast<Json::Value::UInt64>( rawData->size() );
+                        metadata["payload"] = payloadSpecificMetadata;
 
-                    mPayloadManager->storeData( reinterpret_cast<const uint8_t *>( rawData->data() ),
-                                                rawData->size(),
-                                                metadata,
-                                                dataToPersist->getFilename() );
-                }
-                else if ( dataVariant.type() == typeid( std::shared_ptr<std::streambuf> ) )
-                {
-                    auto rawData = boost::get<std::shared_ptr<std::streambuf>>( dataVariant );
-                    mPayloadManager->storeData( *rawData, dataToPersist->getMetadata(), dataToPersist->getFilename() );
+                        mPayloadManager->storeData( reinterpret_cast<const uint8_t *>( rawData->data() ),
+                                                    rawData->size(),
+                                                    metadata,
+                                                    dataToPersist->getFilename() );
+                    }
+                    else if ( dataVariant.type() == typeid( std::shared_ptr<std::streambuf> ) )
+                    {
+                        auto rawData = boost::get<std::shared_ptr<std::streambuf>>( dataVariant );
+                        mPayloadManager->storeData(
+                            *rawData, dataToPersist->getMetadata(), dataToPersist->getFilename() );
+                    }
                 }
             }
-        }
-        else
-        {
-            FWE_LOG_ERROR(
-                "Failed to send data, but persistency is not enabled for this type of data. Discarding it." );
-        }
-    } );
+            else
+            {
+                FWE_LOG_ERROR(
+                    "Failed to send data, but persistency is not enabled for this type of data. Discarding it." );
+            }
+        } );
 }
 
 void
@@ -101,6 +99,7 @@ DataSenderManager::checkAndSendRetrievedData()
         return;
     }
     FWE_LOG_TRACE( "Number of Payloads to transmit : " + std::to_string( files.size() ) );
+    unsigned int skippedPayloadsDueToSenderNotAlive = 0;
     for ( const auto &item : files )
     {
         auto payloadType = SenderDataType::TELEMETRY;
@@ -128,37 +127,39 @@ DataSenderManager::checkAndSendRetrievedData()
             continue;
         }
 
-        // Retrieve the payload as stream so that it can be lazily read by the sender
+        if ( !sender->second->isAlive() )
+        {
+            skippedPayloadsDueToSenderNotAlive++;
+            continue;
+        }
+
         std::string filename = payloadMetadata["filename"].asString();
         size_t payloadSize = sizeof( size_t ) >= sizeof( uint64_t ) ? payloadMetadata["payloadSize"].asUInt64()
                                                                     : payloadMetadata["payloadSize"].asUInt();
-        std::ifstream payload;
-        if ( mPayloadManager->retrievePayloadLazily( payload, filename ) != ErrorCode::SUCCESS )
+        std::vector<uint8_t> payload;
+        payload.resize( payloadSize );
+        if ( mPayloadManager->retrievePayload( payload.data(), payloadSize, filename ) != ErrorCode::SUCCESS )
         {
             continue;
         }
 
-        payload.seekg( 0, std::ios::end );
-        auto fileSize = static_cast<size_t>( payload.tellg() );
-        if ( payloadSize != fileSize )
-        {
-            FWE_LOG_ERROR( "Failed to read persisted data: requested size " + std::to_string( payloadSize ) +
-                           " Bytes and actual size " + std::to_string( fileSize ) + " Bytes differ for file " +
-                           filename );
-            continue;
-        }
-        payload.seekg( 0, std::ios::beg );
+        sender->second->processPersistedData(
+            payload.data(), payloadSize, payloadMetadata, [this, item, filename]( bool success ) {
+                if ( !success )
+                {
+                    FWE_LOG_ERROR( "Payload transmission for file " + filename + " failed. Saving its metadata back." );
+                    mPayloadManager->storeMetadata( item );
+                    return;
+                }
+                FWE_LOG_TRACE( "Payload from file " + filename + " has been successfully sent to the backend" );
+                mPayloadManager->deletePayload( filename );
+            } );
+    }
 
-        sender->second->processPersistedData( payload, payloadMetadata, [this, item, filename]( bool success ) {
-            if ( !success )
-            {
-                FWE_LOG_ERROR( "Payload transmission for file " + filename + " failed. Saving its metadata back." );
-                mPayloadManager->storeMetadata( item );
-                return;
-            }
-            FWE_LOG_TRACE( "Payload from file " + filename + " has been successfully sent to the backend" );
-            mPayloadManager->deletePayload( filename );
-        } );
+    if ( skippedPayloadsDueToSenderNotAlive > 0 )
+    {
+        FWE_LOG_TRACE( "Number of payloads skipped because the sender is not connected: " +
+                       std::to_string( skippedPayloadsDueToSenderNotAlive ) );
     }
 }
 

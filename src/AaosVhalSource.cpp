@@ -1,10 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "AaosVhalSource.h"
-#include "IDecoderManifest.h"
-#include "LoggingModule.h"
-#include "QueueTypes.h"
+#include "aws/iotfleetwise/AaosVhalSource.h"
+#include "aws/iotfleetwise/IDecoderManifest.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <cstddef>
 #include <string>
 #include <unordered_map>
@@ -15,9 +14,9 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-AaosVhalSource::AaosVhalSource( InterfaceID interfaceId, SignalBufferDistributorPtr signalBufferDistributor )
+AaosVhalSource::AaosVhalSource( InterfaceID interfaceId, SignalBufferDistributor &signalBufferDistributor )
     : mInterfaceId( std::move( interfaceId ) )
-    , mSignalBufferDistributor{ std::move( signalBufferDistributor ) }
+    , mSignalBufferDistributor( signalBufferDistributor )
 {
 }
 
@@ -104,7 +103,7 @@ AaosVhalSource::setVehicleProperty( SignalID signalId, const DecodedSignalValue 
     CollectedSignalsGroup collectedSignalsGroup;
     collectedSignalsGroup.push_back( CollectedSignal::fromDecodedSignal( signalId, timestamp, value, signalType ) );
 
-    mSignalBufferDistributor->push( CollectedDataFrame( collectedSignalsGroup ) );
+    mSignalBufferDistributor.push( CollectedDataFrame( collectedSignalsGroup ) );
 }
 
 } // namespace IoTFleetWise

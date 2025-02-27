@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "RetryThread.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/RetryThread.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <algorithm>
 #include <string>
 #include <utility>
@@ -35,7 +35,9 @@ RetryThread::start()
     // On multi core systems the shared variable fShouldStop must be updated for
     // all cores before starting the thread otherwise thread will directly end
     fShouldStop.store( false );
-    if ( !fThread.create( doWork, this ) )
+    if ( !fThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "Retry Thread failed to start" );
     }
@@ -73,37 +75,36 @@ RetryThread::stop()
 }
 
 void
-RetryThread::doWork( void *data )
+RetryThread::doWork()
 {
-    RetryThread *retryThread = static_cast<RetryThread *>( data );
-    retryThread->fCurrentWaitTime = retryThread->fStartBackoffMs;
+    fCurrentWaitTime = fStartBackoffMs;
     RetryStatus result = RetryStatus::RETRY;
-    while ( !retryThread->fShouldStop )
+    while ( !fShouldStop )
     {
-        if ( ( result == RetryStatus::RETRY ) || retryThread->fRestart )
+        if ( ( result == RetryStatus::RETRY ) || fRestart )
         {
-            if ( retryThread->fRestart )
+            if ( fRestart )
             {
-                retryThread->fCurrentWaitTime = retryThread->fStartBackoffMs;
-                retryThread->fRestart.store( false, std::memory_order_relaxed );
+                fCurrentWaitTime = fStartBackoffMs;
+                fRestart.store( false, std::memory_order_relaxed );
             }
 
-            result = retryThread->fRetryable();
+            result = fRetryable();
             if ( result != RetryStatus::RETRY )
             {
                 FWE_LOG_TRACE( "Finished with code " + std::to_string( static_cast<int>( result ) ) );
-                retryThread->fWait.wait( Signal::WaitWithPredicate );
+                fWait.wait( Signal::WaitWithPredicate );
                 continue;
             }
 
-            FWE_LOG_TRACE( "Current retry time is: " + std::to_string( retryThread->fCurrentWaitTime ) );
-            retryThread->fWait.wait( retryThread->fCurrentWaitTime );
+            FWE_LOG_TRACE( "Current retry time is: " + std::to_string( fCurrentWaitTime ) );
+            fWait.wait( fCurrentWaitTime );
             // exponential backoff
-            retryThread->fCurrentWaitTime = std::min( retryThread->fCurrentWaitTime * 2, retryThread->fMaxBackoffMs );
+            fCurrentWaitTime = std::min( fCurrentWaitTime * 2, fMaxBackoffMs );
         }
         else
         {
-            retryThread->fWait.wait( Signal::WaitWithPredicate );
+            fWait.wait( Signal::WaitWithPredicate );
         }
     }
     // If thread is shutdown without succeeding signal abort

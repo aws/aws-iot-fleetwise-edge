@@ -1,0 +1,10 @@
+[
+  {
+    "fullyQualifiedName": "Vehicle.Histogram",
+    "interfaceId": "NAMED_SIGNAL",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.Histogram"
+    }
+  }
+]

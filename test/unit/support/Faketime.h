@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "Testing.h"
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
@@ -39,13 +40,13 @@ public:
      */
     Faketime( fake_mode mode )
     {
-        std::string ldPreload = getEnvVarOrDefault( "LD_PRELOAD", "" );
+        std::string ldPreload = getEnvVar( "LD_PRELOAD" ).get_value_or( "" );
         if ( ldPreload.find( "libfaketime" ) == std::string::npos )
         {
             throw std::runtime_error( "libfaketime needs to be preloaded to enable faketime" );
         }
 
-        std::string noCache = getEnvVarOrDefault( "FAKETIME_NO_CACHE", "0" );
+        std::string noCache = getEnvVar( "FAKETIME_NO_CACHE" ).get_value_or( "0" );
         if ( noCache != "1" )
         {
             // If cache is not disabled, it is not possible to reliably change the fake time while the tests are running
@@ -56,8 +57,8 @@ public:
         // Some older libfaketime releases (0.9.7) uses the DONT_FAKE_MONOTONIC variable and more recent ones
         // use FAKETIME_DONT_FAKE_MONOTONIC. So if those variables don't match, we can't reliably determine whether
         // the monotonic clock is being faked.
-        std::string faketimeDontFakeMonotonic = getEnvVarOrDefault( "FAKETIME_DONT_FAKE_MONOTONIC", "0" );
-        std::string dontFakeMonotonic = getEnvVarOrDefault( "DONT_FAKE_MONOTONIC", "0" );
+        std::string faketimeDontFakeMonotonic = getEnvVar( "FAKETIME_DONT_FAKE_MONOTONIC" ).get_value_or( "0" );
+        std::string dontFakeMonotonic = getEnvVar( "DONT_FAKE_MONOTONIC" ).get_value_or( "0" );
         if ( faketimeDontFakeMonotonic != dontFakeMonotonic )
         {
             throw std::runtime_error(
@@ -109,14 +110,6 @@ public:
     Faketime &operator=( const Faketime & ) = delete;
     Faketime( Faketime && ) = delete;
     Faketime &operator=( Faketime && ) = delete;
-
-private:
-    static std::string
-    getEnvVarOrDefault( const std::string &name, const std::string &defaultValue )
-    {
-        const char *envVarValue = getenv( name.c_str() );
-        return envVarValue == nullptr ? defaultValue : envVarValue;
-    }
 };
 
 } // namespace IoTFleetWise

@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "AwsSDKMemoryManager.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/AwsSDKMemoryManager.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <cstddef>
 
 namespace Aws

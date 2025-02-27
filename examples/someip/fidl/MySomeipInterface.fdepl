@@ -1,0 +1,26 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+import "platform:/plugin/org.genivi.commonapi.someip/deployment/CommonAPI-4-SOMEIP_deployment_spec.fdepl"
+import "MySomeipInterface.fidl"
+
+define org.genivi.commonapi.someip.deployment for interface commonapi.MySomeipInterface {
+    SomeIpServiceID = 0x1234
+
+    attribute x {
+        SomeIpGetterID = 0x0BB8
+        SomeIpSetterID = 0x0BB9
+        SomeIpNotifierID = 0x80f2
+        SomeIpNotifierEventGroups = { 0x80f2 }
+
+        SomeIpAttributeReliable = false
+    }
+
+}
+
+define org.genivi.commonapi.someip.deployment for provider as Service {
+    instance commonapi.MySomeipInterface {
+        InstanceId = "commonapi.MySomeipInterface"
+        SomeIpInstanceID = 0x5678
+    }
+}

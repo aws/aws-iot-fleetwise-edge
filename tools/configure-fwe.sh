@@ -26,12 +26,18 @@ set -euo pipefail
 : ${CREDS_ENDPOINT_URL:=""}
 : ${CREDS_ROLE_ALIAS:=""}
 : ${RAW_DATA_BUFFER_SIZE:=1073741824}
+: ${ENABLE_RO2_INTERFACE:=false}
 : ${ENABLE_CAN_TO_SOMEIP_BRIDGE_INTERFACE:=false}
 : ${ENABLE_SOMEIP_INTERFACE:=false}
 : ${ENABLE_IWAVE_GPS_INTERFACE:=false}
 : ${ENABLE_NAMED_SIGNAL_INTERFACE:=false}
 : ${CAN_COMMAND_INTERFACE:=""}
 : ${GENERIC_DTC_INTERFACE:=""}
+: ${SCRIPT_ENGINE_BUCKET_NAME:=""}
+: ${SCRIPT_ENGINE_BUCKET_REGION:=""}
+: ${SCRIPT_ENGINE_BUCKET_OWNER:=""}
+: ${ENABLE_MICROPYTHON:=false}
+: ${ENABLE_CPYTHON:=false}
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -120,6 +126,9 @@ parse_args() {
             RAW_DATA_BUFFER_SIZE=$2
             shift
             ;;
+        --enable-ros2-interface)
+            ENABLE_RO2_INTERFACE=true
+            ;;
         --enable-can-to-someip-bridge-interface)
             ENABLE_CAN_TO_SOMEIP_BRIDGE_INTERFACE=true
             ;;
@@ -139,6 +148,24 @@ parse_args() {
         --uds-dtc-example-interface)
             GENERIC_DTC_INTERFACE=$2
             shift
+            ;;
+        --script-engine-bucket-name)
+            SCRIPT_ENGINE_BUCKET_NAME=$2
+            shift
+            ;;
+        --script-engine-bucket-region)
+            SCRIPT_ENGINE_BUCKET_REGION=$2
+            shift
+            ;;
+        --script-engine-bucket-owner)
+            SCRIPT_ENGINE_BUCKET_OWNER=$2
+            shift
+            ;;
+        --enable-micropython)
+            ENABLE_MICROPYTHON=true
+            ;;
+        --enable-cpython)
+            ENABLE_CPYTHON=true
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
@@ -163,12 +190,18 @@ parse_args() {
             echo "  --creds-endpoint-url <URL>               Endpoint URL for AWS IoT Credentials Provider"
             echo "  --creds-role-alias <ALIAS>               Role alias for AWS IoT Credentials Provider"
             echo "  --raw-data-buffer-size <SIZE>            Raw data buffer size, default: ${RAW_DATA_BUFFER_SIZE}"
+            echo "  --enable-ros2-interface                  Enables ROS2 interface"
             echo "  --enable-can-to-someip-bridge-interface  Enables CAN to SOME/IP bridge interface"
             echo "  --enable-someip-interface                Enables SOME/IP collection and command interface"
             echo "  --enable-iwave-gps-interface             Enables iWave GPS interface"
             echo "  --enable-named-signal-interface          Enables named signal interface"
             echo "  --can-command-interface <BUS>            Enables CAN command interface for the given CAN bus, e.g. vcan0"
             echo "  --uds-dtc-example-interface <BUS>        Enables example UDS DTC interface for the given CAN bus, e.g. vcan0"
+            echo "  --script-engine-bucket-name <NAME>       Script engine S3 bucket name"
+            echo "  --script-engine-bucket-region <REGION>   Script engine S3 bucket region"
+            echo "  --script-engine-bucket-owner <OWNER>     Script engine S3 bucket owner"
+            echo "  --enable-micropython                     Enables MicroPython support"
+            echo "  --enable-cpython                         Enables CPython support"
             exit 0
             ;;
         esac
@@ -210,7 +243,8 @@ OUTPUT_CONFIG=` \
     | jq ".staticConfig.internalParameters.logColor=\"${LOG_COLOR}\"" \
     | jq ".staticConfig.persistency.persistencyPath=\"${PERSISTENCY_PATH}\"" \
     | jq ".staticConfig.publishToCloudParameters.collectionSchemeManagementCheckinIntervalMs=5000" \
-    | jq ".staticConfig.mqttConnection.connectionType=\"${CONNECTION_TYPE}\""`
+    | jq ".staticConfig.mqttConnection.connectionType=\"${CONNECTION_TYPE}\"" \
+    | jq ".staticConfig.visionSystemDataCollection.rawDataBuffer.maxSize=${RAW_DATA_BUFFER_SIZE}"`
 
 if [ "${IOT_FLEETWISE_TOPIC_PREFIX}" != "" ]; then
     OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" \
@@ -335,15 +369,34 @@ if [ "${CAN_COMMAND_INTERFACE}" != "" ]; then
 fi
 
 if [ "${CREDS_ENDPOINT_URL}" != "" ] || [ "${CREDS_ROLE_ALIAS}" != "" ]; then
+    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" \
+        | jq ".staticConfig.credentialsProvider.endpointUrl=\"${CREDS_ENDPOINT_URL}\"" \
+        | jq ".staticConfig.credentialsProvider.roleAlias=\"${CREDS_ROLE_ALIAS}\""`
+fi
+
+if ${ENABLE_RO2_INTERFACE}; then
     ROS2_INTERFACE=`echo "{}" | jq ".interfaceId=\"10\"" \
         | jq ".type=\"ros2Interface\"" \
         | jq ".ros2Interface.subscribeQueueLength=100" \
         | jq ".ros2Interface.executorThreads=2" \
         | jq ".ros2Interface.introspectionLibraryCompare=\"ErrorAndFail\""`
-    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".networkInterfaces+=[${ROS2_INTERFACE}]" \
-        | jq ".staticConfig.credentialsProvider.endpointUrl=\"${CREDS_ENDPOINT_URL}\"" \
-        | jq ".staticConfig.credentialsProvider.roleAlias=\"${CREDS_ROLE_ALIAS}\"" \
-        | jq ".staticConfig.visionSystemDataCollection.rawDataBuffer.maxSize=${RAW_DATA_BUFFER_SIZE}"`
+    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".networkInterfaces+=[${ROS2_INTERFACE}]"`
+fi
+
+if [ "${SCRIPT_ENGINE_BUCKET_NAME}" != "" ] || [ "${SCRIPT_ENGINE_BUCKET_REGION}" != "" ] || [ "${SCRIPT_ENGINE_BUCKET_OWNER}" != "" ]; then
+    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" \
+        | jq ".staticConfig.scriptEngine.bucketName=\"${SCRIPT_ENGINE_BUCKET_NAME}\"" \
+        | jq ".staticConfig.scriptEngine.bucketRegion=\"${SCRIPT_ENGINE_BUCKET_REGION}\"" \
+        | jq ".staticConfig.scriptEngine.bucketOwner=\"${SCRIPT_ENGINE_BUCKET_OWNER}\"" \
+        | jq ".staticConfig.scriptEngine.maxConnections=2"`
+fi
+
+if ${ENABLE_MICROPYTHON}; then
+    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".staticConfig.micropython={}"`
+fi
+
+if ${ENABLE_CPYTHON}; then
+    OUTPUT_CONFIG=`echo "${OUTPUT_CONFIG}" | jq ".staticConfig.cpython={}"`
 fi
 
 echo "${OUTPUT_CONFIG}" > ${OUTPUT_CONFIG_FILE}

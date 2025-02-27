@@ -1,13 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CollectionSchemeManager.h" // IWYU pragma: associated
-#include "ICollectionScheme.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/CollectionSchemeManager.h" // IWYU pragma: associated
+#include "aws/iotfleetwise/ICollectionScheme.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <algorithm> // IWYU pragma: keep
 #include <cstddef>
 #include <cstdint>
-#include <string>
 #include <unordered_map> // IWYU pragma: keep
 #include <utility>
 
@@ -99,12 +98,12 @@ CollectionSchemeManager::updateRawDataBufferConfigStringSignals(
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 void
 CollectionSchemeManager::updateRawDataBufferConfigComplexSignals(
-    std::shared_ptr<Aws::IoTFleetWise::ComplexDataDecoderDictionary> complexDataDecoderDictionary,
+    Aws::IoTFleetWise::ComplexDataDecoderDictionary *complexDataDecoderDictionary,
     std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> &updatedSignals )
 {
     if ( ( mDecoderManifest != nullptr ) && isCollectionSchemesInSyncWithDm() )
     {
-        // Iterate through enabled collectionScheme lists to locate the signals and CAN frames to be collected
+        // Iterate through enabled collectionScheme lists to locate the signals to be collected
         for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); ++it )
         {
             const auto &collectionSchemePtr = it->second;
@@ -153,16 +152,16 @@ CollectionSchemeManager::updateRawDataBufferConfigComplexSignals(
 #endif
 
 void
-CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectionScheme,
+CollectionSchemeManager::addConditionData( const ICollectionScheme &collectionScheme,
                                            ConditionWithCollectedData &conditionData )
 {
-    conditionData.metadata.compress = collectionScheme->isCompressionNeeded();
-    conditionData.metadata.persist = collectionScheme->isPersistNeeded();
-    conditionData.metadata.priority = collectionScheme->getPriority();
-    conditionData.metadata.decoderID = collectionScheme->getDecoderManifestID();
-    conditionData.metadata.collectionSchemeID = collectionScheme->getCollectionSchemeID();
+    conditionData.metadata.compress = collectionScheme.isCompressionNeeded();
+    conditionData.metadata.persist = collectionScheme.isPersistNeeded();
+    conditionData.metadata.priority = collectionScheme.getPriority();
+    conditionData.metadata.decoderID = collectionScheme.getDecoderManifestID();
+    conditionData.metadata.collectionSchemeID = collectionScheme.getCollectionSchemeID();
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
-    conditionData.metadata.campaignArn = collectionScheme->getCampaignArn();
+    conditionData.metadata.campaignArn = collectionScheme.getCampaignArn();
 #endif
 
     /*
@@ -170,7 +169,7 @@ CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectio
      * This is probably not the fastest way to get things done, but the safest way
      * since the object is not big, so not really slow
      */
-    const std::vector<SignalCollectionInfo> &collectionSignals = collectionScheme->getCollectSignals();
+    const std::vector<SignalCollectionInfo> &collectionSignals = collectionScheme.getCollectSignals();
     for ( uint32_t i = 0; i < collectionSignals.size(); i++ )
     {
         InspectionMatrixSignalCollectionInfo inspectionSignal = {};
@@ -183,28 +182,10 @@ CollectionSchemeManager::addConditionData( const ICollectionSchemePtr &collectio
         conditionData.signals.emplace_back( inspectionSignal );
     }
 
-    const std::vector<CanFrameCollectionInfo> &collectionCANFrames = collectionScheme->getCollectRawCanFrames();
-    for ( uint32_t i = 0; i < collectionCANFrames.size(); i++ )
-    {
-        InspectionMatrixCanFrameCollectionInfo CANFrame = {};
-        CANFrame.frameID = collectionCANFrames[i].frameID;
-        CANFrame.channelID = mCANIDTranslator.getChannelNumericID( collectionCANFrames[i].interfaceID );
-        CANFrame.sampleBufferSize = collectionCANFrames[i].sampleBufferSize;
-        CANFrame.minimumSampleIntervalMs = collectionCANFrames[i].minimumSampleIntervalMs;
-        if ( CANFrame.channelID == INVALID_CAN_SOURCE_NUMERIC_ID )
-        {
-            FWE_LOG_WARN( "Invalid Interface ID provided: " + collectionCANFrames[i].interfaceID );
-        }
-        else
-        {
-            conditionData.canFrames.emplace_back( CANFrame );
-        }
-    }
-
-    conditionData.minimumPublishIntervalMs = collectionScheme->getMinimumPublishIntervalMs();
-    conditionData.afterDuration = collectionScheme->getAfterDurationMs();
-    conditionData.includeActiveDtcs = collectionScheme->isActiveDTCsIncluded();
-    conditionData.triggerOnlyOnRisingEdge = collectionScheme->isTriggerOnlyOnRisingEdge();
+    conditionData.minimumPublishIntervalMs = collectionScheme.getMinimumPublishIntervalMs();
+    conditionData.afterDuration = collectionScheme.getAfterDurationMs();
+    conditionData.includeActiveDtcs = collectionScheme.isActiveDTCsIncluded();
+    conditionData.triggerOnlyOnRisingEdge = collectionScheme.isTriggerOnlyOnRisingEdge();
 }
 
 static void
@@ -262,8 +243,7 @@ buildExpressionNodeMapAndVector( const ExpressionNode *expressionNode,
 }
 
 void
-CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix,
-                                          const std::shared_ptr<FetchMatrix> &fetchMatrix )
+CollectionSchemeManager::matrixExtractor( InspectionMatrix &inspectionMatrix, FetchMatrix &fetchMatrix )
 {
     std::map<const ExpressionNode *, uint32_t> expressionNodeToIndexMap;
     std::vector<const ExpressionNode *> expressionNodes;
@@ -277,16 +257,16 @@ CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix
 
     for ( const auto &enabledCollectionScheme : mEnabledCollectionSchemeMap )
     {
-        ICollectionSchemePtr collectionScheme = enabledCollectionScheme.second;
+        auto collectionScheme = enabledCollectionScheme.second;
 
         extractCondition( inspectionMatrix,
-                          collectionScheme,
+                          *collectionScheme,
                           expressionNodes,
                           expressionNodeToIndexMap,
                           index,
                           collectionScheme->getCondition() );
 
-        ConditionWithCollectedData &conditionWithCollectedData = inspectionMatrix->conditions.back();
+        ConditionWithCollectedData &conditionWithCollectedData = inspectionMatrix.conditions.back();
 
         // extract FetchInformation
         const std::vector<FetchInformation> &fetchInformations = collectionScheme->getAllFetchInformations();
@@ -296,7 +276,7 @@ CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix
             bool isValid = true;
 
             auto itFetchRequests =
-                fetchMatrix->fetchRequests.emplace( fetchRequestID, std::vector<FetchRequest>() ).first;
+                fetchMatrix.fetchRequests.emplace( fetchRequestID, std::vector<FetchRequest>() ).first;
             std::vector<FetchRequest> &fetchRequests = itFetchRequests->second;
 
             SignalID signalID = fetchInformation.signalID;
@@ -360,7 +340,7 @@ CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix
             if ( !isValid )
             {
                 // invalid FetchInformation => remove key fetchRequestID from map fetchMatrix->fetchRequests
-                fetchMatrix->fetchRequests.erase( itFetchRequests );
+                fetchMatrix.fetchRequests.erase( itFetchRequests );
                 continue;
             }
 
@@ -368,7 +348,7 @@ CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix
             {
                 // time-based fetch configuration
                 PeriodicalFetchParameters &periodicalFetchParameters =
-                    fetchMatrix->periodicalFetchRequestSetup[fetchRequestID];
+                    fetchMatrix.periodicalFetchRequestSetup[fetchRequestID];
 
                 periodicalFetchParameters.fetchFrequencyMs = fetchInformation.executionPeriodMs;
                 // TODO: below parameters are not yet supported by the cloud and are ignored on edge
@@ -429,64 +409,63 @@ CollectionSchemeManager::matrixExtractor( const std::shared_ptr<InspectionMatrix
     // re-build all ExpressionNodes (for storage) and set ExpressionNode pointer addresses appropriately
     std::size_t expressionNodeCount = expressionNodes.size();
 
-    inspectionMatrix->expressionNodeStorage.resize( expressionNodeCount );
+    inspectionMatrix.expressionNodeStorage.resize( expressionNodeCount );
 
     for ( std::size_t i = 0U; i < expressionNodeCount; i++ )
     {
-        inspectionMatrix->expressionNodeStorage[i].nodeType = expressionNodes[i]->nodeType;
-        inspectionMatrix->expressionNodeStorage[i].floatingValue = expressionNodes[i]->floatingValue;
-        inspectionMatrix->expressionNodeStorage[i].booleanValue = expressionNodes[i]->booleanValue;
-        inspectionMatrix->expressionNodeStorage[i].stringValue = expressionNodes[i]->stringValue;
-        inspectionMatrix->expressionNodeStorage[i].signalID = expressionNodes[i]->signalID;
-        inspectionMatrix->expressionNodeStorage[i].function.windowFunction =
-            expressionNodes[i]->function.windowFunction;
-        inspectionMatrix->expressionNodeStorage[i].function.customFunctionName =
+        inspectionMatrix.expressionNodeStorage[i].nodeType = expressionNodes[i]->nodeType;
+        inspectionMatrix.expressionNodeStorage[i].floatingValue = expressionNodes[i]->floatingValue;
+        inspectionMatrix.expressionNodeStorage[i].booleanValue = expressionNodes[i]->booleanValue;
+        inspectionMatrix.expressionNodeStorage[i].stringValue = expressionNodes[i]->stringValue;
+        inspectionMatrix.expressionNodeStorage[i].signalID = expressionNodes[i]->signalID;
+        inspectionMatrix.expressionNodeStorage[i].function.windowFunction = expressionNodes[i]->function.windowFunction;
+        inspectionMatrix.expressionNodeStorage[i].function.customFunctionName =
             expressionNodes[i]->function.customFunctionName;
-        inspectionMatrix->expressionNodeStorage[i].function.customFunctionInvocationId =
+        inspectionMatrix.expressionNodeStorage[i].function.customFunctionInvocationId =
             expressionNodes[i]->function.customFunctionInvocationId;
 
         for ( const auto &param : expressionNodes[i]->function.customFunctionParams )
         {
             uint32_t paramIndex = expressionNodeToIndexMap[param];
 
-            inspectionMatrix->expressionNodeStorage[i].function.customFunctionParams.push_back(
-                &inspectionMatrix->expressionNodeStorage[paramIndex] );
+            inspectionMatrix.expressionNodeStorage[i].function.customFunctionParams.push_back(
+                &inspectionMatrix.expressionNodeStorage[paramIndex] );
         }
 
         if ( expressionNodes[i]->left != nullptr )
         {
             uint32_t leftIndex = expressionNodeToIndexMap[expressionNodes[i]->left];
-            inspectionMatrix->expressionNodeStorage[i].left = &inspectionMatrix->expressionNodeStorage[leftIndex];
+            inspectionMatrix.expressionNodeStorage[i].left = &inspectionMatrix.expressionNodeStorage[leftIndex];
         }
 
         if ( expressionNodes[i]->right != nullptr )
         {
             uint32_t rightIndex = expressionNodeToIndexMap[expressionNodes[i]->right];
-            inspectionMatrix->expressionNodeStorage[i].right = &inspectionMatrix->expressionNodeStorage[rightIndex];
+            inspectionMatrix.expressionNodeStorage[i].right = &inspectionMatrix.expressionNodeStorage[rightIndex];
         }
     }
 
-    for ( auto &conditionWithCollectedData : inspectionMatrix->conditions )
+    for ( auto &conditionWithCollectedData : inspectionMatrix.conditions )
     {
         if ( conditionWithCollectedData.condition != nullptr )
         {
             uint32_t conditionIndex = expressionNodeToIndexMap[conditionWithCollectedData.condition];
 
-            conditionWithCollectedData.condition = &inspectionMatrix->expressionNodeStorage[conditionIndex];
+            conditionWithCollectedData.condition = &inspectionMatrix.expressionNodeStorage[conditionIndex];
         }
 
         for ( auto &conditionForFetch : conditionWithCollectedData.fetchConditions )
         {
             uint32_t conditionIndex = expressionNodeToIndexMap[conditionForFetch.condition];
 
-            conditionForFetch.condition = &inspectionMatrix->expressionNodeStorage[conditionIndex];
+            conditionForFetch.condition = &inspectionMatrix.expressionNodeStorage[conditionIndex];
         }
     }
 }
 
 void
-CollectionSchemeManager::extractCondition( const std::shared_ptr<InspectionMatrix> &inspectionMatrix,
-                                           const ICollectionSchemePtr &collectionScheme,
+CollectionSchemeManager::extractCondition( InspectionMatrix &inspectionMatrix,
+                                           const ICollectionScheme &collectionScheme,
                                            std::vector<const ExpressionNode *> &nodes,
                                            std::map<const ExpressionNode *, uint32_t> &nodeToIndexMap,
                                            uint32_t &index,
@@ -504,17 +483,17 @@ CollectionSchemeManager::extractCondition( const std::shared_ptr<InspectionMatri
                                      index,
                                      conditionData.isStaticCondition,
                                      conditionData.alwaysEvaluateCondition );
-    inspectionMatrix->conditions.emplace_back( conditionData );
+    inspectionMatrix.conditions.emplace_back( conditionData );
 }
 
 void
-CollectionSchemeManager::inspectionMatrixUpdater( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
+CollectionSchemeManager::inspectionMatrixUpdater( std::shared_ptr<const InspectionMatrix> inspectionMatrix )
 {
     mInspectionMatrixChangeListeners.notify( inspectionMatrix );
 }
 
 void
-CollectionSchemeManager::fetchMatrixUpdater( const std::shared_ptr<const FetchMatrix> &fetchMatrix )
+CollectionSchemeManager::fetchMatrixUpdater( std::shared_ptr<const FetchMatrix> fetchMatrix )
 {
     mFetchMatrixChangeListeners.notify( fetchMatrix );
 }

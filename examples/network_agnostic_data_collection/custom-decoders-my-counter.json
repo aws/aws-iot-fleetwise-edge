@@ -1,0 +1,10 @@
+[
+  {
+    "fullyQualifiedName": "Vehicle.MyCounter",
+    "interfaceId": "MY_COUNTER",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.MyCounter"
+    }
+  }
+]

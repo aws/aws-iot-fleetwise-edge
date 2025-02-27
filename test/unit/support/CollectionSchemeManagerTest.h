@@ -2,21 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include "CollectionInspectionAPITypes.h"
-#include "CollectionInspectionEngine.h"
-#include "CollectionInspectionWorkerThread.h"
-#include "CollectionSchemeIngestion.h"
-#include "CollectionSchemeIngestionList.h"
-#include "DataFetchManagerAPITypes.h"
-#include "DecoderManifestIngestion.h"
-#include "ICollectionScheme.h"
-#include "ICollectionSchemeList.h"
-#include "IDecoderDictionary.h"
-#include "IDecoderManifest.h"
-#include "MessageTypes.h"
-#include "OBDOverCANModule.h"
-#include "SignalTypes.h"
-#include "VehicleDataSourceTypes.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/CollectionInspectionEngine.h"
+#include "aws/iotfleetwise/CollectionInspectionWorkerThread.h"
+#include "aws/iotfleetwise/CollectionSchemeIngestion.h"
+#include "aws/iotfleetwise/CollectionSchemeIngestionList.h"
+#include "aws/iotfleetwise/DataFetchManagerAPITypes.h"
+#include "aws/iotfleetwise/DecoderManifestIngestion.h"
+#include "aws/iotfleetwise/ICollectionScheme.h"
+#include "aws/iotfleetwise/IDecoderManifest.h"
+#include "aws/iotfleetwise/MessageTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/VehicleDataSourceTypes.h"
 #include <algorithm> // IWYU pragma: keep
 #include <cstdint>
 #include <memory>
@@ -46,7 +43,7 @@ class IDecoderManifestTest : public DecoderManifestIngestion
 {
 public:
     IDecoderManifestTest( SyncID id )
-        : ID( id )
+        : ID( std::move( id ) )
     {
     }
     IDecoderManifestTest(
@@ -63,7 +60,7 @@ public:
             std::unordered_map<ComplexDataTypeId, ComplexDataElement>()
 #endif
             )
-        : ID( id )
+        : ID( std::move( id ) )
         , mFormatMap( std::move( formatMap ) )
         , mSignalToFrameAndNodeID( std::move( signalToFrameAndNodeID ) )
         , mSignalIDToPIDDecoderFormat( std::move( signalIDToPIDDecoderFormat ) )
@@ -77,17 +74,17 @@ public:
     }
 
     SyncID
-    getID() const
+    getID() const override
     {
         return ID;
     }
     const CANMessageFormat &
-    getCANMessageFormat( CANRawFrameID canId, InterfaceID interfaceId ) const
+    getCANMessageFormat( CANRawFrameID canId, InterfaceID interfaceId ) const override
     {
         return mFormatMap.at( interfaceId ).at( canId );
     }
     bool
-    build()
+    build() override
     {
         return true;
     }
@@ -128,7 +125,7 @@ public:
         }
     }
     PIDSignalDecoderFormat
-    getPIDSignalDecoderFormat( SignalID signalId ) const
+    getPIDSignalDecoderFormat( SignalID signalId ) const override
     {
         if ( mSignalIDToPIDDecoderFormat.count( signalId ) > 0 )
         {
@@ -138,7 +135,7 @@ public:
     }
 
     CustomSignalDecoderFormat
-    getCustomSignalDecoderFormat( SignalID signalID ) const
+    getCustomSignalDecoderFormat( SignalID signalID ) const override
     {
         auto it = mSignalIDToCustomDecoderFormat.find( signalID );
         if ( it == mSignalIDToCustomDecoderFormat.end() )
@@ -168,7 +165,7 @@ public:
         auto s = mComplexSignalMap.find( signalID );
         if ( s == mComplexSignalMap.end() )
         {
-            return ComplexSignalDecoderFormat();
+            return {};
         }
         return s->second;
     }
@@ -179,7 +176,7 @@ public:
         auto c = mComplexDataTypeMap.find( typeId );
         if ( c == mComplexDataTypeMap.end() )
         {
-            return ComplexDataElement( InvalidComplexVariant() );
+            return { InvalidComplexVariant() };
         }
         return c->second;
     }
@@ -203,11 +200,10 @@ public:
                            SyncID DMID,
                            uint64_t start,
                            uint64_t stop,
-                           const Signals_t &signalsIn,
-                           const RawCanFrames_t &rawCanFrmsIn
+                           Signals_t signalsIn
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
                            ,
-                           const PartialSignalIDLookup &partialSignalLookup = PartialSignalIDLookup()
+                           PartialSignalIDLookup partialSignalLookup = PartialSignalIDLookup()
 #endif
                                )
         : CollectionSchemeIngestion(
@@ -215,14 +211,13 @@ public:
               std::make_shared<CollectionSchemeIngestion::PartialSignalIDLookup>()
 #endif
                   )
-        , collectionSchemeID( collectionSchemeID )
-        , decoderManifestID( DMID )
+        , collectionSchemeID( std::move( collectionSchemeID ) )
+        , decoderManifestID( std::move( DMID ) )
         , startTime( start )
         , expiryTime( stop )
-        , signals( signalsIn )
-        , rawCanFrms( rawCanFrmsIn )
+        , signals( std::move( signalsIn ) )
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-        , partialSignalLookup( partialSignalLookup )
+        , partialSignalLookup( std::move( partialSignalLookup ) )
 #endif
         , root( nullptr )
     {
@@ -241,12 +236,12 @@ public:
               std::make_shared<CollectionSchemeIngestion::PartialSignalIDLookup>()
 #endif
                   )
-        , collectionSchemeID( collectionSchemeID )
-        , decoderManifestID( DMID )
+        , collectionSchemeID( std::move( collectionSchemeID ) )
+        , decoderManifestID( std::move( DMID ) )
         , startTime( start )
         , expiryTime( stop )
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-        , s3UploadMetadata( s3UploadMetadata )
+        , s3UploadMetadata( std::move( s3UploadMetadata ) )
 #endif
         , root( nullptr )
     {
@@ -257,8 +252,8 @@ public:
               std::make_shared<CollectionSchemeIngestion::PartialSignalIDLookup>()
 #endif
                   )
-        , collectionSchemeID( collectionSchemeID )
-        , decoderManifestID( DMID )
+        , collectionSchemeID( std::move( collectionSchemeID ) )
+        , decoderManifestID( std::move( DMID ) )
         , startTime( start )
         , expiryTime( stop )
         , root( root )
@@ -276,7 +271,6 @@ public:
                            bool persistNeeded,
                            bool compressionNeeded,
                            Signals_t collectSignals,
-                           RawCanFrames_t collectRawCanFrames,
                            ExpressionNode *condition,
                            FetchInformation_t fetchInformations
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -290,8 +284,8 @@ public:
               std::make_shared<CollectionSchemeIngestion::PartialSignalIDLookup>()
 #endif
                   )
-        , collectionSchemeID( collectionSchemeID )
-        , decoderManifestID( decoderManifestID )
+        , collectionSchemeID( std::move( collectionSchemeID ) )
+        , decoderManifestID( std::move( decoderManifestID ) )
         , startTime( startTime )
         , expiryTime( expiryTime )
         , minimumPublishIntervalMs( minimumPublishIntervalMs )
@@ -301,33 +295,32 @@ public:
         , priority( priority )
         , persistNeeded( persistNeeded )
         , compressionNeeded( compressionNeeded )
-        , signals( collectSignals )
-        , rawCanFrms( collectRawCanFrames )
+        , signals( std::move( collectSignals ) )
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-        , partialSignalLookup( partialSignalLookup )
-        , s3UploadMetadata( s3UploadMetadata )
+        , partialSignalLookup( std::move( partialSignalLookup ) )
+        , s3UploadMetadata( std::move( s3UploadMetadata ) )
 #endif
         , root( condition )
-        , fetchInformations( fetchInformations )
+        , fetchInformations( std::move( fetchInformations ) )
     {
     }
     const SyncID &
-    getCollectionSchemeID() const
+    getCollectionSchemeID() const override
     {
         return collectionSchemeID;
     }
     const SyncID &
-    getDecoderManifestID() const
+    getDecoderManifestID() const override
     {
         return decoderManifestID;
     }
     uint64_t
-    getStartTime() const
+    getStartTime() const override
     {
         return startTime;
     }
     uint64_t
-    getExpiryTime() const
+    getExpiryTime() const override
     {
         return expiryTime;
     }
@@ -367,17 +360,12 @@ public:
         return compressionNeeded;
     }
     const Signals_t &
-    getCollectSignals() const
+    getCollectSignals() const override
     {
         return signals;
     }
-    const RawCanFrames_t &
-    getCollectRawCanFrames() const
-    {
-        return rawCanFrms;
-    }
     const ExpressionNode *
-    getCondition() const
+    getCondition() const override
     {
         return root;
     }
@@ -424,7 +412,6 @@ private:
     bool persistNeeded;
     bool compressionNeeded;
     Signals_t signals;
-    RawCanFrames_t rawCanFrms;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     PartialSignalIDLookup partialSignalLookup;
     S3UploadMetadata s3UploadMetadata;
@@ -436,11 +423,11 @@ private:
 class ICollectionSchemeListTest : public CollectionSchemeIngestionList
 {
 public:
-    ICollectionSchemeListTest( const std::vector<ICollectionSchemePtr> &list )
+    ICollectionSchemeListTest( const std::vector<std::shared_ptr<ICollectionScheme>> &list )
         : mCollectionSchemeTest( list )
     {
     }
-    const std::vector<ICollectionSchemePtr> &
+    const std::vector<std::shared_ptr<ICollectionScheme>> &
     getCollectionSchemes() const override
     {
         return mCollectionSchemeTest;
@@ -457,41 +444,7 @@ public:
         return true;
     }
 
-public:
-    std::vector<ICollectionSchemePtr> mCollectionSchemeTest;
-};
-
-/* mock OBDOverCANModule class that receive decoder dictionary update from PM */
-class OBDOverCANModuleMock : public OBDOverCANModule
-{
-public:
-    OBDOverCANModuleMock()
-        : mUpdateFlag( false )
-    {
-    }
-    ~OBDOverCANModuleMock()
-    {
-    }
-    void
-    onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dictionary, VehicleDataSourceProtocol networkProtocol )
-    {
-        OBDOverCANModule::onChangeOfActiveDictionary( dictionary, networkProtocol );
-        mUpdateFlag = true;
-    }
-    void
-    setUpdateFlag( bool flag )
-    {
-        mUpdateFlag = flag;
-    }
-    bool
-    getUpdateFlag()
-    {
-        return mUpdateFlag;
-    }
-
-private:
-    // This flag is used for testing whether Vehicle Data Consumer received the update
-    bool mUpdateFlag;
+    std::vector<std::shared_ptr<ICollectionScheme>> mCollectionSchemeTest;
 };
 
 /* mock Collection Inspection Engine class that receive Inspection Matrix and Fetch Matrix update from PM */
@@ -499,22 +452,21 @@ class CollectionInspectionWorkerThreadMock : public CollectionInspectionWorkerTh
 {
 public:
     CollectionInspectionWorkerThreadMock()
-        : CollectionInspectionWorkerThread( mEngine )
-        , mInspectionMatrixUpdateFlag( false )
-        , mFetchMatrixUpdateFlag( false )
+        : CollectionInspectionWorkerThread( mEngine, nullptr, nullptr, 0, nullptr )
+        , mEngine( nullptr )
     {
     }
-    ~CollectionInspectionWorkerThreadMock()
-    {
-    }
+
+    ~CollectionInspectionWorkerThreadMock() = default;
+
     void
-    onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
+    onChangeInspectionMatrix( std::shared_ptr<const InspectionMatrix> inspectionMatrix )
     {
         CollectionInspectionWorkerThread::onChangeInspectionMatrix( inspectionMatrix );
         mInspectionMatrixUpdateFlag = true;
     }
     void
-    onChangeFetchMatrix( const std::shared_ptr<const FetchMatrix> &fetchMatrix )
+    onChangeFetchMatrix( std::shared_ptr<const FetchMatrix> fetchMatrix )
     {
         static_cast<void>( fetchMatrix );
         mFetchMatrixUpdateFlag = true;
@@ -530,12 +482,12 @@ public:
         mFetchMatrixUpdateFlag = flag;
     }
     bool
-    getInspectionMatrixUpdateFlag()
+    getInspectionMatrixUpdateFlag() const
     {
         return mInspectionMatrixUpdateFlag;
     }
     bool
-    getFetchMatrixUpdateFlag()
+    getFetchMatrixUpdateFlag() const
     {
         return mFetchMatrixUpdateFlag;
     }
@@ -543,10 +495,10 @@ public:
 private:
     CollectionInspectionEngine mEngine;
     // This flag is used for testing whether the listener received the Inspection Matrix update
-    bool mInspectionMatrixUpdateFlag;
+    bool mInspectionMatrixUpdateFlag{};
 
     // This flag is used for testing whether the listener received the Fetch Matrix update
-    bool mFetchMatrixUpdateFlag;
+    bool mFetchMatrixUpdateFlag{};
 };
 
 } // namespace IoTFleetWise

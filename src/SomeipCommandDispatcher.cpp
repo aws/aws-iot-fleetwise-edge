@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "SomeipCommandDispatcher.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/SomeipCommandDispatcher.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <CommonAPI/CommonAPI.hpp>
 #include <chrono>
 #include <functional>

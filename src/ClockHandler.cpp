@@ -1,8 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ClockHandler.h"
-#include "TimeTypes.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <chrono>
 #include <ctime>
 #include <iomanip>
@@ -87,7 +88,11 @@ timePointFromSystemTime( const TimePoint &currTime, Timestamp systemTimeMs )
             // 3. We obtain the current system time (which is now 10:00:00) and monotonic time
             // 4. If the monotonic time is small enough (e.g. less than 2 * 60 * 60 * 1000 = 7200000 ms), this situation
             // will happen.
-            return TimePoint{ 0, 0 };
+            FWE_LOG_WARN( "The system time " + std::to_string( systemTimeMs ) +
+                          " corresponds to a time in the past before the monotonic" +
+                          " clock started ticking. Current system time: " + std::to_string( currTime.systemTimeMs ) +
+                          ". Current monotonic time: " + std::to_string( currTime.monotonicTimeMs ) );
+            return TimePoint{ systemTimeMs, 0 };
         }
     }
 }

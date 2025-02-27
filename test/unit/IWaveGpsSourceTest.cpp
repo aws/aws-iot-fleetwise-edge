@@ -1,22 +1,22 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "IWaveGpsSource.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IDecoderDictionary.h"
-#include "IDecoderManifest.h"
-#include "NamedSignalDataSource.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "VehicleDataSourceTypes.h"
+#include "aws/iotfleetwise/IWaveGpsSource.h"
+#include "Testing.h"
 #include "WaitUntil.h"
-#include <climits>
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/IDecoderDictionary.h"
+#include "aws/iotfleetwise/IDecoderManifest.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/NamedSignalDataSource.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/VehicleDataSourceTypes.h"
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <gtest/gtest.h>
-#include <iostream>
 #include <memory>
 #include <string>
-#include <unistd.h>
 #include <unordered_map>
 
 namespace Aws
@@ -28,12 +28,12 @@ class IWaveGpsSourceTest : public ::testing::Test
 {
 protected:
     IWaveGpsSourceTest()
-        : mSignalBuffer( std::make_shared<SignalBuffer>( 2, "Signal Buffer" ) )
-        , mSignalBufferDistributor( std::make_shared<SignalBufferDistributor>() )
+        : mFilePath( getTempDir() / "testGpsNMEA.txt" )
+        , mSignalBuffer( std::make_shared<SignalBuffer>( 2, "Signal Buffer" ) )
         , mNamedSignalDataSource( std::make_shared<NamedSignalDataSource>( "5", mSignalBufferDistributor ) )
         , mDictionary( std::make_shared<CustomDecoderDictionary>() )
     {
-        mSignalBufferDistributor->registerQueue( mSignalBuffer );
+        mSignalBufferDistributor.registerQueue( mSignalBuffer );
     }
 
     void
@@ -44,19 +44,13 @@ protected:
         mDictionary->customDecoderMethod["5"]["Vehicle.CurrentLocation.Longitude"] =
             CustomSignalDecoderFormat{ "5", "Vehicle.CurrentLocation.Longitude", 0x5678, SignalType::DOUBLE };
 
-        char bufferFilePath[PATH_MAX];
-        if ( getcwd( bufferFilePath, sizeof( bufferFilePath ) ) != nullptr )
-        {
-            mFilePath = bufferFilePath;
-            mFilePath += "/testGpsNMEA.txt";
-            std::cout << "File being saved here: " << mFilePath << std::endl;
-            mNmeaFile = std::make_unique<std::ofstream>( mFilePath );
-            mIWaveGpsSource = std::make_shared<IWaveGpsSource>( mNamedSignalDataSource,
-                                                                mFilePath,
-                                                                "Vehicle.CurrentLocation.Latitude",
-                                                                "Vehicle.CurrentLocation.Longitude",
-                                                                1000 );
-        }
+        FWE_LOG_INFO( "File being saved here: " + mFilePath.string() )
+        mNmeaFile = std::make_unique<std::ofstream>( mFilePath.c_str() );
+        mIWaveGpsSource = std::make_shared<IWaveGpsSource>( mNamedSignalDataSource,
+                                                            mFilePath.string(),
+                                                            "Vehicle.CurrentLocation.Latitude",
+                                                            "Vehicle.CurrentLocation.Longitude",
+                                                            1000 );
     }
 
     void
@@ -64,10 +58,10 @@ protected:
     {
     }
 
-    std::string mFilePath;
+    boost::filesystem::path mFilePath;
     std::unique_ptr<std::ofstream> mNmeaFile;
     std::shared_ptr<SignalBuffer> mSignalBuffer;
-    SignalBufferDistributorPtr mSignalBufferDistributor;
+    SignalBufferDistributor mSignalBufferDistributor;
     std::shared_ptr<NamedSignalDataSource> mNamedSignalDataSource;
     std::shared_ptr<IWaveGpsSource> mIWaveGpsSource;
     std::shared_ptr<CustomDecoderDictionary> mDictionary;

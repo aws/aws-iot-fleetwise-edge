@@ -1,21 +1,21 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ActuatorCommandManager.h"
-#include "Clock.h"
-#include "ClockHandler.h"
-#include "CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/ActuatorCommandManager.h"
 #include "CommandDispatcherMock.h"
-#include "CommandTypes.h"
-#include "DataSenderTypes.h"
-#include "ICommandDispatcher.h"
-#include "IDecoderManifest.h"
-#include "QueueTypes.h"
 #include "RawDataBufferManagerSpy.h"
-#include "RawDataManager.h"
-#include "SignalTypes.h"
-#include "TimeTypes.h"
 #include "WaitUntil.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/CommandTypes.h"
+#include "aws/iotfleetwise/DataSenderTypes.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/IDecoderManifest.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/RawDataManager.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <atomic>
 #include <boost/optional/optional.hpp>
 #include <cstdint>
@@ -46,8 +46,7 @@ class ActuatorCommandManagerTest : public ::testing::Test
 {
 public:
     ActuatorCommandManagerTest()
-        : mRawBufferManagerSpy( std::make_shared<NiceMock<Testing::RawDataBufferManagerSpy>>(
-              RawData::BufferManagerConfig::create().get() ) )
+        : mRawDataBufferManagerSpy( RawData::BufferManagerConfig::create().get() )
     {
     }
     void
@@ -57,7 +56,7 @@ public:
         mCommandDispatcher = std::make_shared<StrictMock<Testing::CommandDispatcherMock>>();
 
         mActuatorCommandManager = std::make_unique<ActuatorCommandManager>(
-            mCommandResponses, maxConcurrentCommandRequests, mRawBufferManagerSpy );
+            mCommandResponses, maxConcurrentCommandRequests, &mRawDataBufferManagerSpy );
 
         mCommandResponses->subscribeToNewDataAvailable( [&]() {
             mReadyToPublishCallbackCount++;
@@ -94,7 +93,7 @@ public:
     }
 
 protected:
-    std::shared_ptr<NiceMock<Testing::RawDataBufferManagerSpy>> mRawBufferManagerSpy;
+    NiceMock<Testing::RawDataBufferManagerSpy> mRawDataBufferManagerSpy;
     std::unique_ptr<ActuatorCommandManager> mActuatorCommandManager;
     std::shared_ptr<DataSenderQueue> mCommandResponses;
     std::shared_ptr<StrictMock<Testing::CommandDispatcherMock>> mCommandDispatcher;
@@ -457,33 +456,33 @@ TEST_F( ActuatorCommandManagerTest, ProcessMultipleCommands )
 TEST_F( ActuatorCommandManagerTest, NoCommandResponsesQueue )
 {
     std::unique_ptr<ActuatorCommandManager> commandManager =
-        std::make_unique<ActuatorCommandManager>( nullptr, maxConcurrentCommandRequests, mRawBufferManagerSpy );
+        std::make_unique<ActuatorCommandManager>( nullptr, maxConcurrentCommandRequests, &mRawDataBufferManagerSpy );
     ASSERT_FALSE( commandManager->start() );
 }
 
 TEST_F( ActuatorCommandManagerTest, StringValue )
 {
     auto currentTime = ClockHandler::getClock()->systemTimeSinceEpochMs();
-    mRawBufferManagerSpy->updateConfig( { { 1, { 1, "", "" } } } );
+    mRawDataBufferManagerSpy.updateConfig( { { 1, { 1, "", "" } } } );
     std::string stringVal = "hello";
-    auto handle =
-        mRawBufferManagerSpy->push( reinterpret_cast<const uint8_t *>( stringVal.data() ), stringVal.size(), 1234, 1 );
-    mRawBufferManagerSpy->increaseHandleUsageHint( 1, handle, RawData::BufferHandleUsageStage::UPLOADING );
+    auto handle = mRawDataBufferManagerSpy.push(
+        reinterpret_cast<const uint8_t *>( stringVal.data() ), stringVal.size(), 1234, 1 );
+    mRawDataBufferManagerSpy.increaseHandleUsageHint( 1, handle, RawData::BufferHandleUsageStage::UPLOADING );
 
     EXPECT_CALL( *mCommandDispatcher, setActuatorValue( _, _, _, _, _, _ ) )
-        .WillOnce( Invoke( [this, currentTime, handle, stringVal]( const std::string &actuatorName,
-                                                                   const SignalValueWrapper &signalValue,
-                                                                   const CommandID &commandId,
-                                                                   Timestamp issuedTimestampMs,
-                                                                   Timestamp executionTimeoutMs,
-                                                                   NotifyCommandStatusCallback notifyStatusCallback ) {
+        .WillOnce( Invoke( [this, currentTime, stringVal]( const std::string &actuatorName,
+                                                           const SignalValueWrapper &signalValue,
+                                                           const CommandID &commandId,
+                                                           Timestamp issuedTimestampMs,
+                                                           Timestamp executionTimeoutMs,
+                                                           NotifyCommandStatusCallback notifyStatusCallback ) {
             EXPECT_EQ( actuatorName, "custom-decoder-0" );
             EXPECT_EQ( signalValue.type, SignalType::STRING );
             EXPECT_EQ( commandId, "command1" );
             EXPECT_EQ( issuedTimestampMs, currentTime );
             EXPECT_EQ( executionTimeoutMs, 10000 );
-            auto loanedFrame = mRawBufferManagerSpy->borrowFrame( signalValue.value.rawDataVal.signalId,
-                                                                  signalValue.value.rawDataVal.handle );
+            auto loanedFrame = mRawDataBufferManagerSpy.borrowFrame( signalValue.value.rawDataVal.signalId,
+                                                                     signalValue.value.rawDataVal.handle );
             EXPECT_FALSE( loanedFrame.isNull() );
             if ( !loanedFrame.isNull() )
             {

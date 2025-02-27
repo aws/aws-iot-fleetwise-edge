@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "IConnectivityModule.h"
+#include "aws/iotfleetwise/IConnectivityModule.h"
 #include <gmock/gmock.h>
 #include <memory>
 

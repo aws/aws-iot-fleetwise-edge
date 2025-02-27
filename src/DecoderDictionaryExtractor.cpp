@@ -1,11 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CollectionSchemeManager.h" // IWYU pragma: associated
-#include "EnumUtility.h"
-#include "ICollectionScheme.h"
-#include "LoggingModule.h"
-#include "MessageTypes.h"
+#include "aws/iotfleetwise/CollectionSchemeManager.h" // IWYU pragma: associated
+#include "aws/iotfleetwise/EnumUtility.h"
+#include "aws/iotfleetwise/ICollectionScheme.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/MessageTypes.h"
 #include <array>
 #include <cstdint>
 #include <string>
@@ -102,28 +102,15 @@ CollectionSchemeManager::addSignalToDecoderDictionaryMap(
                 canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID] =
                     std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>();
             }
-            // check if this CAN Frame already exits in dictionary, if so, update if its a raw can decoder
-            // method.
+            // check if this CAN Frame already exits in dictionary.
             // If not, we need to create an entry for this CAN Frame which will include decoder
             // format for all signals defined in decoder manifest
             if ( canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].find( canRawFrameID ) ==
                  canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].end() )
             {
                 CANMessageDecoderMethod decoderMethod;
-                // We set the collect Type to DECODE at this stage. In the second half of this function, we will
-                // examine the CAN Frames. If there's any CAN Frame to have both signal and raw bytes to be
-                // collected, the type will be updated to RAW_AND_DECODE
-                decoderMethod.collectType = CANMessageCollectType::DECODE;
                 decoderMethod.format = mDecoderManifest->getCANMessageFormat( canRawFrameID, interfaceId );
                 canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID][canRawFrameID] = decoderMethod;
-            }
-            else if ( canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID][canRawFrameID].collectType ==
-                      CANMessageCollectType::RAW )
-            {
-                canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID][canRawFrameID].collectType =
-                    CANMessageCollectType::RAW_AND_DECODE;
-                canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID][canRawFrameID].format =
-                    mDecoderManifest->getCANMessageFormat( canRawFrameID, interfaceId );
             }
         }
     }
@@ -170,6 +157,8 @@ CollectionSchemeManager::addSignalToDecoderDictionaryMap(
             CANSignalFormat format;
             format.mSignalID = signalId;
             format.mSignalType = pidDecoderFormat.mSignalType;
+            format.mRawSignalType = pidDecoderFormat.mRawSignalType;
+            format.mIsSigned = pidDecoderFormat.mIsSigned;
             format.mFirstBitPosition =
                 static_cast<uint16_t>( pidDecoderFormat.mStartByte * BYTE_SIZE + pidDecoderFormat.mBitRightShift );
             format.mSizeInBits = static_cast<uint16_t>( ( pidDecoderFormat.mByteLength - 1 ) * BYTE_SIZE +
@@ -245,7 +234,7 @@ CollectionSchemeManager::decoderDictionaryExtractor(
     std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     ,
-    std::shared_ptr<InspectionMatrix> inspectionMatrix
+    InspectionMatrix &inspectionMatrix
 #endif
 )
 {
@@ -259,7 +248,7 @@ CollectionSchemeManager::decoderDictionaryExtractor(
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     std::unordered_map<SignalID, SignalType> partialSignalTypes;
 #endif
-    // Iterate through enabled collectionScheme lists to locate the signals and CAN frames to be collected
+    // Iterate through enabled collectionScheme lists to locate the signals to be collected
     for ( auto it = mEnabledCollectionSchemeMap.begin(); it != mEnabledCollectionSchemeMap.end(); ++it )
     {
         const auto &collectionSchemePtr = it->second;
@@ -299,64 +288,6 @@ CollectionSchemeManager::decoderDictionaryExtractor(
 #endif
             );
         }
-        // Next let's iterate through the CAN Frames that collectionScheme wants to collect.
-        // If some CAN Frame has signals to be decoded, we will set its collectType as RAW_AND_DECODE.
-        if ( !collectionSchemePtr->getCollectRawCanFrames().empty() )
-        {
-            if ( decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] == nullptr )
-            {
-                // Currently we don't have decoder dictionary for this type of network protocol, create one
-                decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] = std::make_shared<CANDecoderDictionary>();
-            }
-            auto canDecoderDictionaryPtr = std::dynamic_pointer_cast<CANDecoderDictionary>(
-                decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] );
-            if ( !canDecoderDictionaryPtr )
-            {
-                FWE_LOG_WARN( "Can not cast dictionary to CANDecoderDictionary for CAN RAW_SOCKET" );
-            }
-            else
-            {
-                for ( const auto &canFrameInfo : collectionSchemePtr->getCollectRawCanFrames() )
-                {
-                    auto canChannelID = mCANIDTranslator.getChannelNumericID( canFrameInfo.interfaceID );
-                    if ( canChannelID == INVALID_CAN_SOURCE_NUMERIC_ID )
-                    {
-                        FWE_LOG_WARN( "Invalid Interface ID provided:" + canFrameInfo.interfaceID );
-                    }
-                    else
-                    {
-                        if ( canDecoderDictionaryPtr->canMessageDecoderMethod.find( canChannelID ) ==
-                             canDecoderDictionaryPtr->canMessageDecoderMethod.end() )
-                        {
-                            // create an entry for canChannelID if the dictionary doesn't have one
-                            canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID] =
-                                std::unordered_map<CANRawFrameID, CANMessageDecoderMethod>();
-                        }
-                        // check if we already have entry for CAN Frame. If not, it means this CAN Frame doesn't contain
-                        // any Signals to decode, hence the collectType will be RAW only.
-                        auto decoderMethod =
-                            canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].find( canFrameInfo.frameID );
-                        if ( decoderMethod == canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].end() )
-                        {
-                            // there's entry for CANChannelNumericID but no corresponding canFrameID
-                            CANMessageDecoderMethod canMessageDecoderMethod;
-                            canMessageDecoderMethod.collectType = CANMessageCollectType::RAW;
-                            canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID][canFrameInfo.frameID] =
-                                canMessageDecoderMethod;
-                        }
-                        else
-                        {
-                            if ( decoderMethod->second.collectType == CANMessageCollectType::DECODE )
-                            {
-                                // This CAN Frame contains signal to be decoded. As we need to collect both CAN Frame
-                                // and signal, set the collectType as RAW_AND_DECODE
-                                decoderMethod->second.collectType = CANMessageCollectType::RAW_AND_DECODE;
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -368,7 +299,7 @@ CollectionSchemeManager::decoderDictionaryExtractor(
     // buffers.
     if ( !partialSignalTypes.empty() )
     {
-        for ( auto &condition : inspectionMatrix->conditions )
+        for ( auto &condition : inspectionMatrix.conditions )
         {
             for ( auto &signal : condition.signals )
             {
@@ -570,7 +501,7 @@ CollectionSchemeManager::putComplexSignalInDictionary( ComplexDataMessageFormat 
 
 void
 CollectionSchemeManager::decoderDictionaryUpdater(
-    std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap )
+    const std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap )
 {
     for ( auto const &dict : decoderDictionaryMap )
     {

@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "LastKnownStateIngestion.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/LastKnownStateIngestion.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <google/protobuf/message.h>
 #include <iterator>
 #include <string>

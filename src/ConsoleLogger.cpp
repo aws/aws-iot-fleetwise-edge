@@ -1,9 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ConsoleLogger.h"
-#include "Clock.h"
-#include "ClockHandler.h"
+#include "aws/iotfleetwise/ConsoleLogger.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
 #include <cinttypes>
 #include <cstdio>
 #include <memory>

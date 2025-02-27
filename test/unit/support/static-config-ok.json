@@ -26,15 +26,6 @@
       "type": "externalCanInterface"
     },
     {
-      "ros2Interface": {
-        "executorThreads": 1,
-        "subscribeQueueLength": 1000,
-        "introspectionLibraryCompare": "ErrorAndFail"
-      },
-      "interfaceId": "10",
-      "type": "ros2Interface"
-    },
-    {
       "someipToCanBridgeInterface": {
         "someipServiceId": "0x7777",
         "someipInstanceId": "0x5678",
@@ -126,7 +117,8 @@
       "systemWideLogLevel": "Trace",
       "persistencyUploadRetryIntervalMs": 5000,
       "maximumAwsSdkHeapMemoryBytes": 10000000,
-      "minFetchTriggerIntervalMs": 1000
+      "minFetchTriggerIntervalMs": 1000,
+      "maxFetchQueueSize": 1000
     },
     "publishToCloudParameters": {
       "maxPublishMessageCount": 1000,
@@ -137,9 +129,9 @@
       "clientId": "ClientId",
       "metricsUploadTopic": "aws-iot-fleetwise-metrics-upload",
       "loggingUploadTopic": "aws-iot-fleetwise-logging-upload",
-      "certificateFilename": "/tmp/dummyCertificate.pem",
-      "privateKeyFilename": "/tmp/dummyPrivateKey.key",
-      "rootCAFilename": "/tmp/dummyCertificate.pem"
+      "certificateFilename": "CERTIFICATE_FILENAME_PLACEHOLDER",
+      "privateKeyFilename": "PRIVATE_KEY_FILENAME_PLACEHOLDER",
+      "rootCAFilename": "ROOT_CA_FILENAME_PLACEHOLDER"
     },
     "remoteProfilerDefaultValues": {
       "loggingUploadLevelThreshold": "Warning",

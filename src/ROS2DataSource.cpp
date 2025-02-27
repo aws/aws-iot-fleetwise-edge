@@ -1,9 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ROS2DataSource.h"
-#include "LoggingModule.h"
-#include "QueueTypes.h"
+#include "aws/iotfleetwise/ROS2DataSource.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <boost/variant.hpp>
 #include <chrono>
 #include <exception>
@@ -117,11 +116,11 @@ ROS2DataSourceNode::subscribe( std::string topic,
 }
 
 ROS2DataSource::ROS2DataSource( ROS2DataSourceConfig config,
-                                SignalBufferDistributorPtr signalBufferDistributor,
-                                std::shared_ptr<RawData::BufferManager> rawDataBufferManager )
+                                SignalBufferDistributor &signalBufferDistributor,
+                                RawData::BufferManager *rawDataBufferManager )
     : mConfig( std::move( config ) )
-    , mSignalBufferDistributor( std::move( signalBufferDistributor ) )
-    , mRawBufferManager( std::move( rawDataBufferManager ) )
+    , mSignalBufferDistributor( signalBufferDistributor )
+    , mRawDataBufferManager( rawDataBufferManager )
 {
     mNode = std::make_shared<ROS2DataSourceNode>();
     mROS2Executor = std::make_unique<rclcpp::executors::MultiThreadedExecutor>(
@@ -156,6 +155,7 @@ static std::atomic<int> gThreadCounter{ 1 };           // NOLINT Global atomic t
  * called from multiple threads in parallel as callback group is Reentrant
  */
 void
+// coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
 ROS2DataSource::topicCallback( std::shared_ptr<rclcpp::SerializedMessage> msg, std::string dictionaryMessageId )
 {
     if ( !gAlreadyNamedThread )
@@ -221,17 +221,17 @@ ROS2DataSource::topicCallback( std::shared_ptr<rclcpp::SerializedMessage> msg, s
     }
     if ( messageFormat.mCollectRaw )
     {
-        if ( mRawBufferManager == nullptr )
+        if ( mRawDataBufferManager == nullptr )
         {
             FWE_LOG_WARN( "Raw message id: '" + dictionaryMessageId + "' can not be handed over to RawBufferManager" );
         }
         else
         {
             auto bufferHandle =
-                mRawBufferManager->push( reinterpret_cast<uint8_t *>( msg->get_rcl_serialized_message().buffer ),
-                                         msg->get_rcl_serialized_message().buffer_length,
-                                         timestamp,
-                                         messageFormat.mSignalId );
+                mRawDataBufferManager->push( reinterpret_cast<uint8_t *>( msg->get_rcl_serialized_message().buffer ),
+                                             msg->get_rcl_serialized_message().buffer_length,
+                                             timestamp,
+                                             messageFormat.mSignalId );
             if ( bufferHandle == RawData::INVALID_BUFFER_HANDLE )
             {
                 FWE_LOG_WARN( "Raw message id: '" + dictionaryMessageId + "' was rejected by RawBufferManager" );
@@ -239,7 +239,7 @@ ROS2DataSource::topicCallback( std::shared_ptr<rclcpp::SerializedMessage> msg, s
             else
             {
                 // immediately set usage hint so buffer handle does not get directly deleted again
-                mRawBufferManager->increaseHandleUsageHint(
+                mRawDataBufferManager->increaseHandleUsageHint(
                     messageFormat.mSignalId,
                     bufferHandle,
                     RawData::BufferHandleUsageStage::COLLECTED_NOT_IN_HISTORY_BUFFER );
@@ -250,7 +250,7 @@ ROS2DataSource::topicCallback( std::shared_ptr<rclcpp::SerializedMessage> msg, s
             }
         }
     }
-    mSignalBufferDistributor->push( CollectedDataFrame( collectedSignalsGroup ) );
+    mSignalBufferDistributor.push( CollectedDataFrame( collectedSignalsGroup ) );
 }
 
 void
@@ -1003,7 +1003,9 @@ ROS2DataSource::start()
     // Make sure the thread goes into sleep immediately to wait for
     // the manifest to be available
     mShouldSleep.store( true );
-    if ( !mThread.create( doWork, this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "Thread failed to start" );
     }
@@ -1056,54 +1058,52 @@ ROS2DataSource::~ROS2DataSource()
 }
 
 void
-ROS2DataSource::doWork( void *data )
+ROS2DataSource::doWork()
 {
-    ROS2DataSource *ros2DataSource = static_cast<ROS2DataSource *>( data );
-    ros2DataSource->mCyclicTopicRetry.reset();
-    while ( !ros2DataSource->shouldStop() )
+    mCyclicTopicRetry.reset();
+    while ( !shouldStop() )
     {
-        if ( ros2DataSource->shouldSleep() )
+        if ( shouldSleep() )
         {
             // We either just started or there was a decoder manifest update that we can't use
             // We should sleep
             FWE_LOG_TRACE( "No valid decoding dictionary available ROS2 Data Source goes to sleep" );
-            ros2DataSource->mWait.wait( Signal::WaitWithPredicate );
+            mWait.wait( Signal::WaitWithPredicate );
         }
         bool newDecoderDictionaryEvent = false;
-        if ( ros2DataSource->mEventNewDecoderManifestAvailable )
+        if ( mEventNewDecoderManifestAvailable )
         {
             // If thread is active cancel spinning and wait for it to finish
-            if ( ros2DataSource->mExecutorSpinThread.joinable() )
+            if ( mExecutorSpinThread.joinable() )
             {
-                ros2DataSource->mROS2Executor->cancel();
-                ros2DataSource->mExecutorSpinThread.join();
-                ros2DataSource->mNode->deleteAllSubscriptions();
+                mROS2Executor->cancel();
+                mExecutorSpinThread.join();
+                mNode->deleteAllSubscriptions();
             }
-            ros2DataSource->processNewDecoderManifest();
+            processNewDecoderManifest();
             newDecoderDictionaryEvent = true;
         }
-        if ( newDecoderDictionaryEvent ||
-             ( ros2DataSource->mCyclicTopicRetry.getElapsedMs().count() > ROS2_RETRY_TOPIC_SUBSCRIBE_MS ) )
+        if ( newDecoderDictionaryEvent || ( mCyclicTopicRetry.getElapsedMs().count() > ROS2_RETRY_TOPIC_SUBSCRIBE_MS ) )
         {
-            ros2DataSource->trySubscribe( ros2DataSource->mMissingMessageIdsWaitingForSubscription );
-            ros2DataSource->mCyclicTopicRetry.reset();
+            trySubscribe( mMissingMessageIdsWaitingForSubscription );
+            mCyclicTopicRetry.reset();
         }
-        if ( ros2DataSource->mCurrentDict )
+        if ( mCurrentDict )
         {
             // If thread not active start a new thread
-            if ( !ros2DataSource->mExecutorSpinThread.joinable() )
+            if ( !mExecutorSpinThread.joinable() )
             {
                 // coverity[autosar_cpp14_a15_5_2_violation] false positive - join is called to exit the previous thread
                 // coverity[cert_err50_cpp_violation] false positive - join is called to exit the previous thread
                 gThreadCounter = 1;
-                ros2DataSource->mExecutorSpinThread = std::thread( [ros2DataSource]() {
+                mExecutorSpinThread = std::thread( [this]() {
                     FWE_LOG_TRACE( "Executor start spinning" );
-                    ros2DataSource->mROS2Executor->spin();
+                    mROS2Executor->spin();
                     FWE_LOG_TRACE( "Executor stopped spinning" );
                 } );
             }
         }
-        ros2DataSource->mWait.wait( ROS2_DATA_SOURCE_INTERVAL_MS );
+        mWait.wait( ROS2_DATA_SOURCE_INTERVAL_MS );
     }
 }
 

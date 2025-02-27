@@ -9,7 +9,7 @@ install(TARGETS can-to-someip
 )
 
 target_include_directories(can-to-someip PUBLIC
-    ${VSOMEIP_INCLUDE_DIRS}
+    ${VSOMEIP_INCLUDE_DIR}
 )
 
 target_link_libraries(can-to-someip

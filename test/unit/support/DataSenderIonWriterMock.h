@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "CollectionInspectionAPITypes.h"
-#include "DataSenderIonWriter.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/DataSenderIonWriter.h"
 #include <gmock/gmock.h>
 #include <memory>
 #include <streambuf>
@@ -27,7 +27,7 @@ public:
 
     MOCK_METHOD( void,
                  setupVehicleData,
-                 ( std::shared_ptr<const TriggeredVisionSystemData> mTriggeredVisionSystemData ),
+                 ( const TriggeredVisionSystemData &mTriggeredVisionSystemData ),
                  ( override ) );
 
     MOCK_METHOD( std::unique_ptr<StreambufBuilder>, getStreambufBuilder, (), ( override ) );

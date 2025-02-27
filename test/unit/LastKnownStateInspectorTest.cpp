@@ -1,18 +1,18 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "LastKnownStateInspector.h"
-#include "Clock.h"
-#include "ClockHandler.h"
-#include "CollectionInspectionAPITypes.h"
-#include "CommandTypes.h"
-#include "DataSenderTypes.h"
-#include "ICommandDispatcher.h"
-#include "LastKnownStateTypes.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/LastKnownStateInspector.h"
 #include "Testing.h"
-#include "TimeTypes.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/CommandTypes.h"
+#include "aws/iotfleetwise/DataSenderTypes.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/LastKnownStateTypes.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <algorithm> // IWYU pragma: keep
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -133,7 +133,7 @@ TYPED_TEST( LastKnownStateInspectorTest, inspectTwoSameSignalValues )
     auto stateTemplate = std::make_shared<const StateTemplateInformation>( StateTemplateInformation{
         "stateTemplate1", "decoder", signalsToInspect, LastKnownStateUpdateStrategy::ON_CHANGE } );
 
-    inspector.onStateTemplatesChanged( std::make_shared<StateTemplateList>( StateTemplateList{ stateTemplate } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ stateTemplate } );
     inspector.onNewCommandReceived(
         LastKnownStateCommandRequest{ "command1", stateTemplate->id, LastKnownStateOperation::ACTIVATE } );
 
@@ -164,7 +164,7 @@ TYPED_TEST( LastKnownStateInspectorTest, inspectTwoDifferentSignalValues )
     auto stateTemplate = std::make_shared<const StateTemplateInformation>( StateTemplateInformation{
         "stateTemplate1", "decoder", signalsToInspect, LastKnownStateUpdateStrategy::ON_CHANGE } );
 
-    inspector.onStateTemplatesChanged( std::make_shared<StateTemplateList>( StateTemplateList{ stateTemplate } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ stateTemplate } );
 
     inspector.inspectNewSignal<TypeParam>( SIG_C, TimePoint(), 2.0 );
     auto dataToSend = this->collectNextDataToSendSorted( inspector, TimePoint() );
@@ -212,8 +212,7 @@ protected:
 
 TEST_F( LastKnownStateInspectorDoubleTest, inspectFirstTimeReceivedSignal )
 {
-    inspector.onStateTemplatesChanged(
-        std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplateOnChange } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplateOnChange } );
     inspector.onNewCommandReceived(
         LastKnownStateCommandRequest{ "command1", mStateTemplateOnChange->id, LastKnownStateOperation::ACTIVATE } );
     inspector.inspectNewSignal<double>( SIG_A, TimePoint(), 1.0 );
@@ -230,8 +229,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, inspectFirstTimeReceivedSignal )
 
 TEST_F( LastKnownStateInspectorDoubleTest, inspectTwoSignalsWithSameValue )
 {
-    inspector.onStateTemplatesChanged(
-        std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplateOnChange } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplateOnChange } );
     inspector.onNewCommandReceived(
         LastKnownStateCommandRequest{ "command1", mStateTemplateOnChange->id, LastKnownStateOperation::ACTIVATE } );
     inspector.inspectNewSignal<double>( SIG_A, TimePoint(), 1.0 );
@@ -260,8 +258,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, inspectSignalWithDifferentValue )
                                   "decoder",
                                   { LastKnownStateSignalInformation{ SIG_F, SignalType::DOUBLE } },
                                   LastKnownStateUpdateStrategy::ON_CHANGE } );
-    inspector.onStateTemplatesChanged(
-        std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplateOnChange, stateTemplate4 } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplateOnChange, stateTemplate4 } );
 
     inspector.onNewCommandReceived(
         LastKnownStateCommandRequest{ "command1", mStateTemplateOnChange->id, LastKnownStateOperation::ACTIVATE } );
@@ -334,8 +331,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, withNoLksInspectionMatrix )
 
 TEST_F( LastKnownStateInspectorDoubleTest, activateStateTemplateMultipleTimesWithAutoDeactivate )
 {
-    inspector.onStateTemplatesChanged(
-        std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplatePeriodic1000ms } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplatePeriodic1000ms } );
 
     inspector.onNewCommandReceived( LastKnownStateCommandRequest{
         "command1",
@@ -427,8 +423,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, activateStateTemplateMultipleTimesWit
 
 TEST_F( LastKnownStateInspectorDoubleTest, activateStateTemplateMultipleTimesWithoutAutoDeactivate )
 {
-    inspector.onStateTemplatesChanged(
-        std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplatePeriodic1000ms } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplatePeriodic1000ms } );
 
     inspector.onNewCommandReceived( LastKnownStateCommandRequest{
         "command1",
@@ -502,8 +497,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, activateStateTemplateMultipleTimesWit
 
 TEST_F( LastKnownStateInspectorDoubleTest, keepActivationStatusOnStateTemplatesUpdate )
 {
-    inspector.onStateTemplatesChanged(
-        std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplatePeriodic1000ms } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplatePeriodic1000ms } );
 
     inspector.onNewCommandReceived( LastKnownStateCommandRequest{
         "command1",
@@ -529,8 +523,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, keepActivationStatusOnStateTemplatesU
         ASSERT_EQ( dataToSend->stateTemplateCollectedSignals.size(), 1 );
     }
 
-    inspector.onStateTemplatesChanged( std::make_shared<StateTemplateList>(
-        StateTemplateList{ mStateTemplatePeriodic1000ms, mStateTemplatePeriodic400ms } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplatePeriodic1000ms, mStateTemplatePeriodic400ms } );
 
     inspector.inspectNewSignal<double>( SIG_D, TimePoint{ 4500, 4500 }, 1.0 );
 
@@ -549,8 +542,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, keepActivationStatusOnStateTemplatesU
 
 TEST_F( LastKnownStateInspectorDoubleTest, deactivateAlreadyDeactivatedStateTemplate )
 {
-    inspector.onStateTemplatesChanged(
-        std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplatePeriodic1000ms } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplatePeriodic1000ms } );
 
     inspector.onNewCommandReceived( LastKnownStateCommandRequest{
         "command1", mStateTemplatePeriodic1000ms->id, LastKnownStateOperation::DEACTIVATE } );
@@ -574,8 +566,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, persistActivatedStateTemplate )
     auto persistency = createCacheAndPersist();
     {
         LastKnownStateInspector inspector( mCommandResponses, persistency );
-        inspector.onStateTemplatesChanged(
-            std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplatePeriodic1000ms } ) );
+        inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplatePeriodic1000ms } );
 
         inspector.onNewCommandReceived( LastKnownStateCommandRequest{
             "command1",
@@ -602,8 +593,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, persistActivatedStateTemplate )
         // Create a new inspector, which should load the persisted metadata from the previous instance
         // and thus set the state template as activated.
         LastKnownStateInspector inspector( mCommandResponses, persistency );
-        inspector.onStateTemplatesChanged(
-            std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplatePeriodic1000ms } ) );
+        inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplatePeriodic1000ms } );
 
         inspector.inspectNewSignal<double>( SIG_D, initialTime + 1100, 2.0 );
 
@@ -622,8 +612,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, persistActivatedStateTemplate )
         // Create a new inspector, but since the last time the state template was deactivate, this
         // new instance should not activate the state template.
         LastKnownStateInspector inspector( mCommandResponses, persistency );
-        inspector.onStateTemplatesChanged(
-            std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplatePeriodic1000ms } ) );
+        inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplatePeriodic1000ms } );
 
         inspector.inspectNewSignal<double>( SIG_D, initialTime + 6500, 4.0 );
 
@@ -646,8 +635,8 @@ TEST_F( LastKnownStateInspectorDoubleTest, inspectSignalPeriodically )
                                     LastKnownStateSignalInformation{ SIG_G, SignalType::DOUBLE } },
                                   LastKnownStateUpdateStrategy::PERIODIC,
                                   500 } );
-    inspector.onStateTemplatesChanged( std::make_shared<StateTemplateList>(
-        StateTemplateList{ mStateTemplatePeriodic1000ms, mStateTemplatePeriodic400ms, stateTemplate4 } ) );
+    inspector.onStateTemplatesChanged(
+        StateTemplateList{ mStateTemplatePeriodic1000ms, mStateTemplatePeriodic400ms, stateTemplate4 } );
 
     // Activate only two templates
     inspector.onNewCommandReceived( LastKnownStateCommandRequest{
@@ -798,8 +787,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, inspectSignalPeriodically )
 TEST_F( LastKnownStateInspectorDoubleTest, inspectSignalWithUpdatedInspectionLogic )
 {
     // We first set SIG_A as on change policy
-    inspector.onStateTemplatesChanged(
-        std::make_shared<StateTemplateList>( StateTemplateList{ mStateTemplateOnChange } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ mStateTemplateOnChange } );
     inspector.onNewCommandReceived(
         LastKnownStateCommandRequest{ "command1", mStateTemplateOnChange->id, LastKnownStateOperation::ACTIVATE } );
     inspector.inspectNewSignal<double>( SIG_A, TimePoint{ 500, 500 }, 0.1 );
@@ -832,7 +820,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, inspectSignalWithUpdatedInspectionLog
                                   LastKnownStateUpdateStrategy::PERIODIC,
                                   1000 } );
     // Here we change update policy to one-second period
-    inspector.onStateTemplatesChanged( std::make_shared<StateTemplateList>( StateTemplateList{ stateTemplate4 } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ stateTemplate4 } );
     inspector.onNewCommandReceived(
         LastKnownStateCommandRequest{ "command2", stateTemplate4->id, LastKnownStateOperation::ACTIVATE } );
     // The first collection should be a snapshot with all signals for the newly activate state template.
@@ -877,7 +865,7 @@ TEST_F( LastKnownStateInspectorDoubleTest, inspectSignalWithUpdatedInspectionLog
                                   LastKnownStateUpdateStrategy::PERIODIC,
                                   2000 } );
     // Here we change update policy to one-second period
-    inspector.onStateTemplatesChanged( std::make_shared<StateTemplateList>( StateTemplateList{ stateTemplate5 } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ stateTemplate5 } );
     inspector.onNewCommandReceived(
         LastKnownStateCommandRequest{ "command3", stateTemplate5->id, LastKnownStateOperation::ACTIVATE } );
 
@@ -941,8 +929,7 @@ TYPED_TEST( LastKnownStateInspectorTest, inspectSignalsPeriodicallyAndOnChange )
                                   LastKnownStateUpdateStrategy::PERIODIC,
                                   400 } );
 
-    inspector.onStateTemplatesChanged(
-        std::make_shared<StateTemplateList>( StateTemplateList{ stateTemplate4, stateTemplate5, stateTemplate6 } ) );
+    inspector.onStateTemplatesChanged( StateTemplateList{ stateTemplate4, stateTemplate5, stateTemplate6 } );
 
     inspector.onNewCommandReceived(
         LastKnownStateCommandRequest{ "command1", stateTemplate4->id, LastKnownStateOperation::ACTIVATE } );

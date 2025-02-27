@@ -4,13 +4,13 @@
 pybind11_add_module(someip_device_shadow_editor
     tools/someip_device_shadow_editor/src/bindings.cpp
     tools/someip_device_shadow_editor/src/DeviceShadowOverSomeipExampleApplication.cpp
-    ${CAPICXX_DEVICE_SHADOW_GENERATED_FILES}
+    $<TARGET_OBJECTS:fwe-device-shadow-over-someip>
     )
 
 target_include_directories(someip_device_shadow_editor PUBLIC
     ${JSONCPP_INCLUDE_DIR}
     ${Python3_INCLUDE_DIRS}
-    ${VSOMEIP_INCLUDE_DIRS}
+    ${VSOMEIP_INCLUDE_DIR}
     ${COMMONAPI_INCLUDE_DIRS}
     ${COMMONAPI_SOMEIP_INCLUDE_DIRS}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>

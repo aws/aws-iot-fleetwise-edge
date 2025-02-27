@@ -1,17 +1,21 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DataSenderIonWriter.h"
-#include "EventTypes.h"
-#include "LoggingModule.h"
-#include "MessageTypes.h"
-#include "RawDataManager.h"
-#include "SignalTypes.h"
-#include "StreambufBuilder.h"
+#include "aws/iotfleetwise/DataSenderIonWriter.h"
+#include "aws/iotfleetwise/Assert.h"
+#include "aws/iotfleetwise/EventTypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/MessageTypes.h"
+#include "aws/iotfleetwise/RawDataManager.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/StreambufBuilder.h"
+#include <boost/asio.hpp>
 #include <cstddef>
 #include <functional>
+#include <future>
 #include <ionc/ion.h>
 #include <ios>
+#include <new>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -31,6 +35,7 @@ using IonWriteCallback = std::function<iERR( _ion_user_stream *stream )>;
 extern "C"
 {
     static iERR
+    // coverity[autosar_cpp14_a8_4_10_violation] raw pointer needed to match the expected signature
     ionWriteCallback( _ion_user_stream *stream )
     {
         // forwards call to mIonWriteCallback
@@ -42,6 +47,172 @@ namespace Aws
 {
 namespace IoTFleetWise
 {
+
+/**
+ * @brief Wrapper for the ion-c library functions to work around multi-thread issues
+ *
+ * The ion-c library doesn't play well with multiple threads. The library allocates some shared
+ * table in a thread local variable:
+ *
+ * https://github.com/amazon-ion/ion-c/blob/ece2e8c23e9d017852dff67646652689ff9e8d2b/ionc/ion_symbol_table.c#L259
+ *
+ * This means that each thread that calls a ion-c function will allocate a new table and never free
+ * it: https://github.com/amazon-ion/ion-c/issues/264
+ *
+ * Since we hand over a stream to AWS SDK and generates the Ion file on demand, a lot of different
+ * threads can call the ion-c functions. Over time this makes the memory allocation to increase without
+ * any way to deallocate this memory.
+ *
+ * The only way to avoid this issue is to ensure any ion-c function call happens in the same thread.
+ *
+ * This wrapper ensures that by dispatching all the ion-c function calls to a single thread and wait
+ * for the result.
+ */
+class IoncWrapper
+{
+public:
+    ~IoncWrapper() = default;
+
+    IoncWrapper( const IoncWrapper & ) = delete;
+    IoncWrapper &operator=( const IoncWrapper & ) = delete;
+    IoncWrapper( IoncWrapper && ) = delete;
+    IoncWrapper &operator=( IoncWrapper && ) = delete;
+
+    static IoncWrapper &
+    getInstance()
+    {
+        // We need to ensure only one instance is created so that all function calls happen in the
+        // same thread to avoid the memory leak.
+        try
+        {
+            static IoncWrapper wrapper;
+            return wrapper;
+        }
+        catch ( boost::asio::invalid_service_owner &e )
+        {
+            FWE_FATAL_ASSERT(
+                false, "Unable to create ion-c wrapper because of invalid service owner: " + std::string( e.what() ) );
+            // It should never get here
+            IoncWrapper *wrapper = nullptr;
+            return *wrapper;
+        }
+    }
+
+    template <typename T>
+    T
+    callFunction( std::function<T()> func )
+    {
+        try
+        {
+            std::future<T> future = boost::asio::post( mThreadPool.get_executor(), boost::asio::use_future( func ) );
+            return future.get();
+        }
+        catch ( std::bad_alloc & )
+        {
+            // If we can't allocate memory, not much we can do and most likely everything else will break.
+            FWE_FATAL_ASSERT( false, "Unable to allocate memory to dispatch ion-c function call to thread" );
+        }
+
+        // Should never get here
+        return {};
+    }
+
+    iERR
+    ionWriterClose( hWRITER hwriter )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<iERR>( std::bind( ion_writer_close, hwriter ) );
+    }
+
+    ION_STRING *
+    ionStringAssignCstr( ION_STRING *str, char *val, SIZE len )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<ION_STRING *>( std::bind( ion_string_assign_cstr, str, val, len ) );
+    }
+
+    iERR
+    ionWriterWriteFieldName( hWRITER hwriter, iSTRING name )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<iERR>( std::bind( ion_writer_write_field_name, hwriter, name ) );
+    }
+
+    iERR
+    ionWriterWriteString( hWRITER hwriter, iSTRING p_value )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<iERR>( std::bind( ion_writer_write_string, hwriter, p_value ) );
+    }
+
+    iERR
+    ionWriterOpenStream( hWRITER *p_hwriter,
+                         ION_STREAM_HANDLER fn_output_handler,
+                         void *handler_state,
+                         ION_WRITER_OPTIONS *p_options )
+    {
+        return callFunction<iERR>(
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            std::bind( ion_writer_open_stream, p_hwriter, fn_output_handler, handler_state, p_options ) );
+    }
+
+    iERR
+    ionWriterStartContainer( hWRITER hwriter, ION_TYPE container_type )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<iERR>( std::bind( ion_writer_start_container, hwriter, container_type ) );
+    }
+
+    iERR
+    ionWriterWriteInt64( hWRITER hwriter, int64_t value )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<iERR>( std::bind( ion_writer_write_int64, hwriter, value ) );
+    }
+
+    iERR
+    ionWriterFinish( hWRITER hwriter, SIZE *p_bytes_flushed )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<iERR>( std::bind( ion_writer_finish, hwriter, p_bytes_flushed ) );
+    }
+
+    iERR
+    ionWriterFinishContainer( hWRITER hwriter )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<iERR>( std::bind( ion_writer_finish_container, hwriter ) );
+    }
+
+    iERR
+    ionWriterWriteInt32( hWRITER hwriter, int32_t value )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<iERR>( std::bind( ion_writer_write_int32, hwriter, value ) );
+    }
+
+    iERR
+    ionWriterWriteSymbol( hWRITER hwriter, iSTRING p_value )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<iERR>( std::bind( ion_writer_write_symbol, hwriter, p_value ) );
+    }
+
+    iERR
+    ionWriterWriteBlob( hWRITER hwriter, BYTE *p_buf, SIZE length )
+    {
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+        return callFunction<iERR>( std::bind( ion_writer_write_blob, hwriter, p_buf, length ) );
+    }
+
+private:
+    IoncWrapper()
+        : mThreadPool( 1 )
+    {
+    }
+
+    boost::asio::thread_pool mThreadPool;
+};
 
 class IonFileGenerator : public std::streambuf
 {
@@ -215,7 +386,7 @@ protected:
     static const int WRITE_BUFFER_INCREASE_STEP = 64 * 1024;
     // IonFileGenerator specific logic not directly used by std::streambuf:
 public:
-    IonFileGenerator( std::shared_ptr<RawData::BufferManager> rawDataBufferManager,
+    IonFileGenerator( RawData::BufferManager *rawDataBufferManager,
                       std::string vehicleId,
                       Timestamp triggerTime,
                       EventID eventId,
@@ -223,7 +394,8 @@ public:
                       std::string collectionSchemeId,
                       std::vector<FrameInfoForIon> &framesToSendOut )
         : mIonWriteCallback( nullptr )
-        , mRawDataBufferManager( std::move( rawDataBufferManager ) )
+        , mRawDataBufferManager( rawDataBufferManager )
+        , mIoncWrapper( IoncWrapper::getInstance() )
         , mTriggerTime( triggerTime )
         , mEventId( eventId )
         , mDecoderManifestId( std::move( decoderManifestId ) )
@@ -238,7 +410,7 @@ public:
         unlockAllBufferHandles();
         if ( mWriterNeedsClose )
         {
-            ION_CHECK( ion_writer_close( mIonWriter ) );
+            ION_CHECK( mIoncWrapper.ionWriterClose( mIonWriter ) );
             mWriterNeedsClose = false;
         }
     }
@@ -299,7 +471,7 @@ private:
         mFramesToSendOut.clear();
     }
 
-    static iERR
+    iERR
     ionWriteFieldStr( hWRITER writer, const char *str, size_t len )
     {
         ION_STRING fieldNameString;
@@ -307,12 +479,12 @@ private:
         // coverity[autosar_cpp14_a5_2_3_violation] ion-c needs non-const input
         // coverity[misra_cpp_2008_rule_5_2_5_violation] ion-c needs non-const input
         // coverity[cert_exp55_cpp_violation] ion-c needs non-const input
-        ion_string_assign_cstr( &fieldNameString, const_cast<char *>( str ), static_cast<SIZE>( len ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
+        mIoncWrapper.ionStringAssignCstr( &fieldNameString, const_cast<char *>( str ), static_cast<SIZE>( len ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
         // clang-format on
-        return ion_writer_write_field_name( ( writer ), &fieldNameString );
+        return mIoncWrapper.ionWriterWriteFieldName( ( writer ), &fieldNameString );
     }
 
-    static iERR
+    iERR
     ionWriteValueStr( hWRITER writer, const char *str, size_t len )
     {
         ION_STRING valueString;
@@ -320,9 +492,9 @@ private:
         // coverity[autosar_cpp14_a5_2_3_violation] ion-c needs non-const input
         // coverity[misra_cpp_2008_rule_5_2_5_violation] ion-c needs non-const input
         // coverity[cert_exp55_cpp_violation] ion-c needs non-const input
-        ion_string_assign_cstr( &valueString, const_cast<char *>( str ), static_cast<SIZE>( len ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
+        mIoncWrapper.ionStringAssignCstr( &valueString, const_cast<char *>( str ), static_cast<SIZE>( len ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
         // clang-format on
-        return ion_writer_write_string( ( writer ), &valueString );
+        return mIoncWrapper.ionWriterWriteString( ( writer ), &valueString );
     }
 
     /**
@@ -335,7 +507,7 @@ private:
     {
         if ( mWriterNeedsClose )
         {
-            auto res = ion_writer_close( mIonWriter );
+            auto res = mIoncWrapper.ionWriterClose( mIonWriter );
             if ( res != IERR_OK )
             {
                 FWE_LOG_WARN( "Could not close old ion writer stream because of error:  " + std::to_string( res ) );
@@ -347,6 +519,7 @@ private:
         mIonWriteBuffer.resize( WRITE_BUFFER_INCREASE_STEP );
 
         // The callbacks will come only directly form inside a ion_ call and not from a different thread
+        // coverity[autosar_cpp14_a8_4_10_violation] raw pointer needed to match the expected signature
         mIonWriteCallback = [this]( _ion_user_stream *stream ) -> iERR {
             // Check limit to skip first call where stream->limit is not initialized
             if ( stream->limit == static_cast<BYTE *>( mIonWriteBuffer.data() + mIonWriteBuffer.size() ) )
@@ -394,7 +567,7 @@ private:
         ION_WRITER_OPTIONS options{};
         options.output_as_binary = 1;
 
-        auto res = ion_writer_open_stream( &mIonWriter, &ionWriteCallback, &mIonWriteCallback, &options );
+        auto res = mIoncWrapper.ionWriterOpenStream( &mIonWriter, &ionWriteCallback, &mIonWriteCallback, &options );
         if ( res != IERR_OK )
         {
             FWE_LOG_ERROR( "Could not open Ion writer stream because of error:  " + std::to_string( res ) )
@@ -416,7 +589,7 @@ private:
         // coverity[autosar_cpp14_m5_2_9_violation] tid_STRUCT comes from library so cast is done in library header
         // coverity[misra_cpp_2008_rule_5_2_9_violation] tid_STRUCT comes from library so cast is done in library header
         // coverity[cert_exp57_cpp_violation] tid_STRUCT comes from library so cast is done in library header
-        ION_CHECK( ion_writer_start_container( mIonWriter, tid_STRUCT ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast, cppcoreguidelines-pro-type-cstyle-cast)
+        ION_CHECK( mIoncWrapper.ionWriterStartContainer( mIonWriter, tid_STRUCT ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast, cppcoreguidelines-pro-type-cstyle-cast)
         // clang-format on
 
         ION_CHECK( ionWriteFieldStr(
@@ -441,15 +614,15 @@ private:
         ION_CHECK( ionWriteFieldStr( mIonWriter,
                                      &FIELD_NAME_COLLECTION_EVENT_ID[0],
                                      static_cast<size_t>( sizeof( FIELD_NAME_COLLECTION_EVENT_ID ) - 1 ) ) );
-        ION_CHECK( ion_writer_write_int64( mIonWriter, mEventId ) );
+        ION_CHECK( mIoncWrapper.ionWriterWriteInt64( mIonWriter, mEventId ) );
 
         ION_CHECK( ionWriteFieldStr( mIonWriter,
                                      &FIELD_NAME_VEHICLE_EVENT_TIME[0],
                                      static_cast<size_t>( sizeof( FIELD_NAME_VEHICLE_EVENT_TIME ) - 1 ) ) );
-        ION_CHECK( ion_writer_write_int64( mIonWriter, static_cast<int64_t>( mTriggerTime ) ) );
+        ION_CHECK( mIoncWrapper.ionWriterWriteInt64( mIonWriter, static_cast<int64_t>( mTriggerTime ) ) );
 
-        ION_CHECK( ion_writer_finish_container( mIonWriter ) );
-        ION_CHECK( ion_writer_finish( mIonWriter, nullptr ) );
+        ION_CHECK( mIoncWrapper.ionWriterFinishContainer( mIonWriter ) );
+        ION_CHECK( mIoncWrapper.ionWriterFinish( mIonWriter, nullptr ) );
     }
 
     void
@@ -464,11 +637,11 @@ private:
         // coverity[autosar_cpp14_m5_2_9_violation] tid_STRUCT comes from library so cast is done in library header
         // coverity[misra_cpp_2008_rule_5_2_9_violation] tid_STRUCT comes from library so cast is done in library header
         // coverity[cert_exp57_cpp_violation] tid_STRUCT comes from library so cast is done in library header
-        ION_CHECK( ion_writer_start_container( mIonWriter, tid_STRUCT ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast, cppcoreguidelines-pro-type-cstyle-cast)
+        ION_CHECK( mIoncWrapper.ionWriterStartContainer( mIonWriter, tid_STRUCT ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast, cppcoreguidelines-pro-type-cstyle-cast)
         // clang-format on
         ION_CHECK( ionWriteFieldStr(
             mIonWriter, &FIELD_NAME_SIGNAL_ID[0], static_cast<size_t>( sizeof( FIELD_NAME_SIGNAL_ID ) - 1 ) ) );
-        ION_CHECK( ion_writer_write_int32( mIonWriter, static_cast<int32_t>( frameInfo.mId ) ) );
+        ION_CHECK( mIoncWrapper.ionWriterWriteInt32( mIonWriter, static_cast<int32_t>( frameInfo.mId ) ) );
 
         ION_CHECK( ionWriteFieldStr(
             mIonWriter, &FIELD_NAME_SIGNAL_NAME[0], static_cast<size_t>( sizeof( FIELD_NAME_SIGNAL_NAME ) - 1 ) ) );
@@ -480,7 +653,7 @@ private:
 
         ION_CHECK( ionWriteFieldStr(
             mIonWriter, &FIELD_NAME_RELATIVE_TIME[0], static_cast<size_t>( sizeof( FIELD_NAME_RELATIVE_TIME ) - 1 ) ) );
-        ION_CHECK( ion_writer_write_int64(
+        ION_CHECK( mIoncWrapper.ionWriterWriteInt64(
             mIonWriter, static_cast<int64_t>( frameInfo.mReceiveTime ) - static_cast<int64_t>( mTriggerTime ) ) );
 
         ION_CHECK( ionWriteFieldStr(
@@ -489,7 +662,7 @@ private:
         char dataFormatValue[] = "CDR";
         dataFormat.value = reinterpret_cast<BYTE *>( dataFormatValue );
         dataFormat.length = static_cast<SIZE>( sizeof( dataFormatValue ) - 1 );
-        ION_CHECK( ion_writer_write_symbol( mIonWriter, &dataFormat ) );
+        ION_CHECK( mIoncWrapper.ionWriterWriteSymbol( mIonWriter, &dataFormat ) );
 
         if ( size > MAX_BYTES_PER_BLOB )
         {
@@ -504,13 +677,13 @@ private:
             // coverity[autosar_cpp14_a5_2_3_violation] ion-c needs non-const input
             // coverity[misra_cpp_2008_rule_5_2_5_violation] ion-c needs non-const input
             // coverity[cert_exp55_cpp_violation] ion-c needs non-const input
-            ION_CHECK( ion_writer_write_blob(
+            ION_CHECK( mIoncWrapper.ionWriterWriteBlob(
                 mIonWriter, reinterpret_cast<BYTE *>( const_cast<char *>( buffer ) ), static_cast<SIZE>( size ) ) ); // NOLINT(cppcoreguidelines-pro-type-const-cast) ion-c needs non-const input
             // clang-format on
         }
-        ION_CHECK( ion_writer_finish_container( mIonWriter ) );
+        ION_CHECK( mIoncWrapper.ionWriterFinishContainer( mIonWriter ) );
 
-        ION_CHECK( ion_writer_finish( mIonWriter, nullptr ) );
+        ION_CHECK( mIoncWrapper.ionWriterFinish( mIonWriter, nullptr ) );
     }
 
     hWRITER mIonWriter = nullptr;
@@ -524,7 +697,8 @@ private:
     int64_t mOverallSize = -1;
     size_t mOutputStep = 0;
     std::vector<FrameInfoForIon> mFramesToSendOut;
-    std::shared_ptr<RawData::BufferManager> mRawDataBufferManager;
+    RawData::BufferManager *mRawDataBufferManager;
+    IoncWrapper &mIoncWrapper;
 
     Timestamp mTriggerTime;
     EventID mEventId;
@@ -552,13 +726,13 @@ private:
 class IonStreambufBuilder : public StreambufBuilder
 {
 public:
-    IonStreambufBuilder( std::shared_ptr<RawData::BufferManager> rawDataBufferManager,
+    IonStreambufBuilder( RawData::BufferManager *rawDataBufferManager,
                          std::string vehicleId,
                          Timestamp triggerTime,
                          EventID eventId,
                          SyncID decoderManifestId,
                          SyncID collectionSchemeId )
-        : mRawDataBufferManager( std::move( rawDataBufferManager ) )
+        : mRawDataBufferManager( rawDataBufferManager )
         , mVehicleId( std::move( vehicleId ) )
         , mTriggerTime( triggerTime )
         , mEventId( eventId )
@@ -591,7 +765,7 @@ public:
     }
 
 private:
-    std::shared_ptr<RawData::BufferManager> mRawDataBufferManager;
+    RawData::BufferManager *mRawDataBufferManager;
     std::string mVehicleId;
     Timestamp mTriggerTime;
     EventID mEventId;
@@ -616,9 +790,8 @@ constexpr char IonFileGenerator::FIELD_NAME_RELATIVE_TIME[]; // NOLINT
 constexpr char IonFileGenerator::FIELD_NAME_DATA_FORMAT[];   // NOLINT
 constexpr char IonFileGenerator::FIELD_NAME_SIGNAL_BLOB[];   // NOLINT
 
-DataSenderIonWriter::DataSenderIonWriter( std::shared_ptr<RawData::BufferManager> rawDataBufferManager,
-                                          std::string vehicleId )
-    : mRawDataBufferManager( std::move( rawDataBufferManager ) )
+DataSenderIonWriter::DataSenderIonWriter( RawData::BufferManager *rawDataBufferManager, std::string vehicleId )
+    : mRawDataBufferManager( rawDataBufferManager )
     , mVehicleId( std::move( vehicleId ) )
 {
 }
@@ -648,7 +821,7 @@ DataSenderIonWriter::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr 
 DataSenderIonWriter::~DataSenderIonWriter() = default;
 
 void
-DataSenderIonWriter::setupVehicleData( std::shared_ptr<const TriggeredVisionSystemData> triggeredVisionSystemData )
+DataSenderIonWriter::setupVehicleData( const TriggeredVisionSystemData &triggeredVisionSystemData )
 {
     mEstimatedBytesInCurrentStream = ESTIMATED_SERIALIZED_EVENT_METADATA_BYTES; // reset and start new
     if ( mRawDataBufferManager != nullptr )
@@ -657,10 +830,10 @@ DataSenderIonWriter::setupVehicleData( std::shared_ptr<const TriggeredVisionSyst
         mCurrentStreamBuilder =
             std::make_unique<IonStreambufBuilder>( mRawDataBufferManager,
                                                    mVehicleId,
-                                                   triggeredVisionSystemData->triggerTime,
-                                                   triggeredVisionSystemData->eventID,
-                                                   triggeredVisionSystemData->metadata.decoderID,
-                                                   triggeredVisionSystemData->metadata.collectionSchemeID );
+                                                   triggeredVisionSystemData.triggerTime,
+                                                   triggeredVisionSystemData.eventID,
+                                                   triggeredVisionSystemData.metadata.decoderID,
+                                                   triggeredVisionSystemData.metadata.collectionSchemeID );
     }
     else
     {

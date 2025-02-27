@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "TraceModule.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/TraceModule.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <string>
 
 namespace Aws
@@ -203,6 +203,22 @@ TraceModule::getVariableName( TraceVariable variable )
         return "DataForwardError";
     case TraceVariable::VEHICLE_DATA_PUBLISH_COUNT:
         return "VehicleDataPublishCount";
+    case TraceVariable::SHADOW_REQUESTS_SENT:
+        return "ShadowRequestsSent";
+    case TraceVariable::SHADOW_GET_REQUESTS:
+        return "ShadowGetRequests";
+    case TraceVariable::SHADOW_UPDATE_REQUESTS:
+        return "ShadowUpdateRequests";
+    case TraceVariable::SHADOW_DELETE_REQUESTS:
+        return "ShadowDeleteRequests";
+    case TraceVariable::SHADOW_DOCUMENTS_UPDATES_RECEIVED:
+        return "ShadowDocumentsUpdatesReceived";
+    case TraceVariable::SHADOW_ACCEPTED_RESPONSES:
+        return "ShadowAcceptedResponses";
+    case TraceVariable::SHADOW_REJECTED_RESPONSES:
+        return "ShadowRejectedResponses";
+    case TraceVariable::SHADOW_UNKNOWN_RESPONSES:
+        return "ShadowUnknownResponses";
         // Intentionally omit default so that we can use compiler warnings to remind us about missing values
     }
     return nullptr;

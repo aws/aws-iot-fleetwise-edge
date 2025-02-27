@@ -200,9 +200,12 @@ vehicle model and register the virtual vehicle created in the previous section:
    engine torque:
 
    ```bash
-   SIGNAL_CATALOG_ARN=`aws iotfleetwise list-signal-catalogs \
+   MODEL_MANIFEST_ARN=`aws iotfleetwise get-vehicle \
       --region us-east-1 \
-      | jq -r ".summaries[0].arn"` \
+      --vehicle-name fwdemo-lks | jq -r .modelManifestArn` \
+   && SIGNAL_CATALOG_ARN=`aws iotfleetwise get-model-manifest \
+      --region us-east-1 \
+      --name ${MODEL_MANIFEST_ARN##*/} | jq -r .signalCatalogArn` \
    && aws iotfleetwise create-state-template \
       --region us-east-1 \
       --signal-catalog-arn ${SIGNAL_CATALOG_ARN} \

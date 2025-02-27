@@ -1,14 +1,18 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DecoderManifestIngestion.h"
-#include "CANDataTypes.h"
-#include "EnumUtility.h"
-#include "LoggingModule.h"
-#include "OBDDataTypes.h"
+#include "aws/iotfleetwise/DecoderManifestIngestion.h"
+#include "aws/iotfleetwise/CANDataTypes.h"
+#include "aws/iotfleetwise/EnumUtility.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/OBDDataTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "decoder_manifest.pb.h"
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <google/protobuf/message.h>
 #include <memory>
+#include <string>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include <boost/variant.hpp>
@@ -18,6 +22,75 @@ namespace Aws
 {
 namespace IoTFleetWise
 {
+
+namespace
+{
+/**
+ * @brief In the protobuf a different enum if used to represent the different types like uint8, uint16 etc.
+ * @param primitiveType the enum type of the protobuf
+ *
+ * @return the type C++ enum used by the DecoderDictionary
+ */
+boost::optional<SignalType>
+convertPrimitiveTypeToInternal( Schemas::DecoderManifestMsg::PrimitiveType primitiveType )
+{
+    switch ( primitiveType )
+    {
+    case Schemas::DecoderManifestMsg::PrimitiveType::BOOL:
+        return SignalType::BOOLEAN;
+    case Schemas::DecoderManifestMsg::PrimitiveType::UINT8:
+        return SignalType::UINT8;
+    case Schemas::DecoderManifestMsg::PrimitiveType::UINT16:
+        return SignalType::UINT16;
+    case Schemas::DecoderManifestMsg::PrimitiveType::UINT32:
+        return SignalType::UINT32;
+    case Schemas::DecoderManifestMsg::PrimitiveType::UINT64:
+        return SignalType::UINT64;
+    case Schemas::DecoderManifestMsg::PrimitiveType::INT8:
+        return SignalType::INT8;
+    case Schemas::DecoderManifestMsg::PrimitiveType::INT16:
+        return SignalType::INT16;
+    case Schemas::DecoderManifestMsg::PrimitiveType::INT32:
+        return SignalType::INT32;
+    case Schemas::DecoderManifestMsg::PrimitiveType::INT64:
+        return SignalType::INT64;
+    case Schemas::DecoderManifestMsg::PrimitiveType::FLOAT32:
+        return SignalType::FLOAT;
+    case Schemas::DecoderManifestMsg::PrimitiveType::FLOAT64:
+        return SignalType::DOUBLE;
+    case Schemas::DecoderManifestMsg::PrimitiveType::STRING:
+        return SignalType::STRING;
+    case Schemas::DecoderManifestMsg::PrimitiveType::NULL_:
+        return SignalType::DOUBLE;
+    default:
+        FWE_LOG_WARN( "Currently PrimitiveType " + std::to_string( primitiveType ) + " is not supported" );
+        break;
+    }
+    return boost::none;
+}
+
+/**
+ * @brief In the protobuf a different enum if used to represent the different raw value types
+ * @param signalValueType the enum type of the protobuf
+ *
+ * @return the type C++ enum used by the DecoderDictionary
+ */
+boost::optional<RawSignalType>
+convertSignalValueTypeToInternal( Schemas::DecoderManifestMsg::SignalValueType signalValueType )
+{
+    switch ( signalValueType )
+    {
+    case Schemas::DecoderManifestMsg::SignalValueType::INTEGER:
+        return RawSignalType::INTEGER;
+    case Schemas::DecoderManifestMsg::SignalValueType::FLOATING_POINT:
+        return RawSignalType::FLOATING_POINT;
+    default:
+        break;
+    }
+    return boost::none;
+}
+
+} // namespace
 
 DecoderManifestIngestion::~DecoderManifestIngestion()
 {
@@ -245,10 +318,8 @@ DecoderManifestIngestion::build()
     FWE_LOG_INFO( "Building Decoder Manifest with Sync ID: " + mProtoDecoderManifest.sync_id() );
 
     // Iterate over CAN Signals and build the mCANSignalFormatDictionary
-    for ( int i = 0; i < mProtoDecoderManifest.can_signals_size(); i++ )
+    for ( const Schemas::DecoderManifestMsg::CANSignal &canSignal : mProtoDecoderManifest.can_signals() )
     {
-        // Get a reference to the CAN signal in the protobuf
-        const Schemas::DecoderManifestMsg::CANSignal &canSignal = mProtoDecoderManifest.can_signals( i );
         mSignalToVehicleDataSourceProtocol[canSignal.signal_id()] = VehicleDataSourceProtocol::RAW_SOCKET;
 
         // Add an entry to the Signal to CANRawFrameID and NodeID dictionary
@@ -257,7 +328,15 @@ DecoderManifestIngestion::build()
 
         // For backward compatibility, default to double
         auto signalType =
-            convertPrimitiveTypeToSignalType( canSignal.primitive_type() ).get_value_or( SignalType::DOUBLE );
+            convertPrimitiveTypeToInternal( canSignal.primitive_type() ).get_value_or( SignalType::DOUBLE );
+
+        auto rawSignalType = convertSignalValueTypeToInternal( canSignal.signal_value_type() );
+        if ( !rawSignalType.has_value() )
+        {
+            FWE_LOG_ERROR( "Invalid Raw Signal Type " + std::to_string( canSignal.signal_value_type() ) +
+                           " for Signal ID: " + std::to_string( canSignal.signal_id() ) + " , skipping it" );
+            continue;
+        }
 
         // Create a container to hold the InterfaceManagement::CANSignal we will build
         CANSignalFormat canSignalFormat;
@@ -270,6 +349,7 @@ DecoderManifestIngestion::build()
         canSignalFormat.mOffset = canSignal.offset();
         canSignalFormat.mFactor = canSignal.factor();
         canSignalFormat.mSignalType = signalType;
+        canSignalFormat.mRawSignalType = *rawSignalType;
 
         mSignalIDToTypeMap[canSignal.signal_id()] = signalType;
 
@@ -326,10 +406,8 @@ DecoderManifestIngestion::build()
     // This optimization can avoid multiple rehashes and improve overall build performance
     mSignalToPIDDictionary.reserve( static_cast<size_t>( mProtoDecoderManifest.obd_pid_signals_size() ) );
     // Iterate over OBD-II PID Signals and build the obdPIDSignalDecoderFormat
-    for ( int i = 0; i < mProtoDecoderManifest.obd_pid_signals_size(); i++ )
+    for ( const Schemas::DecoderManifestMsg::OBDPIDSignal &pidSignal : mProtoDecoderManifest.obd_pid_signals() )
     {
-        // Get a reference to the OBD PID signal in the protobuf
-        const Schemas::DecoderManifestMsg::OBDPIDSignal &pidSignal = mProtoDecoderManifest.obd_pid_signals( i );
         if ( ( pidSignal.service_mode() >= toUType( SID::MAX ) ) || ( pidSignal.pid() > UINT8_MAX ) ||
              ( pidSignal.bit_right_shift() > UINT8_MAX ) || ( pidSignal.bit_mask_length() > UINT8_MAX ) )
         {
@@ -339,7 +417,15 @@ DecoderManifestIngestion::build()
         mSignalToVehicleDataSourceProtocol[pidSignal.signal_id()] = VehicleDataSourceProtocol::OBD;
         // For backward compatibility, default to double
         auto signalType =
-            convertPrimitiveTypeToSignalType( pidSignal.primitive_type() ).get_value_or( SignalType::DOUBLE );
+            convertPrimitiveTypeToInternal( pidSignal.primitive_type() ).get_value_or( SignalType::DOUBLE );
+        auto rawSignalType = convertSignalValueTypeToInternal( pidSignal.signal_value_type() );
+        if ( !rawSignalType.has_value() )
+        {
+            FWE_LOG_ERROR( "Invalid Raw Signal Type " + std::to_string( pidSignal.signal_value_type() ) +
+                           " for Signal ID: " + std::to_string( pidSignal.signal_id() ) + " , skipping it" );
+            continue;
+        }
+
         PIDSignalDecoderFormat obdPIDSignalDecoderFormat = PIDSignalDecoderFormat(
             pidSignal.pid_response_length(),
             // coverity[autosar_cpp14_a7_2_1_violation] The if-statement above checks the correct range
@@ -352,14 +438,15 @@ DecoderManifestIngestion::build()
             static_cast<uint8_t>( pidSignal.bit_right_shift() ),
             static_cast<uint8_t>( pidSignal.bit_mask_length() ) );
         obdPIDSignalDecoderFormat.mSignalType = signalType;
+        obdPIDSignalDecoderFormat.mRawSignalType = *rawSignalType;
+        obdPIDSignalDecoderFormat.mIsSigned = pidSignal.is_signed();
         mSignalToPIDDictionary[pidSignal.signal_id()] = obdPIDSignalDecoderFormat;
         mSignalIDToTypeMap[pidSignal.signal_id()] = signalType;
     }
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-    for ( int i = 0; i < mProtoDecoderManifest.complex_types_size(); i++ )
+    for ( const Schemas::DecoderManifestMsg::ComplexType &complexType : mProtoDecoderManifest.complex_types() )
     {
-        const Schemas::DecoderManifestMsg::ComplexType &complexType = mProtoDecoderManifest.complex_types( i );
         if ( ( complexType.type_id() == RESERVED_UTF8_UINT8_TYPE_ID ) ||
              ( complexType.type_id() == RESERVED_UTF16_UINT32_TYPE_ID ) )
         {
@@ -380,7 +467,7 @@ DecoderManifestIngestion::build()
             scaling = ( scaling == 0.0 ? 1.0 : scaling ); // If scaling is not set in protobuf or set to invalid 0
                                                           // replace it by default scaling: 1
             auto convertedType =
-                convertPrimitiveTypeToSignalType( primitiveData.primitive_type() ).get_value_or( SignalType::UINT8 );
+                convertPrimitiveTypeToInternal( primitiveData.primitive_type() ).get_value_or( SignalType::UINT8 );
             mComplexTypeMap[complexType.type_id()] =
                 ComplexDataElement( PrimitiveData{ convertedType, scaling, primitiveData.offset() } );
             FWE_LOG_TRACE( "Adding PrimitiveData with complex type id: " + std::to_string( complexType.type_id() ) +
@@ -436,9 +523,8 @@ DecoderManifestIngestion::build()
         }
     }
 
-    for ( int i = 0; i < mProtoDecoderManifest.complex_signals_size(); i++ )
+    for ( const Schemas::DecoderManifestMsg::ComplexSignal &complexSignal : mProtoDecoderManifest.complex_signals() )
     {
-        const Schemas::DecoderManifestMsg::ComplexSignal &complexSignal = mProtoDecoderManifest.complex_signals( i );
         mSignalToVehicleDataSourceProtocol[complexSignal.signal_id()] = VehicleDataSourceProtocol::COMPLEX_DATA;
         if ( complexSignal.interface_id() == INVALID_INTERFACE_ID )
         {
@@ -464,9 +550,8 @@ DecoderManifestIngestion::build()
     // This optimization can avoid multiple rehashes and improve overall build performance
     SignalIDToCustomSignalDecoderFormatMap signalToCustomDecoderMap;
     signalToCustomDecoderMap.reserve( static_cast<size_t>( mProtoDecoderManifest.custom_decoding_signals_size() ) );
-    for ( int i = 0; i < mProtoDecoderManifest.custom_decoding_signals_size(); i++ )
+    for ( const auto &customDecodedSignal : mProtoDecoderManifest.custom_decoding_signals() )
     {
-        const auto &customDecodedSignal = mProtoDecoderManifest.custom_decoding_signals( i );
         auto signalId = customDecodedSignal.signal_id();
         mSignalToVehicleDataSourceProtocol[signalId] = VehicleDataSourceProtocol::CUSTOM_DECODING;
 
@@ -477,7 +562,7 @@ DecoderManifestIngestion::build()
         else
         {
             // For backward compatibility, default to double
-            auto signalType = convertPrimitiveTypeToSignalType( customDecodedSignal.primitive_type() )
+            auto signalType = convertPrimitiveTypeToInternal( customDecodedSignal.primitive_type() )
                                   .get_value_or( SignalType::DOUBLE );
             mSignalIDToTypeMap[signalId] = signalType;
             signalToCustomDecoderMap[signalId] = CustomSignalDecoderFormat{
@@ -495,44 +580,6 @@ DecoderManifestIngestion::build()
     // Set our ready flag to true
     mReady = true;
     return true;
-}
-
-boost::optional<SignalType>
-DecoderManifestIngestion::convertPrimitiveTypeToSignalType( Schemas::DecoderManifestMsg::PrimitiveType primitiveType )
-{
-    switch ( primitiveType )
-    {
-    case Schemas::DecoderManifestMsg::PrimitiveType::BOOL:
-        return SignalType::BOOLEAN;
-    case Schemas::DecoderManifestMsg::PrimitiveType::UINT8:
-        return SignalType::UINT8;
-    case Schemas::DecoderManifestMsg::PrimitiveType::UINT16:
-        return SignalType::UINT16;
-    case Schemas::DecoderManifestMsg::PrimitiveType::UINT32:
-        return SignalType::UINT32;
-    case Schemas::DecoderManifestMsg::PrimitiveType::UINT64:
-        return SignalType::UINT64;
-    case Schemas::DecoderManifestMsg::PrimitiveType::INT8:
-        return SignalType::INT8;
-    case Schemas::DecoderManifestMsg::PrimitiveType::INT16:
-        return SignalType::INT16;
-    case Schemas::DecoderManifestMsg::PrimitiveType::INT32:
-        return SignalType::INT32;
-    case Schemas::DecoderManifestMsg::PrimitiveType::INT64:
-        return SignalType::INT64;
-    case Schemas::DecoderManifestMsg::PrimitiveType::FLOAT32:
-        return SignalType::FLOAT;
-    case Schemas::DecoderManifestMsg::PrimitiveType::FLOAT64:
-        return SignalType::DOUBLE;
-    case Schemas::DecoderManifestMsg::PrimitiveType::STRING:
-        return SignalType::STRING;
-    case Schemas::DecoderManifestMsg::PrimitiveType::NULL_:
-        return SignalType::DOUBLE;
-    default:
-        FWE_LOG_WARN( "Currently PrimitiveType " + std::to_string( primitiveType ) + " is not supported" );
-        break;
-    }
-    return boost::none;
 }
 
 } // namespace IoTFleetWise

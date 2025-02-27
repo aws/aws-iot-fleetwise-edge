@@ -1,16 +1,23 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CANInterfaceIDTranslator.h"
-#include "CacheAndPersist.h"
-#include "CheckinSender.h"
 #include "CollectionSchemeManagerMock.h"
 #include "CollectionSchemeManagerTest.h" // IWYU pragma: associated
+#include "Testing.h"
+#include "aws/iotfleetwise/CANInterfaceIDTranslator.h"
+#include "aws/iotfleetwise/CacheAndPersist.h"
+#include "aws/iotfleetwise/CheckinSender.h"
+#include "aws/iotfleetwise/ICollectionSchemeList.h"
+#include <boost/filesystem.hpp>
 #include <cstdlib>
 #include <fstream> // IWYU pragma: keep
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <iostream>
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+#include "collection_schemes.pb.h"
+#include "common_types.pb.h"
+#endif
 
 namespace Aws
 {
@@ -145,9 +152,9 @@ TEST( PersistencyTest, retrieveTest )
  */
 TEST( PersistencyTest, StoreAndRetrieve )
 {
-    int ret = std::system( "mkdir ./testPersist" );
-    ASSERT_FALSE( WIFEXITED( ret ) == 0 );
-    std::shared_ptr<CacheAndPersist> testPersistency = std::make_shared<CacheAndPersist>( "./testPersist", 4096 );
+    auto persistenceRootDir = getTempDir();
+    std::shared_ptr<CacheAndPersist> testPersistency =
+        std::make_shared<CacheAndPersist>( persistenceRootDir.string(), 4096 );
     ASSERT_TRUE( testPersistency->init() );
     std::string dataPL =
         "if the destructor for an automatic object is explicitly invoked, and the block is subsequently left in a "
@@ -162,7 +169,7 @@ TEST( PersistencyTest, StoreAndRetrieve )
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerWrapper testCollectionSchemeManager(
         testPersistency, canIDTranslator, std::make_shared<CheckinSender>( nullptr ) );
-    std::vector<ICollectionSchemePtr> emptyCP;
+    std::vector<std::shared_ptr<ICollectionScheme>> emptyCP;
     ICollectionSchemeListPtr storePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
     storePL->copyData( reinterpret_cast<const uint8_t *>( dataPL.c_str() ), sizePL );
     IDecoderManifestPtr storeDM = std::make_shared<IDecoderManifestTest>( "DM" );
@@ -171,10 +178,6 @@ TEST( PersistencyTest, StoreAndRetrieve )
     testCollectionSchemeManager.setDecoderManifest( storeDM );
     testCollectionSchemeManager.store( DataType::COLLECTION_SCHEME_LIST );
     testCollectionSchemeManager.store( DataType::DECODER_MANIFEST );
-
-    ret = std::system( "ls -l ./testPersist >test.txt" );
-    ASSERT_FALSE( WIFEXITED( ret ) == 0 );
-    std::cout << std::ifstream( "test.txt" ).rdbuf();
 
     ICollectionSchemeListPtr retrievePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
     IDecoderManifestPtr retrieveDM = std::make_shared<IDecoderManifestTest>( "DM" );
@@ -189,19 +192,17 @@ TEST( PersistencyTest, StoreAndRetrieve )
     orgData = storeDM->getData();
     retData = retrieveDM->getData();
     ASSERT_EQ( orgData, retData );
-    ret = std::system( "rm -rf ./testPersist" );
-    ASSERT_FALSE( WIFEXITED( ret ) == 0 );
 }
 
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
 /** @brief
  * This test validates Store and Forward campaign persistency with the usage of the store/retrieve APIs.
  */
-TEST( CollectionSchemeManagerTest2, StoreAndForwardPersistency )
+TEST( PersistencyTest, StoreAndForwardPersistency )
 {
-    int ret = std::system( "mkdir ./testPersist" );
-    ASSERT_FALSE( WIFEXITED( ret ) == 0 );
-    std::shared_ptr<CacheAndPersist> testPersistency = std::make_shared<CacheAndPersist>( "./testPersist", 4096 );
+    auto persistenceRootDir = getTempDir();
+    std::shared_ptr<CacheAndPersist> testPersistency =
+        std::make_shared<CacheAndPersist>( persistenceRootDir.string(), 4096 );
     ASSERT_TRUE( testPersistency->init() );
 
     Schemas::CollectionSchemesMsg::CollectionSchemes protoCollectionSchemesMsg;
@@ -267,13 +268,6 @@ TEST( CollectionSchemeManagerTest2, StoreAndForwardPersistency )
     signal3->set_condition_only_signal( true );
     signal3->set_data_partition_id( 1 );
 
-    // Add 1 RAW CAN Messages
-    Schemas::CollectionSchemesMsg::RawCanFrame *can1 = collectionSchemeTestMessage->add_raw_can_frames_to_collect();
-    can1->set_can_interface_id( "1230" );
-    can1->set_can_message_id( 0x1FF );
-    can1->set_sample_buffer_size( 200 );
-    can1->set_minimum_sample_period_ms( 255 );
-
     std::string protoMessage;
     ASSERT_TRUE( protoCollectionSchemesMsg.SerializeToString( &protoMessage ) );
     size_t sizePL = protoMessage.length();
@@ -283,25 +277,19 @@ TEST( CollectionSchemeManagerTest2, StoreAndForwardPersistency )
     CollectionSchemeManagerWrapper testCollectionSchemeManager(
         nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ) );
     testCollectionSchemeManager.setCollectionSchemePersistency( testPersistency );
-    std::vector<ICollectionSchemePtr> emptyCP;
-    ICollectionSchemeListPtr storePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
+    std::vector<std::shared_ptr<ICollectionScheme>> emptyCP;
+    auto storePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
     storePL->copyData( reinterpret_cast<const uint8_t *>( dataPL.c_str() ), sizePL );
     testCollectionSchemeManager.setCollectionSchemeList( storePL );
     testCollectionSchemeManager.store( DataType::COLLECTION_SCHEME_LIST );
 
-    ret = std::system( "ls -l ./testPersist >test.txt" );
-    ASSERT_FALSE( WIFEXITED( ret ) == 0 );
-    std::cout << std::ifstream( "test.txt" ).rdbuf();
-
-    ICollectionSchemeListPtr retrievePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
+    auto retrievePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
     testCollectionSchemeManager.setCollectionSchemeList( retrievePL );
     testCollectionSchemeManager.retrieve( DataType::COLLECTION_SCHEME_LIST );
 
     std::vector<uint8_t> orgData = storePL->getData();
     std::vector<uint8_t> retData = retrievePL->getData();
     ASSERT_EQ( orgData, retData );
-    ret = std::system( "rm -rf ./testPersist" );
-    ASSERT_FALSE( WIFEXITED( ret ) == 0 );
 }
 #endif
 

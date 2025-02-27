@@ -19,9 +19,12 @@
 - :cloud:
   [IoT topics as a data destination](https://docs.aws.amazon.com/iot-fleetwise/latest/developerguide/create-campaign.html).
 - :jigsaw: [Custom functions in expressions](./docs/dev-guide/custom-function-dev-guide.md).
+  - :snake: including
+    [Python support](./docs/dev-guide/custom-function-dev-guide.md#python-custom-function).
 - :fast_forward: [Store and forward](./docs/dev-guide/store-and-forward-dev-guide.md), for
   conditional upload of collected data.
 - :wrench: [UDS DTC data collection](./docs/dev-guide/edge-agent-uds-dtc-dev-guide.md).
+- :books: Usage as an external library, see the [`examples`](./examples/README.md).
 
 <!-- prettier-ignore -->
 > [!NOTE]
@@ -138,7 +141,7 @@ information.
   - [Curl: v7.58.0](https://github.com/curl/curl)
   - [OpenSSL: v1.1.1](https://github.com/openssl/openssl)
   - [zlib: v1.2.11](https://github.com/madler/zlib)
-- [GoogleTest: v1.10.0](https://github.com/google/googletest)
+- [GoogleTest: v1.15.2](https://github.com/google/googletest)
 - [Google Benchmark: v1.6.1](https://github.com/google/benchmark)
 - [Protobuf: v3.21.12](https://github.com/protocolbuffers/protobuf)
 - [Boost: v1.84.0](https://github.com/boostorg/boost)
@@ -173,6 +176,16 @@ Optional: The following dependencies are only required when the option
 `FWE_FEATURE_STORE_AND_FORWARD` is enabled.
 
 - [device-storelibrary-cpp: v1.0.0](https://github.com/aws/device-storelibrary-cpp)
+
+Optional: The following dependencies are only required when the option `FWE_FEATURE_CPYTHON` is
+enabled.
+
+- [CPython: v3.8.10](https://github.com/python/cpython)
+
+Optional: The following dependencies are only required when the option `FWE_FEATURE_MICROPYTHON` is
+enabled.
+
+- [MicroPython: v1.23.0](https://github.com/micropython/micropython)
 
 See [LICENSE](./LICENSE) for more information.
 

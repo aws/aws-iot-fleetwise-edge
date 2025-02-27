@@ -62,6 +62,7 @@ your IoT Credentials Provider role alias in order to enable ROS2 support, then r
 - `CREDS_ENDPOINT_URL`: IoT Credentials Provider Endpoint URL
 - `CREDS_ROLE_ALIAS`: IoT Credentials Provider role alias
 - `RAW_DATA_BUFFER_SIZE`: Raw data buffer size in bytes
+- `ENABLE_ROS2_INTERFACE`: true
 
 For example:
 
@@ -76,5 +77,6 @@ docker run \
     --env CREDS_ENDPOINT_URL=<CREDS_ENDPOINT_URL> \
     --env CREDS_ROLE_ALIAS=<CREDS_ROLE_ALIAS> \
     --env RAW_DATA_BUFFER_SIZE=<RAW_DATA_BUFFER_SIZE> \
+    --env ENABLE_ROS2_INTERFACE=true \
     public.ecr.aws/aws-iot-fleetwise-edge/aws-iot-fleetwise-edge-ros2
 ```

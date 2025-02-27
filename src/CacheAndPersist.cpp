@@ -1,21 +1,60 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CacheAndPersist.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/CacheAndPersist.h"
+#include "aws/iotfleetwise/Assert.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <algorithm>
 #include <boost/filesystem.hpp>
+#include <boost/uuid/detail/sha1.hpp>
 #include <cstdio>
-#include <fstream>  // IWYU pragma: keep
+#include <fstream> // IWYU pragma: keep
+#include <iomanip>
 #include <ios>      // IWYU pragma: keep
 #include <iostream> // IWYU pragma: keep
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
+
+constexpr auto SHA1_DIGEST_SIZE_BYTES = sizeof( boost::uuids::detail::sha1::digest_type );
+constexpr auto SHA1_DIGEST_SIZE_WORDS = SHA1_DIGEST_SIZE_BYTES / sizeof( uint32_t );
+
+namespace
+{
+std::string sha1DigestAsString( uint32_t ( &digest )[SHA1_DIGEST_SIZE_WORDS] )
+{
+    std::stringstream hashString;
+    for ( unsigned int i = 0; i < SHA1_DIGEST_SIZE_WORDS; i++ )
+    {
+        hashString << std::hex << std::setw( sizeof( uint32_t ) * 2 ) << std::setfill( '0' ) << digest[i];
+    }
+    return hashString.str();
+}
+
+std::string
+calculateSha1( const uint8_t *buf, size_t size )
+{
+    boost::uuids::detail::sha1 sha1;
+    try
+    {
+        sha1.process_bytes( buf, size );
+    }
+    catch ( const std::runtime_error &e )
+    {
+        // An exception is only thrown in case the input is too large. The max length for the input when calculating
+        // SHA1 is 2^64 bits, so it should never happen in our case.
+        FWE_FATAL_ASSERT( false, "Exception while calculating SHA1: " + std::string( e.what() ) );
+    }
+    uint32_t digest[SHA1_DIGEST_SIZE_WORDS];
+    sha1.get_digest( digest );
+    return sha1DigestAsString( digest );
+}
+} // namespace
 
 CacheAndPersist::CacheAndPersist( const std::string &partitionPath, size_t maxPartitionSize )
     : mPersistencyPath{ partitionPath }
@@ -123,7 +162,7 @@ CacheAndPersist::write( const uint8_t *bufPtr, size_t size, DataType dataType, c
 }
 
 ErrorCode
-CacheAndPersist::write( const uint8_t *bufPtr, size_t size, std::string &path )
+CacheAndPersist::write( const uint8_t *bufPtr, size_t size, const std::string &path )
 {
     if ( bufPtr == nullptr )
     {
@@ -141,6 +180,12 @@ CacheAndPersist::write( const uint8_t *bufPtr, size_t size, std::string &path )
     {
         FWE_LOG_ERROR( "Failed to persist data: memory limit achieved" );
         return ErrorCode::MEMORY_FULL;
+    }
+
+    auto checksumStatus = writeChecksumForFile( path, calculateSha1( bufPtr, size ) );
+    if ( checksumStatus != ErrorCode::SUCCESS )
+    {
+        return checksumStatus;
     }
 
     std::ofstream file( path.c_str(), std::ios_base::out | std::ios_base::binary );
@@ -168,16 +213,16 @@ CacheAndPersist::write( std::streambuf &streambuf, DataType dataType, const std:
         return ErrorCode::INVALID_DATATYPE;
     }
 
-    boost::filesystem::path path{ filename };
+    boost::filesystem::path path{ mCollectedDataPath + filename };
     // coverity[misra_cpp_2008_rule_14_8_2_violation] - boost filesystem path header defines both template and
     // and non-template function
-    if ( !boost::filesystem::exists( mCollectedDataPath + path.parent_path().string() ) )
+    if ( !boost::filesystem::exists( path.parent_path().string() ) )
     {
         try
         {
             // coverity[misra_cpp_2008_rule_14_8_2_violation] - boost filesystem path header defines both template and
             // and non-template function
-            boost::filesystem::create_directories( mCollectedDataPath + path.parent_path().string() );
+            boost::filesystem::create_directories( path.parent_path().string() );
         }
         catch ( const boost::filesystem::filesystem_error &err )
         {
@@ -187,8 +232,37 @@ CacheAndPersist::write( std::streambuf &streambuf, DataType dataType, const std:
         }
     }
 
-    std::ofstream file( mCollectedDataPath + filename, std::ios::binary );
-    file << &streambuf;
+    std::ofstream file( path.string(), std::ios::binary );
+
+    boost::uuids::detail::sha1 sha1;
+
+    while ( streambuf.sgetc() != std::char_traits<char>::eof() )
+    {
+        static const std::size_t CHUNK_SIZE = 4024;
+        char chunk[CHUNK_SIZE];
+        char *chunkPtr = chunk;
+        auto count = streambuf.sgetn( chunkPtr, CHUNK_SIZE );
+        try
+        {
+            sha1.process_bytes( chunkPtr, static_cast<size_t>( count ) );
+        }
+        catch ( const std::runtime_error &e )
+        {
+            // An exception is only thrown in case the input is too large. The max length for the input when calculating
+            // SHA1 is 2^64 bits, so it should never happen in our case.
+            FWE_FATAL_ASSERT( false, "Exception while calculating SHA1: " + std::string( e.what() ) );
+        }
+        file.write( chunkPtr, count );
+    }
+
+    unsigned int digest[SHA1_DIGEST_SIZE_WORDS];
+    sha1.get_digest( digest );
+    auto checksumStatus = writeChecksumForFile( path.string(), sha1DigestAsString( digest ) );
+    if ( checksumStatus != ErrorCode::SUCCESS )
+    {
+        return checksumStatus;
+    }
+
     file.close();
 
     if ( !file.good() )
@@ -281,34 +355,7 @@ CacheAndPersist::read( uint8_t *const readBufPtr, size_t size, DataType dataType
 }
 
 ErrorCode
-CacheAndPersist::read( std::ifstream &fileStream, DataType dataType, const std::string &filename )
-{
-    std::string path = getFileName( dataType );
-    if ( dataType == DataType::EDGE_TO_CLOUD_PAYLOAD )
-    {
-        if ( filename.empty() )
-        {
-            FWE_LOG_ERROR( "Failed to read persisted data: filename for the payload is empty " );
-            return ErrorCode::INVALID_DATATYPE;
-        }
-        else
-        {
-            path += filename;
-        }
-    }
-
-    fileStream.open( path, std::ios::in | std::ios::binary );
-    if ( !fileStream.is_open() )
-    {
-        FWE_LOG_ERROR( "Could not open file stream for file " + path )
-        return ErrorCode::FILESYSTEM_ERROR;
-    }
-
-    return ErrorCode::SUCCESS;
-}
-
-ErrorCode
-CacheAndPersist::read( uint8_t *const readBufPtr, size_t size, std::string &path ) const
+CacheAndPersist::read( uint8_t *const readBufPtr, size_t size, const std::string &path ) const
 {
     if ( readBufPtr == nullptr )
     {
@@ -350,7 +397,86 @@ CacheAndPersist::read( uint8_t *const readBufPtr, size_t size, std::string &path
         return ErrorCode::FILESYSTEM_ERROR;
     }
 
+    std::string expectedChecksum;
+    auto checksumStatus = readChecksumForFile( path, expectedChecksum );
+    if ( checksumStatus == ErrorCode::EMPTY )
+    {
+        // Skip the check as this is likely data that was persisted before checksum support was added.
+        return ErrorCode::SUCCESS;
+    }
+    else if ( checksumStatus != ErrorCode::SUCCESS )
+    {
+        return checksumStatus;
+    }
+
+    std::string actualChecksum = calculateSha1( readBufPtr, size );
+    if ( expectedChecksum != actualChecksum )
+    {
+        FWE_LOG_ERROR( "Checksum mismatch for file '" + path + "'. Expected SHA1: " + expectedChecksum +
+                       ", actual SHA1: " + actualChecksum );
+        erase( path );
+        erase( getChecksumFilename( path ) );
+        return ErrorCode::INVALID_DATA;
+    }
+
     return ErrorCode::SUCCESS;
+}
+
+ErrorCode
+CacheAndPersist::readChecksumForFile( const std::string &path, std::string &result )
+{
+    auto checksumFilename = getChecksumFilename( path );
+    // SHA1_DIGEST_SIZE is multiplied by 2 because we write it as a hex string
+    if ( !boost::filesystem::exists( checksumFilename ) )
+    {
+        FWE_LOG_WARN( "Checksum file " + checksumFilename +
+                      " doesn't exist. It won't be possible to detect if data is corrupted." );
+        return ErrorCode::EMPTY;
+    }
+
+    constexpr auto checksumFileSize = static_cast<size_t>( SHA1_DIGEST_SIZE_BYTES * 2 );
+    if ( getSize( checksumFilename ) != checksumFileSize )
+    {
+        // Don't do anything. The caller will eventually compare the values and detect the mismatch.
+        FWE_LOG_WARN( "Invalid checksum file: " + checksumFilename );
+        result = "";
+        return ErrorCode::SUCCESS;
+    }
+
+    char checksumBuf[checksumFileSize];
+    char *checksumBufPtr = checksumBuf;
+    std::ifstream checksumFile( checksumFilename.c_str(), std::ios_base::in );
+    checksumFile.clear();
+    checksumFile.read( checksumBufPtr, static_cast<std::streamsize>( checksumFileSize ) );
+    if ( checksumFile.fail() )
+    {
+        FWE_LOG_ERROR( "Error reading file: " + checksumFilename );
+        return ErrorCode::FILESYSTEM_ERROR;
+    }
+
+    result = std::string( checksumBufPtr, checksumBufPtr + checksumFileSize );
+    return ErrorCode::SUCCESS;
+}
+
+ErrorCode
+CacheAndPersist::writeChecksumForFile( const std::string &path, const std::string &checksum )
+{
+    auto checksumFilename = getChecksumFilename( path );
+    std::ofstream checksumFile( checksumFilename.c_str(), std::ios_base::out );
+    checksumFile << checksum;
+    if ( !checksumFile.good() )
+    {
+        FWE_LOG_ERROR( "Failed to write file: " + checksumFilename );
+        return ErrorCode::FILESYSTEM_ERROR;
+    }
+
+    return ErrorCode::SUCCESS;
+}
+
+std::string
+CacheAndPersist::getChecksumFilename( const std::string &path )
+{
+    return path + ".sha1";
 }
 
 ErrorCode
@@ -390,7 +516,7 @@ CacheAndPersist::erase( DataType dataType, const std::string &filename )
 }
 
 ErrorCode
-CacheAndPersist::erase( std::string &path )
+CacheAndPersist::erase( const std::string &path )
 {
     if ( path.empty() )
     {

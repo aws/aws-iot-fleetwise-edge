@@ -1,13 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CANDecoder.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/CANDecoder.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <typeinfo>
-
-#define MASK64( nbits ) ( static_cast<uint64_t>( 0xFFFFFFFFFFFFFFFFULL ) >> ( 64 - ( nbits ) ) )
 
 namespace Aws
 {
@@ -42,35 +42,30 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
         if ( signalIDsToCollect.find( it->mSignalID ) != signalIDsToCollect.end() )
         {
             // Decode the multiplexor Value
-            int64_t rawValue = extractSignalFromFrame( frameData, *it );
+            int64_t rawValue = extractIntegerSignalFromFrame( frameData, *it );
             multiplexorValue = static_cast<uint8_t>( static_cast<uint8_t>( rawValue ) * it->mFactor + it->mOffset );
 
             const auto CANsignalType = it->mSignalType;
             switch ( CANsignalType )
             {
-            case ( SignalType::UINT64 ): {
-                if ( typeid( it->mFactor ) == typeid( double ) )
-                {
-                    FWE_LOG_WARN( "Scaling Factor is double for signal ID " + std::to_string( it->mSignalID ) +
-                                  " and type as uint64" );
-                }
+            case SignalType::UINT64: {
                 auto physicalRawValue = static_cast<uint64_t>( multiplexorValue );
                 auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
-                decodedSignals.emplace_back( CANDecodedSignal( it->mSignalID, physicalValue, CANsignalType ) );
+                decodedSignals.emplace_back( it->mSignalID, physicalValue, CANsignalType );
                 break;
             }
-            case ( SignalType::INT64 ): {
+            case SignalType::INT64: {
 
                 auto physicalRawValue = static_cast<int64_t>( multiplexorValue );
                 auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
-                decodedSignals.emplace_back( CANDecodedSignal( it->mSignalID, physicalValue, CANsignalType ) );
+                decodedSignals.emplace_back( it->mSignalID, physicalValue, CANsignalType );
                 break;
             }
             default: {
 
                 auto physicalRawValue = static_cast<double>( multiplexorValue );
                 auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
-                decodedSignals.emplace_back( CANDecodedSignal( it->mSignalID, physicalValue, CANsignalType ) );
+                decodedSignals.emplace_back( it->mSignalID, physicalValue, CANsignalType );
                 break;
             }
             }
@@ -105,40 +100,22 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
                 continue;
             }
 
-            // Start decoding the signal, extract the value before scaling from the Frame.
-            int64_t rawValue = extractSignalFromFrame( frameData, format.mSignals[i] );
-            const auto CANsignalType = format.mSignals[i].mSignalType;
-            switch ( CANsignalType )
+            switch ( format.mSignals[i].mRawSignalType )
             {
-            case ( SignalType::UINT64 ): {
-                if ( typeid( format.mSignals[i].mFactor ) == typeid( double ) )
+            case RawSignalType::INTEGER: {
+                decodedSignals.emplace_back( decodeIntegerSignal( frameData, format.mSignals[i] ) );
+                break;
+            }
+            case RawSignalType::FLOATING_POINT: {
+                if ( ( format.mSignals[i].mSizeInBits != 32 ) && ( format.mSignals[i].mSizeInBits != 64 ) )
                 {
-                    FWE_LOG_WARN( "Scaling Factor is double for signal ID " +
-                                  std::to_string( format.mSignals[i].mSignalID ) + " and type as uint64" );
+                    FWE_LOG_ERROR( "Floating point signal must be 32 or 64 bits but got " +
+                                   std::to_string( format.mSignals[i].mSizeInBits ) );
+                    errorCounter++;
+                    continue;
                 }
-                uint64_t physicalRawValue =
-                    static_cast<uint64_t>( rawValue ) * static_cast<uint64_t>( format.mSignals[i].mFactor ) +
-                    static_cast<uint64_t>( format.mSignals[i].mOffset );
-                auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
-                decodedSignals.emplace_back(
-                    CANDecodedSignal( format.mSignals[i].mSignalID, physicalValue, CANsignalType ) );
+                decodedSignals.emplace_back( decodeFloatingPointSignal( frameData, format.mSignals[i] ) );
                 break;
-            }
-            case ( SignalType::INT64 ): {
-                auto physicalRawValue =
-                    static_cast<int64_t>( rawValue ) * static_cast<int64_t>( format.mSignals[i].mFactor ) +
-                    static_cast<int64_t>( format.mSignals[i].mOffset );
-                auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
-                decodedSignals.emplace_back(
-                    CANDecodedSignal( format.mSignals[i].mSignalID, physicalValue, CANsignalType ) );
-                break;
-            }
-            default: {
-                auto physicalRawValue =
-                    static_cast<double>( rawValue ) * format.mSignals[i].mFactor + format.mSignals[i].mOffset;
-                auto physicalValue = DecodedSignalValue( physicalRawValue, CANsignalType );
-                decodedSignals.emplace_back(
-                    CANDecodedSignal( format.mSignals[i].mSignalID, physicalValue, CANsignalType ) );
             }
             }
         }
@@ -148,8 +125,75 @@ CANDecoder::decodeCANMessage( const uint8_t *frameData,
     return errorCounter == 0;
 }
 
+CANDecodedSignal
+CANDecoder::decodeIntegerSignal( const uint8_t *frameData, const CANSignalFormat &signalDescription )
+{
+    const auto canSignalType = signalDescription.mSignalType;
+    int64_t rawValue = extractIntegerSignalFromFrame( frameData, signalDescription );
+    switch ( canSignalType )
+    {
+    case SignalType::UINT64: {
+        if ( typeid( signalDescription.mFactor ) == typeid( double ) )
+        {
+            FWE_LOG_WARN( "Scaling Factor is double for signal ID " + std::to_string( signalDescription.mSignalID ) +
+                          " and type as uint64" );
+        }
+        uint64_t physicalRawValue =
+            static_cast<uint64_t>( rawValue ) * static_cast<uint64_t>( signalDescription.mFactor ) +
+            static_cast<uint64_t>( signalDescription.mOffset );
+        return { signalDescription.mSignalID, DecodedSignalValue( physicalRawValue, canSignalType ), canSignalType };
+    }
+    case SignalType::INT64: {
+        auto physicalRawValue = static_cast<int64_t>( rawValue ) * static_cast<int64_t>( signalDescription.mFactor ) +
+                                static_cast<int64_t>( signalDescription.mOffset );
+        return { signalDescription.mSignalID, DecodedSignalValue( physicalRawValue, canSignalType ), canSignalType };
+    }
+    default: {
+        auto physicalRawValue = static_cast<double>( rawValue ) * signalDescription.mFactor + signalDescription.mOffset;
+        return { signalDescription.mSignalID, DecodedSignalValue( physicalRawValue, canSignalType ), canSignalType };
+    }
+    }
+}
+
+CANDecodedSignal
+CANDecoder::decodeFloatingPointSignal( const uint8_t *frameData, const CANSignalFormat &signalDescription )
+{
+    const auto canSignalType = signalDescription.mSignalType;
+    if ( signalDescription.mSizeInBits == 32 )
+    {
+        uint32_t rawValue = extractRawSignalFromFrame<uint32_t>( frameData, signalDescription );
+        float *floatValue = reinterpret_cast<float *>( &rawValue );
+        auto physicalRawValue =
+            static_cast<double>( *floatValue ) * signalDescription.mFactor + signalDescription.mOffset;
+        return { signalDescription.mSignalID, DecodedSignalValue( physicalRawValue, canSignalType ), canSignalType };
+    }
+    else
+    {
+        uint64_t rawValue = extractRawSignalFromFrame<uint64_t>( frameData, signalDescription );
+        double *doubleValue = reinterpret_cast<double *>( &rawValue );
+        auto physicalRawValue =
+            static_cast<double>( *doubleValue ) * signalDescription.mFactor + signalDescription.mOffset;
+        return { signalDescription.mSignalID, DecodedSignalValue( physicalRawValue, canSignalType ), canSignalType };
+    }
+}
+
 int64_t
-CANDecoder::extractSignalFromFrame( const uint8_t *frameData, const CANSignalFormat &signalDescription )
+CANDecoder::extractIntegerSignalFromFrame( const uint8_t *frameData, const CANSignalFormat &signalDescription )
+{
+    uint64_t rawValue = extractRawSignalFromFrame<uint64_t>( frameData, signalDescription );
+
+    // perform sign extension
+    if ( signalDescription.mIsSigned )
+    {
+        uint64_t msbSignMask = static_cast<uint64_t>( 1U ) << ( signalDescription.mSizeInBits - 1 );
+        rawValue = ( ( rawValue ^ msbSignMask ) - msbSignMask );
+    }
+    return static_cast<int64_t>( rawValue );
+}
+
+template <typename T>
+auto
+CANDecoder::extractRawSignalFromFrame( const uint8_t *frameData, const CANSignalFormat &signalDescription ) -> T
 {
     uint16_t startBit = static_cast<uint16_t>( signalDescription.mFirstBitPosition );
     uint8_t startByte = static_cast<uint8_t>( startBit / BYTE_SIZE );
@@ -161,7 +205,7 @@ CANDecoder::extractSignalFromFrame( const uint8_t *frameData, const CANSignalFor
     // NOTE: The start bit here is different from how it appears in a DBC file. In a DBC file, the
     // start bit indicates the LSB for little endian and MSB for big endian signals.
     // But AWS IoT FleetWise considers start bit to always be the LSB regardless of endianess.
-    uint64_t result = frameData[startByte] >> startBitInByte;
+    T result = frameData[startByte] >> startBitInByte;
 
     // Write residual bytes
     if ( signalDescription.mIsBigEndian ) // Motorola (big endian)
@@ -171,7 +215,7 @@ CANDecoder::extractSignalFromFrame( const uint8_t *frameData, const CANSignalFor
 
         for ( int count = startByte - 1; count >= endByte; count-- )
         {
-            result |= static_cast<uint64_t>( frameData[count] ) << resultLength;
+            result |= static_cast<T>( frameData[count] ) << resultLength;
             resultLength = static_cast<uint8_t>( resultLength + BYTE_SIZE );
         }
     }
@@ -181,21 +225,17 @@ CANDecoder::extractSignalFromFrame( const uint8_t *frameData, const CANSignalFor
 
         for ( int count = startByte + 1; count <= endByte; count++ )
         {
-            result |= static_cast<uint64_t>( frameData[count] ) << resultLength;
+            result |= static_cast<T>( frameData[count] ) << resultLength;
             resultLength = static_cast<uint8_t>( resultLength + BYTE_SIZE );
         }
     }
 
     // Mask value
-    result &= MASK64( signalDescription.mSizeInBits );
+    auto mask =
+        ( static_cast<T>( 0xFFFFFFFFFFFFFFFFULL ) >> ( sizeof( T ) * BYTE_SIZE - ( signalDescription.mSizeInBits ) ) );
+    result &= mask;
 
-    // perform sign extension
-    if ( signalDescription.mIsSigned )
-    {
-        uint64_t msbSignMask = static_cast<uint64_t>( 1U ) << ( signalDescription.mSizeInBits - 1 );
-        result = ( ( result ^ msbSignMask ) - msbSignMask );
-    }
-    return static_cast<int64_t>( result );
+    return result;
 }
 
 } // namespace IoTFleetWise

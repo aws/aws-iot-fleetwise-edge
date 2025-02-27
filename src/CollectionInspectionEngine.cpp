@@ -1,10 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CollectionInspectionEngine.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/CollectionInspectionEngine.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <algorithm>
 #include <cstdlib>
+#include <functional>
 
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
 #include <unordered_map>
@@ -15,10 +17,22 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-CollectionInspectionEngine::CollectionInspectionEngine( uint32_t minFetchTriggerIntervalMs,
-                                                        bool sendDataOnlyOncePerCondition )
+CollectionInspectionEngine::CollectionInspectionEngine( RawData::BufferManager *rawDataBufferManager,
+                                                        uint32_t minFetchTriggerIntervalMs,
+                                                        const std::shared_ptr<FetchRequestQueue> fetchQueue,
+                                                        bool sendDataOnlyOncePerCondition
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                                                        ,
+                                                        Aws::IoTFleetWise::Store::StreamForwarder *streamForwarder
+#endif
+                                                        )
     : mMinFetchTriggerIntervalMs( minFetchTriggerIntervalMs )
+    , mFetchQueue( fetchQueue )
     , mSendDataOnlyOncePerCondition( sendDataOnlyOncePerCondition )
+    , mRawDataBufferManager( rawDataBufferManager )
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    , mStreamForwarder( streamForwarder )
+#endif
 {
     setActiveDTCsConsumed( ALL_CONDITIONS, false );
 }
@@ -81,7 +95,7 @@ CollectionInspectionEngine::cleanupCustomFunctions( const ExpressionNode *expres
 }
 
 void
-CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix,
+CollectionInspectionEngine::onChangeInspectionMatrix( std::shared_ptr<const InspectionMatrix> inspectionMatrix,
                                                       const TimePoint &currentTime )
 {
     // Clears everything in this class including all data in the signal history buffer
@@ -114,10 +128,6 @@ CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<cons
             return;
         }
         mConditions.emplace_back( condition );
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-        mForwardConditionCurrentlyTrueForCampaignPartitions[condition.metadata.campaignArn].resize(
-            condition.forwardConditions.size() );
-#endif
         for ( auto &signal : condition.signals )
         {
             if ( signal.signalID == INVALID_SIGNAL_ID )
@@ -201,25 +211,6 @@ CollectionInspectionEngine::onChangeInspectionMatrix( const std::shared_ptr<cons
                 addSignalBuffer<RawData::BufferHandle>( signal, signalBufferConditionIndex );
                 break;
 #endif
-            }
-        }
-        for ( auto &canFrame : condition.canFrames )
-        {
-            bool found = false;
-            for ( auto &buf : mCanFrameBuffers )
-            {
-                if ( ( buf.mFrameID == canFrame.frameID ) && ( buf.mChannelID == canFrame.channelID ) &&
-                     ( buf.mMinimumSampleIntervalMs == canFrame.minimumSampleIntervalMs ) )
-                {
-                    found = true;
-                    buf.mSize = std::max( buf.mSize, canFrame.sampleBufferSize );
-                    break;
-                }
-            }
-            if ( !found )
-            {
-                mCanFrameBuffers.emplace_back(
-                    canFrame.frameID, canFrame.channelID, canFrame.sampleBufferSize, canFrame.minimumSampleIntervalMs );
             }
         }
         signalBufferConditionIndexCount++;
@@ -345,10 +336,10 @@ CollectionInspectionEngine::allocateBufferVector( SignalID signalID,
             uint64_t requiredBytes = buffer.mSize * static_cast<uint64_t>( sizeof( struct SignalSample<T> ) );
             if ( usedBytes + requiredBytes > MAX_SAMPLE_MEMORY )
             {
-                FWE_LOG_WARN( "The requested " + std::to_string( buffer.mSize ) +
-                              " number of signal samples leads to a memory requirement  that's above the maximum "
-                              "configured of " +
-                              std::to_string( MAX_SAMPLE_MEMORY ) + "Bytes" );
+                FWE_LOG_ERROR( "The requested " + std::to_string( buffer.mSize ) +
+                               " number of signal samples leads to a memory requirement  that's above the maximum "
+                               "configured of " +
+                               std::to_string( MAX_SAMPLE_MEMORY ) + "Bytes" );
                 buffer.mSize = 0;
                 TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::COLLECTION_SCHEME_ERROR );
                 return false;
@@ -471,24 +462,6 @@ CollectionInspectionEngine::preAllocateBuffers()
             }
         }
     }
-    // Allocate Can buffer
-    for ( auto &buf : mCanFrameBuffers )
-    {
-        size_t requiredBytes = buf.mSize * sizeof( struct CanFrameSample );
-        if ( usedBytes + requiredBytes > MAX_SAMPLE_MEMORY )
-        {
-            FWE_LOG_WARN( "The requested " + std::to_string( buf.mSize ) +
-                          " number of CAN raw samples leads to a memory requirement  that's above the maximum "
-                          "configured of" +
-                          std::to_string( MAX_SAMPLE_MEMORY ) + "Bytes" );
-            buf.mSize = 0;
-            return false;
-        }
-        usedBytes += requiredBytes;
-
-        // reserve the size like new[]
-        buf.mBuffer.resize( buf.mSize );
-    }
     TraceModule::get().setVariable( TraceVariable::SIGNAL_BUFFER_SIZE, usedBytes );
     return true;
 }
@@ -498,7 +471,6 @@ CollectionInspectionEngine::clear()
 {
     mSignalBuffers.clear();
     mSignalToBufferTypeMap.clear();
-    mCanFrameBuffers.clear();
     mConditions.clear();
     mFetchRequestToConditionIndexMap.clear();
     mNextConditionToCollectedIndex = 0;
@@ -506,13 +478,11 @@ CollectionInspectionEngine::clear()
     mConditionsWithInputSignalChanged.reset();
     // Default all conditions to true to force rising edge logic
     mConditionsWithConditionCurrentlyTrue.set();
+    mFetchConditionsWithConditionCurrentlyTrue.set();
     mConditionsTriggeredWaitingPublished.reset();
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-    mForwardConditionCurrentlyTrueForCampaignPartitions.clear();
-#endif
-    if ( mRawBufferManager != nullptr )
+    if ( mRawDataBufferManager != nullptr )
     {
-        mRawBufferManager->resetUsageHintsForStage(
+        mRawDataBufferManager->resetUsageHintsForStage(
             RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_HISTORY_BUFFER );
     }
     // Cleanup the custom functions for the last campaigns:
@@ -700,12 +670,19 @@ CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
                         if ( ( !fetchCondition.triggerOnlyOnRisingEdge ) ||
                              ( !mFetchConditionsWithConditionCurrentlyTrue.test( fetchCondition.fetchRequestID ) ) )
                         {
-                            // Notify fetch manager that condition for this fetch request evaluated to TRUE
-                            mFetchConditionEvaluationListeners.notify( fetchCondition.fetchRequestID,
-                                                                       fetchConditionResult.boolVal );
-                            oneConditionEvaluatedToTrue = true;
-                            mLastFetchTrigger[fetchCondition.fetchRequestID] = currentTime.monotonicTimeMs;
+                            if ( mFetchQueue && mFetchQueue->push( fetchCondition.fetchRequestID ) )
+                            {
+                                FWE_LOG_TRACE( "New fetch request was handed over" );
+                                oneConditionEvaluatedToTrue = true;
+                                mLastFetchTrigger[fetchCondition.fetchRequestID] = currentTime.monotonicTimeMs;
+                            }
+                            else
+                            {
+                                FWE_LOG_WARN( "Fetch Queue full, discarding fetch request ID " +
+                                              std::to_string( fetchCondition.fetchRequestID ) );
+                            }
                         }
+
                         mFetchConditionsWithConditionCurrentlyTrue.set( fetchCondition.fetchRequestID );
                     }
                     else
@@ -717,7 +694,7 @@ CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
 
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
             // If forward conditions are set and input signal has changed, evaluate forward conditions
-            if ( !condition.mCondition.forwardConditions.empty() )
+            if ( ( mStreamForwarder != nullptr ) && ( !condition.mCondition.forwardConditions.empty() ) )
             {
                 for ( uint32_t j = 0; j < condition.mCondition.forwardConditions.size(); j++ )
                 {
@@ -727,15 +704,13 @@ CollectionInspectionEngine::evaluateConditions( const TimePoint &currentTime )
                     if ( ( ret != ExpressionErrorCode::SUCCESSFUL ) || ( !resultForward.isBoolOrDouble() ) ||
                          ( !resultForward.asBool() ) )
                     {
-
-                        mForwardConditionCurrentlyTrueForCampaignPartitions[condition.mCondition.metadata.campaignArn]
-                                                                           [j] = false;
+                        mStreamForwarder->cancelForward(
+                            condition.mCondition.metadata.campaignArn, j, Store::StreamForwarder::Source::CONDITION );
                     }
                     else
                     {
-
-                        mForwardConditionCurrentlyTrueForCampaignPartitions[condition.mCondition.metadata.campaignArn]
-                                                                           [j] = true;
+                        mStreamForwarder->beginForward(
+                            condition.mCondition.metadata.campaignArn, j, Store::StreamForwarder::Source::CONDITION );
                         oneConditionEvaluatedToTrue = true;
                     }
                 }
@@ -828,53 +803,13 @@ CollectionInspectionEngine::collectLastSignals( SignalID id,
             {
                 NotifyRawBufferManager<T>::increaseElementUsage(
                     id,
-                    mRawBufferManager.get(),
+                    mRawDataBufferManager,
                     RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD,
                     sample.mValue );
             }
         }
         newestSignalTimestamp = std::max( newestSignalTimestamp, sample.mTimestamp );
         pos--;
-    }
-}
-
-void
-CollectionInspectionEngine::collectLastCanFrames( CANRawFrameID canID,
-                                                  CANChannelNumericID channelID,
-                                                  uint32_t minimumSamplingInterval,
-                                                  size_t maxNumberOfSignalsToCollect,
-                                                  uint32_t conditionId,
-                                                  Timestamp &newestSignalTimestamp,
-                                                  std::vector<CollectedCanRawFrame> &output )
-{
-    for ( auto &buf : mCanFrameBuffers )
-    {
-        if ( ( buf.mFrameID == canID ) && ( buf.mChannelID == channelID ) &&
-             ( buf.mMinimumSampleIntervalMs == minimumSamplingInterval ) )
-        {
-            int pos = static_cast<int>( buf.mCurrentPosition );
-            for ( uint32_t i = 0; i < std::min( maxNumberOfSignalsToCollect, buf.mCounter ); i++ )
-            {
-                // Ensure access is in bounds
-                if ( pos < 0 )
-                {
-                    pos = static_cast<int>( buf.mSize ) - 1;
-                }
-                if ( pos >= static_cast<int>( buf.mSize ) )
-                {
-                    pos = 0;
-                }
-                auto &sample = buf.mBuffer[static_cast<uint32_t>( pos )];
-                if ( ( !sample.isAlreadyConsumed( conditionId ) ) || ( !mSendDataOnlyOncePerCondition ) )
-                {
-                    output.emplace_back( canID, channelID, sample.mTimestamp, sample.mBuffer, sample.mSize );
-                    sample.setAlreadyConsumed( conditionId, true );
-                }
-                newestSignalTimestamp = std::max( newestSignalTimestamp, sample.mTimestamp );
-                pos--;
-            }
-            return;
-        }
     }
 }
 
@@ -1015,17 +950,6 @@ CollectionInspectionEngine::collectData( ActiveCondition &condition,
         }
     }
 
-    // Pack raw frames
-    for ( auto &c : condition.mCondition.canFrames )
-    {
-        collectLastCanFrames( c.frameID,
-                              c.channelID,
-                              c.minimumSampleIntervalMs,
-                              c.sampleBufferSize,
-                              conditionId,
-                              newestSignalTimestamp,
-                              output.triggeredCollectionSchemeData->canFrames );
-    }
     // Pack active DTCs if any
     if ( condition.mCondition.includeActiveDtcs &&
          ( ( !isActiveDTCsConsumed( conditionId ) ) || mSendDataOnlyOncePerCondition ) )
@@ -1098,51 +1022,6 @@ CollectionInspectionEngine::collectNextDataToSend( const TimePoint &currentTime,
     // No Data ready to be sent
     waitTimeMs = minimumWaitTimeMs;
     return {};
-}
-
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-// coverity[autosar_cpp14_a18_1_2_violation] std::vector<bool> specialization is acceptable in this usecase
-std::unordered_map<std::string, std::vector<bool>>
-CollectionInspectionEngine::forwardConditionForCampaignPartitions()
-{
-    return mForwardConditionCurrentlyTrueForCampaignPartitions;
-}
-#endif
-
-void
-CollectionInspectionEngine::addNewRawCanFrame( CANRawFrameID canID,
-                                               CANChannelNumericID channelID,
-                                               const TimePoint &receiveTime,
-                                               std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> &buffer,
-                                               uint8_t size )
-{
-    for ( auto &buf : mCanFrameBuffers )
-    {
-        if ( ( buf.mFrameID == canID ) && ( buf.mChannelID == channelID ) )
-        {
-            if ( ( buf.mSize > 0 ) && ( buf.mSize <= buf.mBuffer.size() ) &&
-                 ( ( buf.mMinimumSampleIntervalMs == 0 ) ||
-                   ( ( buf.mLastSample.systemTimeMs == 0 ) && ( buf.mLastSample.monotonicTimeMs == 0 ) ) ||
-                   ( receiveTime.monotonicTimeMs >= buf.mLastSample.monotonicTimeMs + buf.mMinimumSampleIntervalMs ) ) )
-            {
-                buf.mCurrentPosition++;
-                if ( buf.mCurrentPosition >= buf.mSize )
-                {
-                    buf.mCurrentPosition = 0;
-                }
-                buf.mBuffer[buf.mCurrentPosition].mSize =
-                    std::min( size, static_cast<uint8_t>( buf.mBuffer[buf.mCurrentPosition].mBuffer.size() ) );
-                for ( size_t i = 0; i < buf.mBuffer[buf.mCurrentPosition].mSize; i++ )
-                {
-                    buf.mBuffer[buf.mCurrentPosition].mBuffer[i] = buffer[i];
-                }
-                buf.mBuffer[buf.mCurrentPosition].mTimestamp = receiveTime.systemTimeMs;
-                buf.mBuffer[buf.mCurrentPosition].setAlreadyConsumed( ALL_CONDITIONS, false );
-                buf.mCounter++;
-                buf.mLastSample = receiveTime;
-            }
-        }
-    }
 }
 
 void
@@ -1220,7 +1099,7 @@ CollectionInspectionEngine::getLatestSignalValue( SignalID id, ActiveCondition &
             return ExpressionErrorCode::TYPE_MISMATCH;
         }
         auto loanedRawDataFrame =
-            mRawBufferManager->borrowFrame( id, static_cast<RawData::BufferHandle>( result.doubleVal ) );
+            mRawDataBufferManager->borrowFrame( id, static_cast<RawData::BufferHandle>( result.doubleVal ) );
 
         if ( loanedRawDataFrame.isNull() )
         {

@@ -1,0 +1,10 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package commonapi
+
+interface MySomeipInterface {
+    version { major 1 minor 0 }
+
+    attribute Int32 x
+}
