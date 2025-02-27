@@ -14,6 +14,8 @@ WITH_VISION_SYSTEM_DATA="false"
 WITH_ROS2_SUPPORT="false"
 WITH_SOMEIP_SUPPORT="false"
 WITH_STORE_AND_FORWARD_SUPPORT="false"
+WITH_CPYTHON_SUPPORT="false"
+WITH_MICROPYTHON_SUPPORT="false"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -31,6 +33,12 @@ parse_args() {
         --with-store-and-forward-support)
             WITH_STORE_AND_FORWARD_SUPPORT="true"
             ;;
+        --with-cpython-support)
+            WITH_CPYTHON_SUPPORT="true"
+            ;;
+        --with-micropython-support)
+            WITH_MICROPYTHON_SUPPORT="true"
+            ;;
         --native-prefix)
             NATIVE_PREFIX="$2"
             USE_CACHE="false"
@@ -45,6 +53,8 @@ parse_args() {
             echo "  --with-ros2-support                  Install dependencies for ROS2 support"
             echo "  --with-someip-support                Install dependencies for SOME/IP support"
             echo "  --with-store-and-forward-support     Install dependencies for store and forward"
+            echo "  --with-cpython-support               Install dependencies for CPython support"
+            echo "  --with-micropython-support           Install dependencies for MicroPython support"
             echo "  --native-prefix                      Native install prefix"
             echo "  --shared-libs                        Build shared libs, rather than static libs"
             exit 0
@@ -123,6 +133,11 @@ if ${WITH_SOMEIP_SUPPORT}; then
         libpython3-dev:arm64
 fi
 
+if ${WITH_CPYTHON_SUPPORT}; then
+    apt install -y \
+        libpython3-dev:arm64
+fi
+
 if [ ! -f /usr/include/linux/can/isotp.h ]; then
     git clone https://github.com/hartkopp/can-isotp.git
     cd can-isotp
@@ -157,6 +172,7 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/aarch64-linux-gnu ] || [ ! -d ${NATIVE_PR
         --with-atomic \
         --with-system \
         --with-thread \
+        --with-chrono \
         --with-filesystem \
         --with-program_options \
         --prefix=/usr/local/aarch64-linux-gnu \
@@ -281,6 +297,12 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/aarch64-linux-gnu ] || [ ! -d ${NATIVE_PR
             ..
         make install -j`nproc`
         cd ../..
+    fi
+
+    if ${WITH_MICROPYTHON_SUPPORT}; then
+        git clone -b ${VERSION_MICROPYTHON} https://github.com/micropython/micropython.git
+        mkdir -p /usr/local/aarch64-linux-gnu/src
+        cp -r micropython /usr/local/aarch64-linux-gnu/src
     fi
 
     wget -q https://github.com/protocolbuffers/protobuf/releases/download/${VERSION_PROTOBUF_RELEASE}/protobuf-cpp-${VERSION_PROTOBUF}.tar.gz

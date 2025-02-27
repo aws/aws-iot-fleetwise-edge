@@ -1,0 +1,9 @@
+[
+  {
+    "interfaceId": "AC_ACTUATORS",
+    "type": "CUSTOM_DECODING_INTERFACE",
+    "customDecodingInterface": {
+      "name": "NamedSignalInterface"
+    }
+  }
+]

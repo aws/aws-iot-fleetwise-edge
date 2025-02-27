@@ -1,11 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "AwsGreengrassV2Receiver.h"
-#include "IConnectivityModule.h"
-#include "IReceiver.h"
-#include "LoggingModule.h"
-#include "TimeTypes.h"
+#include "aws/iotfleetwise/AwsGreengrassV2Receiver.h"
+#include "aws/iotfleetwise/IConnectivityModule.h"
+#include "aws/iotfleetwise/IReceiver.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <aws/crt/Optional.h>
 #include <aws/crt/Types.h>
 #include <chrono>
@@ -19,7 +19,9 @@ namespace IoTFleetWise
 
 // coverity[autosar_cpp14_a0_1_3_violation] false positive - function overrides sdk's virtual function.
 void
-SubscribeStreamHandler::OnStreamEvent( Aws::Greengrass::IoTCoreMessage *response )
+SubscribeStreamHandler::OnStreamEvent(
+    // coverity[autosar_cpp14_a8_4_10_violation] raw pointer needed to match the expected signature
+    Aws::Greengrass::IoTCoreMessage *response )
 {
     auto message = response->GetMessage();
 
@@ -33,10 +35,9 @@ SubscribeStreamHandler::OnStreamEvent( Aws::Greengrass::IoTCoreMessage *response
     }
 }
 
-AwsGreengrassV2Receiver::AwsGreengrassV2Receiver(
-    IConnectivityModule *connectivityModule,
-    std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &greengrassClient,
-    std::string topicName )
+AwsGreengrassV2Receiver::AwsGreengrassV2Receiver( IConnectivityModule *connectivityModule,
+                                                  Aws::Greengrass::GreengrassCoreIpcClient &greengrassClient,
+                                                  std::string topicName )
     : mConnectivityModule( connectivityModule )
     , mGreengrassClient( greengrassClient )
     , mSubscribed( false )
@@ -47,23 +48,6 @@ AwsGreengrassV2Receiver::AwsGreengrassV2Receiver(
 AwsGreengrassV2Receiver::~AwsGreengrassV2Receiver()
 {
     unsubscribe();
-}
-
-bool
-AwsGreengrassV2Receiver::isAlive()
-{
-    std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
-    return isAliveNotThreadSafe();
-}
-
-bool
-AwsGreengrassV2Receiver::isAliveNotThreadSafe()
-{
-    if ( mConnectivityModule == nullptr )
-    {
-        return false;
-    }
-    return mConnectivityModule->isAlive() && mSubscribed;
 }
 
 ConnectivityError
@@ -86,12 +70,7 @@ AwsGreengrassV2Receiver::subscribe()
             mListeners.notify( receivedMessage );
         } );
 
-    if ( mGreengrassClient == nullptr )
-    {
-        FWE_LOG_ERROR( "mGreengrassClient is null, not initialised" )
-        return ConnectivityError::NoConnection;
-    }
-    mSubscribeOperation = mGreengrassClient->NewSubscribeToIoTCore( mSubscribeStreamHandler );
+    mSubscribeOperation = mGreengrassClient.NewSubscribeToIoTCore( mSubscribeStreamHandler );
     Aws::Greengrass::SubscribeToIoTCoreRequest subscribeRequest;
     subscribeRequest.SetQos( Aws::Greengrass::QOS_AT_LEAST_ONCE );
     subscribeRequest.SetTopicName( mTopicName.c_str() != nullptr ? mTopicName.c_str() : "" );
@@ -158,7 +137,7 @@ bool
 AwsGreengrassV2Receiver::unsubscribe()
 {
     std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
-    if ( isAliveNotThreadSafe() )
+    if ( mSubscribed )
     {
         mSubscribeOperation->Close().wait();
         mSubscribed = false;

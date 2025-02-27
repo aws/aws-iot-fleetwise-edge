@@ -8,5 +8,6 @@
   "Vehicle.ExampleSomeipInterface.A1.A2.B": false,
   "Vehicle.ExampleSomeipInterface.A1.A2.D": 1.0,
   "Vehicle.ExampleSomeipInterface.A1.S": "hi",
-  "Vehicle.ExampleSomeipInterface.X": 1
+  "Vehicle.ExampleSomeipInterface.X": 1,
+  "Vehicle.ExampleSomeipInterface.Temperature": 1
 }

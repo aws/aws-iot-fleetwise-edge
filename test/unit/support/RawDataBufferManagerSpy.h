@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "RawDataManager.h"
+#include "aws/iotfleetwise/RawDataManager.h"
 #include <gmock/gmock.h>
 
 namespace Aws

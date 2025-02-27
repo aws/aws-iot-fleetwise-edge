@@ -1,0 +1,15 @@
+[
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle.MySomeipInterface",
+      "description": "Vehicle.MySomeipInterface"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.MySomeipInterface.X",
+      "description": "Vehicle.MySomeipInterface.X",
+      "dataType": "INT32"
+    }
+  }
+]

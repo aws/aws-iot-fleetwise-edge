@@ -1,12 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DataSenderManagerWorkerThread.h"
-#include "DataSenderTypes.h"
-#include "LoggingModule.h"
-#include "QueueTypes.h"
+#include "aws/iotfleetwise/DataSenderManagerWorkerThread.h"
+#include "aws/iotfleetwise/DataSenderTypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/QueueTypes.h"
 #include <algorithm>
-#include <cstddef>
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -18,14 +18,14 @@ namespace IoTFleetWise
 const uint32_t DataSenderManagerWorkerThread::MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG = 6;
 
 DataSenderManagerWorkerThread::DataSenderManagerWorkerThread(
-    std::shared_ptr<IConnectivityModule> connectivityModule,
-    std::shared_ptr<DataSenderManager> dataSenderManager,
+    const IConnectivityModule &connectivityModule,
+    std::unique_ptr<DataSenderManager> dataSenderManager,
     uint64_t persistencyUploadRetryIntervalMs,
     std::vector<std::shared_ptr<DataSenderQueue>> dataToSendQueues )
     : mDataToSendQueues( std::move( dataToSendQueues ) )
     , mPersistencyUploadRetryIntervalMs{ persistencyUploadRetryIntervalMs }
     , mDataSenderManager( std::move( dataSenderManager ) )
-    , mConnectivityModule( std::move( connectivityModule ) )
+    , mConnectivityModule( connectivityModule )
 {
 }
 
@@ -35,7 +35,9 @@ DataSenderManagerWorkerThread::start()
     // Prevent concurrent stop/init
     std::lock_guard<std::mutex> lock( mThreadMutex );
     mShouldStop.store( false );
-    if ( !mThread.create( doWork, this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "Data Sender Manager Thread failed to start" );
     }
@@ -73,59 +75,57 @@ DataSenderManagerWorkerThread::shouldStop() const
 }
 
 void
-DataSenderManagerWorkerThread::doWork( void *data )
+DataSenderManagerWorkerThread::doWork()
 {
-    DataSenderManagerWorkerThread *sender = static_cast<DataSenderManagerWorkerThread *>( data );
-
     bool uploadedPersistedDataOnce = false;
 
-    while ( !sender->shouldStop() )
+    while ( !shouldStop() )
     {
-        sender->mTimer.reset();
+        mTimer.reset();
         uint64_t minTimeToWaitMs = UINT64_MAX;
 
-        if ( sender->mPersistencyUploadRetryIntervalMs > 0 )
+        if ( mPersistencyUploadRetryIntervalMs > 0 )
         {
             uint64_t timeToWaitMs =
-                sender->mPersistencyUploadRetryIntervalMs -
-                std::min( static_cast<uint64_t>( sender->mRetrySendingPersistedDataTimer.getElapsedMs().count() ),
-                          sender->mPersistencyUploadRetryIntervalMs );
+                mPersistencyUploadRetryIntervalMs -
+                std::min( static_cast<uint64_t>( mRetrySendingPersistedDataTimer.getElapsedMs().count() ),
+                          mPersistencyUploadRetryIntervalMs );
             minTimeToWaitMs = std::min( minTimeToWaitMs, timeToWaitMs );
         }
 
         if ( minTimeToWaitMs < UINT64_MAX )
         {
             FWE_LOG_TRACE( "Waiting for: " + std::to_string( minTimeToWaitMs ) + " ms. Persistency " +
-                           std::to_string( sender->mPersistencyUploadRetryIntervalMs ) + " configured, " +
-                           std::to_string( sender->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) +
-                           " timer." );
-            sender->mWait.wait( static_cast<uint32_t>( minTimeToWaitMs ) );
+                           std::to_string( mPersistencyUploadRetryIntervalMs ) + " configured, " +
+                           std::to_string( mRetrySendingPersistedDataTimer.getElapsedMs().count() ) + " timer." );
+            mWait.wait( static_cast<uint32_t>( minTimeToWaitMs ) );
         }
         else
         {
-            sender->mWait.wait( Signal::WaitWithPredicate );
-            auto elapsedTimeMs = sender->mTimer.getElapsedMs().count();
+            mWait.wait( Signal::WaitWithPredicate );
+            auto elapsedTimeMs = mTimer.getElapsedMs().count();
             FWE_LOG_TRACE( "Event arrived. Time elapsed waiting for the event: " + std::to_string( elapsedTimeMs ) +
                            " ms" );
         }
 
-        size_t consumedElements = 0;
-        for ( auto &queue : sender->mDataToSendQueues )
+        for ( auto &queue : mDataToSendQueues )
         {
-            consumedElements += queue->consumeAll( [sender]( std::shared_ptr<const DataToSend> dataToSend ) {
-                sender->mDataSenderManager->processData( dataToSend );
-            } );
+            queue->consumeAll(
+                // coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
+                [this]( std::shared_ptr<const DataToSend> dataToSend ) {
+                    mDataSenderManager->processData( *dataToSend );
+                } );
         }
 
         if ( ( !uploadedPersistedDataOnce ) ||
-             ( ( sender->mPersistencyUploadRetryIntervalMs > 0 ) &&
-               ( static_cast<uint64_t>( sender->mRetrySendingPersistedDataTimer.getElapsedMs().count() ) >=
-                 sender->mPersistencyUploadRetryIntervalMs ) ) )
+             ( ( mPersistencyUploadRetryIntervalMs > 0 ) &&
+               ( static_cast<uint64_t>( mRetrySendingPersistedDataTimer.getElapsedMs().count() ) >=
+                 mPersistencyUploadRetryIntervalMs ) ) )
         {
-            sender->mRetrySendingPersistedDataTimer.reset();
-            if ( sender->mConnectivityModule->isAlive() )
+            mRetrySendingPersistedDataTimer.reset();
+            if ( mConnectivityModule.isAlive() )
             {
-                sender->mDataSenderManager->checkAndSendRetrievedData();
+                mDataSenderManager->checkAndSendRetrievedData();
                 uploadedPersistedDataOnce = true;
             }
         }

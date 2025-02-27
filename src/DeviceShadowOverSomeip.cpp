@@ -1,10 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DeviceShadowOverSomeip.h"
-#include "IConnectionTypes.h"
-#include "LoggingModule.h"
-#include "TopicConfig.h"
+#include "aws/iotfleetwise/DeviceShadowOverSomeip.h"
+#include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TopicConfig.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -37,8 +38,8 @@ connectivityToDeviceShadowError( ConnectivityError error )
     return v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode::UNKNOWN;
 }
 
-DeviceShadowOverSomeip::DeviceShadowOverSomeip( std::shared_ptr<ISender> sender )
-    : mMqttSender( std::move( sender ) )
+DeviceShadowOverSomeip::DeviceShadowOverSomeip( ISender &sender )
+    : mMqttSender( sender )
     , mClientTokenRandomPrefix( boost::uuids::to_string( boost::uuids::random_generator()() ) + "-" )
 {
 }
@@ -61,13 +62,14 @@ DeviceShadowOverSomeip::onDataReceived( const ReceivedConnectivityMessage &recei
     const std::string updateDocumentsSuffix = "/update/documents";
     if ( boost::ends_with( receivedMessage.mqttTopic, updateDocumentsSuffix ) )
     {
-        if ( !boost::starts_with( receivedMessage.mqttTopic, mMqttSender->getTopicConfig().deviceShadowPrefix ) )
+        TraceModule::get().incrementVariable( TraceVariable::SHADOW_DOCUMENTS_UPDATES_RECEIVED );
+        if ( !boost::starts_with( receivedMessage.mqttTopic, mMqttSender.getTopicConfig().deviceShadowPrefix ) )
         {
             FWE_LOG_ERROR( "Received documents update for incorrect thing" );
             return;
         }
         std::string shadowName;
-        auto namedPrefix = mMqttSender->getTopicConfig().namedDeviceShadowPrefix;
+        auto namedPrefix = mMqttSender.getTopicConfig().namedDeviceShadowPrefix;
         if ( boost::starts_with( receivedMessage.mqttTopic, namedPrefix ) )
         {
             shadowName = receivedMessage.mqttTopic.substr( namedPrefix.size(),
@@ -108,17 +110,20 @@ DeviceShadowOverSomeip::onDataReceived( const ReceivedConnectivityMessage &recei
     {
         errorCode = v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode::NO_ERROR;
         FWE_LOG_INFO( "Received accepted response for clientToken " + clientToken );
+        TraceModule::get().incrementVariable( TraceVariable::SHADOW_ACCEPTED_RESPONSES );
     }
     else if ( boost::ends_with( receivedMessage.mqttTopic, "/rejected" ) )
     {
         errorCode = v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode::REJECTED;
         errorMessage = responseJson["message"].asString();
         FWE_LOG_ERROR( "Received rejected response for clientToken " + clientToken + " with message " + errorMessage );
+        TraceModule::get().incrementVariable( TraceVariable::SHADOW_REJECTED_RESPONSES );
     }
     else
     {
         errorCode = v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode::UNKNOWN;
         FWE_LOG_ERROR( "Received unknown response for clientToken " + clientToken );
+        TraceModule::get().incrementVariable( TraceVariable::SHADOW_UNKNOWN_RESPONSES );
     }
 
     callback( errorCode, errorMessage, responseDocument );
@@ -147,6 +152,7 @@ DeviceShadowOverSomeip::sendRequest( const std::string &topic,
     auto requestDocumentWithClientToken = Json::writeString( builder, requestJson );
 
     FWE_LOG_INFO( "Sending  request to topic " + topic + " with clientToken " + clientToken );
+    TraceModule::get().incrementVariable( TraceVariable::SHADOW_REQUESTS_SENT );
     // It can happen that the response is received via onDataReceived before the transmit callback
     // below is called, so add the request to the request table now, and erase it again in the case
     // of connectivity error.
@@ -154,7 +160,7 @@ DeviceShadowOverSomeip::sendRequest( const std::string &topic,
         std::lock_guard<std::mutex> lock( mRequestTableMutex );
         mRequestTable.emplace( clientToken, callback );
     }
-    mMqttSender->sendBuffer(
+    mMqttSender.sendBuffer(
         topic,
         reinterpret_cast<const uint8_t *>( requestDocumentWithClientToken.data() ),
         requestDocumentWithClientToken.size(),
@@ -182,7 +188,8 @@ DeviceShadowOverSomeip::getShadow( const std::shared_ptr<CommonAPI::ClientId> _c
                                    getShadowReply_t _reply )
 {
     static_cast<void>( _client );
-    sendRequest( mMqttSender->getTopicConfig().getDeviceShadowTopic( _shadowName ), "{}", _reply );
+    TraceModule::get().incrementVariable( TraceVariable::SHADOW_GET_REQUESTS );
+    sendRequest( mMqttSender.getTopicConfig().getDeviceShadowTopic( _shadowName ), "{}", _reply );
 }
 
 void
@@ -192,7 +199,8 @@ DeviceShadowOverSomeip::updateShadow( const std::shared_ptr<CommonAPI::ClientId>
                                       updateShadowReply_t _reply )
 {
     static_cast<void>( _client );
-    sendRequest( mMqttSender->getTopicConfig().updateDeviceShadowTopic( _shadowName ), _updateDocument, _reply );
+    TraceModule::get().incrementVariable( TraceVariable::SHADOW_UPDATE_REQUESTS );
+    sendRequest( mMqttSender.getTopicConfig().updateDeviceShadowTopic( _shadowName ), _updateDocument, _reply );
 }
 
 void
@@ -201,7 +209,8 @@ DeviceShadowOverSomeip::deleteShadow( const std::shared_ptr<CommonAPI::ClientId>
                                       deleteShadowReply_t _reply )
 {
     static_cast<void>( _client );
-    sendRequest( mMqttSender->getTopicConfig().deleteDeviceShadowTopic( _shadowName ),
+    TraceModule::get().incrementVariable( TraceVariable::SHADOW_DELETE_REQUESTS );
+    sendRequest( mMqttSender.getTopicConfig().deleteDeviceShadowTopic( _shadowName ),
                  "{}",
                  [_reply]( auto errorCode, const auto &errorMessage, const auto &responseDocument ) {
                      static_cast<void>( responseDocument );

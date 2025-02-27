@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "LastKnownStateInspector.h"
-#include "ICommandDispatcher.h"
-#include "QueueTypes.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/LastKnownStateInspector.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <istream>
 
 namespace Aws
@@ -35,9 +35,9 @@ LastKnownStateInspector::addSignalBuffer( const LastKnownStateSignalInformation 
 }
 
 void
-LastKnownStateInspector::onStateTemplatesChanged( std::shared_ptr<StateTemplateList> stateTemplates )
+LastKnownStateInspector::onStateTemplatesChanged( const StateTemplateList &stateTemplates )
 {
-    if ( stateTemplates->empty() )
+    if ( stateTemplates.empty() )
     {
         FWE_LOG_INFO( "No state template available" );
         clearUnused( {} );
@@ -45,10 +45,10 @@ LastKnownStateInspector::onStateTemplatesChanged( std::shared_ptr<StateTemplateL
     }
 
     // If there is no change in the templates, return early:
-    if ( mStateTemplates.size() == stateTemplates->size() )
+    if ( mStateTemplates.size() == stateTemplates.size() )
     {
         bool difference = false;
-        for ( const auto &stateTemplate : *stateTemplates )
+        for ( const auto &stateTemplate : stateTemplates )
         {
             if ( mStateTemplates.find( stateTemplate->id ) == mStateTemplates.end() )
             {
@@ -62,13 +62,13 @@ LastKnownStateInspector::onStateTemplatesChanged( std::shared_ptr<StateTemplateL
         }
     }
 
-    clearUnused( *stateTemplates );
+    clearUnused( stateTemplates );
     auto currentTime = mClock->timeSinceEpoch();
-    for ( const auto &stateTemplateInfo : *stateTemplates )
+    for ( const auto &stateTemplateInfo : stateTemplates )
     {
         bool activated = false;
         Timestamp deactivateAfterMonotonicTimeMs = 0;
-        extractMetadataFields( stateTemplateInfo->id, currentTime, &activated, &deactivateAfterMonotonicTimeMs );
+        extractMetadataFields( stateTemplateInfo->id, currentTime, activated, deactivateAfterMonotonicTimeMs );
         mStateTemplates.emplace( stateTemplateInfo->id,
                                  StateTemplate{ // Pointers and references into this memory are maintained so
                                                 // hold a shared_ptr to it so it does not get deleted
@@ -142,8 +142,8 @@ LastKnownStateInspector::onStateTemplatesChanged( std::shared_ptr<StateTemplateL
 void
 LastKnownStateInspector::extractMetadataFields( const SyncID &stateTemplateId,
                                                 const TimePoint &currentTime,
-                                                bool *activated,
-                                                Timestamp *deactivateAfterMonotonicTimeMs )
+                                                bool &activated,
+                                                Timestamp &deactivateAfterMonotonicTimeMs )
 {
     auto &persistedMetadata = mPersistedMetadata["stateTemplates"][stateTemplateId];
     if ( !persistedMetadata.isObject() )
@@ -153,7 +153,7 @@ LastKnownStateInspector::extractMetadataFields( const SyncID &stateTemplateId,
 
     if ( persistedMetadata["activated"].isBool() )
     {
-        *activated = persistedMetadata["activated"].asBool();
+        activated = persistedMetadata["activated"].asBool();
     }
     else
     {
@@ -166,7 +166,7 @@ LastKnownStateInspector::extractMetadataFields( const SyncID &stateTemplateId,
         auto deactivateAfterSystemTimeMs = persistedMetadata["deactivateAfterSystemTimeMs"].asUInt64();
         if ( deactivateAfterSystemTimeMs > currentTime.systemTimeMs )
         {
-            *deactivateAfterMonotonicTimeMs =
+            deactivateAfterMonotonicTimeMs =
                 currentTime.monotonicTimeMs + ( deactivateAfterSystemTimeMs - currentTime.systemTimeMs );
         }
     }
@@ -383,10 +383,10 @@ LastKnownStateInspector::allocateBuffer( SignalID signalID, size_t &usedBytes, s
         uint64_t requiredBytes = buffer.mSize * static_cast<uint64_t>( signalSampleSize );
         if ( usedBytes + requiredBytes > MAX_SAMPLE_MEMORY )
         {
-            FWE_LOG_WARN( "The requested " + std::to_string( buffer.mSize ) +
-                          " number of signal samples leads to a memory requirement  that's above the maximum "
-                          "configured of " +
-                          std::to_string( MAX_SAMPLE_MEMORY ) + "Bytes" );
+            FWE_LOG_ERROR( "The requested " + std::to_string( buffer.mSize ) +
+                           " number of signal samples leads to a memory requirement  that's above the maximum "
+                           "configured of " +
+                           std::to_string( MAX_SAMPLE_MEMORY ) + "Bytes" );
             buffer.mSize = 0;
             TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::STATE_TEMPLATE_ERROR );
             return false;

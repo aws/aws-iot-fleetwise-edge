@@ -2,7 +2,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "TraceModule.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <chrono>
 #include <gtest/gtest.h>
 #include <thread>
@@ -14,6 +14,9 @@ namespace IoTFleetWise
 
 TEST( TraceModuleTest, TraceModulePrint )
 {
+    // Make sure to clear any previous data since this is a singleton
+    TraceModule::get().startNewObservationWindow();
+
     TraceModule::get().setVariable( TraceVariable::READ_SOCKET_FRAMES_0, 10 );
     TraceModule::get().setVariable( TraceVariable::READ_SOCKET_FRAMES_0, 20 );
     TraceModule::get().setVariable( TraceVariable::READ_SOCKET_FRAMES_0, 15 );

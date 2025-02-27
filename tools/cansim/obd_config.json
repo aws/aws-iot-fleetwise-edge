@@ -27,7 +27,8 @@
                 "AMBIENT_AIR_TEMPERATURE"            : {"num": "0x46", "scale":    1.0  , "offset":  40.0, "size": 1},
                 "RELATIVE_ACCELERATOR_PEDAL_POSITION": {"num": "0x5A", "scale":    2.55 , "offset":   0.0, "size": 1},
                 "HYBRID_BATTERY_PACK_REMAINING_LIFE" : {"num": "0x5B", "scale":    2.55 , "offset":   0.0, "size": 1},
-                "ENGINE_OIL_TEMPERATURE"             : {"num": "0x5C", "scale":    1.0  , "offset":  40.0, "size": 1}
+                "ENGINE_OIL_TEMPERATURE"             : {"num": "0x5C", "scale":    1.0  , "offset":  40.0, "size": 1},
+                "EVAP_SYSTEM_VAPOR_PRESSURE_A"       : {"num": "0xA3", "scale":    4.0  , "offset":   0.0, "size": 2, "is_signed": true}
             },
             "dtcs": {
                 "ECM_DTC1": {"num": "0x0123", "type": "OBD"},

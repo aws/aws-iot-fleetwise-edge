@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "StreamManager.h"
+#include "aws/iotfleetwise/snf/StreamManager.h"
 #include <gmock/gmock.h>
 #include <string>
 
@@ -17,8 +17,8 @@ namespace Testing
 class StreamManagerMock : public Aws::IoTFleetWise::Store::StreamManager
 {
 public:
-    explicit StreamManagerMock( std::shared_ptr<DataSenderProtoWriter> protoWriter )
-        : StreamManager( "", protoWriter, 0 ){};
+    explicit StreamManagerMock( std::unique_ptr<DataSenderProtoWriter> protoWriter )
+        : StreamManager( "", std::move( protoWriter ), 0 ){};
 
     MOCK_METHOD( Store::StreamManager::ReturnCode, appendToStreams, ( const TriggeredCollectionSchemeData &data ) );
 

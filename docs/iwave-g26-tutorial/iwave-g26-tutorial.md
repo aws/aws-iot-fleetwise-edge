@@ -431,7 +431,8 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    --log-color Yes \
    --vehicle-name `cat vehicle-name.txt` \
    --endpoint-url `cat endpoint.txt` \
-   --can-bus0 can0
+   --can-bus0 can0 \
+   --enable-iwave-gps-interface \
 && cd .. \
 && zip -r aws-iot-fleetwise-deploy.zip .
 ```

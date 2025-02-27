@@ -1,14 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CommandSchema.h"
-#include "CollectionInspectionAPITypes.h"
-#include "ICommandDispatcher.h"
-#include "LoggingModule.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "TimeTypes.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/CommandSchema.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include "command_request.pb.h"
 #include <cstdint>
 #include <google/protobuf/message.h>
@@ -25,7 +25,7 @@ static CommandReasonCode
 setSignalValue( const Schemas::Commands::ActuatorCommand &protoActuatorCommand,
                 ActuatorCommandRequest &commandRequest,
                 Timestamp receivedTime,
-                std::shared_ptr<RawData::BufferManager> &rawBufferManager )
+                RawData::BufferManager *rawDataBufferManager )
 {
     if ( protoActuatorCommand.has_double_value() )
     {
@@ -102,18 +102,25 @@ setSignalValue( const Schemas::Commands::ActuatorCommand &protoActuatorCommand,
     else if ( protoActuatorCommand.has_string_value() )
     {
         auto signalId = protoActuatorCommand.signal_id();
+        if ( rawDataBufferManager == nullptr )
+        {
+            FWE_LOG_WARN( "Signal id " + std::to_string( signalId ) +
+                          " is of type string type but there is no RawBufferManager" );
+            return REASON_CODE_REJECTED;
+        }
         auto bufferHandle =
-            rawBufferManager->push( reinterpret_cast<const uint8_t *>( protoActuatorCommand.string_value().data() ),
-                                    protoActuatorCommand.string_value().size(),
-                                    receivedTime,
-                                    signalId );
+            rawDataBufferManager->push( reinterpret_cast<const uint8_t *>( protoActuatorCommand.string_value().data() ),
+                                        protoActuatorCommand.string_value().size(),
+                                        receivedTime,
+                                        signalId );
         if ( bufferHandle == RawData::INVALID_BUFFER_HANDLE )
         {
             FWE_LOG_WARN( "Signal id " + std::to_string( signalId ) + "  was rejected by RawBufferManager" );
             return REASON_CODE_REJECTED;
         }
         // immediately set usage hint so buffer handle does not get directly deleted again
-        rawBufferManager->increaseHandleUsageHint( signalId, bufferHandle, RawData::BufferHandleUsageStage::UPLOADING );
+        rawDataBufferManager->increaseHandleUsageHint(
+            signalId, bufferHandle, RawData::BufferHandleUsageStage::UPLOADING );
         commandRequest.signalValueWrapper.setVal<SignalValue::RawDataVal>(
             SignalValue::RawDataVal{ signalId, bufferHandle }, SignalType::STRING );
     }
@@ -126,14 +133,14 @@ setSignalValue( const Schemas::Commands::ActuatorCommand &protoActuatorCommand,
     return REASON_CODE_UNSPECIFIED;
 }
 
-CommandSchema::CommandSchema( std::shared_ptr<IReceiver> receiverCommandRequest,
+CommandSchema::CommandSchema( IReceiver &receiverCommandRequest,
                               std::shared_ptr<DataSenderQueue> commandResponses,
-                              std::shared_ptr<RawData::BufferManager> rawBufferManager )
+                              RawData::BufferManager *rawDataBufferManager )
     : mCommandResponses( std::move( commandResponses ) )
-    , mRawBufferManager( std::move( rawBufferManager ) )
+    , mRawDataBufferManager( rawDataBufferManager )
 {
     // Register the listeners
-    receiverCommandRequest->subscribeToDataReceived( [this]( const ReceivedConnectivityMessage &receivedMessage ) {
+    receiverCommandRequest.subscribeToDataReceived( [this]( const ReceivedConnectivityMessage &receivedMessage ) {
         onCommandRequestReceived( receivedMessage );
     } );
 }
@@ -199,7 +206,7 @@ CommandSchema::onCommandRequestReceived( const ReceivedConnectivityMessage &rece
         commandRequest.executionTimeoutMs = protoCommandRequest.timeout_ms();
         commandRequest.decoderID = protoActuatorCommand.decoder_manifest_sync_id();
 
-        auto reasonCode = setSignalValue( protoActuatorCommand, commandRequest, currentTimeMs, mRawBufferManager );
+        auto reasonCode = setSignalValue( protoActuatorCommand, commandRequest, currentTimeMs, mRawDataBufferManager );
         if ( reasonCode != REASON_CODE_UNSPECIFIED )
         {
             mCommandResponses->push( std::make_shared<CommandResponse>(

@@ -1,17 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CANDataConsumer.h"
-#include "CANDataTypes.h"
-#include "CANDecoder.h"
-#include "CollectionInspectionAPITypes.h"
-#include "EnumUtility.h"
-#include "LoggingModule.h"
-#include "MessageTypes.h"
-#include "QueueTypes.h"
-#include "TraceModule.h"
-#include <algorithm>
-#include <array>
+#include "aws/iotfleetwise/CANDataConsumer.h"
+#include "aws/iotfleetwise/CANDataTypes.h"
+#include "aws/iotfleetwise/CANDecoder.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/EnumUtility.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/MessageTypes.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <linux/can.h>
 #include <string>
 #include <unordered_map>
@@ -23,8 +20,8 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-CANDataConsumer::CANDataConsumer( SignalBufferDistributorPtr signalBufferDistributor )
-    : mSignalBufferDistributor{ std::move( signalBufferDistributor ) }
+CANDataConsumer::CANDataConsumer( SignalBufferDistributor &signalBufferDistributor )
+    : mSignalBufferDistributor{ signalBufferDistributor }
 {
 }
 
@@ -58,7 +55,7 @@ CANDataConsumer::findDecoderMethod( CANChannelNumericID channelId,
 
 void
 CANDataConsumer::processMessage( CANChannelNumericID channelId,
-                                 std::shared_ptr<const CANDecoderDictionary> &dictionary,
+                                 const CANDecoderDictionary *dictionary,
                                  uint32_t messageId,
                                  const uint8_t *data,
                                  size_t dataLength,
@@ -90,68 +87,49 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
     {
         // format to be used for decoding
         const auto &format = currentMessageDecoderMethod.format;
-        const auto &collectType = currentMessageDecoderMethod.collectType;
 
         // Create Collected Data Frame
         CollectedDataFrame collectedDataFrame;
-        // Check if we want to collect RAW CAN Frame; If so we also need to ensure Buffer is valid
-        if ( ( mSignalBufferDistributor.get() != nullptr ) &&
-             ( ( collectType == CANMessageCollectType::RAW ) ||
-               ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ) )
+        if ( format.isValid() )
         {
-            // prepare the raw CAN Frame
-            struct CollectedCanRawFrame canRawFrame;
-            canRawFrame.frameID = messageId;
-            canRawFrame.channelId = channelId;
-            canRawFrame.receiveTime = timestamp;
-            // CollectedCanRawFrame receive up to 64 CAN Raw Bytes
-            canRawFrame.size = std::min( static_cast<uint8_t>( dataLength ), MAX_CAN_FRAME_BYTE_SIZE );
-            std::copy( data, data + canRawFrame.size, canRawFrame.data.begin() );
-            // collectedDataFrame will be pushed to the Buffer for next stage to consume
-            collectedDataFrame.mCollectedCanRawFrame = std::make_shared<CollectedCanRawFrame>( canRawFrame );
-        }
-        // check if we want to decode can frame into signals and collect signals
-        if ( ( mSignalBufferDistributor.get() != nullptr ) &&
-             ( ( collectType == CANMessageCollectType::DECODE ) ||
-               ( collectType == CANMessageCollectType::RAW_AND_DECODE ) ) )
-        {
-            if ( format.isValid() )
+            std::vector<CANDecodedSignal> decodedSignals;
+            if ( !CANDecoder::decodeCANMessage( data, dataLength, format, signalIDsToCollect, decodedSignals ) )
             {
-                std::vector<CANDecodedSignal> decodedSignals;
-                if ( CANDecoder::decodeCANMessage( data, dataLength, format, signalIDsToCollect, decodedSignals ) )
+                if ( decodedSignals.empty() )
                 {
-                    // Create vector of Collected Signal Object
-                    CollectedSignalsGroup collectedSignalsGroup;
-                    for ( auto const &signal : decodedSignals )
-                    {
-                        // Create Collected Signal Object
-                        // Only add valid signals to the vector
-                        if ( signal.mSignalID != INVALID_SIGNAL_ID )
-                        {
-                            collectedSignalsGroup.push_back( CollectedSignal::fromDecodedSignal(
-                                signal.mSignalID, timestamp, signal.mPhysicalValue, signal.mSignalType ) );
-                        }
-                    }
-                    collectedDataFrame.mCollectedSignals = collectedSignalsGroup;
+                    FWE_LOG_WARN( "CAN Frame " + std::to_string( messageId ) + " decoding failed! " );
                 }
                 else
                 {
-                    // The decoding was not fully successful
-                    FWE_LOG_WARN( "CAN Frame " + std::to_string( messageId ) + " decoding failed! " );
+                    FWE_LOG_WARN( "CAN Frame " + std::to_string( messageId ) + " decoding partially failed! " );
                 }
             }
-            else
+
+            // Create vector of Collected Signal Object
+            CollectedSignalsGroup collectedSignalsGroup;
+            for ( auto const &signal : decodedSignals )
             {
-                // The CAN Message format is not valid, report as warning
-                FWE_LOG_WARN( "CANMessageFormat Invalid for format message id: " + std::to_string( format.mMessageID ) +
-                              " can message id: " + std::to_string( messageId ) +
-                              " on CAN Channel Id: " + std::to_string( channelId ) );
+                // Create Collected Signal Object
+                // Only add valid signals to the vector
+                if ( signal.mSignalID != INVALID_SIGNAL_ID )
+                {
+                    collectedSignalsGroup.push_back( CollectedSignal::fromDecodedSignal(
+                        signal.mSignalID, timestamp, signal.mPhysicalValue, signal.mSignalType ) );
+                }
             }
+            collectedDataFrame.mCollectedSignals = collectedSignalsGroup;
+        }
+        else
+        {
+            // The CAN Message format is not valid, report as warning
+            FWE_LOG_WARN( "CANMessageFormat Invalid for format message id: " + std::to_string( format.mMessageID ) +
+                          " can message id: " + std::to_string( messageId ) +
+                          " on CAN Channel Id: " + std::to_string( channelId ) );
         }
 
         TraceModule::get().sectionEnd( traceSection );
 
-        mSignalBufferDistributor->push( std::move( collectedDataFrame ) );
+        mSignalBufferDistributor.push( std::move( collectedDataFrame ) );
     }
 }
 

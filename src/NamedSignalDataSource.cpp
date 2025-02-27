@@ -1,11 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "NamedSignalDataSource.h"
-#include "IDecoderManifest.h"
-#include "LoggingModule.h"
-#include "QueueTypes.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/NamedSignalDataSource.h"
+#include "aws/iotfleetwise/IDecoderManifest.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <unordered_map>
 #include <utility>
 
@@ -15,9 +14,9 @@ namespace IoTFleetWise
 {
 
 NamedSignalDataSource::NamedSignalDataSource( InterfaceID interfaceId,
-                                              SignalBufferDistributorPtr signalBufferDistributor )
+                                              SignalBufferDistributor &signalBufferDistributor )
     : mInterfaceId( std::move( interfaceId ) )
-    , mSignalBufferDistributor( std::move( signalBufferDistributor ) )
+    , mSignalBufferDistributor( signalBufferDistributor )
 {
 }
 
@@ -76,7 +75,7 @@ NamedSignalDataSource::ingestMultipleSignalValues(
     }
     if ( !collectedSignalsGroup.empty() )
     {
-        mSignalBufferDistributor->push( CollectedDataFrame( collectedSignalsGroup ) );
+        mSignalBufferDistributor.push( CollectedDataFrame( collectedSignalsGroup ) );
     }
 }
 

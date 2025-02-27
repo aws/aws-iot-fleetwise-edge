@@ -2,15 +2,16 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CanCommandDispatcher.h"
-#include "Clock.h"
-#include "ClockHandler.h"
-#include "CollectionInspectionAPITypes.h"
-#include "ICommandDispatcher.h"
+#include "aws/iotfleetwise/CanCommandDispatcher.h"
 #include "RawDataBufferManagerSpy.h"
-#include "RawDataManager.h"
-#include "SignalTypes.h"
-#include "TimeTypes.h"
+#include "Testing.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/RawDataManager.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <boost/optional/optional.hpp>
 #include <chrono>
 #include <cstdint>
@@ -27,6 +28,7 @@
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
+#include <thread>
 #include <unistd.h>
 #include <unordered_map>
 #include <vector>
@@ -44,8 +46,8 @@ using ::testing::NiceMock;
 class CanCommandDispatcherTest : public ::testing::Test
 {
 protected:
-    const Timestamp TIMEOUT_MS = 100;
-    const std::string CAN_INTERFACE_NAME = "vcan0";
+    const Timestamp TIMEOUT_MS = 500;
+    const std::string CAN_INTERFACE_NAME = getCanInterfaceName();
     std::unordered_map<std::string, CanCommandDispatcher::CommandConfig> mConfig = {
         { "Vehicle.actuator1", { 0x100, 0x101, SignalType::UINT8 } },
         { "Vehicle.actuator2", { 0x200, 0x201, SignalType::INT8 } },
@@ -64,11 +66,10 @@ protected:
     using MockNotifyCommandStatusCallback = MockFunction<void(
         CommandStatus status, CommandReasonCode reasonCode, const CommandReasonDescription &reasonDescription )>;
 
-    std::shared_ptr<NiceMock<Testing::RawDataBufferManagerSpy>> mRawBufferManagerSpy;
+    NiceMock<Testing::RawDataBufferManagerSpy> mRawDataBufferManagerSpy;
 
     CanCommandDispatcherTest()
-        : mRawBufferManagerSpy( std::make_shared<NiceMock<Testing::RawDataBufferManagerSpy>>(
-              RawData::BufferManagerConfig::create().get() ) )
+        : mRawDataBufferManagerSpy( RawData::BufferManagerConfig::create().get() )
     {
     }
 
@@ -140,7 +141,9 @@ protected:
         auto bytesWritten = write( mCanSocket, &frame, sizeof( struct canfd_frame ) );
         if ( bytesWritten != sizeof( struct canfd_frame ) )
         {
-            throw std::runtime_error( "error writing CAN frame" );
+            throw std::runtime_error( "error writing CAN frame: expected to write " +
+                                      std::to_string( sizeof( struct canfd_frame ) ) + " bytes, but wrote " +
+                                      std::to_string( bytesWritten ) );
         }
     }
 
@@ -158,11 +161,27 @@ protected:
             throw std::runtime_error( "Timeout waiting for response" );
         }
         struct canfd_frame frame = {};
-        auto bytesRead = read( mCanSocket, &frame, sizeof( struct canfd_frame ) );
-        if ( bytesRead != sizeof( struct canfd_frame ) )
+        uint8_t *buffer = reinterpret_cast<uint8_t *>( &frame );
+
+        size_t totalBytesRead = 0;
+        size_t frameSize = sizeof( struct canfd_frame );
+        auto startTime = ClockHandler::getClock()->monotonicTimeSinceEpochMs();
+        while ( totalBytesRead < frameSize )
         {
-            throw std::runtime_error( "error reading CAN frame" );
+            if ( ( ClockHandler::getClock()->monotonicTimeSinceEpochMs() - startTime ) > TIMEOUT_MS )
+            {
+                throw std::runtime_error( "Timeout reading response" );
+            }
+
+            auto bytesRead = read( mCanSocket, buffer + totalBytesRead, frameSize - totalBytesRead );
+            if ( bytesRead < 0 )
+            {
+                throw std::runtime_error( "Error reading from CAN" );
+            }
+            totalBytesRead += static_cast<size_t>( bytesRead );
+            std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
         }
+
         id = frame.can_id;
         data.assign( frame.data, frame.data + frame.len );
     }
@@ -170,7 +189,7 @@ protected:
     void
     testSuccessful( std::string actuatorName, SignalValueWrapper value, std::vector<uint8_t> &data )
     {
-        CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+        CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
         ASSERT_TRUE( dispatcher.init() );
         MockNotifyCommandStatusCallback callback1;
         std::promise<void> callbackPromise;
@@ -220,7 +239,7 @@ protected:
     void
     testTimeout( std::function<void()> sendMessageCallback )
     {
-        CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+        CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
         ASSERT_TRUE( dispatcher.init() );
         MockNotifyCommandStatusCallback callback1;
         std::promise<void> callbackPromise;
@@ -274,13 +293,13 @@ protected:
 
 TEST_F( CanCommandDispatcherTest, invalidCanInterfaceName )
 {
-    CanCommandDispatcher dispatcher( mConfig, "abc", mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, "abc", &mRawDataBufferManagerSpy );
     ASSERT_FALSE( dispatcher.init() );
 }
 
 TEST_F( CanCommandDispatcherTest, getActuatorNames )
 {
-    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
     ASSERT_TRUE( dispatcher.init() );
     auto names = dispatcher.getActuatorNames();
     ASSERT_EQ( names.size(), 13 );
@@ -288,7 +307,7 @@ TEST_F( CanCommandDispatcherTest, getActuatorNames )
 
 TEST_F( CanCommandDispatcherTest, notSupportedActuator )
 {
-    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
     ASSERT_TRUE( dispatcher.init() );
     MockNotifyCommandStatusCallback callback;
     EXPECT_CALL( callback, Call( CommandStatus::EXECUTION_FAILED, REASON_CODE_NOT_SUPPORTED, _ ) ).Times( 1 );
@@ -302,7 +321,7 @@ TEST_F( CanCommandDispatcherTest, notSupportedActuator )
 
 TEST_F( CanCommandDispatcherTest, wrongArgumentType )
 {
-    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
     ASSERT_TRUE( dispatcher.init() );
     MockNotifyCommandStatusCallback callback;
     EXPECT_CALL( callback, Call( CommandStatus::EXECUTION_FAILED, REASON_CODE_ARGUMENT_TYPE_MISMATCH, _ ) ).Times( 1 );
@@ -319,7 +338,7 @@ TEST_F( CanCommandDispatcherTest, wrongArgumentType )
 
 TEST_F( CanCommandDispatcherTest, unsupportedArgumentType )
 {
-    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
     ASSERT_TRUE( dispatcher.init() );
     MockNotifyCommandStatusCallback callback;
     EXPECT_CALL( callback, Call( CommandStatus::EXECUTION_FAILED, REASON_CODE_REJECTED, _ ) ).Times( 1 );
@@ -335,7 +354,7 @@ TEST_F( CanCommandDispatcherTest, unsupportedArgumentType )
 
 TEST_F( CanCommandDispatcherTest, commandIdTooLong )
 {
-    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
     ASSERT_TRUE( dispatcher.init() );
     MockNotifyCommandStatusCallback callback;
     EXPECT_CALL( callback, Call( CommandStatus::EXECUTION_FAILED, REASON_CODE_REJECTED, _ ) ).Times( 1 );
@@ -352,7 +371,7 @@ TEST_F( CanCommandDispatcherTest, commandIdTooLong )
 
 TEST_F( CanCommandDispatcherTest, timedOutBeforeDispatch )
 {
-    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
     ASSERT_TRUE( dispatcher.init() );
     MockNotifyCommandStatusCallback callback;
     EXPECT_CALL( callback, Call( CommandStatus::EXECUTION_TIMEOUT, REASON_CODE_TIMED_OUT_BEFORE_DISPATCH, _ ) )
@@ -370,7 +389,7 @@ TEST_F( CanCommandDispatcherTest, timedOutBeforeDispatch )
 
 TEST_F( CanCommandDispatcherTest, stringBadBorrow )
 {
-    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
     ASSERT_TRUE( dispatcher.init() );
     MockNotifyCommandStatusCallback callback;
     EXPECT_CALL( callback, Call( CommandStatus::EXECUTION_FAILED, REASON_CODE_REJECTED, _ ) ).Times( 1 );
@@ -388,7 +407,7 @@ TEST_F( CanCommandDispatcherTest, stringBadBorrow )
 
 TEST_F( CanCommandDispatcherTest, argumentTooLong )
 {
-    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
     ASSERT_TRUE( dispatcher.init() );
     MockNotifyCommandStatusCallback callback;
     EXPECT_CALL( callback, Call( CommandStatus::EXECUTION_FAILED, REASON_CODE_REJECTED, _ ) ).Times( 1 );
@@ -518,11 +537,11 @@ TEST_F( CanCommandDispatcherTest, successfulAllTypes )
     EXPECT_EQ( data[20], 0x01 );
 
     // STRING
-    mRawBufferManagerSpy->updateConfig( { { 1, { 1, "", "" } } } );
+    mRawDataBufferManagerSpy.updateConfig( { { 1, { 1, "", "" } } } );
     std::string stringVal = "dog";
-    auto handle =
-        mRawBufferManagerSpy->push( reinterpret_cast<const uint8_t *>( stringVal.data() ), stringVal.size(), 1234, 1 );
-    mRawBufferManagerSpy->increaseHandleUsageHint( 1, handle, RawData::BufferHandleUsageStage::UPLOADING );
+    auto handle = mRawDataBufferManagerSpy.push(
+        reinterpret_cast<const uint8_t *>( stringVal.data() ), stringVal.size(), 1234, 1 );
+    mRawDataBufferManagerSpy.increaseHandleUsageHint( 1, handle, RawData::BufferHandleUsageStage::UPLOADING );
     value.value.rawDataVal.handle = handle;
     value.value.rawDataVal.signalId = 1;
     value.type = SignalType::STRING;
@@ -581,7 +600,7 @@ TEST_F( CanCommandDispatcherTest, responseIgnoredWrongResponseId )
 
 TEST_F( CanCommandDispatcherTest, inProgressSuccess )
 {
-    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
     ASSERT_TRUE( dispatcher.init() );
     MockNotifyCommandStatusCallback callback1;
     std::promise<void> callbackPromise;
@@ -641,7 +660,7 @@ TEST_F( CanCommandDispatcherTest, inProgressSuccess )
 
 TEST_F( CanCommandDispatcherTest, inProgressTimeout )
 {
-    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, mRawBufferManagerSpy );
+    CanCommandDispatcher dispatcher( mConfig, CAN_INTERFACE_NAME, &mRawDataBufferManagerSpy );
     ASSERT_TRUE( dispatcher.init() );
     MockNotifyCommandStatusCallback callback1;
     std::promise<void> callbackPromise;

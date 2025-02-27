@@ -20,7 +20,7 @@ message. The Reference Implementation for AWS IoT FleetWise (FWE) receives this 
 it back to the cloud.
 
 The format of the CAN request and response messages implemented in
-[`CanCommandDispatcher`](../../src/CanCommandDispatcher.h) is as follows:
+[`CanCommandDispatcher`](../../include/aws/iotfleetwise/CanCommandDispatcher.h) is as follows:
 
 - The command CAN request payload is formed from the null-terminated command ID string, a `uint64_t`
   issued timestamp in ms since epoch, a `uint64_t` relative execution timeout in ms since the issued
@@ -314,10 +314,11 @@ The following steps will send a CAN command via the AWS IoT FleetWise 'remote co
 
 1. You should see the following output indicating the command was successfully executed. Note that
    the `reasonCode` (uint32) and `reasonDescription` (string) are extensible result information
-   fields. Refer to [ICommandDispatcher.h](../../src/ICommandDispatcher.h) for the reason codes
-   defined by FWE. The OEM range of reason codes begins at 65536. In this example implementation the
-   `reasonCode` is set to `0x1234` (4660), and `reasonDescription` is set to `"hello"` by the CAN
-   command server[`can_command_server.py`](../../tools/cansim/can_command_server.py).
+   fields. Refer to [ICommandDispatcher.h](../../include/aws/iotfleetwise/ICommandDispatcher.h) for
+   the reason codes defined by FWE. The OEM range of reason codes begins at 65536. In this example
+   implementation the `reasonCode` is set to `0x1234` (4660), and `reasonDescription` is set to
+   `"hello"` by the CAN command
+   server[`can_command_server.py`](../../tools/cansim/can_command_server.py).
 
    ```json
    {

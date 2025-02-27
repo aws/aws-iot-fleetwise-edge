@@ -1,9 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "S3Sender.h"
-#include "LoggingModule.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/S3Sender.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <aws/core/client/ClientConfiguration.h>
 #include <aws/core/utils/memory/stl/AWSMap.h>
 #include <aws/core/utils/memory/stl/AWSString.h>
@@ -14,6 +14,7 @@
 #include <aws/s3/model/UploadPartRequest.h>
 #include <aws/transfer/TransferManager.h>
 #include <istream>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -42,6 +43,10 @@ S3Sender::S3Sender( CreateTransferManagerWrapper createTransferManagerWrapper, s
     : mMultipartSize{ multipartSize == 0 ? DEFAULT_MULTIPART_SIZE : multipartSize }
     , mCreateTransferManagerWrapper( std::move( createTransferManagerWrapper ) )
 {
+    if ( mCreateTransferManagerWrapper == nullptr )
+    {
+        throw std::invalid_argument( "createTransferManagerWrapper can't be null" );
+    }
 }
 
 bool
@@ -77,31 +82,13 @@ S3Sender::disconnect()
 }
 
 void
+// unique_ptr is indeed used to transfer ownership, but coverity flags the early return path
+// coverity[autosar_cpp14_a8_4_11_violation:FALSE]
 S3Sender::sendStream( std::unique_ptr<StreambufBuilder> streambufBuilder,
                       const S3UploadMetadata &uploadMetadata,
                       const std::string &objectKey,
                       ResultCallback resultCallback )
 {
-    if ( streambufBuilder == nullptr )
-    {
-        FWE_LOG_ERROR( "No valid streambuf builder provided for the upload" );
-        resultCallback( ConnectivityError::WrongInputData, nullptr );
-        return;
-    }
-
-    if ( mCreateTransferManagerWrapper == nullptr )
-    {
-        FWE_LOG_ERROR( "No S3 client configured" );
-        // TODO: Once we move the simultaneous uploads limit to DataSenderManager, we won't need to
-        // pass the streambuf via callback, because VisionSystemDataSender will already pass the
-        // streambuf instead of the StreambufBuilder to S3Sender. So VisionSystemDataSender will already
-        // have a reference/pointer to the data.
-        // coverity[autosar_cpp14_a20_8_6_violation] no way to construct it with make_shared
-        std::shared_ptr<std::streambuf> streambuf = streambufBuilder->build();
-        resultCallback( ConnectivityError::NotConfigured, streambuf );
-        return;
-    }
-
     {
         std::lock_guard<std::mutex> lock( mQueuedAndOngoingUploadsLookupMutex );
 
@@ -171,7 +158,13 @@ S3Sender::getTransferManagerWrapper( const S3UploadMetadata &uploadMetadata )
     {
         FWE_LOG_INFO( "Creating new S3 client for region " + uploadMetadata.region );
 
-        Aws::Client::ClientConfiguration clientConfig;
+        Aws::Client::ClientConfigurationInitValues initValues;
+        // The SDK can use IMDS to determine the region, but since we will pass the region we don't
+        // want the SDK to use it, specially because in non-EC2 environments without any AWS SDK
+        // config at all, this can cause delays when setting up the client:
+        // https://github.com/aws/aws-sdk-cpp/issues/1511
+        initValues.shouldDisableIMDS = true;
+        Aws::Client::ClientConfiguration clientConfig( initValues );
         clientConfig.region = uploadMetadata.region;
 
         Aws::Transfer::TransferManagerConfiguration transferConfig( nullptr );
@@ -190,6 +183,7 @@ S3Sender::getTransferManagerWrapper( const S3UploadMetadata &uploadMetadata )
         transferConfig.uploadPartTemplate = uploadPartTemplate;
 
         transferConfig.transferStatusUpdatedCallback =
+            // coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
             [this]( const Aws::Transfer::TransferManager *transferManager,
                     const std::shared_ptr<const Aws::Transfer::TransferHandle> &transferHandle ) {
                 static_cast<void>( transferManager );
@@ -204,6 +198,7 @@ S3Sender::getTransferManagerWrapper( const S3UploadMetadata &uploadMetadata )
 }
 
 void
+// coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
 S3Sender::transferStatusUpdatedCallback( const std::shared_ptr<const Aws::Transfer::TransferHandle> &transferHandle )
 {
     // coverity[check_return] Status can be used directly without being checked

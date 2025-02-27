@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "ICommandDispatcher.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
 #include <cstdint>
 #include <gmock/gmock.h>
 #include <mutex>

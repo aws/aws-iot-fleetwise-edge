@@ -1,23 +1,21 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "LastKnownStateWorkerThread.h"
-#include "CANDataTypes.h"
-#include "Clock.h"
-#include "ClockHandler.h"
-#include "CollectionInspectionAPITypes.h"
-#include "CommandTypes.h"
-#include "DataSenderTypes.h"
-#include "ICommandDispatcher.h"
-#include "LastKnownStateInspector.h"
-#include "LastKnownStateTypes.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/LastKnownStateWorkerThread.h"
 #include "Testing.h"
-#include "TimeTypes.h"
 #include "WaitUntil.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/CommandTypes.h"
+#include "aws/iotfleetwise/DataSenderTypes.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/LastKnownStateInspector.h"
+#include "aws/iotfleetwise/LastKnownStateTypes.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include "state_templates.pb.h"
-#include <array>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -215,7 +213,7 @@ TEST_F( LastKnownStateWorkerDoubleTest, ActivateAndDeactivateStateTemplate )
 TEST_F( LastKnownStateWorkerDoubleTest, ActivateWithAutoDeactivate )
 {
     mLastKnownStateWorkerThread = std::make_unique<LastKnownStateWorkerThread>(
-        mSignalBufferPtr, mCollectedSignals, std::move( mLastKnownStateInspector ), 900 );
+        mSignalBufferPtr, mCollectedSignals, std::move( mLastKnownStateInspector ), 50 );
     ASSERT_TRUE( mLastKnownStateWorkerThread->start() );
     WAIT_ASSERT_TRUE( mLastKnownStateWorkerThread->isAlive() );
 
@@ -347,11 +345,8 @@ TEST_F( LastKnownStateWorkerDoubleTest, DtcAndCanRawFrame )
     mLastKnownStateWorkerThread->onStateTemplatesChanged(
         std::make_shared<StateTemplateList>( StateTemplateList{ stateTemplateInfo } ) );
 
-    Timestamp timestamp = mClock->systemTimeSinceEpochMs();
-    std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf1 = { 0xDE, 0xAD, 0xBE, 0xEF, 0x0, 0x0, 0x0, 0x0 };
     CollectedSignalsGroup collectedSignalsGroup;
-    mSignalBufferPtr->push( CollectedDataFrame(
-        collectedSignalsGroup, std::make_shared<CollectedCanRawFrame>( 1, 1, timestamp, buf1, sizeof( buf1 ) ) ) );
+    mSignalBufferPtr->push( CollectedDataFrame( collectedSignalsGroup ) );
 
     std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
     ASSERT_TRUE( mCollectedSignals->isEmpty() );

@@ -1,54 +1,36 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CollectionInspectionWorkerThread.h"
-#include "CANDataTypes.h"
-#include "LoggingModule.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/CollectionInspectionWorkerThread.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <algorithm>
-#include <array>
 #include <string>
 #include <utility>
 #include <vector>
-
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-#include "StreamManager.h"
-#include <unordered_map>
-#endif
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-bool
-CollectionInspectionWorkerThread::init( const std::shared_ptr<SignalBuffer> &inputSignalBuffer,
-                                        const std::shared_ptr<DataSenderQueue> &outputCollectedData,
-                                        uint32_t idleTimeMs,
-                                        std::shared_ptr<RawData::BufferManager> rawBufferManager
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-                                        ,
-                                        std::shared_ptr<Aws::IoTFleetWise::Store::StreamForwarder> streamForwarder,
-                                        std::shared_ptr<Store::StreamManager> streamManager
-#endif
-)
+CollectionInspectionWorkerThread::CollectionInspectionWorkerThread(
+    CollectionInspectionEngine &collectionInspectionEngine,
+    std::shared_ptr<SignalBuffer> inputSignalBuffer,
+    std::shared_ptr<DataSenderQueue> outputCollectedData,
+    uint32_t idleTimeMs,
+    RawData::BufferManager *rawDataBufferManager )
+    : mCollectionInspectionEngine( collectionInspectionEngine )
+    , mInputSignalBuffer( std::move( inputSignalBuffer ) )
+    , mOutputCollectedData( std::move( outputCollectedData ) )
+    , mRawDataBufferManager( rawDataBufferManager )
 {
-    mInputSignalBuffer = inputSignalBuffer;
-    mOutputCollectedData = outputCollectedData;
     if ( idleTimeMs != 0 )
     {
         mIdleTimeMs = idleTimeMs;
     }
-
-    mCollectionInspectionEngine.setRawDataBufferManager( rawBufferManager );
-    mRawBufferManager = std::move( rawBufferManager );
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-    mStreamForwarder = std::move( streamForwarder );
-    mStreamManager = std::move( streamManager );
-#endif
-    return true;
 }
 
 bool
@@ -64,7 +46,9 @@ CollectionInspectionWorkerThread::start()
     // On multi core systems the shared variable mShouldStop must be updated for
     // all cores before starting the thread otherwise thread will directly end
     mShouldStop.store( false );
-    if ( !mThread.create( doWork, this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "Inspection Thread failed to start" );
     }
@@ -101,8 +85,7 @@ CollectionInspectionWorkerThread::shouldStop() const
 }
 
 void
-CollectionInspectionWorkerThread::onChangeInspectionMatrix(
-    const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
+CollectionInspectionWorkerThread::onChangeInspectionMatrix( std::shared_ptr<const InspectionMatrix> inspectionMatrix )
 {
     std::lock_guard<std::mutex> lock( mInspectionMatrixMutex );
     mUpdatedInspectionMatrix = inspectionMatrix;
@@ -119,9 +102,8 @@ CollectionInspectionWorkerThread::onNewDataAvailable()
 }
 
 void
-CollectionInspectionWorkerThread::doWork( void *data )
+CollectionInspectionWorkerThread::doWork()
 {
-    CollectionInspectionWorkerThread *consumer = static_cast<CollectionInspectionWorkerThread *>( data );
     TimePoint lastTimeEvaluated = { 0, 0 };
     Timestamp lastTraceOutput = 0;
     uint32_t statisticInputMessagesProcessed = 0;
@@ -130,26 +112,23 @@ CollectionInspectionWorkerThread::doWork( void *data )
     while ( true )
     {
         activations++;
-        if ( consumer->mUpdatedInspectionMatrixAvailable )
+        if ( mUpdatedInspectionMatrixAvailable )
         {
             std::shared_ptr<const InspectionMatrix> newInspectionMatrix;
             {
-                std::lock_guard<std::mutex> lock( consumer->mInspectionMatrixMutex );
-                consumer->mUpdatedInspectionMatrixAvailable = false;
-                newInspectionMatrix = consumer->mUpdatedInspectionMatrix;
+                std::lock_guard<std::mutex> lock( mInspectionMatrixMutex );
+                mUpdatedInspectionMatrixAvailable = false;
+                newInspectionMatrix = mUpdatedInspectionMatrix;
             }
 
-            consumer->mCollectionInspectionEngine.onChangeInspectionMatrix( newInspectionMatrix,
-                                                                            consumer->mClock->timeSinceEpoch() );
+            mCollectionInspectionEngine.onChangeInspectionMatrix( newInspectionMatrix, mClock->timeSinceEpoch() );
         }
         // Only run the main inspection loop if there is an inspection matrix
         // Otherwise, go to sleep.
-        if ( consumer->mUpdatedInspectionMatrix )
+        if ( mUpdatedInspectionMatrix )
         {
-            std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> buf = {};
-            CollectedCanRawFrame inputCANFrame( 0, 0, 0, buf, 0 );
-            TimePoint currentTime = consumer->mClock->timeSinceEpoch();
-            uint32_t waitTimeMs = consumer->mIdleTimeMs;
+            TimePoint currentTime = mClock->timeSinceEpoch();
+            uint32_t waitTimeMs = mIdleTimeMs;
             // Consume any new signals and pass them over to the inspection Engine
             auto consumeSignalGroups = [&]( const CollectedDataFrame &dataFrame ) {
                 TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_DATA_FRAMES );
@@ -165,103 +144,103 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         switch ( signalValue.getType() )
                         {
                         case SignalType::UINT8:
-                            consumer->mCollectionInspectionEngine.addNewSignal<uint8_t>(
+                            mCollectionInspectionEngine.addNewSignal<uint8_t>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint8Val );
                             break;
                         case SignalType::INT8:
-                            consumer->mCollectionInspectionEngine.addNewSignal<int8_t>(
+                            mCollectionInspectionEngine.addNewSignal<int8_t>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.int8Val );
                             break;
                         case SignalType::UINT16:
-                            consumer->mCollectionInspectionEngine.addNewSignal<uint16_t>(
+                            mCollectionInspectionEngine.addNewSignal<uint16_t>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint16Val );
                             break;
                         case SignalType::INT16:
-                            consumer->mCollectionInspectionEngine.addNewSignal<int16_t>(
+                            mCollectionInspectionEngine.addNewSignal<int16_t>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.int16Val );
                             break;
                         case SignalType::UINT32:
-                            consumer->mCollectionInspectionEngine.addNewSignal<uint32_t>(
+                            mCollectionInspectionEngine.addNewSignal<uint32_t>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint32Val );
                             break;
                         case SignalType::INT32:
-                            consumer->mCollectionInspectionEngine.addNewSignal<int32_t>(
+                            mCollectionInspectionEngine.addNewSignal<int32_t>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.int32Val );
                             break;
                         case SignalType::UINT64:
-                            consumer->mCollectionInspectionEngine.addNewSignal<uint64_t>(
+                            mCollectionInspectionEngine.addNewSignal<uint64_t>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint64Val );
                             break;
                         case SignalType::INT64:
-                            consumer->mCollectionInspectionEngine.addNewSignal<int64_t>(
+                            mCollectionInspectionEngine.addNewSignal<int64_t>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.int64Val );
                             break;
                         case SignalType::FLOAT:
-                            consumer->mCollectionInspectionEngine.addNewSignal<float>(
+                            mCollectionInspectionEngine.addNewSignal<float>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.floatVal );
                             break;
                         case SignalType::DOUBLE:
-                            consumer->mCollectionInspectionEngine.addNewSignal<double>(
+                            mCollectionInspectionEngine.addNewSignal<double>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.doubleVal );
                             break;
                         case SignalType::BOOLEAN:
-                            consumer->mCollectionInspectionEngine.addNewSignal<bool>(
+                            mCollectionInspectionEngine.addNewSignal<bool>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.boolVal );
                             break;
                         case SignalType::STRING:
-                            consumer->mCollectionInspectionEngine.addNewSignal<RawData::BufferHandle>(
+                            mCollectionInspectionEngine.addNewSignal<RawData::BufferHandle>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint32Val );
-                            if ( consumer->mRawBufferManager != nullptr )
+                            if ( mRawDataBufferManager != nullptr )
                             {
-                                consumer->mRawBufferManager->decreaseHandleUsageHint(
+                                mRawDataBufferManager->decreaseHandleUsageHint(
                                     inputSignal.signalID,
                                     signalValue.value.uint32Val,
                                     RawData::BufferHandleUsageStage::COLLECTED_NOT_IN_HISTORY_BUFFER );
@@ -273,15 +252,15 @@ CollectionInspectionWorkerThread::doWork( void *data )
                             break;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
                         case SignalType::COMPLEX_SIGNAL:
-                            consumer->mCollectionInspectionEngine.addNewSignal<RawData::BufferHandle>(
+                            mCollectionInspectionEngine.addNewSignal<RawData::BufferHandle>(
                                 inputSignal.signalID,
                                 inputSignal.fetchRequestID,
-                                calculateMonotonicTime( currentTime, inputSignal.receiveTime ),
+                                timePointFromSystemTime( currentTime, inputSignal.receiveTime ),
                                 currentTime.monotonicTimeMs,
                                 signalValue.value.uint32Val );
-                            if ( consumer->mRawBufferManager != nullptr )
+                            if ( mRawDataBufferManager != nullptr )
                             {
-                                consumer->mRawBufferManager->decreaseHandleUsageHint(
+                                mRawDataBufferManager->decreaseHandleUsageHint(
                                     inputSignal.signalID,
                                     signalValue.value.uint32Val,
                                     RawData::BufferHandleUsageStage::COLLECTED_NOT_IN_HISTORY_BUFFER );
@@ -291,20 +270,6 @@ CollectionInspectionWorkerThread::doWork( void *data )
                         }
                         statisticInputMessagesProcessed++;
                     }
-                }
-                if ( dataFrame.mCollectedCanRawFrame != nullptr )
-                {
-                    // Consume any raw frames
-                    TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_CAN );
-                    TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_CAN_FRAMES );
-
-                    consumer->mCollectionInspectionEngine.addNewRawCanFrame(
-                        dataFrame.mCollectedCanRawFrame->frameID,
-                        dataFrame.mCollectedCanRawFrame->channelId,
-                        calculateMonotonicTime( currentTime, dataFrame.mCollectedCanRawFrame->receiveTime ),
-                        dataFrame.mCollectedCanRawFrame->data,
-                        dataFrame.mCollectedCanRawFrame->size );
-                    statisticInputMessagesProcessed++;
                 }
 
                 // Consume any Active DTCs
@@ -319,33 +284,32 @@ CollectionInspectionWorkerThread::doWork( void *data )
                     TraceModule::get().decrementAtomicVariable(
                         TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS );
                     TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_DTCS );
-                    consumer->mCollectionInspectionEngine.setActiveDTCs( *dataFrame.mActiveDTCs.get() );
+                    mCollectionInspectionEngine.setActiveDTCs( *dataFrame.mActiveDTCs.get() );
                     statisticInputMessagesProcessed++;
                 }
 
-                lastTimeEvaluated = consumer->mClock->timeSinceEpoch();
-                consumer->mCollectionInspectionEngine.evaluateConditions( lastTimeEvaluated );
+                lastTimeEvaluated = mClock->timeSinceEpoch();
+                mCollectionInspectionEngine.evaluateConditions( lastTimeEvaluated );
 
                 // Initiate data collection and upload after every condition evaluation
-                statisticDataSentOut += consumer->collectDataAndUpload();
+                statisticDataSentOut += collectDataAndUpload( waitTimeMs );
             };
-            auto consumed = consumer->mInputSignalBuffer->consumeAll( consumeSignalGroups );
+            auto consumed = mInputSignalBuffer->consumeAll( consumeSignalGroups );
 
             // If nothing was consumed and at least the evaluate interval has elapsed, evaluate the
             // conditions to check heartbeat campaigns:
-            if ( ( consumed == 0 ) && ( ( consumer->mClock->monotonicTimeSinceEpochMs() -
-                                          lastTimeEvaluated.monotonicTimeMs ) >= EVALUATE_INTERVAL_MS ) )
+            if ( ( consumed == 0 ) && ( ( mClock->monotonicTimeSinceEpochMs() - lastTimeEvaluated.monotonicTimeMs ) >=
+                                        EVALUATE_INTERVAL_MS ) )
             {
-                lastTimeEvaluated = consumer->mClock->timeSinceEpoch();
-                consumer->mCollectionInspectionEngine.evaluateConditions( lastTimeEvaluated );
-                statisticDataSentOut += consumer->collectDataAndUpload();
+                lastTimeEvaluated = mClock->timeSinceEpoch();
+                mCollectionInspectionEngine.evaluateConditions( lastTimeEvaluated );
+                statisticDataSentOut += collectDataAndUpload( waitTimeMs );
             }
 
             // Nothing is in the ring buffer to consume. Go to idle mode for some time.
-            uint32_t timeToWait = std::min( waitTimeMs, consumer->mIdleTimeMs );
+            uint32_t timeToWait = std::min( waitTimeMs, mIdleTimeMs );
             // Print only every THREAD_IDLE_TIME_MS to avoid console spam
-            if ( consumer->mClock->monotonicTimeSinceEpochMs() >
-                 ( lastTraceOutput + LoggingModule::LOG_AGGREGATION_TIME_MS ) )
+            if ( mClock->monotonicTimeSinceEpochMs() > ( lastTraceOutput + LoggingModule::LOG_AGGREGATION_TIME_MS ) )
             {
                 FWE_LOG_TRACE( "Activations: " + std::to_string( activations ) +
                                ". Waiting for some data to come. Idling for: " + std::to_string( timeToWait ) +
@@ -356,16 +320,16 @@ CollectionInspectionWorkerThread::doWork( void *data )
                 activations = 0;
                 statisticInputMessagesProcessed = 0;
                 statisticDataSentOut = 0;
-                lastTraceOutput = consumer->mClock->monotonicTimeSinceEpochMs();
+                lastTraceOutput = mClock->monotonicTimeSinceEpochMs();
             }
-            consumer->mWait.wait( timeToWait );
+            mWait.wait( timeToWait );
         }
         else
         {
             // No inspection Matrix available. Wait for it from the CollectionScheme manager
-            consumer->mWait.wait( Signal::WaitWithPredicate );
+            mWait.wait( Signal::WaitWithPredicate );
         }
-        if ( consumer->shouldStop() )
+        if ( shouldStop() )
         {
             break;
         }
@@ -373,33 +337,9 @@ CollectionInspectionWorkerThread::doWork( void *data )
 }
 
 uint32_t
-CollectionInspectionWorkerThread::collectDataAndUpload()
+CollectionInspectionWorkerThread::collectDataAndUpload( uint32_t &waitTimeMs )
 {
     uint32_t collectedDataPackages = 0;
-    uint32_t waitTimeMs = this->mIdleTimeMs;
-
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-    // TODO consider priority, queue is shared between collecting and forwarding
-    if ( this->mStreamForwarder != nullptr )
-    {
-        for ( const auto &campaign : this->mCollectionInspectionEngine.forwardConditionForCampaignPartitions() )
-        {
-            for ( Aws::IoTFleetWise::Store::PartitionID pID = 0; pID < campaign.second.size(); ++pID )
-            {
-                if ( campaign.second[pID] )
-                {
-                    this->mStreamForwarder->beginForward(
-                        campaign.first, pID, Store::StreamForwarder::Source::CONDITION );
-                }
-                else
-                {
-                    this->mStreamForwarder->cancelForward(
-                        campaign.first, pID, Store::StreamForwarder::Source::CONDITION );
-                }
-            }
-        }
-    }
-#endif
 
     auto collectedData =
         this->mCollectionInspectionEngine.collectNextDataToSend( this->mClock->timeSinceEpoch(), waitTimeMs );
@@ -413,39 +353,13 @@ CollectionInspectionWorkerThread::collectDataAndUpload()
         TraceModule::get().incrementVariable( TraceVariable::CE_TRIGGERS );
         if ( collectedData.triggeredCollectionSchemeData != nullptr )
         {
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-            auto result = Store::StreamManager::ReturnCode::STREAM_NOT_FOUND;
-            if ( mStreamManager != nullptr )
+            if ( this->mOutputCollectedData->push( collectedData.triggeredCollectionSchemeData ) )
             {
-                result = mStreamManager->appendToStreams( *collectedData.triggeredCollectionSchemeData );
-            }
-            if ( result == Store::StreamManager::ReturnCode::SUCCESS )
-            {
-                // Successfully appended
-            }
-            else if ( result == Store::StreamManager::ReturnCode::EMPTY_DATA )
-            {
-                FWE_LOG_INFO(
-                    "The trigger for Campaign:  " + collectedData.triggeredCollectionSchemeData->metadata.campaignArn +
-                    " activated eventID: " + std::to_string( collectedData.triggeredCollectionSchemeData->eventID ) +
-                    " but no data is available to ingest" );
-            }
-            else if ( result != Store::StreamManager::ReturnCode::STREAM_NOT_FOUND )
-            {
-                FWE_LOG_ERROR( "Failed to store FWE data with eventID " +
-                               std::to_string( collectedData.triggeredCollectionSchemeData->eventID ) );
+                collectedDataPackages++;
             }
             else
-#endif
             {
-                if ( this->mOutputCollectedData->push( collectedData.triggeredCollectionSchemeData ) )
-                {
-                    collectedDataPackages++;
-                }
-                else
-                {
-                    FWE_LOG_WARN( "Collected data output buffer is full" );
-                }
+                FWE_LOG_WARN( "Collected data output buffer is full" );
             }
         }
 
@@ -467,21 +381,6 @@ CollectionInspectionWorkerThread::collectDataAndUpload()
             this->mCollectionInspectionEngine.collectNextDataToSend( this->mClock->timeSinceEpoch(), waitTimeMs );
     }
     return collectedDataPackages;
-}
-
-TimePoint
-CollectionInspectionWorkerThread::calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs )
-{
-    TimePoint convertedTime = timePointFromSystemTime( currTime, systemTimeMs );
-    if ( ( convertedTime.systemTimeMs == 0 ) && ( convertedTime.monotonicTimeMs == 0 ) )
-    {
-        FWE_LOG_ERROR( "The system time " + std::to_string( systemTimeMs ) +
-                       " corresponds to a time in the past before the monotonic" +
-                       " clock started ticking. Current system time: " + std::to_string( currTime.systemTimeMs ) +
-                       ". Current monotonic time: " + std::to_string( currTime.monotonicTimeMs ) );
-        return TimePoint{ systemTimeMs, 0 };
-    }
-    return convertedTime;
 }
 
 bool

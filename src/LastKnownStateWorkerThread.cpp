@@ -1,12 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "LastKnownStateWorkerThread.h"
-#include "LastKnownStateTypes.h"
-#include "LoggingModule.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/LastKnownStateWorkerThread.h"
+#include "aws/iotfleetwise/LastKnownStateTypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <string>
 #include <utility>
 #include <vector>
@@ -51,7 +52,9 @@ LastKnownStateWorkerThread::start()
     // On multi core systems the shared variable mShouldStop must be updated for
     // all cores before starting the thread otherwise thread will directly end
     mShouldStop.store( false );
-    if ( !mThread.create( doWork, this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "Last Known State Inspection Thread failed to start" );
     }
@@ -65,35 +68,33 @@ LastKnownStateWorkerThread::start()
 }
 
 void
-LastKnownStateWorkerThread::doWork( void *data )
+LastKnownStateWorkerThread::doWork()
 {
-    LastKnownStateWorkerThread *consumer = static_cast<LastKnownStateWorkerThread *>( data );
-
     while ( true )
     {
         {
-            std::lock_guard<std::mutex> lock( consumer->mStateTemplatesMutex );
-            if ( consumer->mStateTemplatesAvailable )
+            std::lock_guard<std::mutex> lock( mStateTemplatesMutex );
+            if ( mStateTemplatesAvailable )
             {
-                consumer->mStateTemplatesAvailable = false;
-                consumer->mStateTemplates = consumer->mStateTemplatesInput;
-                consumer->mLastKnownStateInspector->onStateTemplatesChanged( consumer->mStateTemplates );
+                mStateTemplatesAvailable = false;
+                mStateTemplates = mStateTemplatesInput;
+                mLastKnownStateInspector->onStateTemplatesChanged( *mStateTemplates );
             }
         }
 
         {
-            std::lock_guard<std::mutex> lock( consumer->mLastKnownStateCommandsMutex );
-            for ( auto &command : consumer->mLastKnownStateCommandsInput )
+            std::lock_guard<std::mutex> lock( mLastKnownStateCommandsMutex );
+            for ( auto &command : mLastKnownStateCommandsInput )
             {
-                consumer->mLastKnownStateInspector->onNewCommandReceived( command );
+                mLastKnownStateInspector->onNewCommandReceived( command );
             }
-            consumer->mLastKnownStateCommandsInput.clear();
+            mLastKnownStateCommandsInput.clear();
         }
 
         // Data should only be processed if state templates are available
-        if ( ( consumer->mStateTemplates != nullptr ) && ( !consumer->mStateTemplates->empty() ) )
+        if ( ( mStateTemplates != nullptr ) && ( !mStateTemplates->empty() ) )
         {
-            TimePoint currentTime = consumer->mClock->timeSinceEpoch();
+            TimePoint currentTime = mClock->timeSinceEpoch();
             auto consumeSignalGroups = [&]( const CollectedDataFrame &dataFrame ) {
                 static_cast<void>( dataFrame );
 
@@ -103,69 +104,69 @@ LastKnownStateWorkerThread::doWork( void *data )
                     switch ( signalValue.getType() )
                     {
                     case SignalType::UINT8:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<uint8_t>(
+                        mLastKnownStateInspector->inspectNewSignal<uint8_t>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.uint8Val );
                         break;
                     case SignalType::INT8:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<int8_t>(
+                        mLastKnownStateInspector->inspectNewSignal<int8_t>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.int8Val );
                         break;
                     case SignalType::UINT16:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<uint16_t>(
+                        mLastKnownStateInspector->inspectNewSignal<uint16_t>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.uint16Val );
                         break;
                     case SignalType::INT16:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<int16_t>(
+                        mLastKnownStateInspector->inspectNewSignal<int16_t>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.int16Val );
                         break;
                     case SignalType::UINT32:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<uint32_t>(
+                        mLastKnownStateInspector->inspectNewSignal<uint32_t>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.uint32Val );
                         break;
                     case SignalType::INT32:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<int32_t>(
+                        mLastKnownStateInspector->inspectNewSignal<int32_t>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.int32Val );
                         break;
                     case SignalType::UINT64:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<uint64_t>(
+                        mLastKnownStateInspector->inspectNewSignal<uint64_t>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.uint64Val );
                         break;
                     case SignalType::INT64:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<int64_t>(
+                        mLastKnownStateInspector->inspectNewSignal<int64_t>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.int64Val );
                         break;
                     case SignalType::FLOAT:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<float>(
+                        mLastKnownStateInspector->inspectNewSignal<float>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.floatVal );
                         break;
                     case SignalType::DOUBLE:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<double>(
+                        mLastKnownStateInspector->inspectNewSignal<double>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.doubleVal );
                         break;
                     case SignalType::BOOLEAN:
-                        consumer->mLastKnownStateInspector->inspectNewSignal<bool>(
+                        mLastKnownStateInspector->inspectNewSignal<bool>(
                             signal.signalID,
-                            calculateMonotonicTime( currentTime, signal.receiveTime ),
+                            timePointFromSystemTime( currentTime, signal.receiveTime ),
                             signalValue.value.boolVal );
                         break;
                     case SignalType::STRING:
@@ -183,48 +184,32 @@ LastKnownStateWorkerThread::doWork( void *data )
                     }
                 }
             };
-            consumer->mInputSignalBuffer->consumeAll( consumeSignalGroups );
+            mInputSignalBuffer->consumeAll( consumeSignalGroups );
 
             // Collect and upload data
-            auto collectedData =
-                consumer->mLastKnownStateInspector->collectNextDataToSend( consumer->mClock->timeSinceEpoch() );
+            auto collectedData = mLastKnownStateInspector->collectNextDataToSend( mClock->timeSinceEpoch() );
             if ( collectedData != nullptr )
             {
                 TraceModule::get().incrementVariable( TraceVariable::LAST_KNOWN_STATE_COLLECTION_TRIGGERS );
-                static_cast<void>( consumer->mCollectedLastKnownStateData->push( collectedData ) );
+                static_cast<void>( mCollectedLastKnownStateData->push( collectedData ) );
             }
-            consumer->mWait.wait( consumer->mIdleTimeMs );
+            mWait.wait( mIdleTimeMs );
         }
         else
         {
             // Consume all data received so far to prevent the queue from becoming full
-            consumer->mInputSignalBuffer->consumeAll( [&]( const CollectedDataFrame &dataFrame ) {
+            mInputSignalBuffer->consumeAll( [&]( const CollectedDataFrame &dataFrame ) {
                 static_cast<void>( dataFrame );
             } );
             // Wait for the state templates to arrive
-            consumer->mWait.wait( Signal::WaitWithPredicate );
+            mWait.wait( Signal::WaitWithPredicate );
         }
 
-        if ( consumer->shouldStop() )
+        if ( shouldStop() )
         {
             break;
         }
     }
-}
-
-TimePoint
-LastKnownStateWorkerThread::calculateMonotonicTime( const TimePoint &currTime, Timestamp systemTimeMs )
-{
-    TimePoint convertedTime = timePointFromSystemTime( currTime, systemTimeMs );
-    if ( ( convertedTime.systemTimeMs == 0 ) && ( convertedTime.monotonicTimeMs == 0 ) )
-    {
-        FWE_LOG_ERROR( "The system time " + std::to_string( systemTimeMs ) +
-                       " corresponds to a time in the past before the monotonic" +
-                       " clock started ticking. Current system time: " + std::to_string( currTime.systemTimeMs ) +
-                       ". Current monotonic time: " + std::to_string( currTime.monotonicTimeMs ) );
-        return TimePoint{ systemTimeMs, 0 };
-    }
-    return convertedTime;
 }
 
 void

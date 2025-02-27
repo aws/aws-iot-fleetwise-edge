@@ -1,30 +1,26 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "Schema.h"
-#include "IConnectionTypes.h"
-#include "LoggingModule.h"
-#include "TopicConfig.h"
-#include <utility>
+#include "aws/iotfleetwise/Schema.h"
+#include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TopicConfig.h"
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-Schema::Schema( std::shared_ptr<IReceiver> receiverDecoderManifest,
-                std::shared_ptr<IReceiver> receiverCollectionSchemeList,
-                std::shared_ptr<ISender> sender )
-    : mMqttSender( std::move( sender ) )
+Schema::Schema( IReceiver &receiverDecoderManifest, IReceiver &receiverCollectionSchemeList, ISender &sender )
+    : mMqttSender( sender )
 {
     // Register the listeners
-    receiverDecoderManifest->subscribeToDataReceived( [this]( const ReceivedConnectivityMessage &receivedMessage ) {
+    receiverDecoderManifest.subscribeToDataReceived( [this]( const ReceivedConnectivityMessage &receivedMessage ) {
         onDecoderManifestReceived( receivedMessage.buf, receivedMessage.size );
     } );
-    receiverCollectionSchemeList->subscribeToDataReceived(
-        [this]( const ReceivedConnectivityMessage &receivedMessage ) {
-            onCollectionSchemeReceived( receivedMessage.buf, receivedMessage.size );
-        } );
+    receiverCollectionSchemeList.subscribeToDataReceived( [this]( const ReceivedConnectivityMessage &receivedMessage ) {
+        onCollectionSchemeReceived( receivedMessage.buf, receivedMessage.size );
+    } );
 }
 
 void
@@ -105,13 +101,6 @@ Schema::sendCheckin( const std::vector<SyncID> &documentARNs, OnCheckinSentCallb
 void
 Schema::transmitCheckin( OnCheckinSentCallback callback )
 {
-    if ( mMqttSender == nullptr )
-    {
-        FWE_LOG_ERROR( "Invalid sender instance" );
-        callback( false );
-        return;
-    }
-
     // Trace log for more verbose Checkin Info
     std::string checkinDebugString;
     checkinDebugString = "Checkin data: timestamp: " + std::to_string( mProtoCheckinMsg.timestamp_ms_epoch() );
@@ -127,28 +116,28 @@ Schema::transmitCheckin( OnCheckinSentCallback callback )
     }
     checkinDebugString += "]";
 
-    mMqttSender->sendBuffer( mMqttSender->getTopicConfig().checkinsTopic,
-                             reinterpret_cast<const uint8_t *>( mProtoCheckinMsgOutput.data() ),
-                             mProtoCheckinMsgOutput.size(),
-                             [checkinDebugString, callback]( ConnectivityError result ) {
-                                 if ( result == ConnectivityError::Success )
-                                 {
-                                     FWE_LOG_TRACE( "Checkin Message sent to the backend" );
-                                     FWE_LOG_TRACE( checkinDebugString );
-                                     callback( true );
-                                 }
-                                 else if ( result == ConnectivityError::NoConnection )
-                                 {
-                                     FWE_LOG_TRACE( "Couldn't send checkin message because there is no connection" );
-                                     callback( false );
-                                 }
-                                 else
-                                 {
-                                     FWE_LOG_ERROR(
-                                         "offboardconnectivity error, will retry sending the checkin message" );
-                                     callback( false );
-                                 }
-                             } );
+    mMqttSender.sendBuffer( mMqttSender.getTopicConfig().checkinsTopic,
+                            reinterpret_cast<const uint8_t *>( mProtoCheckinMsgOutput.data() ),
+                            mProtoCheckinMsgOutput.size(),
+                            [checkinDebugString, callback]( ConnectivityError result ) {
+                                if ( result == ConnectivityError::Success )
+                                {
+                                    FWE_LOG_TRACE( "Checkin Message sent to the backend" );
+                                    FWE_LOG_TRACE( checkinDebugString );
+                                    callback( true );
+                                }
+                                else if ( result == ConnectivityError::NoConnection )
+                                {
+                                    FWE_LOG_TRACE( "Couldn't send checkin message because there is no connection" );
+                                    callback( false );
+                                }
+                                else
+                                {
+                                    FWE_LOG_ERROR(
+                                        "offboardconnectivity error, will retry sending the checkin message" );
+                                    callback( false );
+                                }
+                            } );
 }
 
 } // namespace IoTFleetWise

@@ -88,11 +88,219 @@
     }
   },
   {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.E",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.E"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.F",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.F"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.G",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.G"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.H",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.H"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.I",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.I"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.J",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.J"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.K",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.K"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.L",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.L"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.M",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.M"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.N",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.N"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.O",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.O"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.P",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.P"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.Q",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A2.Q"
+    }
+  },
+  {
     "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.S",
     "interfaceId": "SOMEIP",
     "type": "CUSTOM_DECODING_SIGNAL",
     "customDecodingSignal": {
       "id": "Vehicle.ExampleSomeipInterface.A1.S"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.A"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.B",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.B"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.C",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.C"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.D",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.D"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.E",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.E"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.F",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.F"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.G",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.G"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.H",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.H"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.I",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.I"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.J",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.J"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.K",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.K"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.L",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.A1.L"
+    }
+  },
+  {
+    "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.Temperature",
+    "interfaceId": "SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.ExampleSomeipInterface.Temperature"
     }
   }
 ]

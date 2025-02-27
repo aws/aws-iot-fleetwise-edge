@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "DeviceShadowOverSomeipExampleApplication.hpp"
+#include "v1/commonapi/DeviceShadowOverSomeipInterface.hpp"
 #include <CommonAPI/CommonAPI.hpp>
 #include <iostream>
 #include <stdexcept>

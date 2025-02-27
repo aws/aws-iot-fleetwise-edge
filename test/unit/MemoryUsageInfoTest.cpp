@@ -2,7 +2,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "MemoryUsageInfo.h"
+#include "aws/iotfleetwise/MemoryUsageInfo.h"
 
 #include <gtest/gtest.h>
 

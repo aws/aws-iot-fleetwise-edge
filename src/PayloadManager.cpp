@@ -1,9 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "PayloadManager.h"
-#include "LoggingModule.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/PayloadManager.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <cstddef>
 #include <memory>
 #include <utility>
@@ -123,8 +123,6 @@ PayloadManager::retrievePayload( uint8_t *buf, size_t size, const std::string &f
     }
 
     ErrorCode status = mPersistencyPtr->read( buf, size, DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
-    // Delete file from disk
-    mPersistencyPtr->erase( DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
     if ( status != ErrorCode::SUCCESS )
     {
         FWE_LOG_ERROR( "Failed to read persisted data from file " + filename );
@@ -133,12 +131,6 @@ PayloadManager::retrievePayload( uint8_t *buf, size_t size, const std::string &f
     FWE_LOG_TRACE( "Successfully retrieved persisted data of size " + std::to_string( size ) + " Bytes from file " +
                    filename );
     return ErrorCode::SUCCESS;
-}
-
-ErrorCode
-PayloadManager::retrievePayloadLazily( std::ifstream &fileStream, const std::string &filename )
-{
-    return mPersistencyPtr->read( fileStream, DataType::EDGE_TO_CLOUD_PAYLOAD, filename );
 }
 
 void

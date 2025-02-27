@@ -2,16 +2,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "IoTFleetWiseEngine.h"
-#include "CANDataTypes.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IoTFleetWiseConfig.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "WaitUntil.h"
-#include <array>
+#include "aws/iotfleetwise/IoTFleetWiseEngine.h"
+#include "Testing.h"
+#include "aws/iotfleetwise/IoTFleetWiseConfig.h"
 #include <boost/filesystem.hpp>
-#include <cstdint>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <json/json.h>
@@ -29,11 +23,6 @@
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <vector>
-
-#ifdef FWE_FEATURE_ROS2
-#include <rclcpp/rclcpp.hpp>
-#endif
 
 namespace Aws
 {
@@ -97,21 +86,51 @@ protected:
         {
             GTEST_FAIL() << "Test failed due to unavailability of socket";
         }
-#ifdef FWE_FEATURE_IWAVE_GPS
-        std::ofstream iWaveGpsFile( "/tmp/engineTestIWaveGPSfile.txt" );
-        iWaveGpsFile << "NO valid NMEA data";
-        iWaveGpsFile.close();
-#endif
-#ifdef FWE_FEATURE_ROS2
-        rclcpp::init( 0, NULL );
-#endif
+
+        auto tempDir = getTempDir();
+        std::string keyPem;
+        std::string certPem;
+        makeCert( keyPem, certPem );
+
+        auto dummyPrivateKeyFilename = tempDir / "dummyPrivateKey.key";
+        {
+            std::ofstream dummyPrivateKeyFile( dummyPrivateKeyFilename.c_str() );
+            dummyPrivateKeyFile << keyPem;
+        }
+
+        auto dummyCertificateFilename = tempDir / "dummyCertificate.pem";
+        {
+            std::ofstream dummyCertificateFile( dummyCertificateFilename.c_str() );
+            dummyCertificateFile << certPem;
+        }
+
+        std::string staticConfigFileContent;
+        {
+            std::ifstream staticConfigFile( "static-config-ok.json" );
+            std::stringstream buffer;
+            buffer << staticConfigFile.rdbuf();
+            staticConfigFileContent = buffer.str();
+        }
+
+        staticConfigFileContent.replace( staticConfigFileContent.find( "PRIVATE_KEY_FILENAME_PLACEHOLDER" ),
+                                         std::string( "PRIVATE_KEY_FILENAME_PLACEHOLDER" ).length(),
+                                         dummyPrivateKeyFilename.string() );
+        staticConfigFileContent.replace( staticConfigFileContent.find( "CERTIFICATE_FILENAME_PLACEHOLDER" ),
+                                         std::string( "CERTIFICATE_FILENAME_PLACEHOLDER" ).length(),
+                                         dummyCertificateFilename.string() );
+        staticConfigFileContent.replace( staticConfigFileContent.find( "ROOT_CA_FILENAME_PLACEHOLDER" ),
+                                         std::string( "ROOT_CA_FILENAME_PLACEHOLDER" ).length(),
+                                         dummyCertificateFilename.string() );
+
+        mConfigFilePath = ( tempDir / "static-config-ok.json" ).string();
+        {
+            std::ofstream staticConfigFile( mConfigFilePath );
+            staticConfigFile << staticConfigFileContent;
+        }
     }
     void
     TearDown() override
     {
-#ifdef FWE_FEATURE_ROS2
-        rclcpp::shutdown();
-#endif
     }
 
     static bool
@@ -125,26 +144,17 @@ protected:
         close( sock );
         return true;
     }
+
+    std::string mConfigFilePath;
 };
 
 TEST_F( IoTFleetWiseEngineTest, InitAndStartEngine )
 {
     Json::Value config;
-    std::string configFilePath = "static-config-ok.json";
-    ASSERT_TRUE( IoTFleetWiseConfig::read( configFilePath, config ) );
+    ASSERT_TRUE( IoTFleetWiseConfig::read( mConfigFilePath, config ) );
     IoTFleetWiseEngine engine;
 
-    std::string keyPem;
-    std::string certPem;
-    makeCert( keyPem, certPem );
-    std::ofstream dummyPrivateKeyFile( "/tmp/dummyPrivateKey.key" );
-    dummyPrivateKeyFile << keyPem;
-    dummyPrivateKeyFile.close();
-    std::ofstream dummyCertificateFile( "/tmp/dummyCertificate.pem" );
-    dummyCertificateFile << certPem;
-    dummyCertificateFile.close();
-
-    ASSERT_TRUE( engine.connect( config, boost::filesystem::absolute( configFilePath ).parent_path() ) );
+    ASSERT_TRUE( engine.connect( config, boost::filesystem::absolute( mConfigFilePath ).parent_path() ) );
 
     ASSERT_TRUE( engine.start() );
     ASSERT_TRUE( engine.isAlive() );
@@ -171,50 +181,6 @@ TEST_F( IoTFleetWiseEngineTest, InitAndStartEngineInlineCreds )
     ASSERT_TRUE( engine.start() );
     ASSERT_TRUE( engine.isAlive() );
     ASSERT_TRUE( engine.disconnect() );
-    ASSERT_TRUE( engine.stop() );
-}
-
-TEST_F( IoTFleetWiseEngineTest, CheckPublishDataQueue )
-{
-    Json::Value config;
-    std::string configFilePath = "static-config-ok.json";
-    ASSERT_TRUE( IoTFleetWiseConfig::read( configFilePath, config ) );
-    IoTFleetWiseEngine engine;
-    ASSERT_TRUE( engine.connect( config, boost::filesystem::absolute( configFilePath ).parent_path() ) );
-
-    // Push to the publish data queue
-    std::shared_ptr<TriggeredCollectionSchemeData> collectedDataPtr = std::make_shared<TriggeredCollectionSchemeData>();
-    collectedDataPtr->metadata.collectionSchemeID = "123";
-    collectedDataPtr->metadata.decoderID = "456";
-    collectedDataPtr->triggerTime = 800;
-    {
-        CollectedSignal collectedSignalMsg1(
-            120 /*signalId*/, 800 /*receiveTime*/, 77.88 /*value*/, SignalType::DOUBLE );
-        collectedDataPtr->signals.push_back( collectedSignalMsg1 );
-        CollectedSignal collectedSignalMsg2(
-            10 /*signalId*/, 1000 /*receiveTime*/, 46.5 /*value*/, SignalType::DOUBLE );
-        collectedDataPtr->signals.push_back( collectedSignalMsg2 );
-        CollectedSignal collectedSignalMsg3(
-            12 /*signalId*/, 1200 /*receiveTime*/, 98.9 /*value*/, SignalType::DOUBLE );
-        collectedDataPtr->signals.push_back( collectedSignalMsg3 );
-    }
-    {
-        std::array<uint8_t, MAX_CAN_FRAME_BYTE_SIZE> data = { 1, 2, 3, 4, 5, 6, 7, 8 };
-        CollectedCanRawFrame canFrames1( 12 /*frameId*/, 1 /*nodeId*/, 815 /*receiveTime*/, data, sizeof data );
-        collectedDataPtr->canFrames.push_back( canFrames1 );
-        CollectedCanRawFrame canFrames2( 4 /*frameId*/, 2 /*nodeId*/, 1100 /*receiveTime*/, data, sizeof data );
-        collectedDataPtr->canFrames.push_back( canFrames2 );
-        CollectedCanRawFrame canFrames3( 6 /*frameId*/, 3 /*nodeId*/, 1300 /*receiveTime*/, data, sizeof data );
-        collectedDataPtr->canFrames.push_back( canFrames3 );
-    }
-
-    ASSERT_TRUE( engine.mCollectedDataReadyToPublish->push( collectedDataPtr ) );
-
-    ASSERT_TRUE( engine.start() );
-
-    WAIT_ASSERT_TRUE( engine.isAlive() );
-
-    WAIT_ASSERT_TRUE( engine.disconnect() );
     ASSERT_TRUE( engine.stop() );
 }
 

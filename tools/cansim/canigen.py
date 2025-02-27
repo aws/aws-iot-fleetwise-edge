@@ -4,6 +4,7 @@
 
 import json
 import select
+import struct
 import time
 from datetime import datetime
 from threading import Thread
@@ -11,6 +12,7 @@ from threading import Thread
 import can
 import cantools
 import isotp
+from tenacity import Retrying, stop_after_attempt
 
 if __name__ == "__main__":
     import argparse
@@ -162,7 +164,13 @@ class Canigen:
                     arbitration_id=msg.frame_id,
                     data=data,
                 )
-                self._can_bus.send(frame)
+                try:
+                    for attempt in Retrying(stop=stop_after_attempt(5)):
+                        with attempt:
+                            self._can_bus.send(frame)
+                except can.CanError:
+                    print("error: failed to push data to CAN bus, transmit buffer is full")
+
             send_time += cycle_time / 1000
             sleep_time = send_time - time.monotonic()
             if cycle_time >= 5 and sleep_time < 2.0 / 1000.0:
@@ -191,11 +199,25 @@ class Canigen:
     def _encode_pid_data(self, num, ecu):
         for name, data in ecu["pids"].items():
             if num == int(data["num"], 0):
-                val = int((self._values["pid"][name] + data["offset"]) * data["scale"])
-                out = []
-                for i in range(data["size"]):
-                    out.append((val >> ((data["size"] - i - 1) * 8)) & 0xFF)
-                return out
+                scaled_val = (self._values["pid"][name] + data["offset"]) * data["scale"]
+                is_float = data.get("signal_value_type", "INTEGER") == "FLOATING_POINT"
+                if is_float:
+                    if data["size"] == 4:
+                        return list(struct.pack(">f", scaled_val))
+                    elif data["size"] == 8:
+                        return list(struct.pack(">d", scaled_val))
+                    else:
+                        print(
+                            "error: invalid size for floating point value,"
+                            f" expected 4 or 8 bytes but got {data['size']}"
+                        )
+                        return None
+                else:
+                    val = int(scaled_val)
+                    out = []
+                    for i in range(data["size"]):
+                        out.append((val >> ((data["size"] - i - 1) * 8)) & 0xFF)
+                    return out
         return None
 
     def _create_isotp_socket(self, txid, rxid, zero_padding):

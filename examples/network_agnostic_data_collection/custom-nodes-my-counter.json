@@ -1,0 +1,15 @@
+[
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle",
+      "description": "Vehicle"
+    }
+  },
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.MyCounter",
+      "description": "Vehicle.MyCounter",
+      "dataType": "STRING"
+    }
+  }
+]

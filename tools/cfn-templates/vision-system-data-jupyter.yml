@@ -345,24 +345,10 @@ Resources:
             systemctl stop unattended-upgrades
             systemctl disable unattended-upgrades
 
-            # Wait for any existing package install to finish
-            i=0
-            while true; do
-              if sudo fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; then
-                i=0
-              else
-                i=`expr $i + 1`
-                if expr $i \>= 10 > /dev/null; then
-                  break
-                fi
-              fi
-              sleep 1
-            done
-
-            print_process_list() {
-              ps aux # Print processes on error in case apt lock was still taken
+            print_process_tree(){
+              ps axjf # Print process tree in case apt lock was still taken
             }
-            trap print_process_list ERR
+            trap print_process_tree ERR
 
             # Upgrade system and reboot if required
             apt update
@@ -387,7 +373,7 @@ Resources:
             rm amazon-cloudwatch-agent.deb
             # On error, signal back to cfn:
             error_handler() {
-              print_process_list
+              print_process_tree
               /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource ${Resource} --region ${AWS::Region}
             }
             function error_exit {

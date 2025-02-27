@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "RawDataManager.h"
-#include "Assert.h"
-#include "LoggingModule.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/RawDataManager.h"
+#include "aws/iotfleetwise/Assert.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <algorithm>
 #include <numeric>
 #include <set>
@@ -67,7 +67,7 @@ LoanedFrame::operator=( LoanedFrame &&other ) noexcept
 void
 LoanedFrame::swap( LoanedFrame &lhs, LoanedFrame &rhs ) noexcept
 {
-    std::swap( lhs.mRawBufferManager, rhs.mRawBufferManager );
+    std::swap( lhs.mRawDataBufferManager, rhs.mRawDataBufferManager );
     std::swap( lhs.mTypeId, rhs.mTypeId );
     std::swap( lhs.mHandle, rhs.mHandle );
     std::swap( lhs.mData, rhs.mData );
@@ -76,9 +76,9 @@ LoanedFrame::swap( LoanedFrame &lhs, LoanedFrame &rhs ) noexcept
 
 LoanedFrame::~LoanedFrame()
 {
-    if ( mRawBufferManager != nullptr )
+    if ( mRawDataBufferManager != nullptr )
     {
-        mRawBufferManager->returnLoanedFrame( mTypeId, mHandle );
+        mRawDataBufferManager->returnLoanedFrame( mTypeId, mHandle );
     }
 }
 

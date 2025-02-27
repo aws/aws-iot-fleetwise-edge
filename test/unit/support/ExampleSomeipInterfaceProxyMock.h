@@ -19,6 +19,7 @@ public:
     MOCK_METHOD( CommonAPI::InterfaceVersionAttribute &, getInterfaceVersionAttribute, () );
     MOCK_METHOD( std::future<void>, getCompletionFuture, () );
     MOCK_METHOD( v1::commonapi::ExampleSomeipInterfaceProxyBase::XAttribute &, getXAttribute, () );
+    MOCK_METHOD( v1::commonapi::ExampleSomeipInterfaceProxyBase::TemperatureAttribute &, getTemperatureAttribute, () );
     MOCK_METHOD( v1::commonapi::ExampleSomeipInterfaceProxyBase::A1Attribute &, getA1Attribute, () );
     MOCK_METHOD( void,
                  setInt32,

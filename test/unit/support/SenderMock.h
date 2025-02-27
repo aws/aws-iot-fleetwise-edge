@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "ISender.h"
+#include "aws/iotfleetwise/ISender.h"
 #include <cstddef>
 #include <cstdint>
 #include <gmock/gmock.h>
@@ -88,7 +88,7 @@ public:
     MOCK_METHOD( unsigned, getPayloadCountSent, (), ( const, override ) );
 
     const TopicConfig &
-    getTopicConfig() const
+    getTopicConfig() const override
     {
         return *mTopicConfig;
     }

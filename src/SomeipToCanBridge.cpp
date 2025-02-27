@@ -1,11 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "SomeipToCanBridge.h"
-#include "EnumUtility.h"
-#include "LoggingModule.h"
-#include "Thread.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/SomeipToCanBridge.h"
+#include "aws/iotfleetwise/EnumUtility.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/Thread.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <endian.h>
 #include <iomanip>
 #include <set>
@@ -40,7 +40,7 @@ SomeipToCanBridge::SomeipToCanBridge(
 }
 
 bool
-SomeipToCanBridge::init()
+SomeipToCanBridge::connect()
 {
     mSomeipApplication = mCreateSomeipApplication( mSomeipApplicationName );
     if ( !mSomeipApplication->init() )
@@ -72,7 +72,10 @@ SomeipToCanBridge::init()
         mSomeipServiceId,
         mSomeipInstanceId,
         mSomeipEventId,
-        [this]( const std::shared_ptr<vsomeip::message> &response ) {
+        // coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
+        [this](
+            // coverity[autosar_cpp14_a8_4_13_violation] smart pointer needed to match the expected signature
+            const std::shared_ptr<vsomeip::message> &response ) {
             auto payload = response->get_payload();
             if ( payload->get_length() < HEADER_SIZE )
             {
@@ -102,7 +105,7 @@ SomeipToCanBridge::init()
                     : TraceVariable::READ_SOCKET_FRAMES_19 );
             std::lock_guard<std::mutex> lock( mDecoderDictMutex );
             mCanDataConsumer.processMessage( mCanChannelId,
-                                             mDecoderDictionary,
+                                             mDecoderDictionary.get(),
                                              canMessageId,
                                              payload->get_data() + HEADER_SIZE,
                                              payload->get_length() - HEADER_SIZE,

@@ -1,16 +1,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "LastKnownStateDataSender.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IConnectionTypes.h"
-#include "LastKnownStateTypes.h"
-#include "LoggingModule.h"
-#include "SignalTypes.h"
-#include "TopicConfig.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/LastKnownStateDataSender.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/LastKnownStateTypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TopicConfig.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <cstdint>
 #include <google/protobuf/message.h>
+#include <memory>
 #include <snappy.h>
 #include <string>
 #include <utility>
@@ -21,32 +22,28 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-LastKnownStateDataSender::LastKnownStateDataSender( std::shared_ptr<ISender> lastKnownStateSender,
-                                                    unsigned maxMessagesPerPayload )
-    : mLastKnownStateSender( std::move( lastKnownStateSender ) )
+LastKnownStateDataSender::LastKnownStateDataSender( ISender &sender, unsigned maxMessagesPerPayload )
+    : mMqttSender( sender )
     , mMaxMessagesPerPayload( maxMessagesPerPayload )
 {
 }
 
-void
-LastKnownStateDataSender::processData( std::shared_ptr<const DataToSend> data, OnDataProcessedCallback callback )
+bool
+LastKnownStateDataSender::isAlive()
 {
-    if ( data == nullptr )
-    {
-        FWE_LOG_WARN( "Nothing to send as the input is empty" );
-        return;
-    }
+    return mMqttSender.isAlive();
+}
 
-    auto collectedData = std::dynamic_pointer_cast<const LastKnownStateCollectedData>( data );
+void
+LastKnownStateDataSender::processData( const DataToSend &data, OnDataProcessedCallback callback )
+{
+    // coverity[autosar_cpp14_a5_2_1_violation] Cast by design as we want the sender to know the concrete type.
+    // coverity[autosar_cpp14_m5_2_3_violation] Cast by design as we want the sender to know the concrete type.
+    // coverity[misra_cpp_2008_rule_5_2_3_violation] Cast by design as we want the sender to know the concrete type.
+    auto collectedData = dynamic_cast<const LastKnownStateCollectedData *>( &data );
     if ( collectedData == nullptr )
     {
         FWE_LOG_WARN( "Nothing to send as the input is not a valid LastKnownStateCollectedData" );
-        return;
-    }
-
-    if ( mLastKnownStateSender == nullptr )
-    {
-        FWE_LOG_ERROR( "No sender for LastKnownState data provided" );
         return;
     }
 
@@ -164,8 +161,8 @@ LastKnownStateDataSender::sendProto( std::stringstream &logMessageIds,
     }
     protoOutput = compressedProtoOutput;
 
-    mLastKnownStateSender->sendBuffer(
-        mLastKnownStateSender->getTopicConfig().lastKnownStateDataTopic,
+    mMqttSender.sendBuffer(
+        mMqttSender.getTopicConfig().lastKnownStateDataTopic,
         reinterpret_cast<const uint8_t *>( protoOutput->data() ),
         protoOutput->size(),
         [stateTemplateSyncIds = logMessageIds.str(), payloadSize = protoOutput->size(), callback](
@@ -189,11 +186,13 @@ LastKnownStateDataSender::sendProto( std::stringstream &logMessageIds,
 }
 
 void
-LastKnownStateDataSender::processPersistedData( std::istream &data,
+LastKnownStateDataSender::processPersistedData( const uint8_t *buf,
+                                                size_t size,
                                                 const Json::Value &metadata,
                                                 OnPersistedDataProcessedCallback callback )
 {
-    static_cast<void>( data );
+    static_cast<void>( buf );
+    static_cast<void>( size );
     static_cast<void>( metadata );
     static_cast<void>( callback );
 

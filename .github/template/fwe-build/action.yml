@@ -62,8 +62,8 @@ runs:
       shell: bash
       if: inputs.build-arch  == 'native'
       run: |
-        ./tools/test-fwe.sh ${{ inputs.extra-options }} --extra-gtest-filter "-*CANDataSourceTest*:*ISOTPOverCANProtocolTest*:*IoTFleetWiseEngineTest*:*OBDOverCANModuleTest*:*CanCommandDispatcherTest*:*UDSTemplateInterfaceTest*"
-
+        PYTEST_ADDOPTS='-k "not (CANDataSourceTest or ISOTPOverCANProtocolTest or IoTFleetWiseEngineTest or OBDOverCANModuleTest or CanCommandDispatcherTest or UDSTemplateInterfaceTest)"' \
+          ./tools/test-fwe.sh ${{ inputs.extra-options }}
     - name: upload-artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -74,6 +74,7 @@ runs:
           build/${{ inputs.dist-name }}-${{ inputs.upload-arch }}.tar.gz
           build/Testing/Temporary/
           build/**/report-*.xml
+          build/**/html_report/
           build/opt.tar.gz
 
     - name: upload-asset

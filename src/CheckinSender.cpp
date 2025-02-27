@@ -1,9 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CheckinSender.h"
-#include "LoggingModule.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/CheckinSender.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include <algorithm>
 #include <boost/none.hpp>
 #include <cstddef>
@@ -52,12 +52,9 @@ CheckinSender::start()
     // On multi core systems the shared variable mShouldStop must be updated for
     // all cores before starting the thread otherwise thread will directly end
     mShouldStop.store( false );
-    if ( !mThread.create(
-             []( void *data ) {
-                 CheckinSender *checkinSender = static_cast<CheckinSender *>( data );
-                 checkinSender->doWork();
-             },
-             this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "Checkin Thread failed to start" );
     }

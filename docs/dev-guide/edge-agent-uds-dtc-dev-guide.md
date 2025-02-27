@@ -34,9 +34,9 @@
 
 ## Overview
 
-The [`IRemoteDiagnostics`](../../src/IRemoteDiagnostics.h) interface facilitates the retrieval of
-active DTCs, snapshot records, and extended data from ECUs. AWS IoT FleetWise utilizes this
-diagnostics interface to collect DTCs and related information.
+The [`IRemoteDiagnostics`](../../include/aws/iotfleetwise/IRemoteDiagnostics.h) interface
+facilitates the retrieval of active DTCs, snapshot records, and extended data from ECUs. AWS IoT
+FleetWise utilizes this diagnostics interface to collect DTCs and related information.
 
 ![](./images/uds-dtc-architecture-uml.png)
 
@@ -239,6 +239,10 @@ Condition based fetch trigger frequency is limited by `minFetchTriggerIntervalMs
 config file. This frequency limits repeated fetch requests while fetch condition is evaluated to
 TRUE. The limitation is set to 1s by default if not specified in the config.
 
+The maximum size of the fetch queue for executing requests when condition evaluates to true is set
+by `maxFetchQueueSize` field in static config file. This limits the number of fetch requests being
+processed, any new fetch requests will be discarded if the queue reaches the defined size.
+
 ## Adding your own UDS interface
 
 If you want to add your custom interface:
@@ -258,7 +262,7 @@ If you want to add your custom interface:
       `RemoteDiagnosticDataSource`:
       - ```cpp
            mDiagnosticDataSource = std::make_shared<RemoteDiagnosticDataSource>( mDiagnosticNamedSignalDataSource,
-                                                                             mRawBufferManager,
+                                                                             mRawDataBufferManager,
                                                                              customDiagnosticInterface);
         ```
 

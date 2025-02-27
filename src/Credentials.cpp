@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "Credentials.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/Credentials.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <aws/core/utils/StringUtils.h>
 #include <aws/crt/Api.h>
 #include <aws/crt/Types.h>

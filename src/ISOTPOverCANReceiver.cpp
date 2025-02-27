@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ISOTPOverCANReceiver.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/ISOTPOverCANReceiver.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <linux/can.h>
 #include <linux/can/isotp.h>
 #include <net/if.h>
@@ -10,6 +10,7 @@
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <utility>
 
 // ISO TP maximum PDU size is 4095, additional bytes are needed
 // for the Linux Networking stack internals.
@@ -20,12 +21,9 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-bool
-ISOTPOverCANReceiver::init( const ISOTPOverCANReceiverOptions &receiverOptions )
+ISOTPOverCANReceiver::ISOTPOverCANReceiver( ISOTPOverCANReceiverOptions receiverOptions )
+    : mReceiverOptions( std::move( receiverOptions ) )
 {
-    mTimer.reset();
-    mReceiverOptions = receiverOptions;
-    return true;
 }
 
 bool

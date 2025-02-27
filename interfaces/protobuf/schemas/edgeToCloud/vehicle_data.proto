@@ -43,9 +43,10 @@ message VehicleData {
     DtcData dtc_data = 6;
 
     /*
-     * Captured raw CAN frames if specified by the collectionScheme
+     * This field was never supported, so it should not be used any more.
      */
-    repeated CanFrame can_frames = 7;
+    reserved 7;
+    reserved "can_frames";
 
     /*
      * This field was never supported, so it should not be used any more.
@@ -112,32 +113,6 @@ message CapturedSignal {
          */
         string string_value = 4;
     }
-}
-
-/*
- * A raw CAN2.0 A or B frame
- */
-message CanFrame {
-
-   /*
-    * Milliseconds relative to the event_time_ms_epoch. Can be negative or positive.
-    */
-   sint64 relative_time_ms = 1;
-
-   /*
-    * CAN Message Arbitration ID
-    */
-   uint32 message_id = 2;
-
-   /*
-    * The CAN interface on which the CAN Frame was received
-    */
-   string interface_id = 3;
-
-   /*
-    * Array of bytes from the CAN Frame
-    */
-   bytes byte_values = 4;
 }
 
 message DtcData {

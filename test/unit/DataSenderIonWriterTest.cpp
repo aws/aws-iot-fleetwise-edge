@@ -1,15 +1,15 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DataSenderIonWriter.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IDecoderDictionary.h"
-#include "MessageTypes.h"
+#include "aws/iotfleetwise/DataSenderIonWriter.h"
 #include "RawDataBufferManagerSpy.h"
-#include "RawDataManager.h"
-#include "SignalTypes.h"
-#include "StreambufBuilder.h"
-#include "VehicleDataSourceTypes.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/IDecoderDictionary.h"
+#include "aws/iotfleetwise/MessageTypes.h"
+#include "aws/iotfleetwise/RawDataManager.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/StreambufBuilder.h"
+#include "aws/iotfleetwise/VehicleDataSourceTypes.h"
 #include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <cstdio>
@@ -35,26 +35,25 @@ using ::testing::NiceMock;
 class DataSenderIonWriterTest : public ::testing::Test
 {
 protected:
+    DataSenderIonWriterTest()
+        : bufferManager( RawData::BufferManagerConfig::create().get() ){};
+
     void
     SetUp() override
     {
         dictionary = std::make_shared<ComplexDataDecoderDictionary>();
         dictionary->complexMessageDecoderMethod["ros2"]["SignalInfoFor1234Name:TypeEncoded"].mSignalId = 1234;
 
-        triggeredVisionSystemData = std::make_shared<TriggeredVisionSystemData>();
-        triggeredVisionSystemData->metadata.decoderID = "TESTDECODERID";
-        triggeredVisionSystemData->metadata.collectionSchemeID = "TESTCOLLECTIONSCHEME";
-        triggeredVisionSystemData->triggerTime = 1000000;
-        triggeredVisionSystemData->eventID = 579;
-
-        bufferManager = std::make_shared<NiceMock<Testing::RawDataBufferManagerSpy>>(
-            RawData::BufferManagerConfig::create().get() );
+        triggeredVisionSystemData.metadata.decoderID = "TESTDECODERID";
+        triggeredVisionSystemData.metadata.collectionSchemeID = "TESTCOLLECTIONSCHEME";
+        triggeredVisionSystemData.triggerTime = 1000000;
+        triggeredVisionSystemData.eventID = 579;
 
         signalConfig.typeId = 1234;
 
-        bufferManager->updateConfig( { { signalConfig.typeId, signalConfig } } );
+        bufferManager.updateConfig( { { signalConfig.typeId, signalConfig } } );
 
-        ionWriter = std::make_unique<DataSenderIonWriter>( bufferManager, "DemoVehicle" );
+        ionWriter = std::make_unique<DataSenderIonWriter>( &bufferManager, "DemoVehicle" );
         ionWriter->onChangeOfActiveDictionary( dictionary, VehicleDataSourceProtocol::COMPLEX_DATA );
         ionWriter->setupVehicleData( triggeredVisionSystemData );
     }
@@ -65,8 +64,8 @@ protected:
     }
 
     std::shared_ptr<ComplexDataDecoderDictionary> dictionary;
-    std::shared_ptr<TriggeredVisionSystemData> triggeredVisionSystemData;
-    std::shared_ptr<NiceMock<Testing::RawDataBufferManagerSpy>> bufferManager;
+    TriggeredVisionSystemData triggeredVisionSystemData;
+    NiceMock<Testing::RawDataBufferManagerSpy> bufferManager;
     RawData::SignalUpdateConfig signalConfig;
     std::unique_ptr<DataSenderIonWriter> ionWriter;
 };
@@ -75,7 +74,7 @@ TEST_F( DataSenderIonWriterTest, StreamOutputIonAfterSeekTheSame )
 {
     std::vector<uint8_t> tmpData;
     tmpData.resize( 100, 0xDE );
-    auto handle = bufferManager->push( &tmpData[0], tmpData.size(), 3000000, signalConfig.typeId );
+    auto handle = bufferManager.push( &tmpData[0], tmpData.size(), 3000000, signalConfig.typeId );
 
     for ( int i = 0; i < 3; i++ )
     {
@@ -91,7 +90,7 @@ TEST_F( DataSenderIonWriterTest, StreamOutputIonAfterSeekTheSame )
 
     EXPECT_THAT( firstIterationString, HasSubstr( "collection_event_time" ) );
     EXPECT_THAT( firstIterationString, HasSubstr( "signal_name" ) );
-    EXPECT_THAT( firstIterationString, HasSubstr( triggeredVisionSystemData->metadata.collectionSchemeID ) );
+    EXPECT_THAT( firstIterationString, HasSubstr( triggeredVisionSystemData.metadata.collectionSchemeID ) );
     EXPECT_THAT( firstIterationString, HasSubstr( "SignalInfoFor1234Name" ) );
 
     // for better analysis create file
@@ -126,7 +125,7 @@ TEST_F( DataSenderIonWriterTest, StreamOutputIonAfterAbsoluteSeek )
 {
     std::vector<uint8_t> tmpData;
     tmpData.resize( 100, 0xDE );
-    auto handle = bufferManager->push( &tmpData[0], tmpData.size(), 3000000, signalConfig.typeId );
+    auto handle = bufferManager.push( &tmpData[0], tmpData.size(), 3000000, signalConfig.typeId );
 
     for ( int i = 0; i < 3; i++ )
     {
@@ -143,7 +142,7 @@ TEST_F( DataSenderIonWriterTest, StreamOutputIonAfterAbsoluteSeek )
 
     EXPECT_THAT( firstIterationString, HasSubstr( "collection_event_time" ) );
     EXPECT_THAT( firstIterationString, HasSubstr( "signal_name" ) );
-    EXPECT_THAT( firstIterationString, HasSubstr( triggeredVisionSystemData->metadata.collectionSchemeID ) );
+    EXPECT_THAT( firstIterationString, HasSubstr( triggeredVisionSystemData.metadata.collectionSchemeID ) );
     EXPECT_THAT( firstIterationString, HasSubstr( "SignalInfoFor1234Name" ) );
 
     // for better analysis create file
@@ -221,7 +220,7 @@ TEST_F( DataSenderIonWriterTest, StreamOutputHugeIon )
 
     std::vector<uint8_t> tmpData;
     tmpData.resize( 1024 * 1024, 0xDE );
-    auto handle = bufferManager->push( &tmpData[0], tmpData.size(), 16435345, signalConfig.typeId );
+    auto handle = bufferManager.push( &tmpData[0], tmpData.size(), 16435345, signalConfig.typeId );
 
     for ( int i = 0; i < 1000; i++ )
     {
@@ -246,7 +245,7 @@ TEST_F( DataSenderIonWriterTest, StreamTellgStream )
 {
     std::vector<uint8_t> tmpData;
     tmpData.resize( 100, 0xDE );
-    auto handle = bufferManager->push( &tmpData[0], tmpData.size(), 3000000, signalConfig.typeId );
+    auto handle = bufferManager.push( &tmpData[0], tmpData.size(), 3000000, signalConfig.typeId );
 
     for ( int i = 0; i < 3; i++ )
     {
@@ -295,13 +294,13 @@ TEST_F( DataSenderIonWriterTest, ReturnNullStreamWhenAllDataIsDeleted )
 {
     std::vector<uint8_t> tmpData;
     tmpData.resize( 100, 0xDE );
-    auto handle1 = bufferManager->push( &tmpData[0], tmpData.size(), 3000000, signalConfig.typeId );
-    auto handle2 = bufferManager->push( &tmpData[0], tmpData.size(), 3000001, signalConfig.typeId );
-    ASSERT_TRUE( bufferManager->increaseHandleUsageHint(
+    auto handle1 = bufferManager.push( &tmpData[0], tmpData.size(), 3000000, signalConfig.typeId );
+    auto handle2 = bufferManager.push( &tmpData[0], tmpData.size(), 3000001, signalConfig.typeId );
+    ASSERT_TRUE( bufferManager.increaseHandleUsageHint(
         signalConfig.typeId,
         handle1,
         RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD ) );
-    ASSERT_TRUE( bufferManager->increaseHandleUsageHint(
+    ASSERT_TRUE( bufferManager.increaseHandleUsageHint(
         signalConfig.typeId,
         handle2,
         RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD ) );
@@ -312,9 +311,9 @@ TEST_F( DataSenderIonWriterTest, ReturnNullStreamWhenAllDataIsDeleted )
         CollectedSignal( static_cast<SignalID>( signalConfig.typeId ), 3000001, handle2, SignalType::COMPLEX_SIGNAL ) );
 
     // Before we get the stream, make the buffer manager delete the data
-    ASSERT_TRUE( bufferManager->decreaseHandleUsageHint(
+    ASSERT_TRUE( bufferManager.decreaseHandleUsageHint(
         signalConfig.typeId, handle1, RawData::BufferHandleUsageStage::HANDED_OVER_TO_SENDER ) );
-    ASSERT_TRUE( bufferManager->decreaseHandleUsageHint(
+    ASSERT_TRUE( bufferManager.decreaseHandleUsageHint(
         signalConfig.typeId, handle2, RawData::BufferHandleUsageStage::HANDED_OVER_TO_SENDER ) );
     auto stream = ionWriter->getStreambufBuilder()->build();
 
@@ -326,25 +325,25 @@ TEST_F( DataSenderIonWriterTest, HandleUsageIsUpdatedWhenStreamIsCreated )
 {
     std::vector<uint8_t> tmpData;
     tmpData.resize( 100, 0xDE );
-    auto handle = bufferManager->push( &tmpData[0], tmpData.size(), 3000000, signalConfig.typeId );
-    ASSERT_TRUE( bufferManager->increaseHandleUsageHint(
+    auto handle = bufferManager.push( &tmpData[0], tmpData.size(), 3000000, signalConfig.typeId );
+    ASSERT_TRUE( bufferManager.increaseHandleUsageHint(
         signalConfig.typeId,
         handle,
         RawData::BufferHandleUsageStage::COLLECTION_INSPECTION_ENGINE_SELECTED_FOR_UPLOAD ) );
 
     // From now on we want to strictly check the handle usage updates, so don't allow any call that
     // doesn't match exactly.
-    EXPECT_CALL( *bufferManager, mockedIncreaseHandleUsageHint( _, _, _ ) ).Times( 0 );
-    EXPECT_CALL( *bufferManager, mockedDecreaseHandleUsageHint( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( bufferManager, mockedIncreaseHandleUsageHint( _, _, _ ) ).Times( 0 );
+    EXPECT_CALL( bufferManager, mockedDecreaseHandleUsageHint( _, _, _ ) ).Times( 0 );
 
     // Add the data, which should make the previous usage stage to be cleared
     {
         InSequence seq;
-        EXPECT_CALL( *bufferManager,
+        EXPECT_CALL( bufferManager,
                      mockedIncreaseHandleUsageHint(
                          signalConfig.typeId, handle, RawData::BufferHandleUsageStage::HANDED_OVER_TO_SENDER ) )
             .Times( 1 );
-        EXPECT_CALL( *bufferManager,
+        EXPECT_CALL( bufferManager,
                      mockedDecreaseHandleUsageHint(
                          signalConfig.typeId,
                          handle,
@@ -359,10 +358,10 @@ TEST_F( DataSenderIonWriterTest, HandleUsageIsUpdatedWhenStreamIsCreated )
     {
         InSequence seq;
         EXPECT_CALL(
-            *bufferManager,
+            bufferManager,
             mockedIncreaseHandleUsageHint( signalConfig.typeId, handle, RawData::BufferHandleUsageStage::UPLOADING ) )
             .Times( 1 );
-        EXPECT_CALL( *bufferManager,
+        EXPECT_CALL( bufferManager,
                      mockedDecreaseHandleUsageHint(
                          signalConfig.typeId, handle, RawData::BufferHandleUsageStage::HANDED_OVER_TO_SENDER ) )
             .Times( 1 );
@@ -371,7 +370,7 @@ TEST_F( DataSenderIonWriterTest, HandleUsageIsUpdatedWhenStreamIsCreated )
 
     // On stream destruction the usage stage should be cleared
     EXPECT_CALL(
-        *bufferManager,
+        bufferManager,
         mockedDecreaseHandleUsageHint( signalConfig.typeId, handle, RawData::BufferHandleUsageStage::UPLOADING ) )
         .Times( 1 );
 }

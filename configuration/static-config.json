@@ -44,7 +44,8 @@
       "maxConcurrentCommandRequests": 100,
       "systemWideLogLevel": "Trace",
       "maximumAwsSdkHeapMemoryBytes": 10000000,
-      "minFetchTriggerIntervalMs": 1000
+      "minFetchTriggerIntervalMs": 1000,
+      "maxFetchQueueSize": 1000
     },
     "publishToCloudParameters": {
       "maxPublishMessageCount": 1000,

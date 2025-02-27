@@ -12,6 +12,8 @@ WITH_LAST_KNOWN_STATE_SUPPORT="false"
 WITH_GENERIC_DTC_SUPPORT="false"
 WITH_CUSTOM_FUNCTION_EXAMPLES="false"
 WITH_REMOTE_COMMANDS_SUPPORT="false"
+WITH_CPYTHON_SUPPORT="false"
+WITH_MICROPYTHON_SUPPORT="false"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -40,6 +42,12 @@ parse_args() {
         --with-remote-commands-support)
             WITH_REMOTE_COMMANDS_SUPPORT="true"
             ;;
+        --with-cpython-support)
+            WITH_CPYTHON_SUPPORT="true"
+            ;;
+        --with-micropython-support)
+            WITH_MICROPYTHON_SUPPORT="true"
+            ;;
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --with-greengrassv2-support       Build with Greengrass V2 support"
@@ -50,6 +58,8 @@ parse_args() {
             echo "  --with-uds-dtc-example            Build with UDS DTC Example"
             echo "  --with-custom-function-examples   Build with custom function examples"
             echo "  --with-remote-commands-support    Build with remote commands support"
+            echo "  --with-cpython-support            Build with CPython support"
+            echo "  --with-micropython-support        Build with MicroPython support"
             exit 0
             ;;
         esac
@@ -91,6 +101,12 @@ if ${WITH_CUSTOM_FUNCTION_EXAMPLES}; then
 fi
 if ${WITH_REMOTE_COMMANDS_SUPPORT}; then
     CMAKE_OPTIONS="${CMAKE_OPTIONS} -DFWE_FEATURE_REMOTE_COMMANDS=On"
+fi
+if ${WITH_CPYTHON_SUPPORT}; then
+    CMAKE_OPTIONS="${CMAKE_OPTIONS} -DFWE_FEATURE_CPYTHON=On"
+fi
+if ${WITH_MICROPYTHON_SUPPORT}; then
+    CMAKE_OPTIONS="${CMAKE_OPTIONS} -DFWE_FEATURE_MICROPYTHON=On"
 fi
 
 if ${WITH_ROS2_SUPPORT}; then

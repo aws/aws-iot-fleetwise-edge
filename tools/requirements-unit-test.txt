@@ -1,0 +1,7 @@
+pytest==8.3.2
+pytest-cpp==2.6.0
+pytest-html==4.1.1
+ansi2html==1.9.2
+pytest-metadata==3.1.1
+pytest-random-order==1.1.1
+pytest-xdist==3.6.1

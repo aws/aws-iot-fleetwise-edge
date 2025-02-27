@@ -1,13 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "OBDOverCANModule.h"
-#include "Assert.h"
-#include "ISOTPOverCANOptions.h"
-#include "LoggingModule.h"
-#include "MessageTypes.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/OBDOverCANModule.h"
+#include "aws/iotfleetwise/Assert.h"
+#include "aws/iotfleetwise/ISOTPOverCANOptions.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/MessageTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
@@ -34,6 +33,20 @@ constexpr uint32_t OBDOverCANModule::MASKING_SHIFT_BITS;     // NOLINT Shift 8 b
 constexpr uint32_t OBDOverCANModule::MASKING_TEMPLATE_TX_ID; // NOLINT All 29-bit tx id has the same bytes
 constexpr uint32_t OBDOverCANModule::MASKING_REMOVE_BYTE;    // NOLINT
 
+OBDOverCANModule::OBDOverCANModule( SignalBufferDistributor &signalBufferDistributor,
+                                    std::string gatewayCanInterfaceName,
+                                    uint32_t pidRequestIntervalSeconds,
+                                    uint32_t dtcRequestIntervalSeconds,
+                                    bool broadcastRequests )
+    : mSignalBufferDistributor( signalBufferDistributor )
+    , mPIDRequestIntervalSeconds( pidRequestIntervalSeconds )
+    , mDTCRequestIntervalSeconds( dtcRequestIntervalSeconds )
+    , mBroadcastRequests( broadcastRequests )
+    , mGatewayCanInterfaceName( std::move( gatewayCanInterfaceName ) )
+    , mOBDDataDecoder( mDecoderDictionary )
+{
+}
+
 OBDOverCANModule::~OBDOverCANModule()
 {
     // To make sure the thread stops during teardown of tests.
@@ -41,28 +54,6 @@ OBDOverCANModule::~OBDOverCANModule()
     {
         stop();
     }
-}
-
-bool
-OBDOverCANModule::init( SignalBufferDistributorPtr signalBufferDistributor,
-                        const std::string &gatewayCanInterfaceName,
-                        uint32_t pidRequestIntervalSeconds,
-                        uint32_t dtcRequestIntervalSeconds,
-                        bool broadcastRequests )
-{
-    if ( ( signalBufferDistributor.get() == nullptr ) )
-    {
-        FWE_LOG_ERROR( "Received Buffer nullptr" );
-        return false;
-    }
-
-    mSignalBufferDistributor = signalBufferDistributor;
-    mOBDDataDecoder = std::make_shared<OBDDataDecoder>( mDecoderDictionaryPtr );
-    mGatewayCanInterfaceName = gatewayCanInterfaceName;
-    mPIDRequestIntervalSeconds = pidRequestIntervalSeconds;
-    mDTCRequestIntervalSeconds = dtcRequestIntervalSeconds;
-    mBroadcastRequests = broadcastRequests;
-    return true;
 }
 
 bool
@@ -78,7 +69,9 @@ OBDOverCANModule::start()
     mDecoderManifestAvailable.store( false );
     // Do not request DTCs on startup
     mShouldRequestDTCs.store( false );
-    if ( !mThread.create( doWork, this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "OBD Module Thread failed to start" );
     }
@@ -121,43 +114,41 @@ OBDOverCANModule::shouldStop() const
 }
 
 void
-OBDOverCANModule::doWork( void *data )
+OBDOverCANModule::doWork()
 {
-    OBDOverCANModule *obdModule = static_cast<OBDOverCANModule *>( data );
     // First we will auto detect ECUs
     bool finishECUsDetection = false;
-    while ( ( !finishECUsDetection ) && ( !obdModule->shouldStop() ) )
+    while ( ( !finishECUsDetection ) && ( !shouldStop() ) )
     {
         std::vector<uint32_t> canIDResponses;
         // If we don't have an OBD decoder manifest and we should not request DTCs,
         // Take the thread to sleep
-        if ( ( !obdModule->mShouldRequestDTCs.load( std::memory_order_relaxed ) ) &&
-             ( ( !obdModule->mDecoderDictionaryPtr ) || obdModule->mDecoderDictionaryPtr->empty() ) )
+        if ( ( !mShouldRequestDTCs.load( std::memory_order_relaxed ) ) && mDecoderDictionary.empty() )
         {
             FWE_LOG_TRACE(
                 "No valid decoding dictionary available and DTC requests disabled, Module Thread going to sleep " );
-            obdModule->mDataAvailableWait.wait( Signal::WaitWithPredicate );
+            mDataAvailableWait.wait( Signal::WaitWithPredicate );
         }
         // Now we will determine whether the ECUs are using extended IDs
         bool isExtendedID = false;
-        obdModule->autoDetectECUs( isExtendedID, canIDResponses );
+        autoDetectECUs( isExtendedID, canIDResponses );
         if ( canIDResponses.empty() )
         {
             isExtendedID = true;
-            obdModule->autoDetectECUs( isExtendedID, canIDResponses );
+            autoDetectECUs( isExtendedID, canIDResponses );
         }
         FWE_LOG_TRACE( "Detect size of ECUs:" + std::to_string( canIDResponses.size() ) );
         if ( !canIDResponses.empty() )
         {
             // If broadcast mode is enabled, open the broadcast socket:
-            if ( obdModule->mBroadcastRequests )
+            if ( mBroadcastRequests )
             {
-                obdModule->mBroadcastSocket = obdModule->openISOTPBroadcastSocket( isExtendedID );
+                mBroadcastSocket = openISOTPBroadcastSocket( isExtendedID );
                 // Failure to open broadcast socket is non recoverable, hence we will send signal out to terminate
-                FWE_GRACEFUL_FATAL_ASSERT( obdModule->mBroadcastSocket >= 0, "Failed to open broadcast", );
+                FWE_GRACEFUL_FATAL_ASSERT( mBroadcastSocket >= 0, "Failed to open broadcast", );
             }
             // Initialize ECU for each CAN ID in canIDResponse
-            FWE_GRACEFUL_FATAL_ASSERT( obdModule->initECUs( isExtendedID, canIDResponses, obdModule->mBroadcastSocket ),
+            FWE_GRACEFUL_FATAL_ASSERT( initECUs( isExtendedID, canIDResponses, mBroadcastSocket ),
                                        "OBDOverCANECU failed to init. Check CAN ISO-TP module", );
             finishECUsDetection = true;
         }
@@ -165,86 +156,83 @@ OBDOverCANModule::doWork( void *data )
         else
         {
             FWE_LOG_TRACE( "Waiting for: " + std::to_string( SLEEP_TIME_SECS ) + " seconds" );
-            obdModule->mWait.wait( static_cast<uint32_t>( SLEEP_TIME_SECS * 1000 ) );
+            mWait.wait( static_cast<uint32_t>( SLEEP_TIME_SECS * 1000 ) );
         }
     }
 
-    obdModule->mDTCTimer.reset();
-    obdModule->mPIDTimer.reset();
+    mDTCTimer.reset();
+    mPIDTimer.reset();
     // Flag to indicate whether we have acquired the supported PIDs from ECUs.
     bool hasAcquiredSupportedPIDs = false;
-    while ( !obdModule->shouldStop() )
+    while ( !shouldStop() )
     {
         // Check if we need to request PIDs and we have a decoder manifest to decode them.
-        if ( obdModule->mDecoderManifestAvailable.load( std::memory_order_relaxed ) )
+        if ( mDecoderManifestAvailable.load( std::memory_order_relaxed ) )
         {
             // A new decoder manifest arrived. Pass it over to the OBD decoder.
-            std::lock_guard<std::mutex> lock( obdModule->mDecoderDictMutex );
+            std::lock_guard<std::mutex> lock( mDecoderDictMutex );
             FWE_LOG_TRACE( "Decoder Manifest set on the OBD Decoder " );
             // Reset the atomic state
-            obdModule->mDecoderManifestAvailable.store( false, std::memory_order_relaxed );
+            mDecoderManifestAvailable.store( false, std::memory_order_relaxed );
         }
         // Is it time to request PIDs ?
-        if ( ( obdModule->mPIDRequestIntervalSeconds > 0 ) &&
-             ( obdModule->mPIDTimer.getElapsedSeconds() >= obdModule->mPIDRequestIntervalSeconds ) )
+        if ( ( mPIDRequestIntervalSeconds > 0 ) && ( mPIDTimer.getElapsedSeconds() >= mPIDRequestIntervalSeconds ) )
         {
             // Reschedule
-            obdModule->mPIDTimer.reset();
+            mPIDTimer.reset();
             // Request PID if decoder dictionary is valid and it is time to do so
-            if ( obdModule->mDecoderDictionaryPtr && ( !obdModule->mDecoderDictionaryPtr->empty() ) )
+            if ( !mDecoderDictionary.empty() )
             {
                 // besides this thread, onChangeOfActiveDictionary can update mPIDsToRequestPerECU.
                 // Use mutex to ensure only one thread is doing the update.
-                std::lock_guard<std::mutex> lock( obdModule->mDecoderDictMutex );
+                std::lock_guard<std::mutex> lock( mDecoderDictMutex );
                 // This should execute only once
                 if ( !hasAcquiredSupportedPIDs )
                 {
                     hasAcquiredSupportedPIDs = true;
-                    obdModule->assignPIDsToECUs();
+                    assignPIDsToECUs();
                     // Reschedule
-                    obdModule->mPIDTimer.reset();
+                    mPIDTimer.reset();
                 }
-                for ( auto ecu : obdModule->mECUs )
+                for ( auto &ecu : mECUs )
                 {
                     auto numRequests = ecu->requestReceiveEmissionPIDs( SID::CURRENT_STATS );
-                    obdModule->flush( numRequests, ecu );
+                    flush( numRequests, *ecu );
                 }
             }
         }
-        if ( ( obdModule->mDTCRequestIntervalSeconds > 0 ) &&
-             ( obdModule->mDTCTimer.getElapsedSeconds() >= obdModule->mDTCRequestIntervalSeconds ) )
+        if ( ( mDTCRequestIntervalSeconds > 0 ) && ( mDTCTimer.getElapsedSeconds() >= mDTCRequestIntervalSeconds ) )
         {
             // Reschedule
-            obdModule->mDTCTimer.reset();
+            mDTCTimer.reset();
             // Request DTC if specified by inspection matrix and it is time to do so
-            if ( obdModule->mShouldRequestDTCs.load( std::memory_order_relaxed ) )
+            if ( mShouldRequestDTCs.load( std::memory_order_relaxed ) )
             {
                 bool successfulDTCRequest = false;
                 DTCInfo dtcInfo;
-                dtcInfo.receiveTime = obdModule->mClock->systemTimeSinceEpochMs();
-                for ( auto ecu : obdModule->mECUs )
+                dtcInfo.receiveTime = mClock->systemTimeSinceEpochMs();
+                for ( auto &ecu : mECUs )
                 {
                     size_t numRequests = 0;
                     if ( ecu->getDTCData( dtcInfo, numRequests ) )
                     {
                         successfulDTCRequest = true;
                     }
-                    obdModule->flush( numRequests, ecu );
+                    flush( numRequests, *ecu );
                 }
                 // Also DTCInfo structs without any DTCs must be pushed to the queue because it means
                 // there was a OBD request that did not return any SID::STORED_DTCs
                 if ( successfulDTCRequest )
                 {
-                    obdModule->mSignalBufferDistributor->push(
-                        CollectedDataFrame( std::make_shared<DTCInfo>( dtcInfo ) ) );
+                    mSignalBufferDistributor.push( CollectedDataFrame( std::make_shared<DTCInfo>( dtcInfo ) ) );
                 }
             }
         }
 
         // Wait for the next cycle
         int64_t sleepTime = INT64_MAX;
-        calcSleepTime( obdModule->mPIDRequestIntervalSeconds, obdModule->mPIDTimer, sleepTime );
-        calcSleepTime( obdModule->mDTCRequestIntervalSeconds, obdModule->mDTCTimer, sleepTime );
+        calcSleepTime( mPIDRequestIntervalSeconds, mPIDTimer, sleepTime );
+        calcSleepTime( mDTCRequestIntervalSeconds, mDTCTimer, sleepTime );
         if ( sleepTime < 0 )
         {
             FWE_LOG_WARN( "Request time overdue by " + std::to_string( -sleepTime ) + " ms" );
@@ -252,7 +240,7 @@ OBDOverCANModule::doWork( void *data )
         else
         {
             FWE_LOG_TRACE( "Waiting for: " + std::to_string( sleepTime ) + " ms" );
-            obdModule->mWait.wait( static_cast<uint32_t>( sleepTime ) );
+            mWait.wait( static_cast<uint32_t>( sleepTime ) );
         }
     }
 }
@@ -271,16 +259,16 @@ OBDOverCANModule::calcSleepTime( uint32_t requestIntervalSeconds, const Timer &t
 }
 
 void
-OBDOverCANModule::flush( size_t count, std::shared_ptr<OBDOverCANECU> &exceptECU )
+OBDOverCANModule::flush( size_t count, OBDOverCANECU &exceptECU )
 {
     if ( !mBroadcastRequests )
     {
         return;
     }
     uint32_t timeLeftMs = P2_TIMEOUT_DEFAULT_MS;
-    for ( auto ecu : mECUs )
+    for ( auto &ecu : mECUs )
     {
-        if ( ecu == exceptECU )
+        if ( ecu.get() == &exceptECU )
         {
             continue;
         }
@@ -477,18 +465,18 @@ OBDOverCANModule::initECUs( bool isExtendedID, std::vector<uint32_t> &canIDRespo
     auto canIDSet = std::set<uint32_t>( canIDResponses.begin(), canIDResponses.end() );
     for ( auto rxID : canIDSet )
     {
-        auto ecu = std::make_shared<OBDOverCANECU>();
-        if ( !ecu->init( mGatewayCanInterfaceName,
-                         mOBDDataDecoder,
-                         rxID,
-                         getTxIDByRxID( isExtendedID, rxID ),
-                         isExtendedID,
-                         mSignalBufferDistributor,
-                         broadcastSocket ) )
+        auto ecu = std::make_unique<OBDOverCANECU>( mGatewayCanInterfaceName,
+                                                    mOBDDataDecoder,
+                                                    rxID,
+                                                    getTxIDByRxID( isExtendedID, rxID ),
+                                                    isExtendedID,
+                                                    mSignalBufferDistributor,
+                                                    broadcastSocket );
+        if ( !ecu->init() )
         {
             return false;
         }
-        mECUs.push_back( ecu );
+        mECUs.push_back( std::move( ecu ) );
     }
     FWE_LOG_TRACE( "Initialize ECUs in size of: " + std::to_string( mECUs.size() ) );
     return true;
@@ -503,7 +491,7 @@ OBDOverCANModule::assignPIDsToECUs()
     {
         // Get supported PIDs. FWE will either request it from ECU or get it from the buffer
         auto numRequests = ecu->requestReceiveSupportedPIDs( SID::CURRENT_STATS );
-        flush( numRequests, ecu );
+        flush( numRequests, *ecu );
         // Allocate PID to each ECU to request. Note that if the PID has been already assigned, it will not be
         // reassigned to another ECU
         ecu->updatePIDRequestList( SID::CURRENT_STATS, mPIDsRequestedByDecoderDict[SID::CURRENT_STATS], mPIDAssigned );
@@ -549,12 +537,9 @@ OBDOverCANModule::getExternalPIDsToRequest()
 {
     std::lock_guard<std::mutex> lock( mDecoderDictMutex );
     std::vector<PID> pids;
-    if ( mDecoderDictionaryPtr != nullptr )
+    for ( const auto &decoder : mDecoderDictionary )
     {
-        for ( const auto &decoder : *mDecoderDictionaryPtr )
-        {
-            pids.push_back( decoder.first );
-        }
+        pids.push_back( decoder.first );
     }
     return pids;
 }
@@ -563,25 +548,21 @@ void
 OBDOverCANModule::setExternalPIDResponse( PID pid, std::vector<uint8_t> response )
 {
     std::lock_guard<std::mutex> lock( mDecoderDictMutex );
-    if ( mDecoderDictionaryPtr == nullptr )
-    {
-        return;
-    }
-    if ( mDecoderDictionaryPtr->find( pid ) == mDecoderDictionaryPtr->end() )
+    if ( mDecoderDictionary.find( pid ) == mDecoderDictionary.end() )
     {
         FWE_LOG_WARN( "Unexpected PID response: " + std::to_string( pid ) );
         return;
     }
     EmissionInfo info;
     std::vector<PID> pids = { pid };
-    size_t expectedResponseSize = 2 + mDecoderDictionaryPtr->at( pid ).mSizeInBytes;
+    size_t expectedResponseSize = 2 + mDecoderDictionary.at( pid ).mSizeInBytes;
     if ( response.size() < expectedResponseSize )
     {
         FWE_LOG_WARN( "Unexpected PID response length: " + std::to_string( pid ) );
         return;
     }
     response.resize( expectedResponseSize );
-    if ( !mOBDDataDecoder->decodeEmissionPIDs( SID::CURRENT_STATS, pids, response, info ) )
+    if ( !mOBDDataDecoder.decodeEmissionPIDs( SID::CURRENT_STATS, pids, response, info ) )
     {
         return;
     }
@@ -589,7 +570,8 @@ OBDOverCANModule::setExternalPIDResponse( PID pid, std::vector<uint8_t> response
 }
 
 void
-OBDOverCANModule::onChangeInspectionMatrix( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
+// coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
+OBDOverCANModule::onChangeInspectionMatrix( std::shared_ptr<const InspectionMatrix> inspectionMatrix )
 {
     // We check here that at least one condition needs DTCs. If yes, we activate that.
     if ( inspectionMatrix )
@@ -619,7 +601,7 @@ OBDOverCANModule::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &di
         return;
     }
     std::lock_guard<std::mutex> lock( mDecoderDictMutex );
-    mDecoderDictionaryPtr = std::make_shared<OBDDecoderDictionary>();
+    mDecoderDictionary.clear();
     // Here we up cast the decoder dictionary to CAN Decoder Dictionary to extract can decoder method
     auto canDecoderDictionaryPtr = std::dynamic_pointer_cast<const CANDecoderDictionary>( dictionary );
     if ( canDecoderDictionaryPtr == nullptr )
@@ -638,7 +620,7 @@ OBDOverCANModule::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &di
     for ( const auto &canMessageDecoderMethod : canDecoderDictionaryPtr->canMessageDecoderMethod.cbegin()->second )
     {
         // The key is PID; The Value is decoder format
-        mDecoderDictionaryPtr->emplace( canMessageDecoderMethod.first, canMessageDecoderMethod.second.format );
+        mDecoderDictionary.emplace( canMessageDecoderMethod.first, canMessageDecoderMethod.second.format );
         // Check if this PID's decoder method contains signals to be collected by
         // Decoder Dictionary. If so, add the PID to pidsRequestedByDecoderDict
         // Note in worst case scenario when no OBD signals are to be collected, this will

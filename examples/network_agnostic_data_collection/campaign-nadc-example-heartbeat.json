@@ -1,0 +1,22 @@
+{
+  "compression": "SNAPPY",
+  "collectionScheme": {
+    "timeBasedCollectionScheme": {
+      "periodMs": 10000
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.CurrentLocation.Latitude"
+    },
+    {
+      "name": "Vehicle.CurrentLocation.Longitude"
+    },
+    {
+      "name": "Vehicle.MyCounter"
+    },
+    {
+      "name": "Vehicle.MyCustom"
+    }
+  ]
+}

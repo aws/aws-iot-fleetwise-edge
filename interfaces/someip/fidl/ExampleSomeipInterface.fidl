@@ -7,6 +7,7 @@ interface ExampleSomeipInterface {
     version { major 1 minor 0 }
 
     attribute Int32 x
+    attribute Int32 temperature
     attribute CommonTypes.a1Struct a1
 
     method setInt32 {
@@ -109,6 +110,18 @@ typeCollection CommonTypes {
 
     struct a1Struct {
         String s
+        Boolean a
+        Int32 b
+        Double c
+        Int64 d
+        Boolean e
+        Int32 f
+        Double g
+        Int64 h
+        Boolean i
+        Int32 j
+        Double k
+        Int64 l
         a2Struct a2
     }
 
@@ -116,5 +129,18 @@ typeCollection CommonTypes {
         Int32 a
         Boolean b
         Double d
+        Int64 e
+        Int32 f
+        Boolean g
+        Double h
+        Int64 i
+        Int32 j
+        Boolean k
+        Double l
+        Int64 m
+        Int32 n
+        Boolean o
+        Double p
+        Int64 q
     }
 }

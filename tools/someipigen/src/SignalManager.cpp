@@ -196,6 +196,10 @@ SignalManager::main( const std::string &domain, const std::string &instance, con
 void
 SignalManager::stop()
 {
+    if ( !mIsInitialized )
+    {
+        return;
+    }
     mIoService.stop();
     if ( mThread.joinable() )
     {
@@ -206,6 +210,7 @@ SignalManager::stop()
     {
         throw std::runtime_error( "Failed to unregister service" );
     }
+    mIsInitialized = false;
 }
 
 void

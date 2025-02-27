@@ -24,9 +24,9 @@ details the steps needed to add your own sensors or actuators using the NADC fea
 
 ### AAOS VHAL
 
-The [`AaosVhalSource`](../../src/AaosVhalSource.h) **does not** use the FQN as the decoder string,
-but rather passes a CSV of parameters for obtaining each Android Automotive (AAOS) VHAL vehicle
-property.
+The [`AaosVhalSource`](../../include/aws/iotfleetwise/AaosVhalSource.h) **does not** use the FQN as
+the decoder string, but rather passes a CSV of parameters for obtaining each Android Automotive
+(AAOS) VHAL vehicle property.
 
 The corresponding JSON files for use with the cloud APIs are:
 
@@ -39,10 +39,10 @@ for step-by-step instructions on running this example.
 
 ### CAN actuators
 
-The [`CanCommandDispatcher`](../../src/CanCommandDispatcher.h) implements actuators controlled via
-CAN bus. The `CanCommandDispatcher` is registered with the
-[`ActuatorCommandManager`](../../src/ActuatorCommandManager.h) which identifies actuator signals by
-FQN.
+The [`CanCommandDispatcher`](../../include/aws/iotfleetwise/CanCommandDispatcher.h) implements
+actuators controlled via CAN bus. The `CanCommandDispatcher` is registered with the
+[`ActuatorCommandManager`](../../include/aws/iotfleetwise/ActuatorCommandManager.h) which identifies
+actuator signals by FQN.
 
 The corresponding JSON files for use with the cloud APIs are:
 
@@ -55,11 +55,11 @@ this example.
 
 ### Location
 
-The [`IWaveGpsSource`](../../src/IWaveGpsSource.h) and the
-[`ExternalGpsSource`](../../src/ExternalGpsSource.h) both use the
-[`NamedSignalDataSource`](../../src/NamedSignalDataSource.h) to ingest location data. The
-`ExternalGpsSource` is exposed via
-[`IoTFleetWiseEngine::setExternalGpsLocation`](../../src/IoTFleetWiseEngine.h) allowing ingestion of
+The [`IWaveGpsSource`](../../include/aws/iotfleetwise/IWaveGpsSource.h) and the
+[`ExternalGpsSource`](../../include/aws/iotfleetwise/ExternalGpsSource.h) both use the
+[`NamedSignalDataSource`](../../include/aws/iotfleetwise/NamedSignalDataSource.h) to ingest location
+data. The `ExternalGpsSource` is exposed as a public class member of
+[`IoTFleetWiseEngine](../../include/aws/iotfleetwise/IoTFleetWiseEngine.h) allowing ingestion of
 position information from outside FWE, for example from Android.
 
 The corresponding JSON files for use with the cloud APIs are:
@@ -74,13 +74,14 @@ these examples.
 
 ### `MULTI_RISING_EDGE_TRIGGER`
 
-The [CustomFunctionMultiRisingEdgeTrigger](../../src/CustomFunctionMultiRisingEdgeTrigger.h) module
-implements a [custom function](./custom-function-dev-guide.md) that produces signal data for direct
-collection via the custom function
+The
+[CustomFunctionMultiRisingEdgeTrigger](../../include/aws/iotfleetwise/CustomFunctionMultiRisingEdgeTrigger.h)
+module implements a [custom function](./custom-function-dev-guide.md) that produces signal data for
+direct collection via the custom function
 [`conditionEndCallback`](./custom-function-dev-guide.md#interface-conditionendcallback) interface.
 The signal data is modelled as a signal with FQN `Vehicle.MultiRisingEdgeTrigger`. The
-[`NamedSignalDataSource`](../../src/NamedSignalDataSource.h) is used to obtain the signal ID of this
-signal.
+[`NamedSignalDataSource`](../../include/aws/iotfleetwise/NamedSignalDataSource.h) is used to obtain
+the signal ID of this signal.
 
 The corresponding JSON files for use with the cloud APIs are:
 
@@ -99,12 +100,14 @@ FWE includes example FIDL and FDEPL files for SOME/IP sensor and actuator signal
 [`ExampleSomeipInterface.fdepl`](../../interfaces/someip/fidl/ExampleSomeipInterface.fdepl). The
 [CommonAPI](https://covesa.github.io/capicxx-core-tools/) proxy for reading the sensor values and
 the stubs for performing the actuator commands are implemented in
-[`ExampleSomeipInterfaceWrapper`](../../src/ExampleSomeipInterfaceWrapper.h). Data collection from
-SOME/IP is performed by [`SomeipDataSource`](../../src/SomeipDataSource.h), which uses the
-[`NamedSignalDataSource`](../../src/NamedSignalDataSource.h) to identify the signals by FQN and
-ingest the signal values. Remote command actuation for SOME/IP is performed by
-[`SomeipCommandDispatcher`](../../src/SomeipCommandDispatcher.h). The `SomeipCommandDispatcher` is
-registered with the [`ActuatorCommandManager`](../../src/ActuatorCommandManager.h) which identifies
+[`ExampleSomeipInterfaceWrapper`](../../include/aws/iotfleetwise/ExampleSomeipInterfaceWrapper.h).
+Data collection from SOME/IP is performed by
+[`SomeipDataSource`](../../include/aws/iotfleetwise/SomeipDataSource.h), which uses the
+[`NamedSignalDataSource`](../../include/aws/iotfleetwise/NamedSignalDataSource.h) to identify the
+signals by FQN and ingest the signal values. Remote command actuation for SOME/IP is performed by
+[`SomeipCommandDispatcher`](../../include/aws/iotfleetwise/SomeipCommandDispatcher.h). The
+`SomeipCommandDispatcher` is registered with the
+[`ActuatorCommandManager`](../../include/aws/iotfleetwise/ActuatorCommandManager.h) which identifies
 actuator signals by FQN.
 
 The corresponding JSON files for use with the cloud APIs are:
@@ -118,9 +121,10 @@ running this example.
 
 ### UDS DTC
 
-The [`RemoteDiagnosticDataSource`](../../src/RemoteDiagnosticDataSource.h) collects DTC data and
-provides it for ingestion via [`NamedSignalDataSource`](../../src/NamedSignalDataSource.h) as a
-signal with FQN `Vehicle.ECU1.DTC_INFO`.
+The [`RemoteDiagnosticDataSource`](../../include/aws/iotfleetwise/RemoteDiagnosticDataSource.h)
+collects DTC data and provides it for ingestion via
+[`NamedSignalDataSource`](../../include/aws/iotfleetwise/NamedSignalDataSource.h) as a signal with
+FQN `Vehicle.ECU1.DTC_INFO`.
 
 The corresponding JSON files for use with the cloud APIs are:
 
@@ -134,10 +138,15 @@ The corresponding JSON files for use with the cloud APIs are:
 ### Sensor Data Collection
 
 > In this section data will be ingested for signals based on their FQN, hence the standard
-> [`NamedSignalDataSource`](../../src/NamedSignalDataSource.h) will be used directly. For more
-> complex interfaces, for example when additional configuration parameters such as IP address are
-> needed, a custom network interface type will need to be added. Refer to the examples above to see
-> how this is achieved.
+> [`NamedSignalDataSource`](../../include/aws/iotfleetwise/NamedSignalDataSource.h) will be used
+> directly. For more complex interfaces, for example when additional configuration parameters such
+> as IP address are needed, a custom network interface type will need to be added. Refer to
+> [`MyCounterDataSource.h`](../../examples/network_agnostic_data_collection/MyCounterDataSource.h)
+> or the examples above to see how this is achieved.
+
+> See the
+> [`network_agnostic_data_collection` example](../../examples/network_agnostic_data_collection/README.md)
+> for a fully working example of the following.
 
 First, adjust the static configuration file of FWE to add the `namedSignalInterface` interface. The
 interface ID will need to match the ID used with the cloud APIs, here it is `NAMED_SIGNAL`.
@@ -168,19 +177,17 @@ other type of data acquisition could be implemented here. This example simply us
 code, generates the data, and injects it into the signal buffers.
 
 ```cpp
-// Added the below to the main.cpp of FWE
-// Generates random Lat/Long and inject those every second to the Signal Buffers
+// Generates random Lat/Long signal values
 std::random_device rd;
 std::mt19937 longGen( rd() );
 std::mt19937 latGen( rd() );
 std::uniform_real_distribution<> longDist( -180.0, 180.0 );
 std::uniform_real_distribution<> latDist( -90.0, 90.0 );
-for ( int n = 0; n < 100; ++n )
+while ( !locationThreadShouldStop )
 {
     std::vector<std::pair<std::string, Aws::IoTFleetWise::DecodedSignalValue>> values;
     auto longitude = longDist( longGen );
     auto latitude = latDist( latGen );
-    std::cout << longitude << '\t' << latitude << '\n';
     values.emplace_back(
         "Vehicle.CurrentLocation.Longitude",
         Aws::IoTFleetWise::DecodedSignalValue( longitude, Aws::IoTFleetWise::SignalType::DOUBLE ) );
@@ -189,8 +196,8 @@ for ( int n = 0; n < 100; ++n )
         Aws::IoTFleetWise::DecodedSignalValue( latitude, Aws::IoTFleetWise::SignalType::DOUBLE ) );
     // This is the API used to inject the data into the Signal Buffers
     // Passing zero as the timestamp will use the current system time
-    engine.ingestMultipleSignalValuesByName( 0, values );
-    sleep( 1 );
+    engine.mNamedSignalDataSource->ingestMultipleSignalValues( 0, values );
+    std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
 }
 ```
 
@@ -199,6 +206,10 @@ collection campaign that acquires those two signals. To do that, use the `create
 to collect the signals `Vehicle.CurrentLocation.Longitude` and `Vehicle.CurrentLocation.Latitude`.
 
 ### Remote Commands
+
+> See the
+> [`network_agnostic_actuator_commands` example](../../examples/network_agnostic_actuator_commands/README.md)
+> for a fully working example of the following.
 
 First, adjust the static configuration file of FWE to add a new `acCommandInterface` interface. The
 interface ID will need to match the ID used with the cloud APIs, here it is `AC_ACTUATORS`.
@@ -224,7 +235,7 @@ First, create a command dispatcher that is called whenever the system receives a
 
 ```cpp
 // Make sure you implement the ICommandDispatcher
-class AcCommandDispatcher : public ICommandDispatcher
+class AcCommandDispatcher : public Aws::IoTFleetWise::ICommandDispatcher
 {
 public:
     /**
@@ -247,11 +258,11 @@ public:
      * @param notifyStatusCallback Callback to notify command status
      */
     void setActuatorValue( const std::string &actuatorName,
-                           const SignalValueWrapper &signalValue,
-                           const CommandID &commandId,
-                           Timestamp issuedTimestampMs,
-                           Timestamp executionTimeoutMs,
-                           NotifyCommandStatusCallback notifyStatusCallback ) override;
+                           const Aws::IoTFleetWise::SignalValueWrapper &signalValue,
+                           const Aws::IoTFleetWise::CommandID &commandId,
+                           Aws::IoTFleetWise::Timestamp issuedTimestampMs,
+                           Aws::IoTFleetWise::Timestamp executionTimeoutMs,
+                           Aws::IoTFleetWise::NotifyCommandStatusCallback notifyStatusCallback ) override;
 };
 ```
 
@@ -266,32 +277,32 @@ AcCommandDispatcher::init()
 
 void
 AcCommandDispatcher::setActuatorValue( const std::string &actuatorName,
-                                       const SignalValueWrapper &signalValue,
-                                       const CommandID &commandId,
-                                       Timestamp issuedTimestampMs,
-                                       Timestamp executionTimeoutMs,
-                                       NotifyCommandStatusCallback notifyStatusCallback )
+                                       const Aws::IoTFleetWise::SignalValueWrapper &signalValue,
+                                       const Aws::IoTFleetWise::CommandID &commandId,
+                                       Aws::IoTFleetWise::Timestamp issuedTimestampMs,
+                                       Aws::IoTFleetWise::Timestamp executionTimeoutMs,
+                                       Aws::IoTFleetWise::NotifyCommandStatusCallback notifyStatusCallback )
 {
     // Here invoke your actuation
     FWE_LOG_INFO( "Actuator " + actuatorName + " executed successfully for command ID " + commandId );
-    notifyStatusCallback( CommandStatus::SUCCEEDED, REASON_CODE_UNSPECIFIED, "Success" );
+    notifyStatusCallback(
+        Aws::IoTFleetWise::CommandStatus::SUCCEEDED, Aws::IoTFleetWise::REASON_CODE_UNSPECIFIED, "Success" );
 }
 ```
 
-Finally, register the command dispatcher with `ActuatorCommandManager` For that, edit the
-`IoTFleetWiseEngine.cpp` file which is where all the modules are initialized.
+Finally, register the command dispatcher with `ActuatorCommandManager`. For that use the
+`setNetworkInterfaceConfigHook`, see the example
+[here](../../examples/network_agnostic_actuator_commands/main.cpp).
 
 ```cpp
-// IoTFleetWiseEngine.cpp
-// ....
 static const std::string AC_COMMAND_INTERFACE_TYPE = "acCommandInterface";
 // ....
 else if ( interfaceType == AC_COMMAND_INTERFACE_TYPE )
 {
 // Here we create and register our command dispatcher
-    mAcCommandDispatcher =std::make_shared<AcCommandDispatcher>();
+    acCommandDispatcher =std::make_shared<AcCommandDispatcher>();
 // All commands on actuators defined in this interface will be routed to the AC command dispatcher
-    if ( !mActuatorCommandManager->registerDispatcher( interfaceId, mAcCommandDispatcher ) )
+    if ( !engine.mActuatorCommandManager->registerDispatcher( interfaceId, acCommandDispatcher ) )
     {
         return false;
     }

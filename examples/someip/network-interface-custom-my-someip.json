@@ -1,0 +1,9 @@
+[
+  {
+    "interfaceId": "MY_SOMEIP",
+    "type": "CUSTOM_DECODING_INTERFACE",
+    "customDecodingInterface": {
+      "name": "NamedSignalInterface"
+    }
+  }
+]

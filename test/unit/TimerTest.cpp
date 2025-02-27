@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "Timer.h"
+#include "aws/iotfleetwise/Timer.h"
 #include <gtest/gtest.h>
 
 namespace Aws

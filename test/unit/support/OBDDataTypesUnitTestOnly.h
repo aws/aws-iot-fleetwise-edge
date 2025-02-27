@@ -4,12 +4,39 @@
 // This files creates a big initialization function to create mode1PIDs,
 // so do not include this file in the main source code, only in unit tests.
 
-#include "OBDDataTypes.h"
+#include "aws/iotfleetwise/OBDDataTypes.h"
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
+
+/**
+ * @brief Formula class for PID Signals. This formula is designed to decode any signal from the PID.
+ * Example 1. Signal Mass Air Flow Sensor A come from PID 0x66, byte B and C
+ *           scaling : 0.03125
+ *           offset  : 0
+ *           byteOffset: 1
+ *           numOfBytes: 2
+ *           bitShift: 0
+ *           bitMaskLen: 8
+ * Example 2. Boost Pressure B Control Status come from PID 0x70, byte J, bit 2, 3
+ *           scaling : 1.0
+ *           offset  : 0
+ *           byteOffset: 9
+ *           numOfBytes: 1
+ *           bitShift: 2
+ *           bitMaskLen: 2
+ */
+struct PIDSignalFormula
+{
+    size_t byteOffset{ 0 }; // the start byte for this signal
+    double scaling{ 1.0 };
+    double offset{ 0.0 };
+    size_t numOfBytes{ 1 };  // number of bytes for this signal
+    uint8_t bitShift{ 0 };   // If signal is bits, the number of right shift to be performed
+    uint8_t bitMaskLen{ 8 }; // If signal is bits, the length of mask after shifting
+};
 
 // Struct represent PID information: id, return length and formula for each signal
 struct PIDInfo
@@ -202,9 +229,9 @@ const std::array<struct PIDInfo, 172> mode1PIDs = { {
         { 3, 0.03125, 0, 2 },
         { 5, 0.03125, 0, 2 },
         { 7, 0.03125, 0, 2 },
-        { 9, 0, 2 },
-        { 9, 2, 2 },
-        { 9, 4, 4 } } }, // Boost pressure control
+        { 9, 1.0, 0, 1, 0, 2 },
+        { 9, 1.0, 0, 1, 2, 2 },
+        { 9, 1.0, 0, 1, 4, 4 } } }, // Boost pressure control
     { 0x71,
       6,
       { { 0, 1.0, 0, 1 },
@@ -212,9 +239,9 @@ const std::array<struct PIDInfo, 172> mode1PIDs = { {
         { 2, (double)100 / 255, 0, 1 },
         { 3, (double)100 / 255, 0, 1 },
         { 4, (double)100 / 255, 0, 1 },
-        { 5, 0, 2 },
-        { 5, 2, 2 },
-        { 5, 4, 4 } } }, // Variable Geometry turbo (VGT) control
+        { 5, 1.0, 0, 1, 0, 2 },
+        { 5, 1.0, 0, 1, 2, 2 },
+        { 5, 1.0, 0, 1, 4, 4 } } }, // Variable Geometry turbo (VGT) control
     { 0x72,
       5,
       { { 0, 1.0, 0, 1 },
@@ -374,16 +401,16 @@ const std::array<struct PIDInfo, 172> mode1PIDs = { {
           { 6, (double)100 / 255, 0, 1 },
           { 7, (double)100 / 255, 0, 1 },
           { 8, (double)100 / 255, 0, 1 },
-      } },                                                              // Fuel System Percentage Use
-    { 0xA0, 4, { {} } },                                                // PIDs supported [A1 - C0]
-    { 0xA1, 9, { {} } },                                                // NOx Sensor Corrected Data
-    { 0xA2, 2, { { 0, 0.03125, 0, 2 } } },                              // Cylinder Fuel Rate
-    { 0xA3, 9, { {} } },                                                // Evap System Vapor Pressure
-    { 0xA4, 4, { { 0, 1.0, 0, 1 }, { 1, 4, 4 }, { 2, 0.001, 0, 2 } } }, // Transmission Actual Gear
-    { 0xA5, 4, { {} } },                                                // Diesel Exhaust Fluid Dosing
-    { 0xA6, 4, { { 0, 0.1, 0, 4 } } },                                  // Odometer
-    { 0xC0, 4, { { 0, 1.0, 0, 4 } } },                                  // PIDs supported [C1 - E0]
-    { 0xC1, 1, { {} } }                                                 // HVESS Recommended Maximum State Of Charge
+      } },                                                                         // Fuel System Percentage Use
+    { 0xA0, 4, { {} } },                                                           // PIDs supported [A1 - C0]
+    { 0xA1, 9, { {} } },                                                           // NOx Sensor Corrected Data
+    { 0xA2, 2, { { 0, 0.03125, 0, 2 } } },                                         // Cylinder Fuel Rate
+    { 0xA3, 9, { {} } },                                                           // Evap System Vapor Pressure
+    { 0xA4, 4, { { 0, 1.0, 0, 1 }, { 1, 1.0, 0, 1, 4, 4 }, { 2, 0.001, 0, 2 } } }, // Transmission Actual Gear
+    { 0xA5, 4, { {} } },                                                           // Diesel Exhaust Fluid Dosing
+    { 0xA6, 4, { { 0, 0.1, 0, 4 } } },                                             // Odometer
+    { 0xC0, 4, { { 0, 1.0, 0, 4 } } },                                             // PIDs supported [C1 - E0]
+    { 0xC1, 1, { {} } } // HVESS Recommended Maximum State Of Charge
 } };
 
 // clang-format off

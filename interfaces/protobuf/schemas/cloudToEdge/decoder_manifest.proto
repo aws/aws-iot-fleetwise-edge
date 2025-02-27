@@ -95,6 +95,8 @@ message CANSignal {
    * If not present this value defaults to FLOAT64.
    */
   PrimitiveType primitive_type = 10;
+
+  SignalValueType signal_value_type = 11;
 }
 
 /*
@@ -174,6 +176,13 @@ message OBDPIDSignal {
    * If not present this value defaults to FLOAT64.
    */
   PrimitiveType primitive_type = 12;
+
+  SignalValueType signal_value_type = 13;
+
+  /*
+   * True when signal is signed
+   */
+  bool is_signed = 14;
 }
 
 /*
@@ -193,6 +202,11 @@ enum PrimitiveType {
   FLOAT32 = 10;
   FLOAT64 = 11;
   STRING = 12;
+}
+
+enum SignalValueType {
+  INTEGER = 0;
+  FLOATING_POINT = 1;
 }
 
 /*

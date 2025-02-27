@@ -13,7 +13,7 @@ a signal named `Speed` with type `int32_t`, you would add the following in
 
 ```cpp
 // Add the initial value in the constructor:
-mSignals["Speed"] = Signal( std::any( static_cast<int32_t>( 0 ) ) );
+mSignals["Speed"] = Signal( boost::any( static_cast<int32_t>( 0 ) ) );
 
 // Add the stub implementation for `getSpeed` method:
 void
@@ -43,7 +43,7 @@ named `Temperature` with type `int32_t`, you would add the following in
 
 ```cpp
 // Add the initial value and onChanged handler in the constructor:
-mSignals["Temperature"] = Signal( std::any(- static_cast<int32_t>( 0 ) ), [this](){
+mSignals["Temperature"] = Signal( boost::any( static_cast<int32_t>( 0 ) ), [this](){
     fireTemperatureAttributeChanged( boost::any_cast<int32_t>( mSignals["Temperature"].value ) );
 } );
 ```

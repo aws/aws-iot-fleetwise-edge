@@ -2,15 +2,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ISOTPOverCANOptions.h"
-#include "ISOTPOverCANReceiver.h"
-#include "ISOTPOverCANSender.h"
-#include "ISOTPOverCANSenderReceiver.h"
-#include "LoggingModule.h"
+#include "Testing.h"
+#include "aws/iotfleetwise/ISOTPOverCANOptions.h"
+#include "aws/iotfleetwise/ISOTPOverCANReceiver.h"
+#include "aws/iotfleetwise/ISOTPOverCANSender.h"
+#include "aws/iotfleetwise/ISOTPOverCANSenderReceiver.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <cstdint>
 #include <functional>
 #include <gtest/gtest.h>
 #include <linux/can.h>
+#include <string>
 #include <sys/socket.h>
 #include <thread>
 #include <unistd.h>
@@ -90,28 +92,28 @@ protected:
             FWE_LOG_ERROR( "Error receiving ISO-TP message" );
         }
     }
+
+    std::string mCanInterfaceName = getCanInterfaceName();
 };
 
 TEST_F( ISOTPOverCANProtocolTest, isotpSenderTestLifeCycle )
 {
-    ISOTPOverCANSender sender;
     ISOTPOverCANSenderOptions options;
-    options.mSocketCanIFName = "vcan0";
+    options.mSocketCanIFName = mCanInterfaceName;
     options.mSourceCANId = 0x123;
     options.mDestinationCANId = 0x456;
-    ASSERT_TRUE( sender.init( options ) );
+    ISOTPOverCANSender sender( options );
     ASSERT_TRUE( sender.connect() );
     ASSERT_TRUE( sender.disconnect() );
 }
 
 TEST_F( ISOTPOverCANProtocolTest, isotpSenderTestSendSingleFramePDU )
 {
-    ISOTPOverCANSender sender;
     ISOTPOverCANSenderOptions options;
-    options.mSocketCanIFName = "vcan0";
+    options.mSocketCanIFName = mCanInterfaceName;
     options.mSourceCANId = 0x123;
     options.mDestinationCANId = 0x456;
-    ASSERT_TRUE( sender.init( options ) );
+    ISOTPOverCANSender sender( options );
     ASSERT_TRUE( sender.connect() );
     // SF PDU of 5 Bytes.
     auto pduData = std::vector<uint8_t>( { 0x11, 0x22, 0x33, 0x44, 0x55 } );
@@ -121,12 +123,11 @@ TEST_F( ISOTPOverCANProtocolTest, isotpSenderTestSendSingleFramePDU )
 
 TEST_F( ISOTPOverCANProtocolTest, isotpReceiverTestLifeCycle )
 {
-    ISOTPOverCANReceiver receiver;
     ISOTPOverCANReceiverOptions options;
-    options.mSocketCanIFName = "vcan0";
+    options.mSocketCanIFName = mCanInterfaceName;
     options.mSourceCANId = 0x456;
     options.mDestinationCANId = 0x123;
-    ASSERT_TRUE( receiver.init( options ) );
+    ISOTPOverCANReceiver receiver( options );
     ASSERT_TRUE( receiver.connect() );
     ASSERT_TRUE( receiver.disconnect() );
 }
@@ -134,20 +135,18 @@ TEST_F( ISOTPOverCANProtocolTest, isotpReceiverTestLifeCycle )
 TEST_F( ISOTPOverCANProtocolTest, isotpSendAndReceiveSingleFrame )
 {
     // Setup the sender
-    ISOTPOverCANSender sender;
     ISOTPOverCANSenderOptions senderOptions;
-    senderOptions.mSocketCanIFName = "vcan0";
+    senderOptions.mSocketCanIFName = mCanInterfaceName;
     senderOptions.mSourceCANId = 0x123;
     senderOptions.mDestinationCANId = 0x456;
-    ASSERT_TRUE( sender.init( senderOptions ) );
+    ISOTPOverCANSender sender( senderOptions );
     ASSERT_TRUE( sender.connect() );
     // Setup the receiver
-    ISOTPOverCANReceiver receiver;
     ISOTPOverCANReceiverOptions receiverOptions;
-    receiverOptions.mSocketCanIFName = "vcan0";
+    receiverOptions.mSocketCanIFName = mCanInterfaceName;
     receiverOptions.mSourceCANId = 0x456;
     receiverOptions.mDestinationCANId = 0x123;
-    ASSERT_TRUE( receiver.init( receiverOptions ) );
+    ISOTPOverCANReceiver receiver( receiverOptions );
     ASSERT_TRUE( receiver.connect() );
     // Setup a Single Frame send with 1 thread, and received from another thread
     std::vector<uint8_t> rxPDUData;
@@ -169,20 +168,18 @@ TEST_F( ISOTPOverCANProtocolTest, isotpSendAndReceiveSingleFrame )
 TEST_F( ISOTPOverCANProtocolTest, isotpSendAndReceiveMultiFrame )
 {
     // Setup the sender
-    ISOTPOverCANSender sender;
     ISOTPOverCANSenderOptions senderOptions;
-    senderOptions.mSocketCanIFName = "vcan0";
+    senderOptions.mSocketCanIFName = mCanInterfaceName;
     senderOptions.mSourceCANId = 0x123;
     senderOptions.mDestinationCANId = 0x456;
-    ASSERT_TRUE( sender.init( senderOptions ) );
+    ISOTPOverCANSender sender( senderOptions );
     ASSERT_TRUE( sender.connect() );
     // Setup the receiver
-    ISOTPOverCANReceiver receiver;
     ISOTPOverCANReceiverOptions receiverOptions;
-    receiverOptions.mSocketCanIFName = "vcan0";
+    receiverOptions.mSocketCanIFName = mCanInterfaceName;
     receiverOptions.mSourceCANId = 0x456;
     receiverOptions.mDestinationCANId = 0x123;
-    ASSERT_TRUE( receiver.init( receiverOptions ) );
+    ISOTPOverCANReceiver receiver( receiverOptions );
     ASSERT_TRUE( receiver.connect() );
     // Setup a Multi Frame ( size > 8 bytes ) send with 1 thread, and received from another thread
     std::vector<uint8_t> rxPDUData;
@@ -204,21 +201,19 @@ TEST_F( ISOTPOverCANProtocolTest, isotpSendAndReceiveMultiFrame )
 TEST_F( ISOTPOverCANProtocolTest, isotpSendAndReceiveSameSocket )
 {
     // Setup the sender receiver
-    ISOTPOverCANSenderReceiver senderReceiver;
     ISOTPOverCANSenderReceiverOptions senderReceiverOptions;
-    senderReceiverOptions.mSocketCanIFName = "vcan0";
+    senderReceiverOptions.mSocketCanIFName = mCanInterfaceName;
     senderReceiverOptions.mSourceCANId = 0x123;
     senderReceiverOptions.mDestinationCANId = 0x456;
-    ASSERT_TRUE( senderReceiver.init( senderReceiverOptions ) );
+    ISOTPOverCANSenderReceiver senderReceiver( senderReceiverOptions );
     ASSERT_TRUE( senderReceiver.connect() );
     // First Use case we would send a PDU and setup a receiver
     // to consume it in a separate channel.
-    ISOTPOverCANReceiver receiver;
     ISOTPOverCANReceiverOptions receiverOptions;
-    receiverOptions.mSocketCanIFName = "vcan0";
+    receiverOptions.mSocketCanIFName = mCanInterfaceName;
     receiverOptions.mSourceCANId = 0x456;
     receiverOptions.mDestinationCANId = 0x123;
-    ASSERT_TRUE( receiver.init( receiverOptions ) );
+    ISOTPOverCANReceiver receiver( receiverOptions );
     ASSERT_TRUE( receiver.connect() );
     // Setup a Frame ) send with 1 thread, and received from another thread
     std::vector<uint8_t> rxPDUData;
@@ -233,12 +228,11 @@ TEST_F( ISOTPOverCANProtocolTest, isotpSendAndReceiveSameSocket )
     ASSERT_EQ( rxPDUData, txPDUData );
 
     // Now we send data in the other direction
-    ISOTPOverCANSender sender;
     ISOTPOverCANSenderOptions senderOptions;
-    senderOptions.mSocketCanIFName = "vcan0";
+    senderOptions.mSocketCanIFName = mCanInterfaceName;
     senderOptions.mSourceCANId = 0x456;
     senderOptions.mDestinationCANId = 0x123;
-    ASSERT_TRUE( sender.init( senderOptions ) );
+    ISOTPOverCANSender sender( senderOptions );
     ASSERT_TRUE( sender.connect() );
 
     rxPDUData.clear();

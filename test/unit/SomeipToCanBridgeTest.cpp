@@ -1,17 +1,16 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "SomeipToCanBridge.h"
-#include "CANDataConsumer.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IDecoderDictionary.h"
-#include "MessageTypes.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/SomeipToCanBridge.h"
 #include "SomeipMock.h"
-#include "TimeTypes.h"
-#include "VehicleDataSourceTypes.h"
-#include <array>
+#include "aws/iotfleetwise/CANDataConsumer.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/IDecoderDictionary.h"
+#include "aws/iotfleetwise/MessageTypes.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
+#include "aws/iotfleetwise/VehicleDataSourceTypes.h"
 #include <cstdint>
 #include <functional>
 #include <gmock/gmock.h>
@@ -52,7 +51,6 @@ class SomeipToCanBridgeTest : public ::testing::Test
 protected:
     SomeipToCanBridgeTest()
         : mSignalBuffer( std::make_shared<SignalBuffer>( 3, "Signal Buffer" ) )
-        , mSignalBufferDistributor( std::make_shared<SignalBufferDistributor>() )
         , mCanConsumer( mSignalBufferDistributor )
         , mSomeipApplicationMock( std::make_shared<StrictMock<SomeipApplicationMock>>() )
         , mSomeipToCanBridge(
@@ -66,7 +64,7 @@ protected:
               [this]( std::string ) {
                   return mSomeipApplicationMock;
               },
-              [this]( std::string ) {} )
+              []( std::string ) {} )
         , mMessage( vsomeip::runtime::get()->create_message() )
     {
     }
@@ -76,7 +74,6 @@ protected:
     {
         std::unordered_map<CANRawFrameID, CANMessageDecoderMethod> frameMap;
         CANMessageDecoderMethod decoderMethod;
-        decoderMethod.collectType = CANMessageCollectType::RAW_AND_DECODE;
 
         decoderMethod.format.mMessageID = CAN_ID;
         decoderMethod.format.mSizeInBytes = 8;
@@ -111,7 +108,7 @@ protected:
 
         setupCanMessage( CAN_ID, CAN_RECEIVE_TIME, { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 } );
 
-        mSignalBufferDistributor->registerQueue( mSignalBuffer );
+        mSignalBufferDistributor.registerQueue( mSignalBuffer );
     }
 
     void
@@ -198,26 +195,10 @@ protected:
             ASSERT_EQ( signal.receiveTime, expectedTimestamp );
         }
         ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x4050607 );
-        auto frame = collectedDataFrame.mCollectedCanRawFrame;
-        ASSERT_EQ( frame->channelId, 0 );
-        ASSERT_EQ( frame->frameID, CAN_ID );
-        if ( expectedTimestamp == 0 )
-        {
-            ASSERT_GT( frame->receiveTime, 0 );
-        }
-        else
-        {
-            ASSERT_EQ( frame->receiveTime, expectedTimestamp );
-        }
-        ASSERT_EQ( frame->size, 8 );
-        for ( auto i = 0; i < 8; i++ )
-        {
-            ASSERT_EQ( frame->data[i], i );
-        }
     }
 
     SignalBufferPtr mSignalBuffer;
-    SignalBufferDistributorPtr mSignalBufferDistributor;
+    SignalBufferDistributor mSignalBufferDistributor;
     CANDataConsumer mCanConsumer{ mSignalBufferDistributor };
     std::shared_ptr<StrictMock<SomeipApplicationMock>> mSomeipApplicationMock;
     SomeipToCanBridge mSomeipToCanBridge;
@@ -231,13 +212,13 @@ protected:
 TEST_F( SomeipToCanBridgeTest, initFail )
 {
     EXPECT_CALL( *mSomeipApplicationMock, init() ).Times( 1 ).WillRepeatedly( Return( false ) );
-    ASSERT_FALSE( mSomeipToCanBridge.init() );
+    ASSERT_FALSE( mSomeipToCanBridge.connect() );
 }
 
 TEST_F( SomeipToCanBridgeTest, initSuccess )
 {
     setupInitExpectations();
-    ASSERT_TRUE( mSomeipToCanBridge.init() );
+    ASSERT_TRUE( mSomeipToCanBridge.connect() );
     vsomeip::remote_info_t remoteInfo{};
     ASSERT_TRUE( mServiceDiscoveryAcceptanceHandler( remoteInfo ) );
     mAvailabilityHandler( SOMEIP_SERVICE_ID, SOMEIP_INSTANCE_ID, true );
@@ -246,7 +227,7 @@ TEST_F( SomeipToCanBridgeTest, initSuccess )
 TEST_F( SomeipToCanBridgeTest, receiveMessageTooShort )
 {
     setupInitExpectations();
-    ASSERT_TRUE( mSomeipToCanBridge.init() );
+    ASSERT_TRUE( mSomeipToCanBridge.connect() );
     mMessage->get_payload()->set_data( std::vector<uint8_t>() );
     mMessageHandler( mMessage );
     ASSERT_TRUE( mSignalBuffer->isEmpty() );
@@ -255,7 +236,7 @@ TEST_F( SomeipToCanBridgeTest, receiveMessageTooShort )
 TEST_F( SomeipToCanBridgeTest, receiveMessageNoDm )
 {
     setupInitExpectations();
-    ASSERT_TRUE( mSomeipToCanBridge.init() );
+    ASSERT_TRUE( mSomeipToCanBridge.connect() );
     mMessageHandler( mMessage );
     ASSERT_TRUE( mSignalBuffer->isEmpty() );
 }
@@ -263,7 +244,7 @@ TEST_F( SomeipToCanBridgeTest, receiveMessageNoDm )
 TEST_F( SomeipToCanBridgeTest, receiveMessageNullDm )
 {
     setupInitExpectations();
-    ASSERT_TRUE( mSomeipToCanBridge.init() );
+    ASSERT_TRUE( mSomeipToCanBridge.connect() );
     mSomeipToCanBridge.onChangeOfActiveDictionary( nullptr, VehicleDataSourceProtocol::RAW_SOCKET );
     mMessageHandler( mMessage );
     ASSERT_TRUE( mSignalBuffer->isEmpty() );
@@ -272,7 +253,7 @@ TEST_F( SomeipToCanBridgeTest, receiveMessageNullDm )
 TEST_F( SomeipToCanBridgeTest, receiveMessageOtherDm )
 {
     setupInitExpectations();
-    ASSERT_TRUE( mSomeipToCanBridge.init() );
+    ASSERT_TRUE( mSomeipToCanBridge.connect() );
     mSomeipToCanBridge.onChangeOfActiveDictionary( nullptr, VehicleDataSourceProtocol::INVALID_PROTOCOL );
     mMessageHandler( mMessage );
     ASSERT_TRUE( mSignalBuffer->isEmpty() );
@@ -281,7 +262,7 @@ TEST_F( SomeipToCanBridgeTest, receiveMessageOtherDm )
 TEST_F( SomeipToCanBridgeTest, receiveMessageValidDm )
 {
     setupInitExpectations();
-    ASSERT_TRUE( mSomeipToCanBridge.init() );
+    ASSERT_TRUE( mSomeipToCanBridge.connect() );
     mSomeipToCanBridge.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     mMessageHandler( mMessage );
     ASSERT_NO_FATAL_FAILURE( checkValidMessage( CAN_RECEIVE_TIME / 1000 ) );
@@ -290,7 +271,7 @@ TEST_F( SomeipToCanBridgeTest, receiveMessageValidDm )
 TEST_F( SomeipToCanBridgeTest, receiveMessageNoTimestamp )
 {
     setupInitExpectations();
-    ASSERT_TRUE( mSomeipToCanBridge.init() );
+    ASSERT_TRUE( mSomeipToCanBridge.connect() );
     mSomeipToCanBridge.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     setupCanMessage( CAN_ID, 0, { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 } );
     mMessageHandler( mMessage );
@@ -300,7 +281,7 @@ TEST_F( SomeipToCanBridgeTest, receiveMessageNoTimestamp )
 TEST_F( SomeipToCanBridgeTest, receiveMessageNonMonotonic )
 {
     setupInitExpectations();
-    ASSERT_TRUE( mSomeipToCanBridge.init() );
+    ASSERT_TRUE( mSomeipToCanBridge.connect() );
     mSomeipToCanBridge.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
     mMessageHandler( mMessage );
     ASSERT_NO_FATAL_FAILURE( checkValidMessage( CAN_RECEIVE_TIME / 1000 ) );

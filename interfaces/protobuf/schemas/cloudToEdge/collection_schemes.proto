@@ -82,9 +82,10 @@ message CollectionScheme {
     repeated SignalInformation signal_information = 9;
 
     /*
-     * List of Raw CAN Frame(s) to be collected and sent to cloud
+     * This field was never supported, so it should not be used any more.
      */
-    repeated RawCanFrame raw_can_frames_to_collect = 10;
+    reserved 10;
+    reserved "raw_can_frames_to_collect";
 
     /*
      * When true, all data will be written to persistent storage when vehicle doesn't not have an internet connection
@@ -308,35 +309,6 @@ message SignalInformation {
      * configuration array.
      */
     uint32 data_partition_id = 7;
-}
-
-/*
- * A raw CAN frame specified to be collected and sent to the cloud.
- */
-message RawCanFrame {
-
-    /*
-     * The interface ID specified by the Decoder Manifest. This will contain the physical channel id of the hardware CAN
-     * Bus the frame is present on.
-     */
-    string can_interface_id = 1;
-
-    /*
-     * CAN Message ID to collect. This Raw CAN message will be collected. Whatever number of bytes present on the bus
-     * for this message ID will be collected.
-     */
-    uint32 can_message_id = 2;
-
-    /*
-     * Ring buffer size used to store these sampled CAN frames. One CAN Frame is a sample.
-     */
-    uint32 sample_buffer_size = 3;
-
-    /*
-     * Minimum time period in milliseconds that must elapse between collecting samples. Samples arriving faster than
-     * this period will be dropped. A value of 0 will collect samples as fast as they arrive.
-     */
-    uint32 minimum_sample_period_ms = 4;
 }
 
 /*

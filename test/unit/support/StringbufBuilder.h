@@ -3,9 +3,12 @@
 
 #pragma once
 
-#include "StreambufBuilder.h"
+#include "aws/iotfleetwise/StreambufBuilder.h"
+#include <gmock/gmock.h>
 #include <memory>
+#include <streambuf>
 #include <string>
+#include <utility>
 
 namespace Aws
 {

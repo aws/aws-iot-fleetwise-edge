@@ -186,9 +186,9 @@ if and how to upload them to the cloud.
 # Adding new metrics
 
 Adding new metrics requires changing the C++ code and recompiling FWE. Add the metrics to the
-`TraceVariable` enum in [TraceModule.h](../src/TraceModule.h) and assign a short name in the
-function `getVariableName` of [TraceModule.cpp](../src/TraceModule.cpp). Then you can set the
-metrics anywhere by using:
+`TraceVariable` enum in [TraceModule.h](../include/aws/iotfleetwise/TraceModule.h) and assign a
+short name in the function `getVariableName` of [TraceModule.cpp](../src/TraceModule.cpp). Then you
+can set the metrics anywhere by using:
 
 ```cpp
  TraceModule::get().setVariable( TraceVariable::MAX_SYSTEMTIME_KERNELTIME_DIFF, observedNewValue);

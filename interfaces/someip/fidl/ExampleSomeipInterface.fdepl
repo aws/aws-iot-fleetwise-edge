@@ -25,6 +25,15 @@ define org.genivi.commonapi.someip.deployment for interface commonapi.ExampleSom
         SomeIpAttributeReliable = false
     }
 
+    attribute temperature {
+        SomeIpGetterID = 0x0BBC
+        SomeIpSetterID = 0x0BBD
+        SomeIpNotifierID = 0x80f4
+        SomeIpNotifierEventGroups = { 0x80f4 }
+
+        SomeIpAttributeReliable = false
+    }
+
     method setInt32 {
         SomeIpMethodID = 0x7530
     }

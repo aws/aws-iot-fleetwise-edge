@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.10.2)
 
-project(iotfleetwise VERSION 1.2.0)
+project(iotfleetwise VERSION 1.2.1)
 
 # FWE uses C++14 for compatibility reasons with Automotive middlewares (Adaptive AUTOSAR, ROS2)
 # Note: When built with FWE_FEATURE_ROS2, colcon will override these settings
@@ -16,7 +16,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(FWE_STATIC_LINK "Statically link external libs" OFF)
 option(FWE_CODE_COVERAGE "Enables code coverage" OFF)
 option(FWE_VALGRIND "Enable valgrind tests" OFF)
-option(FWE_BUILD_DOC "Build documentation" ON)
 option(FWE_STRIP_SYMBOLS "Strips symbols from output binaries" OFF)
 option(FWE_TEST_CLANG_TIDY "Add clang-tidy test" ON)
 option(FWE_TEST_FAKETIME "Enable tests that use the faketime library" OFF)
@@ -29,6 +28,7 @@ option(FWE_FEATURE_IWAVE_GPS "Include the IWave GPS example" OFF)
 option(FWE_FEATURE_EXTERNAL_GPS "Include the external GPS example" OFF)
 option(FWE_FEATURE_AAOS_VHAL "Include the Android Automotive VHAL example" OFF)
 option(FWE_FEATURE_S3 "Internal option, not useful on its own. Enables usage of AWS credential provider, and uploading and downloading from S3." OFF)
+option(FWE_FEATURE_SCRIPT_ENGINE "Internal option, not useful on its own. Enables usage of CustomFunctionScriptEngine. Implies FWE_FEATURE_S3" OFF)
 option(FWE_FEATURE_VISION_SYSTEM_DATA "Include support for vision-system-data sources. Implies FWE_FEATURE_S3." OFF)
 option(FWE_FEATURE_ROS2 "Include support for ROS2 as a vision-system-data source. Implies FWE_FEATURE_VISION_SYSTEM_DATA." OFF)
 option(FWE_FEATURE_SOMEIP "Include the example SOME/IP data source, the example SOME/IP to CAN bridge, the example SOME/IP command dispatcher, and the example SOME/IP to device shadow proxy. Implies FWE_FEATURE_REMOTE_COMMANDS." OFF)
@@ -36,27 +36,17 @@ option(FWE_FEATURE_REMOTE_COMMANDS "Include support for remote commands" OFF)
 option(FWE_FEATURE_LAST_KNOWN_STATE "Include support for last known state. Implies FWE_FEATURE_REMOTE_COMMANDS." OFF)
 option(FWE_FEATURE_STORE_AND_FORWARD "Include support for store and forward" OFF)
 option(FWE_FEATURE_CUSTOM_FUNCTION_EXAMPLES "Include the custom function examples" OFF)
+option(FWE_FEATURE_MICROPYTHON "Include support for MicroPython. Implies FWE_FEATURE_SCRIPT_ENGINE." OFF)
+option(FWE_FEATURE_CPYTHON "Include support for CPython. FOR TESTING PURPOSES ONLY, NOT FOR PRODUCTION SYSTEMS. Implies FWE_FEATURE_SCRIPT_ENGINE." OFF)
+option(FWE_FEATURE_UDS_DTC "Enable UDS DTC information collection" OFF)
+option(FWE_FEATURE_UDS_DTC_EXAMPLE "Include example UDS DTC interface for collecting UDS DTC information. Implies FWE_FEATURE_UDS_DTC." OFF)
+option(FWE_BUILD_DOC "Build documentation" ON)
 option(FWE_BUILD_EXECUTABLE "Build the executable, otherwise build a library" ON)
 option(FWE_BUILD_ANDROID_SHARED_LIBRARY "Build the android shared library" OFF)
 option(FWE_BUILD_TOOLS "Build helper tools" ON)
-option(FWE_FEATURE_UDS_DTC "Enable UDS DTC information collection" OFF)
-option(FWE_FEATURE_UDS_DTC_EXAMPLE "Include example UDS DTC interface for collecting UDS DTC information. Implies FWE_FEATURE_UDS_DTC." OFF)
 
-if(FWE_FEATURE_IWAVE_GPS)
-  add_compile_options("-DFWE_FEATURE_IWAVE_GPS")
-endif()
-if(FWE_FEATURE_EXTERNAL_GPS)
-  add_compile_options("-DFWE_FEATURE_EXTERNAL_GPS")
-endif()
-if(FWE_FEATURE_AAOS_VHAL)
-  add_compile_options("-DFWE_FEATURE_AAOS_VHAL")
-endif()
-if(FWE_FEATURE_GREENGRASSV2)
-  add_compile_options("-DFWE_FEATURE_GREENGRASSV2")
-endif()
 if(FWE_FEATURE_ROS2)
   set(FWE_FEATURE_VISION_SYSTEM_DATA ON FORCE)
-  add_compile_options("-DFWE_FEATURE_ROS2")
   find_package(ament_cmake REQUIRED)
   find_package(rclcpp REQUIRED)
   find_package(fastcdr REQUIRED)
@@ -64,37 +54,33 @@ if(FWE_FEATURE_ROS2)
 endif()
 if(FWE_FEATURE_VISION_SYSTEM_DATA)
   set(FWE_FEATURE_S3 ON FORCE)
-  add_compile_options("-DFWE_FEATURE_VISION_SYSTEM_DATA;-DDECNUMDIGITS=34")
 endif()
 if(FWE_FEATURE_SOMEIP)
   set(FWE_FEATURE_REMOTE_COMMANDS ON FORCE)
-  add_compile_options("-DFWE_FEATURE_SOMEIP")
 endif()
 if(FWE_FEATURE_LAST_KNOWN_STATE)
   set(FWE_FEATURE_REMOTE_COMMANDS ON FORCE)
-  add_compile_options("-DFWE_FEATURE_LAST_KNOWN_STATE")
-endif()
-if(FWE_FEATURE_REMOTE_COMMANDS)
-  add_compile_options("-DFWE_FEATURE_REMOTE_COMMANDS")
 endif()
 if(FWE_FEATURE_STORE_AND_FORWARD)
   find_path(STORE_LIBRARY_CPP_INCLUDE_DIR "stream/stream.hpp" PATH_SUFFIXES "aws/store")
   find_library(STORE_LIBRARY_CPP_STREAM NAMES stream)
   find_library(STORE_LIBRARY_CPP_KV NAMES kv)
-  add_compile_options("-DFWE_FEATURE_STORE_AND_FORWARD")
 endif()
 if(FWE_FEATURE_UDS_DTC_EXAMPLE)
   set(FWE_FEATURE_UDS_DTC ON FORCE)
-  add_compile_options("-DFWE_FEATURE_UDS_DTC_EXAMPLE")
 endif()
-if(FWE_FEATURE_UDS_DTC)
-  add_compile_options("-DFWE_FEATURE_UDS_DTC")
+if(FWE_FEATURE_MICROPYTHON)
+  set(FWE_FEATURE_SCRIPT_ENGINE ON FORCE)
 endif()
-if(FWE_FEATURE_CUSTOM_FUNCTION_EXAMPLES)
-  add_compile_options("-DFWE_FEATURE_CUSTOM_FUNCTION_EXAMPLES")
+if(FWE_FEATURE_CPYTHON)
+  set(FWE_FEATURE_SCRIPT_ENGINE ON FORCE)
 endif()
-if(FWE_FEATURE_S3)
-  add_compile_options("-DFWE_FEATURE_S3")
+if(FWE_FEATURE_SCRIPT_ENGINE)
+  set(FWE_FEATURE_S3 ON FORCE)
+endif()
+
+if(NOT FWE_BUILD_EXECUTABLE AND FWE_FEATURE_SOMEIP)
+  message(FATAL_ERROR "Not possible to build library with the example SOME/IP interfaces, see examples/someip instead")
 endif()
 
 # Define the default build type
@@ -123,14 +109,14 @@ set_property(GLOBAL PROPERTY GLOBAL_DEPENDS_NO_CYCLES ON)
 
 # Version
 execute_process(COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}" rev-parse HEAD
-        OUTPUT_VARIABLE VERSION_GIT_SHA
+        OUTPUT_VARIABLE FWE_VERSION_GIT_SHA
         ERROR_QUIET)
 execute_process(COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}" describe --tags --abbrev=0
-        OUTPUT_VARIABLE VERSION_GIT_TAG
+        OUTPUT_VARIABLE FWE_VERSION_GIT_TAG
         ERROR_QUIET)
-string(STRIP "${VERSION_GIT_SHA}" VERSION_GIT_SHA)
-string(STRIP "${VERSION_GIT_TAG}" VERSION_GIT_TAG)
-string(TIMESTAMP VERSION_CURRENT_TIME "%Y-%m-%d %H:%M:%S" UTC)
+string(STRIP "${FWE_VERSION_GIT_SHA}" FWE_VERSION_GIT_SHA)
+string(STRIP "${FWE_VERSION_GIT_TAG}" FWE_VERSION_GIT_TAG)
+string(TIMESTAMP FWE_VERSION_CURRENT_TIME "%Y-%m-%d %H:%M:%S" UTC)
 configure_file(src/IoTFleetWiseVersion.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/IoTFleetWiseVersion.cpp)
 
 # Protobuf
@@ -167,6 +153,13 @@ target_include_directories(fwe-proto PUBLIC
 set_source_files_properties(${PROTO_SRCS} PROPERTIES COMPILE_FLAGS "-Wno-conversion -Wno-pedantic")
 
 if(FWE_FEATURE_SOMEIP)
+  find_package(vsomeip3 REQUIRED)
+  find_path(VSOMEIP_INCLUDE_DIR "vsomeip/vsomeip.hpp")
+  find_package(CommonAPI REQUIRED)
+  find_package(CommonAPI-SomeIP REQUIRED)
+  # For someipigen:
+  find_package(pybind11 CONFIG REQUIRED)
+
   # CommonAPI code generation
   set(CAPICXX_EXAMPLE_GENERATED_FILES
     v1/commonapi/CommonTypes.hpp
@@ -189,6 +182,21 @@ if(FWE_FEATURE_SOMEIP)
     interfaces/someip/fidl/ExampleSomeipInterface.fdepl
     "${CAPICXX_EXAMPLE_GENERATED_FILES}"
   )
+  add_library(fwe-someip-example OBJECT
+    ${CAPICXX_EXAMPLE_GENERATED_FILES}
+  )
+  target_include_directories(fwe-someip-example PUBLIC
+    ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  target_include_directories(fwe-someip-example SYSTEM PUBLIC
+    ${VSOMEIP_INCLUDE_DIR}
+    ${COMMONAPI_INCLUDE_DIRS}
+    ${COMMONAPI_SOMEIP_INCLUDE_DIRS}
+  )
+  set_target_properties(fwe-someip-example
+    PROPERTIES POSITION_INDEPENDENT_CODE ON
+  )
+
   set(CAPICXX_DEVICE_SHADOW_GENERATED_FILES
     v1/commonapi/DeviceShadowOverSomeipInterface.hpp
     v1/commonapi/DeviceShadowOverSomeipInterfaceProxy.hpp
@@ -207,88 +215,25 @@ if(FWE_FEATURE_SOMEIP)
     interfaces/someip/fidl/DeviceShadowOverSomeipInterface.fdepl
     "${CAPICXX_DEVICE_SHADOW_GENERATED_FILES}"
   )
+  add_library(fwe-device-shadow-over-someip OBJECT
+    ${CAPICXX_DEVICE_SHADOW_GENERATED_FILES}
+  )
+  target_include_directories(fwe-device-shadow-over-someip PUBLIC
+    ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  target_include_directories(fwe-device-shadow-over-someip SYSTEM PUBLIC
+    ${VSOMEIP_INCLUDE_DIR}
+    ${COMMONAPI_INCLUDE_DIRS}
+    ${COMMONAPI_SOMEIP_INCLUDE_DIRS}
+  )
+  set_target_properties(fwe-device-shadow-over-someip
+    PROPERTIES POSITION_INDEPENDENT_CODE ON
+  )
 endif()
 
-set(HEADER_FILES
-  src/Assert.h
-  src/AwsBootstrap.h
-  src/AwsIotConnectivityModule.h
-  src/AwsIotReceiver.h
-  src/AwsIotSender.h
-  src/AwsSDKMemoryManager.h
-  src/CacheAndPersist.h
-  src/CANDataConsumer.h
-  src/CANDataSource.h
-  src/CANDataTypes.h
-  src/CANDecoder.h
-  src/CANInterfaceIDTranslator.h
-  src/CheckinSender.h
-  src/Clock.h
-  src/ClockHandler.h
-  src/CollectionInspectionAPITypes.h
-  src/CollectionInspectionEngine.h
-  src/CollectionInspectionWorkerThread.h
-  src/CollectionSchemeIngestion.h
-  src/CollectionSchemeIngestionList.h
-  src/CollectionSchemeManager.h
-  src/ConsoleLogger.h
-  src/CPUUsageInfo.h
-  src/DataFetchManagerAPITypes.h
-  src/DataFetchManager.h
-  src/DataSenderManager.h
-  src/DataSenderManagerWorkerThread.h
-  src/DataSenderProtoWriter.h
-  src/DataSenderTypes.h
-  src/DecoderManifestIngestion.h
-  src/EnumUtility.h
-  src/EventTypes.h
-  src/ExternalCANDataSource.h
-  src/ICollectionScheme.h
-  src/ICollectionSchemeList.h
-  src/IConnectionTypes.h
-  src/IConnectivityModule.h
-  src/IDecoderDictionary.h
-  src/IDecoderManifest.h
-  src/ILogger.h
-  src/IoTFleetWiseConfig.h
-  src/IoTFleetWiseEngine.h
-  src/IoTFleetWiseVersion.h
-  src/IReceiver.h
-  src/ISender.h
-  src/ISOTPOverCANOptions.h
-  src/ISOTPOverCANReceiver.h
-  src/ISOTPOverCANSender.h
-  src/ISOTPOverCANSenderReceiver.h
-  src/Listener.h
-  src/QueueTypes.h
-  src/LoggingModule.h
-  src/LogLevel.h
-  src/MemoryUsageInfo.h
-  src/MessageTypes.h
-  src/MqttClientWrapper.h
-  src/NamedSignalDataSource.h
-  src/OBDDataDecoder.h
-  src/OBDDataTypes.h
-  src/OBDOverCANECU.h
-  src/OBDOverCANModule.h
-  src/PayloadManager.h
-  src/QueueTypes.h
-  src/RawDataManager.h
-  src/RemoteProfiler.h
-  src/RetryThread.h
-  src/Schema.h
-  src/SchemaListener.h
-  src/Signal.h
-  src/SignalTypes.h
-  src/StreambufBuilder.h
-  src/TelemetryDataSender.h
-  src/Thread.h
-  src/Timer.h
-  src/TimeTypes.h
-  src/TraceModule.h
-  src/TopicConfig.h
-  src/VehicleDataSourceTypes.h
-)
+if(FWE_FEATURE_MICROPYTHON)
+  include(cmake/micropython.cmake)
+endif()
 
 # Source files
 set(SRC_FILES
@@ -388,17 +333,14 @@ set(BENCHMARK_TEST_FILES
 if(FWE_FEATURE_IWAVE_GPS)
   set(SRC_FILES ${SRC_FILES} src/IWaveGpsSource.cpp)
   set(TEST_FILES ${TEST_FILES} test/unit/IWaveGpsSourceTest.cpp)
-  set(HEADER_FILES ${HEADER_FILES} src/IWaveGpsSource.h)
 endif()
 if(FWE_FEATURE_EXTERNAL_GPS)
   set(SRC_FILES ${SRC_FILES} src/ExternalGpsSource.cpp)
   set(TEST_FILES ${TEST_FILES} test/unit/ExternalGpsSourceTest.cpp)
-  set(HEADER_FILES ${HEADER_FILES} src/ExternalGpsSource.h)
 endif()
 if(FWE_FEATURE_AAOS_VHAL)
   set(SRC_FILES ${SRC_FILES} src/AaosVhalSource.cpp)
   set(TEST_FILES ${TEST_FILES} test/unit/AaosVhalSourceTest.cpp)
-  set(HEADER_FILES ${HEADER_FILES} src/AaosVhalSource.h)
 endif()
 if(FWE_FEATURE_GREENGRASSV2)
   set(SRC_FILES ${SRC_FILES}
@@ -406,19 +348,10 @@ if(FWE_FEATURE_GREENGRASSV2)
     src/AwsGreengrassV2Receiver.cpp
     src/AwsGreengrassV2Sender.cpp
   )
-  set(HEADER_FILES ${HEADER_FILES}
-    src/AwsGreengrassV2ConnectivityModule.h
-    src/AwsGreengrassV2Receiver.h
-    src/AwsGreengrassV2Sender.h
-)
 endif()
 if(FWE_FEATURE_S3)
   set(SRC_FILES ${SRC_FILES} src/Credentials.cpp)
   set(TEST_FILES ${TEST_FILES} test/unit/CredentialsTest.cpp)
-  set(HEADER_FILES ${HEADER_FILES}
-    src/Credentials.h
-    src/TransferManagerWrapper.h
-  )
 endif()
 if(FWE_FEATURE_VISION_SYSTEM_DATA)
   set(SRC_FILES ${SRC_FILES}
@@ -430,15 +363,9 @@ if(FWE_FEATURE_VISION_SYSTEM_DATA)
     test/unit/DataSenderIonWriterTest.cpp
     test/unit/S3SenderTest.cpp
   )
-  set(HEADER_FILES ${HEADER_FILES}
-    src/DataSenderIonWriter.h
-    src/S3Sender.h
-    src/VisionSystemDataSender.h
-  )
 endif()
 if(FWE_FEATURE_ROS2)
   set(SRC_FILES ${SRC_FILES} src/ROS2DataSource.cpp)
-  set(HEADER_FILES ${HEADER_FILES} src/ROS2DataSource.h)
 endif()
 if(FWE_FEATURE_SOMEIP)
   set(SRC_FILES ${SRC_FILES}
@@ -446,16 +373,8 @@ if(FWE_FEATURE_SOMEIP)
     src/SomeipCommandDispatcher.cpp
     src/SomeipDataSource.cpp
     src/SomeipToCanBridge.cpp
-    ${CAPICXX_EXAMPLE_GENERATED_FILES}
-    ${CAPICXX_DEVICE_SHADOW_GENERATED_FILES}
-  )
-  set(HEADER_FILES ${HEADER_FILES}
-    src/DeviceShadowOverSomeip.h
-    src/ExampleSomeipInterfaceWrapper.h
-    src/ISomeipInterfaceWrapper.h
-    src/SomeipCommandDispatcher.h
-    src/SomeipDataSource.h
-    src/SomeipToCanBridge.h
+    $<TARGET_OBJECTS:fwe-someip-example>
+    $<TARGET_OBJECTS:fwe-device-shadow-over-someip>
   )
   set(TEST_FILES ${TEST_FILES}
     test/unit/DeviceShadowOverSomeipTest.cpp
@@ -471,14 +390,6 @@ if(FWE_FEATURE_REMOTE_COMMANDS)
     src/CommandResponseDataSender.cpp
     src/CommandSchema.cpp
   )
-  set(HEADER_FILES ${HEADER_FILES}
-    src/ActuatorCommandManager.h
-    src/CanCommandDispatcher.h
-    src/CommandResponseDataSender.h
-    src/CommandSchema.h
-    src/CommandTypes.h
-    src/ICommandDispatcher.h
-  )
   set(TEST_FILES ${TEST_FILES}
     test/unit/ActuatorCommandManagerTest.cpp
     test/unit/CanCommandDispatcherTest.cpp
@@ -493,14 +404,6 @@ if(FWE_FEATURE_LAST_KNOWN_STATE)
     src/LastKnownStateSchema.cpp
     src/LastKnownStateWorkerThread.cpp
   )
-  set(HEADER_FILES ${HEADER_FILES}
-    src/LastKnownStateDataSender.h
-    src/LastKnownStateIngestion.h
-    src/LastKnownStateInspector.h
-    src/LastKnownStateSchema.h
-    src/LastKnownStateTypes.h
-    src/LastKnownStateWorkerThread.h
-  )
   set(TEST_FILES ${TEST_FILES}
     test/unit/LastKnownStateSchemaTest.cpp
     test/unit/LastKnownStateWorkerThreadTest.cpp
@@ -511,62 +414,58 @@ if(FWE_TEST_FAKETIME)
   set(FAKETIME_TEST_FILES test/unit/FakeSystemTimeTest.cpp)
 endif()
 if(FWE_FEATURE_STORE_AND_FORWARD)
-  set(HEADER_FILES ${HEADER_FILES}
-    src/RateLimiter.h
-    src/StoreFileSystem.h
-    src/StoreLogger.h
-    src/StreamManager.h
-    src/StreamForwarder.h
-    src/DataSenderProtoReader.h
-    src/IoTJobsDataRequestHandler.h)
   set(SRC_FILES ${SRC_FILES}
-    src/RateLimiter.cpp
-    src/StoreFileSystem.cpp
-    src/StoreLogger.cpp
-    src/StreamManager.cpp
-    src/StreamForwarder.cpp
-    src/DataSenderProtoReader.cpp
-    src/IoTJobsDataRequestHandler.cpp)
+    src/snf/RateLimiter.cpp
+    src/snf/StoreFileSystem.cpp
+    src/snf/StoreLogger.cpp
+    src/snf/StreamManager.cpp
+    src/snf/StreamForwarder.cpp
+    src/snf/DataSenderProtoReader.cpp
+    src/snf/IoTJobsDataRequestHandler.cpp)
   set(TEST_FILES ${TEST_FILES}
-    test/unit/RateLimiterTest.cpp
-    test/unit/StoreFileSystemTest.cpp
-    test/unit/StoreLoggerTest.cpp
-    test/unit/StreamManagerTest.cpp
-    test/unit/StreamForwarderTest.cpp
-    test/unit/DataSenderProtoReaderTest.cpp
-    test/unit/IoTJobsDataRequestHandlerTest.cpp)
+    test/unit/snf/RateLimiterTest.cpp
+    test/unit/snf/StoreFileSystemTest.cpp
+    test/unit/snf/StoreLoggerTest.cpp
+    test/unit/snf/StreamManagerTest.cpp
+    test/unit/snf/StreamForwarderTest.cpp
+    test/unit/snf/DataSenderProtoReaderTest.cpp
+    test/unit/snf/IoTJobsDataRequestHandlerTest.cpp)
 endif()
 if (FWE_FEATURE_UDS_DTC_EXAMPLE)
   set(SRC_FILES ${SRC_FILES}
     src/ExampleUDSInterface.cpp)
-  set(HEADER_FILES ${HEADER_FILES}
-    src/ExampleUDSInterface.h)
   set(TEST_FILES ${TEST_FILES}
     test/unit/ExampleUDSInterfaceTest.cpp)
 endif()
 if(FWE_FEATURE_UDS_DTC)
   set(SRC_FILES ${SRC_FILES}
     src/RemoteDiagnosticDataSource.cpp)
-  set(HEADER_FILES ${HEADER_FILES}
-    src/RemoteDiagnosticDataSource.h
-    src/IRemoteDiagnostics.h)
 endif()
 if(FWE_FEATURE_CUSTOM_FUNCTION_EXAMPLES)
   set(SRC_FILES ${SRC_FILES}
     src/CustomFunctionMath.cpp
     src/CustomFunctionMultiRisingEdgeTrigger.cpp)
-  set(HEADER_FILES ${HEADER_FILES}
-    src/CustomFunctionMath.h
-    src/CustomFunctionMultiRisingEdgeTrigger.h)
   set(TEST_FILES ${TEST_FILES}
     test/unit/CustomFunctionMathTest.cpp
     test/unit/CustomFunctionMultiRisingEdgeTriggerTest.cpp)
 endif()
+if(FWE_FEATURE_SCRIPT_ENGINE)
+  set(SRC_FILES ${SRC_FILES} src/CustomFunctionScriptEngine.cpp)
+endif()
+if(FWE_FEATURE_CPYTHON)
+  set(SRC_FILES ${SRC_FILES} src/CustomFunctionCPython.cpp)
+endif()
+if(FWE_FEATURE_MICROPYTHON)
+  set(SRC_FILES ${SRC_FILES} src/CustomFunctionMicroPython.cpp)
+endif()
+if(FWE_FEATURE_CPYTHON OR FWE_FEATURE_MICROPYTHON)
+  set(TEST_FILES ${TEST_FILES} test/unit/CustomFunctionPythonTest.cpp)
+endif()
 
 # Dependencies
-set(REQUIRED_BOOST_COMPONENTS "thread;filesystem")
+set(REQUIRED_BOOST_COMPONENTS "thread;filesystem;chrono")
+add_compile_options("-DBOOST_UUID_NO_SIMD") # For clang compatibility
 if(FWE_FEATURE_SOMEIP)
-  add_compile_options("-DBOOST_UUID_NO_SIMD") # For clang compatibility
   set(REQUIRED_BOOST_COMPONENTS "${REQUIRED_BOOST_COMPONENTS};system;program_options")
 endif()
 find_package(Boost 1.71.0 REQUIRED COMPONENTS ${REQUIRED_BOOST_COMPONENTS})
@@ -613,13 +512,12 @@ if(FWE_FEATURE_GREENGRASSV2)
   find_package(GreengrassIpc-cpp REQUIRED)
 endif()
 
-if(FWE_FEATURE_SOMEIP)
-  find_package(vsomeip3 REQUIRED)
-  find_package(CommonAPI REQUIRED)
-  find_package(CommonAPI-SomeIP REQUIRED)
-  # For someipigen:
+if(FWE_FEATURE_SOMEIP OR FWE_FEATURE_CPYTHON)
+  # Dynamically link to Python library:
+  set(OLD_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".so")
   find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
-  find_package(pybind11 CONFIG REQUIRED)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ${OLD_CMAKE_FIND_LIBRARY_SUFFIXES})
 endif()
 
 # Object lib used in output binary and unit tests
@@ -627,15 +525,69 @@ add_library(fwe OBJECT
   ${SRC_FILES}
 )
 
+if(FWE_FEATURE_IWAVE_GPS)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_IWAVE_GPS)
+endif()
+if(FWE_FEATURE_EXTERNAL_GPS)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_EXTERNAL_GPS)
+endif()
+if(FWE_FEATURE_AAOS_VHAL)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_AAOS_VHAL)
+endif()
+if(FWE_FEATURE_GREENGRASSV2)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_GREENGRASSV2)
+endif()
+if(FWE_FEATURE_ROS2)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_ROS2)
+endif()
+if(FWE_FEATURE_VISION_SYSTEM_DATA)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_VISION_SYSTEM_DATA DECNUMDIGITS=34)
+endif()
+if(FWE_FEATURE_SOMEIP)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_SOMEIP)
+endif()
+if(FWE_FEATURE_LAST_KNOWN_STATE)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_LAST_KNOWN_STATE)
+endif()
+if(FWE_FEATURE_REMOTE_COMMANDS)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_REMOTE_COMMANDS)
+endif()
+if(FWE_FEATURE_STORE_AND_FORWARD)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_STORE_AND_FORWARD)
+endif()
+if(FWE_FEATURE_UDS_DTC_EXAMPLE)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_UDS_DTC_EXAMPLE)
+endif()
+if(FWE_FEATURE_UDS_DTC)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_UDS_DTC)
+endif()
+if(FWE_FEATURE_CUSTOM_FUNCTION_EXAMPLES)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_CUSTOM_FUNCTION_EXAMPLES)
+endif()
+if(FWE_FEATURE_MICROPYTHON)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_MICROPYTHON)
+endif()
+if(FWE_FEATURE_CPYTHON)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_CPYTHON)
+endif()
+if(FWE_FEATURE_SCRIPT_ENGINE)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_SCRIPT_ENGINE)
+endif()
+if(FWE_FEATURE_S3)
+  target_compile_definitions(fwe PUBLIC FWE_FEATURE_S3)
+endif()
+
 # Include dirs
 target_include_directories(fwe PUBLIC
   ${JSONCPP_INCLUDE_DIR}
   ${SNAPPY_INCLUDE_DIR}
   ${Protobuf_INCLUDE_DIRS}
-  $<$<BOOL:${FWE_FEATURE_SOMEIP}>:${VSOMEIP_INCLUDE_DIRS} ${COMMONAPI_INCLUDE_DIRS} ${COMMONAPI_SOMEIP_INCLUDE_DIRS}>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  $<$<BOOL:${FWE_FEATURE_SOMEIP}>:${VSOMEIP_INCLUDE_DIR} ${COMMONAPI_INCLUDE_DIRS} ${COMMONAPI_SOMEIP_INCLUDE_DIRS}>
   $<$<BOOL:${FWE_FEATURE_STORE_AND_FORWARD}>:${STORE_LIBRARY_CPP_INCLUDE_DIR}>
+)
+target_include_directories(fwe PRIVATE
+  include
+  ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 # Link libraries
@@ -648,6 +600,7 @@ target_link_libraries(fwe
   ${SNAPPY_LIBRARY}
   ${JSONCPP_LIBRARY}
   ${Protobuf_LIBRARIES}
+  Boost::chrono
   Boost::thread
   Boost::filesystem
   $<$<BOOL:${FWE_FEATURE_ROS2}>:fastcdr>
@@ -665,6 +618,15 @@ if(FWE_FEATURE_VISION_SYSTEM_DATA)
     $<$<NOT:$<BOOL:${FWE_STATIC_LINK}>>:IonC::ionc>
     $<$<NOT:$<BOOL:${FWE_STATIC_LINK}>>:IonC::decNumber>
   )
+endif()
+
+if(FWE_FEATURE_MICROPYTHON)
+  target_include_directories(fwe SYSTEM PUBLIC "${MICROPYTHON_INCLUDE_DIRS}")
+  target_link_libraries(fwe micropython_embed)
+endif()
+if(FWE_FEATURE_CPYTHON)
+  target_include_directories(fwe PUBLIC ${Python3_INCLUDE_DIRS})
+  target_link_libraries(fwe ${Python3_LIBRARIES})
 endif()
 
 if(FWE_FEATURE_ROS2)
@@ -695,13 +657,15 @@ else()
   add_library(aws-iot-fleetwise-edge
     $<TARGET_OBJECTS:fwe>
   )
-  set_target_properties(aws-iot-fleetwise-edge
-    PROPERTIES PUBLIC_HEADER "${HEADER_FILES};${PROTO_HDRS}"
-  )
+  install(DIRECTORY
+    include/aws
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  install(FILES
+    ${PROTO_HDRS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aws/iotfleetwise)
   install(TARGETS aws-iot-fleetwise-edge fwe fwe-proto
     EXPORT AwsIotFweTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/aws/iotfleetwise"
   )
   install(EXPORT AwsIotFweTargets
         FILE AwsIotFweTargets.cmake
@@ -727,6 +691,12 @@ endif()
 target_link_libraries(aws-iot-fleetwise-edge
   fwe
   fwe-proto
+  $<$<BOOL:${FWE_FEATURE_SOMEIP}>:fwe-someip-example>
+  $<$<BOOL:${FWE_FEATURE_SOMEIP}>:fwe-device-shadow-over-someip>
+)
+target_include_directories(aws-iot-fleetwise-edge PRIVATE
+  include
+  ${CMAKE_CURRENT_BINARY_DIR}
 )
 set_target_properties(aws-iot-fleetwise-edge fwe fwe-proto
   PROPERTIES POSITION_INDEPENDENT_CODE ON
@@ -738,6 +708,7 @@ if(${BUILD_TESTING})
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/unit/support/static-config-ok.json           DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/unit/support/static-config-corrupt.json      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/unit/support/static-config-inline-creds.json DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/test/unit/support/test_module.py                  DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
   find_package(GTest REQUIRED)
   find_library(GMOCK_LIB NAMES gmock)
   find_package(benchmark REQUIRED)
@@ -749,25 +720,27 @@ if(${BUILD_TESTING})
   )
 
   target_include_directories(fwe-gtest PUBLIC
-    src
+    include
     test/unit/support
     ${CMAKE_CURRENT_BINARY_DIR}
   )
   target_link_libraries(fwe-gtest
     fwe
     fwe-proto
+    $<$<BOOL:${FWE_FEATURE_SOMEIP}>:fwe-someip-example>
+    $<$<BOOL:${FWE_FEATURE_SOMEIP}>:fwe-device-shadow-over-someip>
     ${GMOCK_LIB}
     GTest::GTest
   )
-  add_unit_test(fwe-gtest)
-  add_valgrind_test(fwe-gtest)
+
+  set(TEST_BINARIES_PARALLEL ${TEST_BINARIES_PARALLEL} fwe-gtest)
 
   # Google Benchmark executable
   add_executable(fwe-benchmark
     ${BENCHMARK_TEST_FILES}
   )
   target_include_directories(fwe-benchmark PUBLIC
-    src
+    include
     test/unit/support
     ${CMAKE_CURRENT_BINARY_DIR}
   )
@@ -788,7 +761,7 @@ if(${BUILD_TESTING})
       test/unit/support/main.cpp
     )
     target_include_directories(fwe-faketime PUBLIC
-      src
+      include
       test/unit/support
       ${CMAKE_CURRENT_BINARY_DIR}
     )
@@ -815,7 +788,7 @@ if(${BUILD_TESTING})
       test/unit/support/main.cpp
     )
     target_include_directories(ROS2DataSourceTest PUBLIC
-      src
+      include
       test/unit/support
       ${CMAKE_CURRENT_BINARY_DIR}
       test/unit/support/ros2-mock-include
@@ -823,12 +796,18 @@ if(${BUILD_TESTING})
     target_link_libraries(ROS2DataSourceTest
       ${JSONCPP_LIBRARY}
       fastcdr
+      Boost::chrono
+      Boost::thread
       ${GMOCK_LIB}
       GTest::GTest
     )
-    add_unit_test(ROS2DataSourceTest)
-    add_valgrind_test(ROS2DataSourceTest)
+    target_compile_definitions(ROS2DataSourceTest PUBLIC
+      $<TARGET_PROPERTY:fwe,INTERFACE_COMPILE_DEFINITIONS>)
+    set(TEST_BINARIES_PARALLEL ${TEST_BINARIES_PARALLEL} ROS2DataSourceTest)
   endif()
+
+  add_parallel_unit_tests(${TEST_BINARIES_PARALLEL})
+  add_parallel_valgrind_tests(${TEST_BINARIES_PARALLEL})
 endif()
 
 # Tools

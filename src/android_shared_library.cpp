@@ -1,11 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ConsoleLogger.h"
-#include "IoTFleetWiseEngine.h"
-#include "IoTFleetWiseVersion.h"
-#include "LogLevel.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/ConsoleLogger.h"
+#include "aws/iotfleetwise/IoTFleetWiseEngine.h"
+#include "aws/iotfleetwise/IoTFleetWiseVersion.h"
+#include "aws/iotfleetwise/LogLevel.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
 #include <android/log.h>
@@ -29,8 +29,8 @@ static std::shared_ptr<Aws::IoTFleetWise::IoTFleetWiseEngine> mEngine;
 static void
 printVersion()
 {
-    LOGI( std::string( "Version: " ) + VERSION_PROJECT_VERSION + ", git tag: " + VERSION_GIT_TAG +
-          ", git commit sha: " + VERSION_GIT_COMMIT_SHA + ", Build time: " + VERSION_BUILD_TIME );
+    LOGI( std::string( "Version: " ) + FWE_VERSION_PROJECT_VERSION + ", git tag: " + FWE_VERSION_GIT_TAG +
+          ", git commit sha: " + FWE_VERSION_GIT_COMMIT_SHA + ", Build time: " + FWE_VERSION_BUILD_TIME );
 }
 
 static void
@@ -188,11 +188,11 @@ Java_com_aws_iotfleetwise_Fwe_setLocation( JNIEnv *env, jobject me, jdouble lati
 {
     static_cast<void>( env );
     static_cast<void>( me );
-    if ( mEngine == nullptr )
+    if ( ( mEngine == nullptr ) || ( mEngine->mExternalGpsSource == nullptr ) )
     {
         return;
     }
-    mEngine->setExternalGpsLocation( latitude, longitude );
+    mEngine->mExternalGpsSource->setLocation( latitude, longitude );
 }
 #endif
 
@@ -204,13 +204,13 @@ Java_com_aws_iotfleetwise_Fwe_getVehiclePropertyInfo( JNIEnv *env, jobject me )
     jclass cls = env->FindClass( "[I" );
     jintArray iniVal = env->NewIntArray( 4 );
     jobjectArray outer;
-    if ( mEngine == nullptr )
+    if ( ( mEngine == nullptr ) || ( mEngine->mAaosVhalSource == nullptr ) )
     {
         outer = env->NewObjectArray( 0, cls, iniVal );
     }
     else
     {
-        auto propertyInfo = mEngine->getVehiclePropertyInfo();
+        auto propertyInfo = mEngine->mAaosVhalSource->getVehiclePropertyInfo();
         outer = env->NewObjectArray( static_cast<jsize>( propertyInfo.size() ), cls, iniVal );
         for ( size_t i = 0; i < propertyInfo.size(); i++ )
         {
@@ -232,7 +232,7 @@ Java_com_aws_iotfleetwise_Fwe_setVehicleProperty( JNIEnv *env, jobject me, jint 
 {
     static_cast<void>( env );
     static_cast<void>( me );
-    if ( mEngine == nullptr )
+    if ( ( mEngine == nullptr ) || ( mEngine->mAaosVhalSource == nullptr ) )
     {
         return;
     }
@@ -244,7 +244,7 @@ Java_com_aws_iotfleetwise_Fwe_setVehicleProperty( JNIEnv *env, jobject me, jint 
     {
         jmethodID doubleJMethodIdDoubleValue = env->GetMethodID( doubleJClass, "doubleValue", "()D" );
         jdouble doubleValue = env->CallDoubleMethod( value, doubleJMethodIdDoubleValue );
-        mEngine->setVehicleProperty(
+        mEngine->mAaosVhalSource->setVehicleProperty(
             static_cast<uint32_t>( signalId ),
             Aws::IoTFleetWise::DecodedSignalValue( doubleValue, Aws::IoTFleetWise::SignalType::DOUBLE ) );
     }
@@ -252,7 +252,7 @@ Java_com_aws_iotfleetwise_Fwe_setVehicleProperty( JNIEnv *env, jobject me, jint 
     {
         jmethodID longJMethodIdLongValue = env->GetMethodID( longJClass, "longValue", "()J" );
         jlong longValue = env->CallLongMethod( value, longJMethodIdLongValue );
-        mEngine->setVehicleProperty(
+        mEngine->mAaosVhalSource->setVehicleProperty(
             static_cast<uint32_t>( signalId ),
             Aws::IoTFleetWise::DecodedSignalValue( longValue, Aws::IoTFleetWise::SignalType::INT64 ) );
     }
@@ -268,9 +268,9 @@ Java_com_aws_iotfleetwise_Fwe_getObdPidsToRequest( JNIEnv *env, jobject me )
 {
     static_cast<void>( me );
     std::vector<uint8_t> requests;
-    if ( mEngine != nullptr )
+    if ( ( mEngine != nullptr ) && ( mEngine->mOBDOverCANModule != nullptr ) )
     {
-        requests = mEngine->getExternalOBDPIDsToRequest();
+        requests = mEngine->mOBDOverCANModule->getExternalPIDsToRequest();
     }
     jintArray ret = env->NewIntArray( static_cast<jsize>( requests.size() ) );
     for ( size_t i = 0; i < requests.size(); i++ )
@@ -285,7 +285,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_aws_iotfleetwise_Fwe_setObdPidResponse( JNIEnv *env, jobject me, jint pid, jintArray responseJArray )
 {
     static_cast<void>( me );
-    if ( mEngine == nullptr )
+    if ( ( mEngine == nullptr ) || ( mEngine->mOBDOverCANModule == nullptr ) )
     {
         return;
     }
@@ -297,7 +297,7 @@ Java_com_aws_iotfleetwise_Fwe_setObdPidResponse( JNIEnv *env, jobject me, jint p
         env->GetIntArrayRegion( responseJArray, i, 1, &byte );
         response[static_cast<size_t>( i )] = static_cast<uint8_t>( byte );
     }
-    mEngine->setExternalOBDPIDResponse( static_cast<uint8_t>( pid ), response );
+    mEngine->mOBDOverCANModule->setExternalPIDResponse( static_cast<uint8_t>( pid ), response );
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -305,7 +305,7 @@ Java_com_aws_iotfleetwise_Fwe_ingestCanMessage(
     JNIEnv *env, jobject me, jstring interfaceIdJString, jlong timestamp, jint messageId, jbyteArray dataJArray )
 {
     static_cast<void>( me );
-    if ( mEngine == nullptr )
+    if ( ( mEngine == nullptr ) || ( mEngine->mExternalCANDataSource == nullptr ) )
     {
         return;
     }
@@ -315,7 +315,7 @@ Java_com_aws_iotfleetwise_Fwe_ingestCanMessage(
     auto len = env->GetArrayLength( dataJArray );
     std::vector<uint8_t> data( static_cast<size_t>( len ) );
     env->GetByteArrayRegion( dataJArray, 0, len, (int8_t *)data.data() );
-    mEngine->ingestExternalCANMessage(
+    mEngine->mExternalCANDataSource->ingestMessage(
         interfaceId, static_cast<Aws::IoTFleetWise::Timestamp>( timestamp ), static_cast<uint32_t>( messageId ), data );
 }
 
@@ -324,7 +324,7 @@ Java_com_aws_iotfleetwise_Fwe_ingestSignalValueByName(
     JNIEnv *env, jobject me, jlong timestamp, jstring nameJString, jobject value )
 {
     static_cast<void>( me );
-    if ( mEngine == nullptr )
+    if ( ( mEngine == nullptr ) || ( mEngine->mNamedSignalDataSource == nullptr ) )
     {
         return;
     }
@@ -339,7 +339,7 @@ Java_com_aws_iotfleetwise_Fwe_ingestSignalValueByName(
     {
         jmethodID doubleJMethodIdDoubleValue = env->GetMethodID( doubleJClass, "doubleValue", "()D" );
         jdouble doubleValue = env->CallDoubleMethod( value, doubleJMethodIdDoubleValue );
-        mEngine->ingestSignalValueByName(
+        mEngine->mNamedSignalDataSource->ingestSignalValue(
             static_cast<Aws::IoTFleetWise::Timestamp>( timestamp ),
             name,
             Aws::IoTFleetWise::DecodedSignalValue( doubleValue, Aws::IoTFleetWise::SignalType::DOUBLE ) );
@@ -348,7 +348,7 @@ Java_com_aws_iotfleetwise_Fwe_ingestSignalValueByName(
     {
         jmethodID longJMethodIdLongValue = env->GetMethodID( longJClass, "longValue", "()J" );
         jlong longValue = env->CallLongMethod( value, longJMethodIdLongValue );
-        mEngine->ingestSignalValueByName(
+        mEngine->mNamedSignalDataSource->ingestSignalValue(
             static_cast<Aws::IoTFleetWise::Timestamp>( timestamp ),
             name,
             Aws::IoTFleetWise::DecodedSignalValue( longValue, Aws::IoTFleetWise::SignalType::INT64 ) );
@@ -366,7 +366,7 @@ Java_com_aws_iotfleetwise_Fwe_ingestMultipleSignalValuesByName( JNIEnv *env,
                                                                 jobject valuesJObject )
 {
     static_cast<void>( me );
-    if ( mEngine == nullptr )
+    if ( ( mEngine == nullptr ) || ( mEngine->mNamedSignalDataSource == nullptr ) )
     {
         return;
     }
@@ -425,7 +425,8 @@ Java_com_aws_iotfleetwise_Fwe_ingestMultipleSignalValuesByName( JNIEnv *env,
     env->DeleteLocalRef( valuesEntrySetIteratorJObject );
     env->DeleteLocalRef( valuesEntrySetJObject );
 
-    mEngine->ingestMultipleSignalValuesByName( static_cast<Aws::IoTFleetWise::Timestamp>( timestamp ), values );
+    mEngine->mNamedSignalDataSource->ingestMultipleSignalValues( static_cast<Aws::IoTFleetWise::Timestamp>( timestamp ),
+                                                                 values );
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -444,6 +445,6 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_aws_iotfleetwise_Fwe_getVersion( JNIEnv *env, jobject me )
 {
     static_cast<void>( me );
-    std::string version = std::string( "v" ) + VERSION_PROJECT_VERSION;
+    std::string version = std::string( "v" ) + FWE_VERSION_PROJECT_VERSION;
     return env->NewStringUTF( version.c_str() );
 }

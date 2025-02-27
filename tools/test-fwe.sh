@@ -5,7 +5,6 @@
 set -efo pipefail
 
 WITH_ROS2_SUPPORT="false"
-EXTRA_GTEST_FILTER="*"
 
 parse_args() {
     while [ "$#" -gt 0 ]; do
@@ -13,14 +12,9 @@ parse_args() {
         --with-ros2-support)
             WITH_ROS2_SUPPORT="true"
             ;;
-        --extra-gtest-filter)
-            EXTRA_GTEST_FILTER=$2
-            shift
-            ;;
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --with-ros2-support    Test with ROS2 support"
-            echo "  --extra-gtest-filter   Regex to set for gtest filter eg. '-*<tests to skip>*' or '*<tests to execute>*'"
             exit 0
             ;;
         esac
@@ -36,4 +30,4 @@ if ${WITH_ROS2_SUPPORT}; then
 else
     cd build
 fi
-GTEST_FILTER=${EXTRA_GTEST_FILTER} ctest -V
+ctest -V

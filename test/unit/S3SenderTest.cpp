@@ -1,14 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "S3Sender.h"
-#include "AwsBootstrap.h"
-#include "ICollectionScheme.h"
-#include "IConnectionTypes.h"
-#include "StreambufBuilder.h"
+#include "aws/iotfleetwise/S3Sender.h"
 #include "StringbufBuilder.h"
-#include "TransferManagerWrapper.h"
 #include "TransferManagerWrapperMock.h"
+#include "aws/iotfleetwise/AwsBootstrap.h"
+#include "aws/iotfleetwise/ICollectionScheme.h"
+#include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/StreambufBuilder.h"
+#include "aws/iotfleetwise/TransferManagerWrapper.h"
 #include <aws/core/client/ClientConfiguration.h>
 #include <aws/s3-crt/model/PutObjectRequest.h>
 #include <aws/transfer/TransferManager.h>
@@ -17,8 +17,6 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <sstream>
-#include <string>
-#include <utility>
 
 namespace Aws
 {
@@ -96,7 +94,7 @@ TEST_P( S3SenderCanceledStatusTest, AsyncStreamUploadInitiatedCallbackCanceled )
         .WillOnce( Return( transferHandle ) );
     EXPECT_CALL( resultCallback, Call( _, _ ) ).Times( 0 );
 
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        TEST_OBJECT_KEY,
                        resultCallback.AsStdFunction() );
@@ -105,17 +103,6 @@ TEST_P( S3SenderCanceledStatusTest, AsyncStreamUploadInitiatedCallbackCanceled )
     EXPECT_CALL( resultCallback, Call( ConnectivityError::TransmissionError, _ ) ).Times( 1 );
     transferHandle->UpdateStatus( GetParam() );
     transferManagerConfiguration.transferStatusUpdatedCallback( nullptr, transferHandle );
-}
-
-TEST_F( S3SenderTest, SendEmptyStream )
-{
-    S3Sender sender{ nullptr, 0 };
-    MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback;
-    EXPECT_CALL( resultCallback, Call( ConnectivityError::WrongInputData, _ ) ).Times( 1 );
-    sender.sendStream( nullptr,
-                       S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
-                       TEST_OBJECT_KEY,
-                       resultCallback.AsStdFunction() );
 }
 
 TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackFailedFirstAttempt )
@@ -134,7 +121,7 @@ TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackFailedFirstAttempt )
         .WillOnce( Return( transferHandle ) );
     EXPECT_CALL( resultCallback, Call( _, _ ) ).Times( 0 );
 
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        TEST_OBJECT_KEY,
                        resultCallback.AsStdFunction() );
@@ -173,7 +160,7 @@ TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackFailedAllAttempts )
         .WillOnce( Return( transferHandle ) );
     EXPECT_CALL( resultCallback, Call( _, _ ) ).Times( 0 );
 
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        TEST_OBJECT_KEY,
                        resultCallback.AsStdFunction() );
@@ -203,17 +190,6 @@ TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackFailedAllAttempts )
     ASSERT_EQ( ss.str(), "test" );
 }
 
-TEST_F( S3SenderTest, NoCredentialsProviderForStreamUpload )
-{
-    S3Sender sender{ nullptr, 0 };
-    MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback;
-    EXPECT_CALL( resultCallback, Call( ConnectivityError::NotConfigured, _ ) ).Times( 1 );
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
-                       S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
-                       TEST_OBJECT_KEY,
-                       resultCallback.AsStdFunction() );
-}
-
 TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackSucceeded )
 {
     S3Sender sender{ createTransferManagerWrapper, 0 };
@@ -230,7 +206,7 @@ TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackSucceeded )
         .WillOnce( Return( transferHandle ) );
     EXPECT_CALL( resultCallback, Call( _, _ ) ).Times( 0 );
 
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        TEST_OBJECT_KEY,
                        resultCallback.AsStdFunction() );
@@ -266,16 +242,16 @@ TEST_F( S3SenderTest, LimitNumberOfSimultaneousUploadsAndQueueTheRemaining )
     EXPECT_CALL( resultCallback, Call( _, _ ) ).Times( 0 );
 
     // Hand over multiple files at once to the sender
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        "objectKey1",
                        resultCallback.AsStdFunction() );
     // The other files shouldn't be passed to transfer manager until the ongoing upload finishes
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        "objectKey2",
                        resultCallback.AsStdFunction() );
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        "objectKey3",
                        resultCallback.AsStdFunction() );
@@ -328,7 +304,7 @@ TEST_F( S3SenderTest, SkipQueuedUploadWhoseDataIsNotAvailableAnymore )
     // Hand over multiple files at once to the sender
     MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback1;
     EXPECT_CALL( resultCallback1, Call( _, _ ) ).Times( 0 );
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        "objectKey1",
                        resultCallback1.AsStdFunction() );
@@ -336,14 +312,13 @@ TEST_F( S3SenderTest, SkipQueuedUploadWhoseDataIsNotAvailableAnymore )
     // skipped.
     MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback2;
     EXPECT_CALL( resultCallback2, Call( _, _ ) ).Times( 0 );
-    sender.sendStream(
-        std::move( std::make_unique<Testing::StringbufBuilder>( std::unique_ptr<std::streambuf>( nullptr ) ) ),
-        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
-        "objectKey2",
-        resultCallback2.AsStdFunction() );
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( std::unique_ptr<std::streambuf>( nullptr ) ),
+                       S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
+                       "objectKey2",
+                       resultCallback2.AsStdFunction() );
     MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback3;
     EXPECT_CALL( resultCallback3, Call( _, _ ) ).Times( 0 );
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        "objectKey3",
                        resultCallback3.AsStdFunction() );
@@ -387,15 +362,15 @@ TEST_F( S3SenderTest, CancelAllOngoingUploadsOnDisconnection )
     EXPECT_CALL( resultCallback, Call( _, _ ) ).Times( 0 );
 
     // Hand over multiple files at once to the sender
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        "objectKey1",
                        resultCallback.AsStdFunction() );
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        "objectKey2",
                        resultCallback.AsStdFunction() );
-    sender.sendStream( std::move( std::make_unique<Testing::StringbufBuilder>( "test" ) ),
+    sender.sendStream( std::make_unique<Testing::StringbufBuilder>( "test" ),
                        S3UploadMetadata{ TEST_BUCKET_NAME, TEST_PREFIX, TEST_REGION, TEST_BUCKET_OWNER_ACCOUNT_ID },
                        "objectKey3",
                        resultCallback.AsStdFunction() );

@@ -4,13 +4,13 @@ pybind11_add_module(someipigen
     tools/someipigen/src/SignalManager.cpp
     tools/someipigen/src/bindings.cpp
     tools/someipigen/src/ExampleSomeipInterfaceStubImpl.cpp
-    ${CAPICXX_EXAMPLE_GENERATED_FILES}
+    $<TARGET_OBJECTS:fwe-someip-example>
 )
 
 target_include_directories(someipigen PUBLIC
     ${JSONCPP_INCLUDE_DIR}
     ${Python3_INCLUDE_DIRS}
-    ${VSOMEIP_INCLUDE_DIRS}
+    ${VSOMEIP_INCLUDE_DIR}
     ${COMMONAPI_INCLUDE_DIRS}
     ${COMMONAPI_SOMEIP_INCLUDE_DIRS}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>

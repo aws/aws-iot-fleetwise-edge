@@ -1,0 +1,14 @@
+{
+  "collectionScheme": {
+    "conditionBasedCollectionScheme": {
+      "conditionLanguageVersion": 1,
+      "expression": "custom_function('python', 'custom-function-python-histogram', 'histogram', $variable.`Vehicle.ECM.DemoEngineTorque`)",
+      "triggerMode": "ALWAYS"
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.Histogram"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+[
+  {
+    "fullyQualifiedName": "Vehicle.MyCustom",
+    "interfaceId": "MY_CUSTOM",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "123:456:789"
+    }
+  }
+]

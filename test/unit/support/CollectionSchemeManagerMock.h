@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 
-#include "CacheAndPersist.h"
-#include "ClockHandler.h"
-#include "CollectionSchemeIngestion.h"
-#include "CollectionSchemeIngestionList.h"
-#include "CollectionSchemeManager.h"
 #include "CollectionSchemeManagerTest.h"
-#include "DecoderManifestIngestion.h"
-#include "Listener.h"
+#include "aws/iotfleetwise/CacheAndPersist.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/CollectionSchemeIngestion.h"
+#include "aws/iotfleetwise/CollectionSchemeIngestionList.h"
+#include "aws/iotfleetwise/CollectionSchemeManager.h"
+#include "aws/iotfleetwise/DecoderManifestIngestion.h"
+#include "aws/iotfleetwise/Listener.h"
 #include <algorithm>
 #include <atomic>
 #include <gmock/gmock.h>
@@ -21,7 +21,7 @@
 #include <vector>
 
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
-#include "LastKnownStateIngestion.h"
+#include "aws/iotfleetwise/LastKnownStateIngestion.h"
 #endif
 
 #define SECOND_TO_MILLISECOND( x ) ( 1000 ) * ( x )
@@ -33,7 +33,7 @@ namespace IoTFleetWise
 
 using uint8Ptr = std::uint8_t *;
 using vectorUint8 = std::vector<uint8_t>;
-using vectorICollectionSchemePtr = std::vector<ICollectionSchemePtr>;
+using vectorICollectionSchemePtr = std::vector<std::shared_ptr<ICollectionScheme>>;
 
 class CollectionSchemeManagerWrapper : public CollectionSchemeManager
 {
@@ -41,7 +41,7 @@ public:
     CollectionSchemeManagerWrapper( std::shared_ptr<CacheAndPersist> schemaPersistencyPtr,
                                     CANInterfaceIDTranslator &canIDTranslator,
                                     std::shared_ptr<CheckinSender> checkinSender,
-                                    std::shared_ptr<RawData::BufferManager> rawDataBufferManager = nullptr )
+                                    RawData::BufferManager *rawDataBufferManager = nullptr )
 
         : CollectionSchemeManager( schemaPersistencyPtr, canIDTranslator, checkinSender, rawDataBufferManager )
     {
@@ -51,7 +51,7 @@ public:
                                     CANInterfaceIDTranslator &canIDTranslator,
                                     std::shared_ptr<CheckinSender> checkinSender,
                                     SyncID decoderManifestID,
-                                    std::shared_ptr<RawData::BufferManager> rawDataBufferManager = nullptr
+                                    RawData::BufferManager *rawDataBufferManager = nullptr
 #ifdef FWE_FEATURE_REMOTE_COMMANDS
                                     ,
                                     GetActuatorNamesCallback getActuatorNamesCallback = nullptr
@@ -74,9 +74,9 @@ public:
                                     CANInterfaceIDTranslator &canIDTranslator,
                                     std::shared_ptr<CheckinSender> checkinSender,
                                     SyncID decoderManifestID,
-                                    std::map<SyncID, ICollectionSchemePtr> &mapEnabled,
-                                    std::map<SyncID, ICollectionSchemePtr> &mapIdle,
-                                    std::shared_ptr<RawData::BufferManager> rawDataBufferManager = nullptr )
+                                    std::map<SyncID, std::shared_ptr<ICollectionScheme>> &mapEnabled,
+                                    std::map<SyncID, std::shared_ptr<ICollectionScheme>> &mapIdle,
+                                    RawData::BufferManager *rawDataBufferManager = nullptr )
         : CollectionSchemeManager( schemaPersistencyPtr, canIDTranslator, checkinSender, rawDataBufferManager )
     {
         mCurrentDecoderManifestID = decoderManifestID;
@@ -101,20 +101,19 @@ public:
     }
 
     void
-    matrixExtractor( const std::shared_ptr<InspectionMatrix> &inspectionMatrix,
-                     const std::shared_ptr<FetchMatrix> &fetchMatrix )
+    matrixExtractor( InspectionMatrix &inspectionMatrix, FetchMatrix &fetchMatrix )
     {
         CollectionSchemeManager::matrixExtractor( inspectionMatrix, fetchMatrix );
     }
 
     void
-    inspectionMatrixUpdater( const std::shared_ptr<const InspectionMatrix> &inspectionMatrix )
+    inspectionMatrixUpdater( std::shared_ptr<const InspectionMatrix> inspectionMatrix )
     {
         CollectionSchemeManager::inspectionMatrixUpdater( inspectionMatrix );
     }
 
     void
-    fetchMatrixUpdater( const std::shared_ptr<const FetchMatrix> &fetchMatrix )
+    fetchMatrixUpdater( std::shared_ptr<const FetchMatrix> fetchMatrix )
     {
         CollectionSchemeManager::fetchMatrixUpdater( fetchMatrix );
     }
@@ -122,7 +121,7 @@ public:
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     void
     updateRawDataBufferConfigComplexSignals(
-        std::shared_ptr<Aws::IoTFleetWise::ComplexDataDecoderDictionary> complexDataDecoderDictionary,
+        Aws::IoTFleetWise::ComplexDataDecoderDictionary *complexDataDecoderDictionary,
         std::unordered_map<RawData::BufferTypeId, RawData::SignalUpdateConfig> &updatedSignals )
     {
         CollectionSchemeManager::updateRawDataBufferConfigComplexSignals( complexDataDecoderDictionary,
@@ -138,7 +137,7 @@ public:
     }
 
     void
-    setCollectionSchemePersistency( const std::shared_ptr<CacheAndPersist> &collectionSchemePersistency )
+    setCollectionSchemePersistency( std::shared_ptr<CacheAndPersist> collectionSchemePersistency )
     {
         CollectionSchemeManager::mSchemaPersistency = collectionSchemePersistency;
     }
@@ -196,13 +195,12 @@ public:
 
     void
     decoderDictionaryExtractor(
-        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap
-#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-        ,
-        std::shared_ptr<InspectionMatrix> inspectionMatrix = nullptr
-#endif
-    )
+        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap )
     {
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+        InspectionMatrix inspectionMatrix;
+#endif
         return CollectionSchemeManager::decoderDictionaryExtractor( decoderDictionaryMap
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
                                                                     ,
@@ -210,6 +208,16 @@ public:
 #endif
         );
     }
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+    void
+    decoderDictionaryExtractor(
+        std::map<VehicleDataSourceProtocol, std::shared_ptr<DecoderDictionary>> &decoderDictionaryMap,
+        InspectionMatrix &inspectionMatrix )
+    {
+        return CollectionSchemeManager::decoderDictionaryExtractor( decoderDictionaryMap, inspectionMatrix );
+    }
+#endif
 
     void
     decoderDictionaryUpdater(
@@ -261,7 +269,7 @@ public:
     {
         inspectionMatrix = std::make_shared<InspectionMatrix>();
         fetchMatrix = std::make_shared<FetchMatrix>();
-        this->matrixExtractor( inspectionMatrix, fetchMatrix );
+        this->matrixExtractor( *inspectionMatrix, *fetchMatrix );
         this->inspectionMatrixUpdater( inspectionMatrix );
     }
 #endif
@@ -367,8 +375,11 @@ public:
     // bool build() override;
     MOCK_METHOD( bool, build, (), ( override ) );
 
-    // const std::vector<ICollectionSchemePtr> &getCollectionSchemes() const override;
-    MOCK_METHOD( const std::vector<ICollectionSchemePtr> &, getCollectionSchemes, (), ( const, override ) );
+    // const std::vector<std::shared_ptr<ICollectionScheme>> &getCollectionSchemes() const override;
+    MOCK_METHOD( const std::vector<std::shared_ptr<ICollectionScheme>> &,
+                 getCollectionSchemes,
+                 (),
+                 ( const, override ) );
 
     MOCK_METHOD( bool, copyData, ( const std::uint8_t *, const size_t ), ( override ) );
     MOCK_METHOD( const std::vector<uint8_t> &, getData, (), ( const, override ) );

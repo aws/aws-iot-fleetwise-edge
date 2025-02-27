@@ -1,0 +1,15 @@
+[
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle",
+      "description": "Vehicle"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.Histogram",
+      "description": "Vehicle.Histogram",
+      "dataType": "STRING"
+    }
+  }
+]

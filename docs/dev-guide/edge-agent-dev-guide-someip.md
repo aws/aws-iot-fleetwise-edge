@@ -324,11 +324,11 @@ feature.
 
 1. You should see the following output indicating the command was successfully executed. Note that
    the `reasonCode` (uint32) and `reasonDescription` (string) are extensible result information
-   fields. Refer to [ICommandDispatcher.h](../../src/ICommandDispatcher.h) for the reason codes
-   defined by FWE. The OEM range of reason codes begins at 65536. In this example implementation the
-   `reasonCode` is set to 65536 plus the CommonAPI `CallStatus` code, and `reasonDescription` is set
-   to the string representation of the CommonAPI `CallStatus` code. In this case the `reasonCode` is
-   65536, meaning `65536 + 0` or `CommonAPI::CallStatus::SUCCESS`.
+   fields. Refer to [ICommandDispatcher.h](../../include/aws/iotfleetwise/ICommandDispatcher.h) for
+   the reason codes defined by FWE. The OEM range of reason codes begins at 65536. In this example
+   implementation the `reasonCode` is set to 65536 plus the CommonAPI `CallStatus` code, and
+   `reasonDescription` is set to the string representation of the CommonAPI `CallStatus` code. In
+   this case the `reasonCode` is 65536, meaning `65536 + 0` or `CommonAPI::CallStatus::SUCCESS`.
 
    ```json
    {

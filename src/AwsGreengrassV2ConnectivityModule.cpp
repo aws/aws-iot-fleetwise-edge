@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "AwsGreengrassV2ConnectivityModule.h"
-#include "AwsGreengrassV2Receiver.h"
-#include "AwsGreengrassV2Sender.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/AwsGreengrassV2ConnectivityModule.h"
+#include "aws/iotfleetwise/AwsGreengrassV2Receiver.h"
+#include "aws/iotfleetwise/AwsGreengrassV2Sender.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <future>
 
 namespace Aws
@@ -32,8 +32,8 @@ AwsGreengrassV2ConnectivityModule::connect()
     mConnected = false;
 
     mLifecycleHandler = std::make_unique<IpcLifecycleHandler>();
-    mGreengrassClient = std::make_shared<Aws::Greengrass::GreengrassCoreIpcClient>( *( mClientBootstrap ) );
-    auto connectionStatus = mGreengrassClient->Connect( *( mLifecycleHandler.get() ) ).get();
+    mGreengrassClient = std::make_unique<Aws::Greengrass::GreengrassCoreIpcClient>( *( mClientBootstrap ) );
+    auto connectionStatus = mGreengrassClient->Connect( *mLifecycleHandler ).get();
     if ( !connectionStatus )
     {
         FWE_LOG_ERROR( "Failed to establish connection with error " + std::to_string( connectionStatus ) );
@@ -55,7 +55,7 @@ AwsGreengrassV2ConnectivityModule::connect()
 std::shared_ptr<ISender>
 AwsGreengrassV2ConnectivityModule::createSender()
 {
-    auto sender = std::make_shared<AwsGreengrassV2Sender>( this, mGreengrassClient, mTopicConfig );
+    auto sender = std::make_shared<AwsGreengrassV2Sender>( this, *mGreengrassClient, mTopicConfig );
     mSenders.emplace_back( sender );
     return sender;
 }
@@ -63,7 +63,7 @@ AwsGreengrassV2ConnectivityModule::createSender()
 std::shared_ptr<IReceiver>
 AwsGreengrassV2ConnectivityModule::createReceiver( const std::string &topicName )
 {
-    auto receiver = std::make_shared<AwsGreengrassV2Receiver>( this, mGreengrassClient, topicName );
+    auto receiver = std::make_shared<AwsGreengrassV2Receiver>( this, *mGreengrassClient, topicName );
     mReceivers.emplace_back( receiver );
     return receiver;
 }

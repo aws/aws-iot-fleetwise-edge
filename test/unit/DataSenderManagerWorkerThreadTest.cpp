@@ -1,18 +1,19 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DataSenderManagerWorkerThread.h"
-#include "Clock.h"
-#include "ClockHandler.h"
-#include "CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/DataSenderManagerWorkerThread.h"
 #include "ConnectivityModuleMock.h"
 #include "DataSenderManagerMock.h"
-#include "DataSenderTypes.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
 #include "Testing.h"
-#include "TimeTypes.h"
 #include "WaitUntil.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/DataSenderManager.h"
+#include "aws/iotfleetwise/DataSenderTypes.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <cstdint>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -20,8 +21,8 @@
 #include <vector>
 
 #ifdef FWE_FEATURE_REMOTE_COMMANDS
-#include "CommandTypes.h"
-#include "ICommandDispatcher.h"
+#include "aws/iotfleetwise/CommandTypes.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
 #endif
 
 namespace Aws
@@ -38,6 +39,26 @@ using ::testing::StrictMock;
 class DataSenderManagerWorkerThreadTest : public ::testing::Test
 {
 public:
+    DataSenderManagerWorkerThreadTest()
+        : mCollectedDataQueue( std::make_shared<DataSenderQueue>( 10000, "Collected Data" ) )
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+        , mCommandResponses( std::make_shared<DataSenderQueue>( 10000, "Command Responses" ) )
+#endif
+        , mDataSenderManagerWorkerThread( mConnectivityModule,
+                                          [&]() {
+                                              auto dataSenderManager =
+                                                  std::make_unique<StrictMock<Testing::DataSenderManagerMock>>();
+                                              mDataSenderManager = dataSenderManager.get();
+                                              return dataSenderManager;
+                                          }(),
+                                          100,
+                                          {
+#ifdef FWE_FEATURE_REMOTE_COMMANDS
+                                              mCommandResponses,
+#endif
+                                              mCollectedDataQueue } )
+    {
+    }
     void
     SetUp() override
     {
@@ -49,25 +70,13 @@ public:
         mTriggeredCollectionSchemeData->triggerTime = mTriggerTime;
         mTriggeredCollectionSchemeData->eventID = 579;
 
-        mConnectivityModule = std::make_shared<StrictMock<Testing::ConnectivityModuleMock>>();
-        mDataSenderManager = std::make_shared<StrictMock<Testing::DataSenderManagerMock>>();
-        mCollectedDataQueue = std::make_shared<DataSenderQueue>( 10000, "Collected Data" );
-        std::vector<std::shared_ptr<DataSenderQueue>> dataToSendQueues;
-#ifdef FWE_FEATURE_REMOTE_COMMANDS
-        mCommandResponses = std::make_shared<DataSenderQueue>( 10000, "Command Responses" );
-        dataToSendQueues.emplace_back( mCommandResponses );
-#endif
-        dataToSendQueues.emplace_back( mCollectedDataQueue );
-        mDataSenderManagerWorkerThread = std::make_unique<DataSenderManagerWorkerThread>(
-            mConnectivityModule, mDataSenderManager, 100, dataToSendQueues );
-
-        EXPECT_CALL( *mConnectivityModule, isAlive() ).WillRepeatedly( Return( true ) );
+        EXPECT_CALL( mConnectivityModule, isAlive() ).WillRepeatedly( Return( true ) );
     }
 
     void
     TearDown() override
     {
-        mDataSenderManagerWorkerThread->stop();
+        mDataSenderManagerWorkerThread.stop();
     }
 
 protected:
@@ -75,13 +84,13 @@ protected:
     Timestamp mTriggerTime;
     std::shared_ptr<TriggeredCollectionSchemeData> mTriggeredCollectionSchemeData;
 
-    std::shared_ptr<StrictMock<Testing::ConnectivityModuleMock>> mConnectivityModule;
-    std::shared_ptr<StrictMock<Testing::DataSenderManagerMock>> mDataSenderManager;
+    StrictMock<Testing::ConnectivityModuleMock> mConnectivityModule;
+    StrictMock<Testing::DataSenderManagerMock> *mDataSenderManager{};
     std::shared_ptr<DataSenderQueue> mCollectedDataQueue;
-    std::unique_ptr<DataSenderManagerWorkerThread> mDataSenderManagerWorkerThread;
 #ifdef FWE_FEATURE_REMOTE_COMMANDS
     std::shared_ptr<DataSenderQueue> mCommandResponses;
 #endif
+    DataSenderManagerWorkerThread mDataSenderManagerWorkerThread;
 };
 
 class DataSenderManagerWorkerThreadTestWithAllSignalTypes : public DataSenderManagerWorkerThreadTest,
@@ -97,7 +106,7 @@ INSTANTIATE_TEST_SUITE_P( MultipleSignals,
 TEST_F( DataSenderManagerWorkerThreadTest, ProcessNoData )
 {
     EXPECT_CALL( *mDataSenderManager, mockedProcessData( _ ) ).Times( 1 );
-    mDataSenderManagerWorkerThread->start();
+    mDataSenderManagerWorkerThread.start();
 
     mCollectedDataQueue->push( mTriggeredCollectionSchemeData );
 
@@ -108,7 +117,7 @@ TEST_P( DataSenderManagerWorkerThreadTestWithAllSignalTypes, ProcessSingleTrigge
 {
     SignalType signalType = GetParam();
     EXPECT_CALL( *mDataSenderManager, mockedProcessData( _ ) ).Times( 1 );
-    mDataSenderManagerWorkerThread->start();
+    mDataSenderManagerWorkerThread.start();
 
     auto signal1 = CollectedSignal( 1234, mTriggerTime - 10, 40.5, signalType );
     mTriggeredCollectionSchemeData->signals.push_back( signal1 );
@@ -117,7 +126,7 @@ TEST_P( DataSenderManagerWorkerThreadTestWithAllSignalTypes, ProcessSingleTrigge
 
     WAIT_ASSERT_EQ( mDataSenderManager->getProcessedData().size(), 1U );
     auto processedData = mDataSenderManager->getProcessedData<TriggeredCollectionSchemeData>();
-    ASSERT_TRUE( mDataSenderManagerWorkerThread->stop() );
+    ASSERT_TRUE( mDataSenderManagerWorkerThread.stop() );
     ASSERT_EQ( processedData[0]->signals.size(), 1 );
 
     auto processedSignal = processedData[0]->signals[0];
@@ -136,7 +145,7 @@ TEST_F( DataSenderManagerWorkerThreadTest, ProcessMultipleTriggers )
 
     EXPECT_CALL( *mDataSenderManager, mockedProcessData( _ ) ).Times( 2 );
 
-    mDataSenderManagerWorkerThread->start();
+    mDataSenderManagerWorkerThread.start();
 
     auto signal1 = CollectedSignal( 1234, mTriggerTime - 10, 40.5, SignalType::DOUBLE );
     mTriggeredCollectionSchemeData->signals.push_back( signal1 );
@@ -148,7 +157,7 @@ TEST_F( DataSenderManagerWorkerThreadTest, ProcessMultipleTriggers )
     mCollectedDataQueue->push( triggeredCollectionSchemeData2 );
 
     WAIT_ASSERT_EQ( mDataSenderManager->getProcessedData().size(), 2U );
-    ASSERT_TRUE( mDataSenderManagerWorkerThread->stop() );
+    ASSERT_TRUE( mDataSenderManagerWorkerThread.stop() );
     auto processedData = mDataSenderManager->getProcessedData<TriggeredCollectionSchemeData>();
 
     ASSERT_EQ( processedData[0]->signals.size(), 1 );
@@ -168,13 +177,14 @@ TEST_F( DataSenderManagerWorkerThreadTest, ProcessMultipleTriggers )
 TEST_F( DataSenderManagerWorkerThreadTest, ProcessSingleCommandResponse )
 {
     EXPECT_CALL( *mDataSenderManager, mockedProcessData( _ ) ).Times( 1 );
-    mDataSenderManagerWorkerThread->start();
+    mDataSenderManagerWorkerThread.start();
 
-    mCommandResponses->push( std::make_shared<CommandResponse>(
-        "command123", CommandStatus::EXECUTION_FAILED, REASON_CODE_DECODER_MANIFEST_OUT_OF_SYNC, "status456" ) );
+    auto commandResponse1 = std::make_shared<CommandResponse>(
+        "command123", CommandStatus::EXECUTION_FAILED, REASON_CODE_DECODER_MANIFEST_OUT_OF_SYNC, "status456" );
+    mCommandResponses->push( commandResponse1 );
 
     WAIT_ASSERT_EQ( mDataSenderManager->getProcessedData().size(), 1U );
-    ASSERT_TRUE( mDataSenderManagerWorkerThread->stop() );
+    ASSERT_TRUE( mDataSenderManagerWorkerThread.stop() );
 
     auto processedCommandResponses = mDataSenderManager->getProcessedData<CommandResponse>();
     ASSERT_EQ( processedCommandResponses[0]->id, "command123" );
@@ -186,17 +196,20 @@ TEST_F( DataSenderManagerWorkerThreadTest, ProcessSingleCommandResponse )
 TEST_F( DataSenderManagerWorkerThreadTest, ProcessMultipleCommandResponses )
 {
     EXPECT_CALL( *mDataSenderManager, mockedProcessData( _ ) ).Times( 3 );
-    mDataSenderManagerWorkerThread->start();
+    mDataSenderManagerWorkerThread.start();
 
-    mCommandResponses->push(
-        std::make_shared<CommandResponse>( "command1", CommandStatus::SUCCEEDED, 0x1234, "status1" ) );
-    mCommandResponses->push(
-        std::make_shared<CommandResponse>( "command2", CommandStatus::EXECUTION_FAILED, 0x5678, "status2" ) );
-    mCommandResponses->push(
-        std::make_shared<CommandResponse>( "command3", CommandStatus::EXECUTION_TIMEOUT, 0x9ABC, "status3" ) );
+    auto commandResponse1 =
+        std::make_shared<CommandResponse>( "command1", CommandStatus::SUCCEEDED, 0x1234, "status1" );
+    mCommandResponses->push( commandResponse1 );
+    auto commandResponse2 =
+        std::make_shared<CommandResponse>( "command2", CommandStatus::EXECUTION_FAILED, 0x5678, "status2" );
+    mCommandResponses->push( commandResponse2 );
+    auto commandResponse3 =
+        std::make_shared<CommandResponse>( "command3", CommandStatus::EXECUTION_TIMEOUT, 0x9ABC, "status3" );
+    mCommandResponses->push( commandResponse3 );
 
     WAIT_ASSERT_EQ( mDataSenderManager->getProcessedData().size(), 3U );
-    ASSERT_TRUE( mDataSenderManagerWorkerThread->stop() );
+    ASSERT_TRUE( mDataSenderManagerWorkerThread.stop() );
 
     auto processedCommandResponses = mDataSenderManager->getProcessedData<CommandResponse>();
     ASSERT_EQ( processedCommandResponses[0]->id, "command1" );

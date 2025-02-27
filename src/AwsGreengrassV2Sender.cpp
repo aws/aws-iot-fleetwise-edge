@@ -1,26 +1,26 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "AwsGreengrassV2Sender.h"
-#include "AwsSDKMemoryManager.h"
-#include "IConnectionTypes.h"
-#include "IConnectivityModule.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/AwsGreengrassV2Sender.h"
+#include "aws/iotfleetwise/AwsSDKMemoryManager.h"
+#include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/IConnectivityModule.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <aws/crt/Optional.h>
 #include <aws/crt/Types.h>
 #include <chrono>
 #include <functional>
 #include <future>
+#include <memory>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-AwsGreengrassV2Sender::AwsGreengrassV2Sender(
-    IConnectivityModule *connectivityModule,
-    std::shared_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &greengrassClient,
-    const TopicConfig &topicConfig )
+AwsGreengrassV2Sender::AwsGreengrassV2Sender( IConnectivityModule *connectivityModule,
+                                              Aws::Greengrass::GreengrassCoreIpcClient &greengrassClient,
+                                              const TopicConfig &topicConfig )
     : mConnectivityModule( connectivityModule )
     , mGreengrassClient( greengrassClient )
     , mTopicConfig( topicConfig )
@@ -92,13 +92,6 @@ AwsGreengrassV2Sender::sendBuffer(
         return;
     }
 
-    if ( mGreengrassClient == nullptr )
-    {
-        FWE_LOG_ERROR( "mGreengrassClient is null, not initialised" )
-        callback( ConnectivityError::NoConnection );
-        return;
-    }
-
     auto greengrassPublishQoS = Aws::Greengrass::QOS_AT_MOST_ONCE;
     switch ( qos )
     {
@@ -110,7 +103,7 @@ AwsGreengrassV2Sender::sendBuffer(
         break;
     }
 
-    auto publishOperation = mGreengrassClient->NewPublishToIoTCore();
+    auto publishOperation = mGreengrassClient.NewPublishToIoTCore();
     Aws::Greengrass::PublishToIoTCoreRequest publishRequest;
     publishRequest.SetTopicName( topic.c_str() != nullptr ? topic.c_str() : "" );
     Aws::Crt::Vector<uint8_t> payload( buf, buf + size );

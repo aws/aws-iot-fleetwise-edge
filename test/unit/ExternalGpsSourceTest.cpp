@@ -1,15 +1,15 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ExternalGpsSource.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IDecoderDictionary.h"
-#include "IDecoderManifest.h"
-#include "NamedSignalDataSource.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "VehicleDataSourceTypes.h"
+#include "aws/iotfleetwise/ExternalGpsSource.h"
 #include "WaitUntil.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/IDecoderDictionary.h"
+#include "aws/iotfleetwise/IDecoderManifest.h"
+#include "aws/iotfleetwise/NamedSignalDataSource.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/VehicleDataSourceTypes.h"
 #include <gtest/gtest.h>
 #include <memory>
 #include <unordered_map>
@@ -24,13 +24,12 @@ class ExternalGpsSourceTest : public ::testing::Test
 protected:
     ExternalGpsSourceTest()
         : mSignalBuffer( std::make_shared<SignalBuffer>( 2, "Signal Buffer" ) )
-        , mSignalBufferDistributor( std::make_shared<SignalBufferDistributor>() )
         , mNamedSignalDataSource( std::make_shared<NamedSignalDataSource>( "5", mSignalBufferDistributor ) )
         , mExternalGpsSource( std::make_shared<ExternalGpsSource>(
               mNamedSignalDataSource, "Vehicle.CurrentLocation.Latitude", "Vehicle.CurrentLocation.Longitude" ) )
         , mDictionary( std::make_shared<CustomDecoderDictionary>() )
     {
-        mSignalBufferDistributor->registerQueue( mSignalBuffer );
+        mSignalBufferDistributor.registerQueue( mSignalBuffer );
     }
 
     void
@@ -48,7 +47,7 @@ protected:
     }
 
     std::shared_ptr<SignalBuffer> mSignalBuffer;
-    SignalBufferDistributorPtr mSignalBufferDistributor;
+    SignalBufferDistributor mSignalBufferDistributor;
     std::shared_ptr<NamedSignalDataSource> mNamedSignalDataSource;
     std::shared_ptr<ExternalGpsSource> mExternalGpsSource;
     std::shared_ptr<CustomDecoderDictionary> mDictionary;

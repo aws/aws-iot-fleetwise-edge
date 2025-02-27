@@ -1,40 +1,46 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ExampleUDSInterface.h"
-#include "IRemoteDiagnostics.h"
-#include "ISOTPOverCANOptions.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/ExampleUDSInterface.h"
+#include "aws/iotfleetwise/IRemoteDiagnostics.h"
+#include "aws/iotfleetwise/ISOTPOverCANOptions.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <algorithm>
 #include <atomic>
 #include <fstream> // IWYU pragma: keep
 #include <functional>
+#include <utility>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-static bool
-openCANChannelPort( struct EcuConnectionInfo &info, bool isFunctional )
+static std::unique_ptr<ISOTPOverCANSenderReceiver>
+openCANChannelPort( const EcuConfig &ecuConfig, bool isFunctional )
 {
     ISOTPOverCANSenderReceiverOptions optionsECU;
-    optionsECU.mSourceCANId =
-        isFunctional ? info.communicationParams.functionalAddress : info.communicationParams.physicalRequestID;
-    optionsECU.mSocketCanIFName = info.communicationParams.canBus;
-    optionsECU.mDestinationCANId = isFunctional ? 0 : info.communicationParams.physicalResponseID;
+    optionsECU.mSourceCANId = isFunctional ? ecuConfig.functionalAddress : ecuConfig.physicalRequestID;
+    optionsECU.mSocketCanIFName = ecuConfig.canBus;
+    optionsECU.mDestinationCANId = isFunctional ? 0 : ecuConfig.physicalResponseID;
     optionsECU.mP2TimeoutMs = 10000;
-    if ( ( !info.isotpSenderReceiver.init( optionsECU ) ) || ( !info.isotpSenderReceiver.connect() ) )
+    auto receiver = std::make_unique<ISOTPOverCANSenderReceiver>( optionsECU );
+    if ( !receiver->connect() )
     {
-        FWE_LOG_ERROR( "Failed to initialize the ECU with Req CAN id: " +
-                       std::to_string( info.communicationParams.physicalRequestID ) +
-                       " Resp CAN id: " + std::to_string( info.communicationParams.physicalResponseID ) );
-        return false;
+        FWE_LOG_ERROR(
+            "Failed to initialize the ECU with Req CAN id: " + std::to_string( ecuConfig.physicalRequestID ) +
+            " Resp CAN id: " + std::to_string( ecuConfig.physicalResponseID ) );
+        return nullptr;
     }
-    FWE_LOG_TRACE( "Successfully initialized ECU with Req CAN id: " +
-                   std::to_string( info.communicationParams.physicalRequestID ) +
-                   " Resp CAN id: " + std::to_string( info.communicationParams.physicalResponseID ) );
-    return true;
+
+    FWE_LOG_TRACE( "Successfully initialized ECU with Req CAN id: " + std::to_string( ecuConfig.physicalRequestID ) +
+                   " Resp CAN id: " + std::to_string( ecuConfig.physicalResponseID ) );
+    return receiver;
+}
+
+ExampleUDSInterface::ExampleUDSInterface( std::vector<EcuConfig> ecuConfigs )
+    : mEcuConfig( std::move( ecuConfigs ) )
+{
 }
 
 void
@@ -95,41 +101,37 @@ ExampleUDSInterface::findTargetAddress( int target, EcuConfig &out )
 static void
 openConnection( const EcuConfig &ecu, std::vector<EcuConnectionInfo> &connectionInfo, bool isFunctional )
 {
-    EcuConnectionInfo info;
-    info.communicationParams = ecu;
-
     if ( isFunctional )
     {
         if ( std::none_of(
-                 connectionInfo.begin(), connectionInfo.end(), [&info]( const EcuConnectionInfo &existing ) -> bool {
-                     return existing.communicationParams.physicalRequestID ==
-                            info.communicationParams.physicalRequestID;
+                 connectionInfo.begin(), connectionInfo.end(), [&ecu]( const EcuConnectionInfo &existing ) -> bool {
+                     return existing.communicationParams.physicalRequestID == ecu.physicalRequestID;
                  } ) )
         {
-            if ( !openCANChannelPort( info, isFunctional ) )
+            auto receiver = openCANChannelPort( ecu, isFunctional );
+            if ( receiver == nullptr )
             {
                 FWE_LOG_ERROR( "Could not open CAN channel" );
                 return;
             }
-            connectionInfo.emplace_back( info );
+            connectionInfo.emplace_back( EcuConnectionInfo{ ecu, std::move( receiver ), {} } );
         }
     }
     else
     {
-        if ( std::none_of( connectionInfo.begin(),
-                           connectionInfo.end(),
-                           [&info, ecu]( const EcuConnectionInfo &existing ) -> bool {
-                               return ( existing.communicationParams.physicalRequestID ==
-                                        info.communicationParams.physicalRequestID ) &&
-                                      ( existing.communicationParams.physicalResponseID == ecu.physicalResponseID );
-                           } ) )
+        if ( std::none_of(
+                 connectionInfo.begin(), connectionInfo.end(), [&ecu]( const EcuConnectionInfo &existing ) -> bool {
+                     return ( existing.communicationParams.physicalRequestID == ecu.physicalRequestID ) &&
+                            ( existing.communicationParams.physicalResponseID == ecu.physicalResponseID );
+                 } ) )
         {
-            if ( !openCANChannelPort( info, isFunctional ) )
+            auto receiver = openCANChannelPort( ecu, isFunctional );
+            if ( receiver == nullptr )
             {
                 FWE_LOG_ERROR( "Could not open CAN channel" );
                 return;
             }
-            connectionInfo.emplace_back( info );
+            connectionInfo.emplace_back( EcuConnectionInfo{ ecu, std::move( receiver ), {} } );
         }
     }
 }
@@ -137,6 +139,10 @@ openConnection( const EcuConfig &ecu, std::vector<EcuConnectionInfo> &connection
 bool
 ExampleUDSInterface::executeRequest( std::vector<uint8_t> &sendPDU, int32_t targetAddress, DTCResponse &response )
 {
+    if ( shouldStop() )
+    {
+        return false;
+    }
     if ( targetAddress == -1 )
     {
         std::vector<struct EcuConnectionInfo> openFunctionalConnection;
@@ -155,7 +161,7 @@ ExampleUDSInterface::executeRequest( std::vector<uint8_t> &sendPDU, int32_t targ
 
         for ( auto &connection : openFunctionalConnection )
         {
-            if ( !connection.isotpSenderReceiver.sendPDU( sendPDU ) )
+            if ( !connection.isotpSenderReceiver->sendPDU( sendPDU ) )
             {
                 FWE_LOG_ERROR( "Send PDU failed for Functional Address " +
                                std::to_string( connection.communicationParams.physicalRequestID ) );
@@ -165,12 +171,12 @@ ExampleUDSInterface::executeRequest( std::vector<uint8_t> &sendPDU, int32_t targ
                 FWE_LOG_TRACE( "Successfully Sent PDU for Functional Address " +
                                std::to_string( connection.communicationParams.physicalRequestID ) );
             }
-            connection.isotpSenderReceiver.disconnect();
+            connection.isotpSenderReceiver->disconnect();
         }
 
         for ( auto &connection : openPhysicalConnection )
         {
-            if ( connection.isotpSenderReceiver.receivePDU( connection.data ) == true )
+            if ( connection.isotpSenderReceiver->receivePDU( connection.data ) == true )
             {
                 FWE_LOG_TRACE( "Received data: " + getStringFromBytes( connection.data ) );
                 UDSDTCInfo dtcInfo;
@@ -186,7 +192,7 @@ ExampleUDSInterface::executeRequest( std::vector<uint8_t> &sendPDU, int32_t targ
                     response.result = 1;
                 }
             }
-            connection.isotpSenderReceiver.disconnect();
+            connection.isotpSenderReceiver->disconnect();
         }
         if ( response.dtcInfo.empty() )
         {
@@ -203,28 +209,30 @@ ExampleUDSInterface::executeRequest( std::vector<uint8_t> &sendPDU, int32_t targ
             return false;
         }
 
-        EcuConnectionInfo phyInfo;
-        phyInfo.communicationParams = ecu;
-        if ( !openCANChannelPort( phyInfo, false ) )
+        bool isFunctional = false;
+        auto receiver = openCANChannelPort( ecu, isFunctional );
+        if ( receiver == nullptr )
         {
             FWE_LOG_ERROR( "Could not open CAN channel" );
             return false;
         }
 
-        if ( !phyInfo.isotpSenderReceiver.sendPDU( sendPDU ) )
+        EcuConnectionInfo phyInfo{ ecu, std::move( receiver ), {} };
+
+        if ( !phyInfo.isotpSenderReceiver->sendPDU( sendPDU ) )
         {
             FWE_LOG_ERROR( "Unable to send PDU" );
             return false;
         }
 
-        if ( !phyInfo.isotpSenderReceiver.receivePDU( phyInfo.data ) )
+        if ( !phyInfo.isotpSenderReceiver->receivePDU( phyInfo.data ) )
         {
             FWE_LOG_ERROR( "Failed to receive PDU for Physical Address " +
                            std::to_string( phyInfo.communicationParams.physicalRequestID ) );
             return false;
         }
 
-        phyInfo.isotpSenderReceiver.disconnect();
+        phyInfo.isotpSenderReceiver->disconnect();
         FWE_LOG_TRACE( "Received data: " + getStringFromBytes( phyInfo.data ) );
         UDSDTCInfo dtcInfo;
         dtcInfo.targetAddress = targetAddress;
@@ -252,60 +260,54 @@ ExampleUDSInterface::addUdsDtcRequest( const UdsDtcRequest &request )
 }
 
 void
-ExampleUDSInterface::doWork( void *data )
+ExampleUDSInterface::doWork()
 {
-    ExampleUDSInterface *udsDataSource = static_cast<ExampleUDSInterface *>( data );
-
-    while ( !udsDataSource->shouldStop() )
+    while ( !shouldStop() )
     {
-        udsDataSource->mWait.wait( Signal::WaitWithPredicate );
+        mWait.wait( Signal::WaitWithPredicate );
 
         {
-            std::lock_guard<std::mutex> lock( udsDataSource->mQueryMutex );
-            while ( ( !udsDataSource->mDtcRequestQueue.empty() ) && ( !udsDataSource->shouldStop() ) )
+            std::lock_guard<std::mutex> lock( mQueryMutex );
+            while ( ( !mDtcRequestQueue.empty() ) && ( !shouldStop() ) )
             {
-                auto query = udsDataSource->mDtcRequestQueue.front();
+                auto query = mDtcRequestQueue.front();
                 DTCResponse response;
                 response.token = query.token;
-                if ( udsDataSource->executeRequest( query.sendPDU, query.targetAddress, response ) )
+                if ( executeRequest( query.sendPDU, query.targetAddress, response ) )
                 {
                     UdsDtcResponse responseToSend;
                     responseToSend.callback = query.callback;
                     responseToSend.response = response;
                     // Unblock request queue for incoming requests from callbacks
-                    udsDataSource->mDtcResponseQueue.push( responseToSend );
+                    mDtcResponseQueue.push( responseToSend );
                 }
-                udsDataSource->mDtcRequestQueue.pop();
+                mDtcRequestQueue.pop();
             }
         }
 
-        while ( ( !udsDataSource->mDtcResponseQueue.empty() ) && ( !udsDataSource->shouldStop() ) )
+        while ( ( !mDtcResponseQueue.empty() ) && ( !shouldStop() ) )
         {
-            auto query = udsDataSource->mDtcResponseQueue.front();
+            auto query = mDtcResponseQueue.front();
             query.callback( query.response );
-            udsDataSource->mDtcResponseQueue.pop();
+            mDtcResponseQueue.pop();
         }
     }
-}
-
-bool
-ExampleUDSInterface::init( const std::vector<EcuConfig> &ecuConfigs )
-{
-    if ( ecuConfigs.empty() )
-    {
-        FWE_LOG_ERROR( "ECU configuration can not be empty" );
-        return false;
-    }
-    mEcuConfig = ecuConfigs;
-    return true;
 }
 
 bool
 ExampleUDSInterface::start()
 {
+    if ( mEcuConfig.empty() )
+    {
+        FWE_LOG_ERROR( "ECU configuration can not be empty" );
+        return false;
+    }
+
     std::lock_guard<std::mutex> lock( mThreadMutex );
     mShouldStop.store( false );
-    if ( !mThread.create( doWork, this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "ExampleUDSInterface Module Thread failed to start" );
     }

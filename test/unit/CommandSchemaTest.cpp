@@ -1,23 +1,22 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CommandSchema.h"
-#include "AwsIotConnectivityModule.h"
-#include "AwsIotReceiver.h"
-#include "Clock.h"
-#include "ClockHandler.h"
-#include "CollectionInspectionAPITypes.h"
-#include "CommandTypes.h"
-#include "DataSenderTypes.h"
-#include "ICommandDispatcher.h"
-#include "MqttClientWrapper.h"
-#include "QueueTypes.h"
+#include "aws/iotfleetwise/CommandSchema.h"
+#include "MqttClientWrapperMock.h"
 #include "RawDataBufferManagerSpy.h"
-#include "RawDataManager.h"
-#include "SignalTypes.h"
 #include "Testing.h"
-#include "TopicConfig.h"
 #include "WaitUntil.h"
+#include "aws/iotfleetwise/AwsIotReceiver.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/CommandTypes.h"
+#include "aws/iotfleetwise/DataSenderTypes.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/RawDataManager.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TopicConfig.h"
 #include "command_request.pb.h"
 #include <aws/crt/Types.h>
 #include <aws/crt/mqtt/Mqtt5Client.h>
@@ -46,27 +45,21 @@ using ::testing::StrictMock;
 class CommandSchemaTest : public ::testing::Test
 {
 protected:
+    CommandSchemaTest()
+        : mTopicConfig( "thing-name", TopicConfigArgs() )
+        , mReceiverCommandRequest( mMqttClientWrapper, "topic" )
+        , mCommandResponses( std::make_shared<DataSenderQueue>( 100, "Command Responses" ) )
+        , mRawDataBufferManagerSpy( RawData::BufferManagerConfig::create().get() )
+        , mCommandSchema( mReceiverCommandRequest, mCommandResponses, &mRawDataBufferManagerSpy )
+    {
+    }
     void
     SetUp() override
     {
-        TopicConfigArgs topicConfigArgs;
-        mTopicConfig = std::make_unique<TopicConfig>( "thing-name", topicConfigArgs );
-        mAwsIotModule = std::make_unique<AwsIotConnectivityModule>( "", "", nullptr, *mTopicConfig );
-
-        std::shared_ptr<MqttClientWrapper> nullMqttClient;
-
-        mReceiverCommandRequest = std::make_shared<AwsIotReceiver>( mAwsIotModule.get(), nullMqttClient, "topic" );
-
-        mCommandResponses = std::make_shared<DataSenderQueue>( 100, "Command Responses" );
-
-        mRawBufferManagerSpy = std::make_shared<NiceMock<Testing::RawDataBufferManagerSpy>>(
-            RawData::BufferManagerConfig::create().get() );
-        mCommandSchema =
-            std::make_unique<CommandSchema>( mReceiverCommandRequest, mCommandResponses, mRawBufferManagerSpy );
-        mCommandSchema->subscribeToActuatorCommandRequestReceived( [&]( const ActuatorCommandRequest &commandRequest ) {
+        mCommandSchema.subscribeToActuatorCommandRequestReceived( [&]( const ActuatorCommandRequest &commandRequest ) {
             mReceivedActuatorCommandRequests.emplace_back( commandRequest );
         } );
-        mCommandSchema->subscribeToLastKnownStateCommandRequestReceived(
+        mCommandSchema.subscribeToLastKnownStateCommandRequestReceived(
             [&]( const LastKnownStateCommandRequest &commandRequest ) {
                 mReceivedLastKnownStateCommandRequests.emplace_back( commandRequest );
             } );
@@ -139,12 +132,13 @@ protected:
         return succeeded;
     }
 
-    std::unique_ptr<TopicConfig> mTopicConfig;
-    std::unique_ptr<AwsIotConnectivityModule> mAwsIotModule;
-    std::shared_ptr<AwsIotReceiver> mReceiverCommandRequest;
+    TopicConfig mTopicConfig;
+    MqttClientBuilderWrapperMock mMqttClientBuilderWrapper;
+    StrictMock<MqttClientWrapperMock> mMqttClientWrapper;
+    AwsIotReceiver mReceiverCommandRequest;
     std::shared_ptr<DataSenderQueue> mCommandResponses;
-    std::shared_ptr<NiceMock<Testing::RawDataBufferManagerSpy>> mRawBufferManagerSpy;
-    std::unique_ptr<CommandSchema> mCommandSchema;
+    NiceMock<Testing::RawDataBufferManagerSpy> mRawDataBufferManagerSpy;
+    CommandSchema mCommandSchema;
 
     std::vector<ActuatorCommandRequest> mReceivedActuatorCommandRequests;
     std::vector<LastKnownStateCommandRequest> mReceivedLastKnownStateCommandRequests;
@@ -154,7 +148,7 @@ TEST_F( CommandSchemaTest, ingestEmptyCommandRequest )
 {
     std::string protoSerializedBuffer;
 
-    mReceiverCommandRequest->onDataReceived( createPublishEvent( protoSerializedBuffer ) );
+    mReceiverCommandRequest.onDataReceived( createPublishEvent( protoSerializedBuffer ) );
 
     ASSERT_EQ( mReceivedActuatorCommandRequests.size(), 0 );
     ASSERT_EQ( mReceivedLastKnownStateCommandRequests.size(), 0 );
@@ -164,7 +158,7 @@ TEST_F( CommandSchemaTest, ingestCommandRequestLargerThanLimit )
 {
     std::string protoSerializedBuffer( COMMAND_REQUEST_BYTE_SIZE_LIMIT + 1, 'X' );
 
-    mReceiverCommandRequest->onDataReceived( createPublishEvent( protoSerializedBuffer ) );
+    mReceiverCommandRequest.onDataReceived( createPublishEvent( protoSerializedBuffer ) );
 
     ASSERT_EQ( mReceivedActuatorCommandRequests.size(), 0 );
     ASSERT_EQ( mReceivedLastKnownStateCommandRequests.size(), 0 );
@@ -188,7 +182,7 @@ TEST_F( CommandSchemaTest, ingestActuatorCommandRequest )
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     ASSERT_EQ( mReceivedActuatorCommandRequests.size(), 1 );
     auto commandRequest = mReceivedActuatorCommandRequests[0];
@@ -212,7 +206,7 @@ TEST_F( CommandSchemaTest, ingestActuatorCommandRequestWithInvalidValue )
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     std::shared_ptr<const CommandResponse> commandResponse;
     WAIT_ASSERT_TRUE( popCommandResponse( commandResponse ) );
@@ -228,7 +222,7 @@ TEST_F( CommandSchemaTest, ingestActuatorCommandRequestWithInvalidValue )
 
     publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     WAIT_ASSERT_TRUE( popCommandResponse( commandResponse ) );
     ASSERT_EQ( commandResponse->id, "command123" );
@@ -243,7 +237,7 @@ TEST_F( CommandSchemaTest, ingestActuatorCommandRequestWithInvalidValue )
 
     publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     ASSERT_EQ( mReceivedActuatorCommandRequests.size(), 1U );
     auto commandRequest = mReceivedActuatorCommandRequests[0];
@@ -272,10 +266,21 @@ struct TestSignal
     static std::string
     toString( const ::testing::TestParamInfo<TestSignal> &info )
     {
+        auto doubleValueAsString = std::to_string( info.param.value );
+        // These values would make the test name too big, making it hard to read the output, so
+        // just replace with the constant name.
+        if ( info.param.value == DBL_MAX )
+        {
+            doubleValueAsString = "DBL_MAX";
+        }
+        else if ( info.param.value == -DBL_MAX )
+        {
+            doubleValueAsString = "-DBL_MAX";
+        }
         // Test names can only contain alphanumeric characters, so we can't just convert a double to string
-        auto doubleValueAsString = std::regex_replace( std::to_string( info.param.value ), std::regex( "\\." ), "d" );
+        doubleValueAsString = std::regex_replace( doubleValueAsString, std::regex( "\\." ), "d" );
         doubleValueAsString = std::regex_replace( doubleValueAsString, std::regex( "-" ), "n" );
-        return doubleValueAsString + signalTypeParamInfoToString( { info.param.type, info.index } );
+        return doubleValueAsString + "_" + signalTypeParamInfoToString( { info.param.type, info.index } );
     }
 };
 
@@ -322,7 +327,7 @@ TEST_P( CommandSchemaTestWithAllSignalTypes, ingestActuatorCommandRequestWithAll
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     ASSERT_EQ( mReceivedActuatorCommandRequests.size(), 1U );
     auto commandRequest = mReceivedActuatorCommandRequests[0];
@@ -361,7 +366,7 @@ TEST_P( CommandSchemaTestWithOutOfRangeSignals, ingestActuatorCommandRequestWith
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     ASSERT_EQ( mReceivedActuatorCommandRequests.size(), 0 );
 }
@@ -378,7 +383,7 @@ TEST_F( CommandSchemaTest, ingestCommandAlreadyTimedOut )
     std::string protoSerializedBuffer;
     ASSERT_TRUE( protoCommandRequest.SerializeToString( &protoSerializedBuffer ) );
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
     std::shared_ptr<const CommandResponse> commandResponse;
     WAIT_ASSERT_TRUE( popCommandResponse( commandResponse ) );
     ASSERT_EQ( commandResponse->id, "command123" );
@@ -397,13 +402,13 @@ TEST_F( CommandSchemaTest, ingestActuatorCommandRequestWithStringSignalWithBadSi
     std::string protoSerializedBuffer;
     ASSERT_TRUE( protoCommandRequest.SerializeToString( &protoSerializedBuffer ) );
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
     ASSERT_EQ( mReceivedActuatorCommandRequests.size(), 0 );
 }
 
 TEST_F( CommandSchemaTest, ingestActuatorCommandRequestWithStringSignal )
 {
-    mRawBufferManagerSpy->updateConfig( { { 12345, { 12345, "", "" } } } );
+    mRawDataBufferManagerSpy.updateConfig( { { 12345, { 12345, "", "" } } } );
     Schemas::Commands::CommandRequest protoCommandRequest;
     protoCommandRequest.set_command_id( "command123" );
     // Check setting issued time in future just produces warning
@@ -414,14 +419,15 @@ TEST_F( CommandSchemaTest, ingestActuatorCommandRequestWithStringSignal )
     std::string protoSerializedBuffer;
     ASSERT_TRUE( protoCommandRequest.SerializeToString( &protoSerializedBuffer ) );
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
     ASSERT_EQ( mReceivedActuatorCommandRequests.size(), 1U );
     auto commandRequest = mReceivedActuatorCommandRequests[0];
     ASSERT_EQ( commandRequest.commandID, "command123" );
     ASSERT_EQ( commandRequest.signalID, 12345 );
     ASSERT_EQ( commandRequest.signalValueWrapper.type, SignalType::STRING );
-    auto loanedFrame = mRawBufferManagerSpy->borrowFrame( commandRequest.signalValueWrapper.value.rawDataVal.signalId,
-                                                          commandRequest.signalValueWrapper.value.rawDataVal.handle );
+    auto loanedFrame =
+        mRawDataBufferManagerSpy.borrowFrame( commandRequest.signalValueWrapper.value.rawDataVal.signalId,
+                                              commandRequest.signalValueWrapper.value.rawDataVal.handle );
     ASSERT_FALSE( loanedFrame.isNull() );
     std::string receivedStringVal;
     receivedStringVal.assign( reinterpret_cast<const char *>( loanedFrame.getData() ), loanedFrame.getSize() );
@@ -444,7 +450,7 @@ TEST_F( CommandSchemaTest, ingestLastKnownStateActivateCommandRequest )
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     ASSERT_EQ( mReceivedLastKnownStateCommandRequests.size(), 1 );
     auto commandRequest = mReceivedLastKnownStateCommandRequests[0];
@@ -471,7 +477,7 @@ TEST_F( CommandSchemaTest, ingestLastKnownStateActivateCommandRequestWithAutoDea
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     ASSERT_EQ( mReceivedLastKnownStateCommandRequests.size(), 1 );
     auto commandRequest = mReceivedLastKnownStateCommandRequests[0];
@@ -497,7 +503,7 @@ TEST_F( CommandSchemaTest, ingestLastKnownStateDeactivateCommandRequest )
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     ASSERT_EQ( mReceivedLastKnownStateCommandRequests.size(), 1 );
     auto commandRequest = mReceivedLastKnownStateCommandRequests[0];
@@ -523,7 +529,7 @@ TEST_F( CommandSchemaTest, ingestLastKnownStateFetchCommandRequest )
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     ASSERT_EQ( mReceivedLastKnownStateCommandRequests.size(), 1 );
     auto commandRequest = mReceivedLastKnownStateCommandRequests[0];
@@ -561,7 +567,7 @@ TEST_F( CommandSchemaTest, ingestMultipleLastKnownStateCommandRequest )
 
     auto publishEvent = createPublishEvent( protoSerializedBuffer );
 
-    mReceiverCommandRequest->onDataReceived( publishEvent );
+    mReceiverCommandRequest.onDataReceived( publishEvent );
 
     ASSERT_EQ( mReceivedLastKnownStateCommandRequests.size(), 4 );
     auto commandRequest = mReceivedLastKnownStateCommandRequests[0];

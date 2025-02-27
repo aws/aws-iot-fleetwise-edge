@@ -3,10 +3,11 @@
 
 #pragma once
 
-#include "CacheAndPersist.h"
-#include "CollectionInspectionAPITypes.h"
-#include "SignalTypes.h"
-#include "TimeTypes.h"
+#include "aws/iotfleetwise/CacheAndPersist.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <boost/filesystem.hpp>
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -252,6 +253,49 @@ createCacheAndPersist()
         throw std::runtime_error( "Failed to initialize persistency" );
     }
     return cacheAndPersist;
+}
+
+inline boost::optional<std::string>
+getEnvVar( const std::string &name )
+{
+    const char *envVarValue = getenv( name.c_str() );
+    if ( envVarValue == nullptr )
+    {
+        return boost::none;
+    }
+    return std::string( envVarValue );
+}
+
+inline unsigned int
+getWorkerNumber()
+{
+    // When running the unit tests in parallel using pytest-cpp and pytest-xdist, this variable
+    // should be present with the name of the worker and a sequential number. We can then use this
+    // number to select different CAN interfaces so that tests are isolated from each other.
+    auto workerName = getEnvVar( "PYTEST_XDIST_WORKER" ).get_value_or( "gw0" );
+    FWE_LOG_TRACE( "Worker name: " + workerName )
+    try
+    {
+        int workerNumber = stoi( workerName.substr( 2 ) );
+        if ( workerNumber < 0 )
+        {
+            throw std::runtime_error( "Invalid worker number: " + std::to_string( workerNumber ) );
+        }
+        return static_cast<unsigned int>( workerNumber );
+    }
+    catch ( const std::invalid_argument &e )
+    {
+        throw std::runtime_error( "Invalid worker name: " + workerName +
+                                  " . It should be in the format gw<SEQUENCE_NUMBER>" );
+    }
+}
+
+inline std::string
+getCanInterfaceName()
+{
+    std::string canInterface = "vcan" + std::to_string( getWorkerNumber() );
+    FWE_LOG_TRACE( "Using CAN interface: " + canInterface )
+    return canInterface;
 }
 
 } // namespace IoTFleetWise

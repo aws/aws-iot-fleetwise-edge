@@ -75,6 +75,13 @@
   },
   {
     "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.Temperature",
+      "description": "Vehicle.ExampleSomeipInterface.Temperature",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "sensor": {
       "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.A",
       "description": "Vehicle.ExampleSomeipInterface.A1.A2.A",
       "dataType": "INT32"
@@ -96,9 +103,184 @@
   },
   {
     "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.E",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.E",
+      "dataType": "INT64"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.F",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.F",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.G",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.G",
+      "dataType": "BOOLEAN"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.H",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.H",
+      "dataType": "DOUBLE"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.I",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.I",
+      "dataType": "INT64"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.J",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.J",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.K",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.K",
+      "dataType": "BOOLEAN"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.L",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.L",
+      "dataType": "DOUBLE"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.M",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.M",
+      "dataType": "INT64"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.N",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.N",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.O",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.O",
+      "dataType": "BOOLEAN"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.P",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.P",
+      "dataType": "DOUBLE"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A2.Q",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A2.Q",
+      "dataType": "INT64"
+    }
+  },
+  {
+    "sensor": {
       "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.S",
       "description": "Vehicle.ExampleSomeipInterface.A1.S",
       "dataType": "STRING"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.A",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A",
+      "dataType": "BOOLEAN"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.B",
+      "description": "Vehicle.ExampleSomeipInterface.A1,B",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.C",
+      "description": "Vehicle.ExampleSomeipInterface.A1.C",
+      "dataType": "DOUBLE"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.D",
+      "description": "Vehicle.ExampleSomeipInterface.A1.D",
+      "dataType": "INT64"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.E",
+      "description": "Vehicle.ExampleSomeipInterface.A1.A",
+      "dataType": "BOOLEAN"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.F",
+      "description": "Vehicle.ExampleSomeipInterface.A1,B",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.G",
+      "description": "Vehicle.ExampleSomeipInterface.A1.C",
+      "dataType": "DOUBLE"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.H",
+      "description": "Vehicle.ExampleSomeipInterface.A1.D",
+      "dataType": "INT64"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.I",
+      "description": "Vehicle.ExampleSomeipInterface.A1.E",
+      "dataType": "BOOLEAN"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.J",
+      "description": "Vehicle.ExampleSomeipInterface.A1.F",
+      "dataType": "INT32"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.K",
+      "description": "Vehicle.ExampleSomeipInterface.A1.G",
+      "dataType": "DOUBLE"
+    }
+  },
+  {
+    "sensor": {
+      "fullyQualifiedName": "Vehicle.ExampleSomeipInterface.A1.L",
+      "description": "Vehicle.ExampleSomeipInterface.A1.H",
+      "dataType": "INT64"
     }
   }
 ]

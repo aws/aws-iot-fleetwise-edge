@@ -2,21 +2,19 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "OBDDataDecoder.h"
-#include "EnumUtility.h"
-#include "MessageTypes.h"
-#include "OBDDataTypes.h"
+#include "aws/iotfleetwise/OBDDataDecoder.h"
 #include "OBDDataTypesUnitTestOnly.h"
-#include "SignalTypes.h"
 #include "Testing.h"
+#include "aws/iotfleetwise/EnumUtility.h"
+#include "aws/iotfleetwise/MessageTypes.h"
+#include "aws/iotfleetwise/OBDDataTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <map>
-#include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 // For testing purpose, Signal ID is defined as PID | (signal_order << PID_SIGNAL_BITS_LEFT_SHIFT)
@@ -30,39 +28,38 @@ namespace IoTFleetWise
 class OBDDataDecoderTest : public ::testing::Test
 {
 protected:
-    std::shared_ptr<OBDDecoderDictionary> decoderDictPtr;
-    OBDDataDecoder decoder{ decoderDictPtr };
+    OBDDecoderDictionary decoderDict;
+    OBDDataDecoder decoder{ decoderDict };
     void
     SetUp() override
     {
-        decoderDictPtr = std::make_shared<OBDDecoderDictionary>();
         // In final product, signal ID comes from Cloud, edge doesn't generate signal ID
         // Below signal ID initialization got implemented only for Edge testing.
         // In this test, signal ID are defined as PID | (signal order) << 8
-        for ( PID pid = toUType( EmissionPIDs::FUEL_SYSTEM_STATUS ); pid <= toUType( EmissionPIDs::ODOMETER ); ++pid )
+        for ( unsigned int i = 0; i < mode1PIDs.size(); ++i )
         {
+            auto pidInfo = mode1PIDs[i];
             // Initialize decoder dictionary based on mode1PIDs table from OBDDataDecoder module
             // Note in actual product, the decoder dictionary comes from decoder manifest
             CANMessageFormat format;
-            format.mMessageID = pid;
-            format.mSizeInBytes = static_cast<uint8_t>( mode1PIDs[pid].retLen );
-            format.mSignals = std::vector<CANSignalFormat>( mode1PIDs[pid].formulas.size() );
-            for ( uint32_t idx = 0; idx < mode1PIDs[pid].formulas.size(); ++idx )
+            format.mMessageID = pidInfo.pid;
+            format.mSizeInBytes = static_cast<uint8_t>( pidInfo.retLen );
+            format.mSignals = std::vector<CANSignalFormat>( pidInfo.formulas.size() );
+            for ( uint32_t idx = 0; idx < pidInfo.formulas.size(); ++idx )
             {
-                format.mSignals[idx].mSignalID = pid | ( idx << PID_SIGNAL_BITS_LEFT_SHIFT );
+                format.mSignals[idx].mSignalID = pidInfo.pid | ( idx << PID_SIGNAL_BITS_LEFT_SHIFT );
                 format.mSignals[idx].mFirstBitPosition = static_cast<uint16_t>(
-                    mode1PIDs[pid].formulas[idx].byteOffset * BYTE_SIZE + mode1PIDs[pid].formulas[idx].bitShift );
-                format.mSignals[idx].mSizeInBits =
-                    static_cast<uint16_t>( ( mode1PIDs[pid].formulas[idx].numOfBytes - 1 ) * BYTE_SIZE +
-                                           mode1PIDs[pid].formulas[idx].bitMaskLen );
-                format.mSignals[idx].mFactor = mode1PIDs[pid].formulas[idx].scaling;
-                format.mSignals[idx].mOffset = mode1PIDs[pid].formulas[idx].offset;
+                    pidInfo.formulas[idx].byteOffset * BYTE_SIZE + pidInfo.formulas[idx].bitShift );
+                format.mSignals[idx].mSizeInBits = static_cast<uint16_t>(
+                    ( pidInfo.formulas[idx].numOfBytes - 1 ) * BYTE_SIZE + pidInfo.formulas[idx].bitMaskLen );
+                format.mSignals[idx].mFactor = pidInfo.formulas[idx].scaling;
+                format.mSignals[idx].mOffset = pidInfo.formulas[idx].offset;
             }
-            decoderDictPtr->emplace( pid, format );
+            decoderDict.emplace( pidInfo.pid, format );
         }
     }
 
-    void
+    static void
     assertSignalValue( const DecodedSignalValue &obdSignal, double expectedSignalValue, SignalType expectedSignalType )
     {
         switch ( expectedSignalType )
@@ -147,7 +144,7 @@ TEST_P( OBDDataDecoderTestWithAllSignalTypes, FullSingleByte )
     signalFormat.mOffset = 0;
     signalFormat.mSignalType = signalType;
     format.mSignals.emplace_back( signalFormat );
-    decoderDictPtr->emplace( pid, format );
+    decoderDict.emplace( pid, format );
 
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0x99 };
     EmissionInfo info;
@@ -172,7 +169,7 @@ TEST_P( OBDDataDecoderTestWithAllSignalTypes, FullSingleByteNegativeOffset )
     signalFormat.mOffset = -10;
     signalFormat.mSignalType = signalType;
     format.mSignals.emplace_back( signalFormat );
-    decoderDictPtr->emplace( pid, format );
+    decoderDict.emplace( pid, format );
 
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0x99 };
     EmissionInfo info;
@@ -197,7 +194,7 @@ TEST_P( OBDDataDecoderTestWithAllSignalTypes, FullMultipleBytes )
     signalFormat.mOffset = 0;
     signalFormat.mSignalType = signalType;
     format.mSignals.emplace_back( signalFormat );
-    decoderDictPtr->emplace( pid, format );
+    decoderDict.emplace( pid, format );
 
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0x00, 0x0A };
     EmissionInfo info;
@@ -222,7 +219,7 @@ TEST_P( OBDDataDecoderTestWithAllSignalTypes, PartialByte )
     signalFormat.mOffset = 0;
     signalFormat.mSignalType = signalType;
     format.mSignals.emplace_back( signalFormat );
-    decoderDictPtr->emplace( pid, format );
+    decoderDict.emplace( pid, format );
 
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0xFB };
     EmissionInfo info;
@@ -248,7 +245,7 @@ TEST_P( OBDDataDecoderTestWithSignedSignalTypes, FullSingleByteWithUnsignedRawVa
     signalFormat.mSignalType = signalType;
     signalFormat.mIsSigned = false;
     format.mSignals.emplace_back( signalFormat );
-    decoderDictPtr->emplace( pid, format );
+    decoderDict.emplace( pid, format );
 
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0xC4 };
     EmissionInfo info;
@@ -276,7 +273,7 @@ TEST_P( OBDDataDecoderTestWithSignedSignalTypes, FullMultipleBytesWithUnsignedRa
     signalFormat.mSignalType = signalType;
     signalFormat.mIsSigned = false;
     format.mSignals.emplace_back( signalFormat );
-    decoderDictPtr->emplace( pid, format );
+    decoderDict.emplace( pid, format );
 
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0xC4, 0x0A };
     EmissionInfo info;
@@ -304,7 +301,7 @@ TEST_P( OBDDataDecoderTestWithSignedSignalTypes, PartialByteWithUnsignedRawValue
     signalFormat.mSignalType = signalType;
     signalFormat.mIsSigned = false;
     format.mSignals.emplace_back( signalFormat );
-    decoderDictPtr->emplace( pid, format );
+    decoderDict.emplace( pid, format );
 
     // 0x4C shifted 2 bits to the right (without extending the sign) = 0x13 = 19
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0x4C };
@@ -313,6 +310,154 @@ TEST_P( OBDDataDecoderTestWithSignedSignalTypes, PartialByteWithUnsignedRawValue
     ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
     ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
     assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), 19, signalType );
+}
+
+TEST_P( OBDDataDecoderTestWithSignedSignalTypes, FullSingleByteWithSignedRawValue )
+{
+    SignalType signalType = GetParam();
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 1;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 8;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = signalType;
+    signalFormat.mIsSigned = true;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDict.emplace( pid, format );
+
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0x85 };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), -123, signalType );
+}
+
+TEST_P( OBDDataDecoderTestWithSignedSignalTypes, FullMultipleBytesWithSignedRawValue )
+{
+    SignalType signalType = GetParam();
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 2;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 16;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = signalType;
+    signalFormat.mIsSigned = true;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDict.emplace( pid, format );
+
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0xE9, 0x35 };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), -5835, signalType );
+}
+
+TEST_P( OBDDataDecoderTestWithSignedSignalTypes, PartialByteWithSignedRawValue )
+{
+    SignalType signalType = GetParam();
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 1;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 1;
+    signalFormat.mSizeInBits = 6;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = signalType;
+    signalFormat.mIsSigned = true;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDict.emplace( pid, format );
+
+    // -25 represented in 6 bits = 0x27 (100111) shifted one bit = 0x4E (1001110)
+    std::vector<uint8_t> txPDUData = { 0x41, pid, 0x4E };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    assertSignalValue( info.mPIDsToValues.at( signalFormat.mSignalID ), -25, signalType );
+}
+
+TEST_F( OBDDataDecoderTest, FullMultipleBytesWithRawFloatValue )
+{
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 4;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 32;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = SignalType::FLOAT;
+    signalFormat.mRawSignalType = RawSignalType::FLOATING_POINT;
+    signalFormat.mIsSigned = false;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDict.emplace( pid, format );
+
+    std::vector<uint8_t> txPDUData = { 0x41,
+                                       pid,
+                                       // float 145.35215 in big endian
+                                       0x43,
+                                       0x11,
+                                       0x5A,
+                                       0x27 };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    ASSERT_FLOAT_EQ( static_cast<float>( info.mPIDsToValues.at( signalFormat.mSignalID ).signalValue.doubleVal ),
+                     145.35215f );
+}
+
+TEST_F( OBDDataDecoderTest, FullMultipleBytesWithRawDoubleValue )
+{
+    PID pid = 0xEF;
+    CANMessageFormat format;
+    format.mMessageID = pid;
+    format.mSizeInBytes = 8;
+    CANSignalFormat signalFormat;
+    signalFormat.mSignalID = 0x100000EF;
+    signalFormat.mFirstBitPosition = 0;
+    signalFormat.mSizeInBits = 64;
+    signalFormat.mFactor = 1.0;
+    signalFormat.mOffset = 0;
+    signalFormat.mSignalType = SignalType::DOUBLE;
+    signalFormat.mRawSignalType = RawSignalType::FLOATING_POINT;
+    signalFormat.mIsSigned = false;
+    format.mSignals.emplace_back( signalFormat );
+    decoderDict.emplace( pid, format );
+
+    std::vector<uint8_t> txPDUData = { 0x41,
+                                       pid,
+                                       // double 47.29873879 (0x4047A63D129A8C5E) in big endian
+                                       0x40,
+                                       0x47,
+                                       0xA6,
+                                       0x3D,
+                                       0x12,
+                                       0x9A,
+                                       0x8C,
+                                       0x5E };
+    EmissionInfo info;
+
+    ASSERT_TRUE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
+    ASSERT_EQ( info.mSID, SID::CURRENT_STATS );
+    ASSERT_DOUBLE_EQ( info.mPIDsToValues.at( signalFormat.mSignalID ).signalValue.doubleVal, 47.29873879 );
 }
 
 TEST_F( OBDDataDecoderTest, KeepPrecisionForUInt64 )
@@ -329,7 +474,7 @@ TEST_F( OBDDataDecoderTest, KeepPrecisionForUInt64 )
     signalFormat.mOffset = -100000;
     signalFormat.mSignalType = SignalType::UINT64;
     format.mSignals.emplace_back( signalFormat );
-    decoderDictPtr->emplace( pid, format );
+    decoderDict.emplace( pid, format );
 
     // 2305843009213693951, which when represented as a double loses precision
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0x1F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
@@ -355,7 +500,7 @@ TEST_F( OBDDataDecoderTest, KeepPrecisionForInt64 )
     signalFormat.mOffset = -100000;
     signalFormat.mSignalType = SignalType::INT64;
     format.mSignals.emplace_back( signalFormat );
-    decoderDictPtr->emplace( pid, format );
+    decoderDict.emplace( pid, format );
 
     // -6917529027641081857, which when represented as a double loses precision
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0x9F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
@@ -585,9 +730,9 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedRelativeThrottlePosition )
         (double)0x80 * 100 / 255 );
 }
 
-TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedAmbientAireTemperature )
+TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedAmbientAirTemperature )
 {
-    // AmbientAireTemperature of 30 deg
+    // AmbientAirTemperature of 30 deg
     std::vector<uint8_t> txPDUData = { 0x41, 0x46, 0x46 };
     EmissionInfo info;
 
@@ -1047,7 +1192,7 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderExtractDTCStringTest )
     ASSERT_EQ( dtc, "P0196" );
 }
 
-TEST_F( OBDDataDecoderTest, OBDDataDecoderdecodeDTCsTest )
+TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodeDTCsTest )
 {
     // 4 DTC reported on each domain
     std::vector<uint8_t> txPDUData = { 0x43, 0x04, 0x01, 0x43, 0x41, 0x96, 0x81, 0x48, 0xC1, 0x48 };
@@ -1061,7 +1206,7 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderdecodeDTCsTest )
     ASSERT_EQ( info.mDTCCodes[3], "U0148" );
 }
 
-TEST_F( OBDDataDecoderTest, OBDDataDecoderdecodeDTCsCorruptDataTest )
+TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodeDTCsCorruptDataTest )
 {
     // Wrong count of DTCs
     std::vector<uint8_t> txPDUData = { 0x43, 0x04, 0x01, 0x43 };
@@ -1070,7 +1215,7 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderdecodeDTCsCorruptDataTest )
     ASSERT_FALSE( decoder.decodeDTCs( SID::STORED_DTC, txPDUData, info ) );
 }
 
-TEST_F( OBDDataDecoderTest, OBDDataDecoderdecodeVIN )
+TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodeVIN )
 {
     // Wrong count of DTCs
     std::vector<uint8_t> txPDUData = { 0x49, 0x02, 0x01, 0x31, 0x47, 0x31, 0x4A, 0x43, 0x35, 0x34,
@@ -1093,27 +1238,27 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderNoVIN )
 TEST_F( OBDDataDecoderTest, OBDDataDecoderCorruptFormulaTest )
 {
     PID pid = 0x66;
-    const auto &originalFormula = decoderDictPtr->at( pid ).mSignals[0];
+    const auto &originalFormula = decoderDict.at( pid ).mSignals[0];
     // corrupt mFirstBitPosition to out of bound
-    decoderDictPtr->at( pid ).mSignals[0].mFirstBitPosition = 80;
+    decoderDict.at( pid ).mSignals[0].mFirstBitPosition = 80;
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0x99 };
     EmissionInfo info;
 
     ASSERT_FALSE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
-    decoderDictPtr->at( pid ).mSignals[0] = originalFormula;
+    decoderDict.at( pid ).mSignals[0] = originalFormula;
     // corrupt mSizeInBits to out of bound
-    decoderDictPtr->at( pid ).mSignals[0].mSizeInBits = 80;
+    decoderDict.at( pid ).mSignals[0].mSizeInBits = 80;
     ASSERT_FALSE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
 
-    decoderDictPtr->at( pid ).mSignals[0] = originalFormula;
+    decoderDict.at( pid ).mSignals[0] = originalFormula;
     // corrupt mSizeInBits to be invalid
-    decoderDictPtr->at( pid ).mSignals[0].mSizeInBits = 33;
+    decoderDict.at( pid ).mSignals[0].mSizeInBits = 33;
     ASSERT_FALSE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
 
-    decoderDictPtr->at( pid ).mSignals[0] = originalFormula;
+    decoderDict.at( pid ).mSignals[0] = originalFormula;
     // corrupt mFirstBitPosition to be invalid. Because mSizeInBit is 8, First Bit position
     // has to be aligned with byte
-    decoderDictPtr->at( pid ).mSignals[0].mFirstBitPosition = 2;
+    decoderDict.at( pid ).mSignals[0].mFirstBitPosition = 2;
     ASSERT_FALSE( decoder.decodeEmissionPIDs( SID::CURRENT_STATS, { pid }, txPDUData, info ) );
 }
 
@@ -1128,11 +1273,11 @@ TEST_F( OBDDataDecoderTest, OBDDataDecoderWithECUResponseMismatchWithDecoderMani
     ASSERT_EQ( info.mPIDsToValues.size(), 0 );
 }
 
-TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineLoadCorruptDecoderDictionaryTest )
+TEST_F( OBDDataDecoderTest, OBDDataDecoderDecodedEngineEmptyDecoderDictionaryTest )
 {
     PID pid = 0x04;
-    // corrupt decoder dictionary pointer to nullptr
-    decoderDictPtr = nullptr;
+    // an empty decoder dictionary should be considered as invalid
+    decoderDict.clear();
     std::vector<uint8_t> txPDUData = { 0x41, pid, 0x99 };
     EmissionInfo info;
 

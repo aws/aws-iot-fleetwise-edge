@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "TransferManagerWrapper.h"
+#include "aws/iotfleetwise/TransferManagerWrapper.h"
 #include <gmock/gmock.h>
 
 namespace Aws
@@ -45,7 +45,7 @@ public:
                 const std::shared_ptr<const Aws::Client::AsyncCallerContext> &context = nullptr ) override
     {
         return MockedUploadFile( fileName, bucketName, keyName, contentType, metadata, context );
-    };
+    }
 
     MOCK_METHOD( std::shared_ptr<Aws::Transfer::TransferHandle>,
                  MockedUploadFile,
@@ -65,7 +65,7 @@ public:
                 const std::shared_ptr<const Aws::Client::AsyncCallerContext> &context = nullptr ) override
     {
         return MockedUploadFile( stream, bucketName, keyName, contentType, metadata, context );
-    };
+    }
 
     MOCK_METHOD( std::shared_ptr<Aws::Transfer::TransferHandle>,
                  RetryUpload,
@@ -77,6 +77,34 @@ public:
                  ( const std::shared_ptr<Aws::IOStream> &stream,
                    const std::shared_ptr<Aws::Transfer::TransferHandle> &retryHandle ),
                  ( override ) );
+
+    MOCK_METHOD( void, MockedDownloadToDirectory, (const Aws::String &, const Aws::String &, const Aws::String &));
+
+    void
+    DownloadToDirectory( const Aws::String &directory,
+                         const Aws::String &bucketName,
+                         const Aws::String &prefix = Aws::String() ) override
+    {
+        MockedDownloadToDirectory( directory, bucketName, prefix );
+    }
+
+    MOCK_METHOD( std::shared_ptr<Aws::Transfer::TransferHandle>,
+                 MockedDownloadFile,
+                 (const Aws::String &,
+                  const Aws::String &,
+                  const Aws::String &,
+                  const Aws::Transfer::DownloadConfiguration &,
+                  const std::shared_ptr<const Aws::Client::AsyncCallerContext> &));
+
+    std::shared_ptr<Aws::Transfer::TransferHandle>
+    DownloadFile( const Aws::String &bucketName,
+                  const Aws::String &keyName,
+                  const Aws::String &writeToFile,
+                  const Aws::Transfer::DownloadConfiguration &downloadConfig = Aws::Transfer::DownloadConfiguration(),
+                  const std::shared_ptr<const Aws::Client::AsyncCallerContext> &context = nullptr ) override
+    {
+        return MockedDownloadFile( bucketName, keyName, writeToFile, downloadConfig, context );
+    }
 };
 
 } // namespace IoTFleetWise

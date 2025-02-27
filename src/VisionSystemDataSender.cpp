@@ -1,15 +1,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "VisionSystemDataSender.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IConnectionTypes.h"
-#include "LoggingModule.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "StreambufBuilder.h"
+#include "aws/iotfleetwise/VisionSystemDataSender.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/EventTypes.h"
+#include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/StreambufBuilder.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <boost/variant.hpp>
 #include <cstdint>
+#include <istream>
 #include <utility>
 #include <vector>
 
@@ -64,28 +66,31 @@ private:
     std::shared_ptr<std::streambuf> mData;
 };
 
-VisionSystemDataSender::VisionSystemDataSender( std::shared_ptr<DataSenderQueue> uploadedS3Objects,
-                                                std::shared_ptr<S3Sender> s3Sender,
-                                                std::shared_ptr<DataSenderIonWriter> ionWriter,
+VisionSystemDataSender::VisionSystemDataSender( DataSenderQueue &uploadedS3Objects,
+                                                S3Sender &s3Sender,
+                                                std::unique_ptr<DataSenderIonWriter> ionWriter,
                                                 std::string vehicleName )
-    : mUploadedS3Objects( std::move( uploadedS3Objects ) )
+    : mUploadedS3Objects( uploadedS3Objects )
     , mIonWriter( std::move( ionWriter ) )
-    , mS3Sender{ std::move( s3Sender ) }
+    , mS3Sender{ s3Sender }
     , mVehicleName( std::move( vehicleName ) )
 
 {
 }
 
-void
-VisionSystemDataSender::processData( std::shared_ptr<const DataToSend> data, OnDataProcessedCallback callback )
+bool
+VisionSystemDataSender::isAlive()
 {
-    if ( data == nullptr )
-    {
-        FWE_LOG_WARN( "Nothing to send as the input is empty" );
-        return;
-    }
+    return true;
+}
 
-    auto triggeredVisionSystemData = std::dynamic_pointer_cast<const TriggeredVisionSystemData>( data );
+void
+VisionSystemDataSender::processData( const DataToSend &data, OnDataProcessedCallback callback )
+{
+    // coverity[autosar_cpp14_a5_2_1_violation] Cast by design as we want the sender to know the concrete type.
+    // coverity[autosar_cpp14_m5_2_3_violation] Cast by design as we want the sender to know the concrete type.
+    // coverity[misra_cpp_2008_rule_5_2_3_violation] Cast by design as we want the sender to know the concrete type.
+    auto triggeredVisionSystemData = dynamic_cast<const TriggeredVisionSystemData *>( &data );
     if ( triggeredVisionSystemData == nullptr )
     {
         FWE_LOG_WARN( "Nothing to send as the input is not a valid TriggeredVisionSystemData" );
@@ -128,16 +133,16 @@ VisionSystemDataSender::processData( std::shared_ptr<const DataToSend> data, OnD
         " Signals:" + std::to_string( triggeredVisionSystemData->signals.size() ) + " " + firstSignalValues +
         firstSignalTimestamp + " trigger timestamp: " + std::to_string( triggeredVisionSystemData->triggerTime ) );
 
-    transformVisionSystemDataToIon( triggeredVisionSystemData, callback );
+    transformVisionSystemDataToIon( *triggeredVisionSystemData, callback );
 }
 
 void
 VisionSystemDataSender::onChangeCollectionSchemeList(
-    const std::shared_ptr<const ActiveCollectionSchemes> &activeCollectionSchemes )
+    std::shared_ptr<const ActiveCollectionSchemes> activeCollectionSchemes )
 {
     FWE_LOG_INFO( "New active collection scheme list was handed over to Data Sender" );
     std::lock_guard<std::mutex> lock( mActiveCollectionSchemeMutex );
-    mActiveCollectionSchemes = activeCollectionSchemes;
+    mActiveCollectionSchemes = std::move( activeCollectionSchemes );
 }
 
 S3UploadMetadata
@@ -158,17 +163,11 @@ VisionSystemDataSender::getS3UploadMetadataForCollectionScheme( const std::strin
 }
 
 void
-VisionSystemDataSender::transformVisionSystemDataToIon(
-    std::shared_ptr<const TriggeredVisionSystemData> triggeredVisionSystemData, OnDataProcessedCallback callback )
+VisionSystemDataSender::transformVisionSystemDataToIon( const TriggeredVisionSystemData &triggeredVisionSystemData,
+                                                        OnDataProcessedCallback callback )
 {
-    if ( triggeredVisionSystemData->signals.empty() )
+    if ( triggeredVisionSystemData.signals.empty() )
     {
-        return;
-    }
-    if ( mS3Sender == nullptr )
-    {
-        FWE_LOG_ERROR( "Can not send data to S3 as S3Sender is not initalized. Please make sure config parameters in "
-                       "section credentialsProvider are correct" );
         return;
     }
     if ( mIonWriter == nullptr )
@@ -179,7 +178,7 @@ VisionSystemDataSender::transformVisionSystemDataToIon(
     bool rawDataAvailableToSend = false;
     bool vehicleDataIsSet = false;
     // Append signals with raw data to Ion file
-    for ( const auto &signal : triggeredVisionSystemData->signals )
+    for ( const auto &signal : triggeredVisionSystemData.signals )
     {
         if ( signal.value.type != SignalType::COMPLEX_SIGNAL )
         {
@@ -200,10 +199,10 @@ VisionSystemDataSender::transformVisionSystemDataToIon(
     }
 
     auto s3UploadMetadata =
-        getS3UploadMetadataForCollectionScheme( triggeredVisionSystemData->metadata.collectionSchemeID );
+        getS3UploadMetadataForCollectionScheme( triggeredVisionSystemData.metadata.collectionSchemeID );
     if ( s3UploadMetadata == S3UploadMetadata() )
     {
-        FWE_LOG_WARN( "Collection scheme " + triggeredVisionSystemData->metadata.collectionSchemeID +
+        FWE_LOG_WARN( "Collection scheme " + triggeredVisionSystemData.metadata.collectionSchemeID +
                       " no longer active" );
         return;
     }
@@ -211,14 +210,21 @@ VisionSystemDataSender::transformVisionSystemDataToIon(
     // Get stream for the Ion file and upload it with S3 sender
     auto streambufBuilder = mIonWriter->getStreambufBuilder();
 
-    std::string objectKey = s3UploadMetadata.prefix + std::to_string( triggeredVisionSystemData->eventID ) + "-" +
-                            std::to_string( triggeredVisionSystemData->triggerTime ) + &DEFAULT_KEY_SUFFIX[0];
-    auto resultCallback = [this, objectKey, triggeredVisionSystemData, callback](
-                              ConnectivityError result, std::shared_ptr<std::streambuf> data ) -> void {
+    std::string objectKey = s3UploadMetadata.prefix + std::to_string( triggeredVisionSystemData.eventID ) + "-" +
+                            std::to_string( triggeredVisionSystemData.triggerTime ) + &DEFAULT_KEY_SUFFIX[0];
+    auto resultCallback = [this,
+                           objectKey,
+                           persist = triggeredVisionSystemData.metadata.persist,
+                           metadata = triggeredVisionSystemData.metadata,
+                           eventID = triggeredVisionSystemData.eventID,
+                           triggerTime = triggeredVisionSystemData.triggerTime,
+                           callback]
+        // coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
+        ( ConnectivityError result, std::shared_ptr<std::streambuf> data ) -> void {
         if ( result != ConnectivityError::Success )
         {
             std::shared_ptr<const VisionSystemDataToPersist> dataToPersist;
-            if ( triggeredVisionSystemData->metadata.persist && data != nullptr )
+            if ( persist && data != nullptr )
             {
                 dataToPersist = std::make_shared<VisionSystemDataToPersist>( objectKey, S3UploadParams(), data );
             }
@@ -227,25 +233,27 @@ VisionSystemDataSender::transformVisionSystemDataToIon(
         }
 
         auto collectedData = std::make_shared<TriggeredCollectionSchemeData>();
-        collectedData->metadata = triggeredVisionSystemData->metadata;
-        collectedData->eventID = triggeredVisionSystemData->eventID;
-        collectedData->triggerTime = triggeredVisionSystemData->triggerTime;
+        collectedData->metadata = metadata;
+        collectedData->eventID = eventID;
+        collectedData->triggerTime = triggerTime;
         collectedData->uploadedS3Objects.push_back( UploadedS3Object{ objectKey, UploadedS3ObjectDataFormat::Cdr } );
-        if ( !mUploadedS3Objects->push( std::move( collectedData ) ) )
+        if ( !mUploadedS3Objects.push( std::move( collectedData ) ) )
         {
             FWE_LOG_ERROR( "Collected data output buffer is full" );
         }
         callback( true, nullptr );
     };
-    mS3Sender->sendStream( std::move( streambufBuilder ), s3UploadMetadata, objectKey, resultCallback );
+    mS3Sender.sendStream( std::move( streambufBuilder ), s3UploadMetadata, objectKey, resultCallback );
 }
 
 void
-VisionSystemDataSender::processPersistedData( std::istream &data,
+VisionSystemDataSender::processPersistedData( const uint8_t *buf,
+                                              size_t size,
                                               const Json::Value &metadata,
                                               OnPersistedDataProcessedCallback callback )
 {
-    static_cast<void>( data );
+    static_cast<void>( buf );
+    static_cast<void>( size );
     static_cast<void>( metadata );
     static_cast<void>( callback );
 

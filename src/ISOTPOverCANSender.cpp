@@ -1,26 +1,24 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ISOTPOverCANSender.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/ISOTPOverCANSender.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <linux/can.h>
 #include <linux/can/isotp.h>
 #include <net/if.h>
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <utility>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-bool
-ISOTPOverCANSender::init( const ISOTPOverCANSenderOptions &senderOptions )
+ISOTPOverCANSender::ISOTPOverCANSender( ISOTPOverCANSenderOptions senderOptions )
+    : mSenderOptions( std::move( senderOptions ) )
 {
-    mTimer.reset();
-    mSenderOptions = senderOptions;
-    return true;
 }
 
 bool

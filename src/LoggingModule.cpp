@@ -1,10 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "LoggingModule.h"
-#include "ConsoleLogger.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/ConsoleLogger.h"
 #include <cerrno>
-#include <cstddef>
 #include <cstring>
 #include <iomanip>
 #include <sstream>
@@ -14,6 +13,9 @@ namespace Aws
 namespace IoTFleetWise
 {
 
+// coverity[autosar_cpp14_a2_11_1_violation] volatile required as it will be used in a signal handler
+volatile sig_atomic_t gOngoingLogMessage = 0; // NOLINT Global signal
+
 void
 LoggingModule::log( LogLevel level,
                     const std::string &filename,
@@ -21,15 +23,19 @@ LoggingModule::log( LogLevel level,
                     const std::string &function,
                     const std::string &logEntry )
 {
+    gOngoingLogMessage = 1;
     static ConsoleLogger logger;
     logger.logMessage( level, filename, lineNumber, function, logEntry );
+    gOngoingLogMessage = 0;
 }
 
 void
 LoggingModule::flush()
 {
+    gOngoingLogMessage = 1;
     static ConsoleLogger logger;
     logger.flush();
+    gOngoingLogMessage = 0;
 }
 
 std::string

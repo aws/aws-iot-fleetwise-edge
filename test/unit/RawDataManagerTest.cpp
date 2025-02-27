@@ -1,16 +1,18 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "RawDataManager.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/RawDataManager.h"
 #include "Testing.h"
-#include "TimeTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/optional/optional_io.hpp> // IWYU pragma: keep
 #include <cstdint>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <iterator>
+#include <limits>
 #include <numeric>
 #include <thread>
 #include <unordered_map>
@@ -303,6 +305,38 @@ TEST_F( RawDataManagerTest, dataStorage )
     std::iota( std::begin( rawDataTest3 ), std::end( rawDataTest3 ), 0 ); // 1.001 MB
     ASSERT_EQ( rawDataBufferManager.push( &rawDataTest3.front(), 10000001, timestamp, typeId3 ),
                RawData::INVALID_BUFFER_HANDLE );
+}
+
+TEST_F( RawDataManagerTest, returnValidBufferHandleWhenCounterWraps )
+{
+    RawData::BufferManager rawDataBufferManager( bufferManagerConfig.get() );
+    ASSERT_EQ( rawDataBufferManager.updateConfig( updatedSignals ), RawData::BufferErrorCode::SUCCESSFUL );
+
+    auto typeId1 = signalUpdateConfig1.typeId;
+    RawData::RawDataType rawDataTest1 = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+
+    // Internally the BufferManager uses a counter combined with the given timestamp to generate
+    // a buffer handle. Since usually the timestamp won't be zero, the handle can't be zero either
+    // (which would be an invalid handle).
+    // But we don't really guarantee that this timestamp won't be zero, we could end up using a
+    // sequence number or some other clock to get the timestamp. So it's better to guarantee that
+    // the BufferManager will never return an invalid handler, regardless of the input we pass to
+    // push.
+    auto internalCounterMaxValue = std::numeric_limits<uint8_t>::max();
+    Timestamp timestamp = 0;
+    // Push enough messages to make the internal counter reach the max value. Please note that the
+    // first handle won't be necessarily 1 because other tests could have used this counter.
+    auto handle = rawDataBufferManager.push( &rawDataTest1.front(), rawDataTest1.size(), timestamp, typeId1 );
+    ASSERT_NE( handle, RawData::INVALID_BUFFER_HANDLE );
+    while ( handle != internalCounterMaxValue )
+    {
+        handle = rawDataBufferManager.push( &rawDataTest1.front(), rawDataTest1.size(), timestamp, typeId1 );
+        ASSERT_NE( handle, RawData::INVALID_BUFFER_HANDLE );
+    }
+
+    // Now the internal counter should wrap, but it should not go to zero.
+    handle = rawDataBufferManager.push( &rawDataTest1.front(), rawDataTest1.size(), timestamp, typeId1 );
+    ASSERT_EQ( handle, 1 );
 }
 
 TEST_F( RawDataManagerTest, overwriteOlderUnusedData )

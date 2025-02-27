@@ -1,0 +1,76 @@
+{
+   __libc_csu_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:__libc_csu_init
+   ...
+}
+{
+   _dl_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_dl_init
+   ...
+}
+{
+   ion-c thread local table leak - https://github.com/amazon-ion/ion-c/issues/264
+   Memcheck:Leak
+   ...
+   fun:_ion_writer_initialize_local_symbol_table
+   ...
+}
+{
+   PythonReachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   obj:*libpython3*
+   ...
+}
+{
+   PythonUninitialized
+   Memcheck:Cond
+   ...
+   obj:*libpython3*
+   ...
+}
+{
+   PythonBadAccess
+   Memcheck:Addr4
+   ...
+   obj:*libpython3*
+   ...
+}
+{
+   PythonBadAccess2
+   Memcheck:Value8
+   ...
+   obj:*libpython3*
+   ...
+}
+{
+   PythonPossible
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   obj:*libpython3*
+   ...
+}
+{
+   PythonPyThreadLock
+   Memcheck:Leak
+   match-leak-kinds: definite
+   ...
+   fun:PyThread_allocate_lock
+   ...
+}
+{
+   gmock static allocation with new - https://github.com/google/googletest/issues/4109
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*SetReactionOnUninterestingCalls*
+   ...
+}

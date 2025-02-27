@@ -1,0 +1,16 @@
+{
+  "compression": "SNAPPY",
+  "collectionScheme": {
+    "conditionBasedCollectionScheme": {
+      "conditionLanguageVersion": 1,
+      "expression": "custom_function('file_size', '/tmp/fwe_test_file') > 10",
+      "minimumTriggerIntervalMs": 1000,
+      "triggerMode": "ALWAYS"
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.FileSize"
+    }
+  ]
+}

@@ -1,14 +1,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CollectionSchemeIngestion.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/CollectionSchemeIngestion.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include <boost/uuid/detail/sha1.hpp>
+#include <exception>
 #include <google/protobuf/message.h>
 #include <string>
 #include <vector>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-#include "MessageTypes.h"
+#include "aws/iotfleetwise/MessageTypes.h"
 #include <unordered_map>
 #include <utility>
 #endif
@@ -21,7 +24,6 @@ namespace IoTFleetWise
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 std::atomic<uint32_t> CollectionSchemeIngestion::mPartialSignalCounter( 0 ); // NOLINT Global atomic signal counter
 #endif
-CustomFunctionInvocationID CollectionSchemeIngestion::mCustomFunctionNextInvocationId{ 1 }; // NOLINT
 
 CollectionSchemeIngestion::~CollectionSchemeIngestion()
 {
@@ -264,26 +266,6 @@ CollectionSchemeIngestion::build()
         FWE_LOG_TRACE( "Adding signalID: " + std::to_string( signalInfo.signalID ) + " to list of signals to collect" +
                        additionalTraceInfo );
         mCollectedSignals.emplace_back( signalInfo );
-    }
-
-    // Build Raw CAN Data
-    for ( int canFrameIndex = 0; canFrameIndex < mProtoCollectionSchemeMessagePtr->raw_can_frames_to_collect_size();
-          ++canFrameIndex )
-    {
-        // Get a reference to the RAW CAN Frame in the protobuf
-        const Schemas::CollectionSchemesMsg::RawCanFrame &rawCanFrame =
-            mProtoCollectionSchemeMessagePtr->raw_can_frames_to_collect( canFrameIndex );
-
-        CanFrameCollectionInfo rawCAN;
-        // Append the CAN Frame Information to the results
-        rawCAN.frameID = rawCanFrame.can_message_id();
-        rawCAN.interfaceID = rawCanFrame.can_interface_id();
-        rawCAN.sampleBufferSize = rawCanFrame.sample_buffer_size();
-        rawCAN.minimumSampleIntervalMs = rawCanFrame.minimum_sample_period_ms();
-
-        FWE_LOG_TRACE( "Adding rawCAN frame to collect ID: " + std::to_string( rawCAN.frameID ) +
-                       " node ID: " + rawCAN.interfaceID );
-        mCollectedRawCAN.emplace_back( rawCAN );
     }
 
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
@@ -709,8 +691,30 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
                   Schemas::CommonTypesMsg::ConditionNode_NodeFunction::kCustomFunction )
         {
             currentNode->function.customFunctionName = node.node_function().custom_function().function_name();
-            currentNode->function.customFunctionInvocationId = mCustomFunctionNextInvocationId;
-            mCustomFunctionNextInvocationId++;
+            // Generate a (probably) unique ID for the custom function invocation based on the collection scheme sync ID
+            // and the invocation index:
+            auto collectionSchemeId = mProtoCollectionSchemeMessagePtr->campaign_sync_id();
+            auto invocationInfo = collectionSchemeId + ":" + std::to_string( mCustomFunctionInvocationCounter );
+            boost::uuids::detail::sha1 invocationHash;
+            try
+            {
+                invocationHash.process_bytes( invocationInfo.c_str(), invocationInfo.size() );
+            }
+            catch ( const std::exception &e )
+            {
+                FWE_LOG_ERROR( "Error calculating SHA1: " + std::string( e.what() ) );
+                return nullptr;
+            }
+            uint32_t digest[5]{}; // SHA1 is 160-bit
+            invocationHash.get_digest( digest );
+            // Use the first 64-bits:
+            currentNode->function.customFunctionInvocationId =
+                static_cast<uint64_t>( digest[0] ) | static_cast<uint64_t>( digest[1] ) << 32;
+            FWE_LOG_TRACE( "Invocation ID " +
+                           customFunctionInvocationIdToHexString( currentNode->function.customFunctionInvocationId ) +
+                           ": " + collectionSchemeId + ", invocation " +
+                           std::to_string( mCustomFunctionInvocationCounter ) );
+            mCustomFunctionInvocationCounter++;
             bool isParamsValid = true;
 
             for ( int i = 0; i < node.node_function().custom_function().params_size(); i++ )
@@ -987,17 +991,6 @@ CollectionSchemeIngestion::getCollectSignals() const
     }
 
     return mCollectedSignals;
-}
-
-const ICollectionScheme::RawCanFrames_t &
-CollectionSchemeIngestion::getCollectRawCanFrames() const
-{
-    if ( !mReady )
-    {
-        return INVALID_RAW_CAN_COLLECTED_SIGNALS;
-    }
-
-    return mCollectedRawCAN;
 }
 
 const ExpressionNode *

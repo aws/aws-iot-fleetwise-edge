@@ -36,7 +36,8 @@ pip3 install \
     prompt_toolkit==3.0.21 \
     python-can==3.3.4 \
     can-isotp==1.7 \
-    matplotlib==3.4.3
+    matplotlib==3.4.3 \
+    tenacity==8.2.3
 
 # Install CAN Simulator
 cp -r tools/cansim /usr/share

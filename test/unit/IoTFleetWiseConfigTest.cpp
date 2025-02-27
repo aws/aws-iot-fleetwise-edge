@@ -2,10 +2,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "IoTFleetWiseConfig.h"
+#include "aws/iotfleetwise/IoTFleetWiseConfig.h"
 #include "Testing.h"
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/optional/optional_io.hpp> // IWYU pragma: keep
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>

@@ -1,9 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CollectionSchemeIngestionList.h"
-#include "CollectionSchemeIngestion.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/CollectionSchemeIngestionList.h"
+#include "aws/iotfleetwise/CollectionSchemeIngestion.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <google/protobuf/message.h>
 #include <memory>
 #include <string>
@@ -17,7 +17,7 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-const std::vector<ICollectionSchemePtr> &
+const std::vector<std::shared_ptr<ICollectionScheme>> &
 CollectionSchemeIngestionList::getCollectionSchemes() const
 {
     if ( !mReady )

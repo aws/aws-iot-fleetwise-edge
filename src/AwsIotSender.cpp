@@ -1,11 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "AwsIotSender.h"
-#include "AwsSDKMemoryManager.h"
-#include "IConnectionTypes.h"
-#include "IConnectivityModule.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/AwsIotSender.h"
+#include "aws/iotfleetwise/AwsSDKMemoryManager.h"
+#include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/IConnectivityModule.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <aws/crt/Api.h>
 #include <aws/crt/Types.h>
 #include <aws/crt/mqtt/Mqtt5Packets.h>
@@ -16,8 +16,8 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-AwsIotSender::AwsIotSender( IConnectivityModule *connectivityModule,
-                            std::shared_ptr<MqttClientWrapper> &mqttClient,
+AwsIotSender::AwsIotSender( const IConnectivityModule *connectivityModule,
+                            MqttClientWrapper &mqttClient,
                             const TopicConfig &topicConfig )
     : mConnectivityModule( connectivityModule )
     , mMqttClient( mqttClient )
@@ -109,38 +109,39 @@ AwsIotSender::publishMessageToTopic(
 {
     auto payload = Aws::Crt::ByteBufFromArray( buf, size );
 
-    auto onPublishComplete = [size, callback, this]( int errorCode,
-                                                     std::shared_ptr<Aws::Crt::Mqtt5::PublishResult> result ) mutable {
-        {
-            AwsSDKMemoryManager::getInstance().releaseReservedMemory( size );
-        }
+    auto onPublishComplete =
+        // coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
+        [size, callback, this]( int errorCode, std::shared_ptr<Aws::Crt::Mqtt5::PublishResult> result ) mutable {
+            {
+                AwsSDKMemoryManager::getInstance().releaseReservedMemory( size );
+            }
 
-        if ( result->wasSuccessful() )
-        {
+            if ( !result->wasSuccessful() )
+            {
+                auto errorString = Aws::Crt::ErrorDebugString( errorCode );
+                auto logMessage =
+                    "Publish failed with error: " +
+                    ( errorString != nullptr ? std::string( errorString ) : std::string( "Unknown error" ) );
+                if ( errorCode == AWS_ERROR_MQTT5_USER_REQUESTED_STOP )
+                {
+                    FWE_LOG_TRACE( logMessage );
+                }
+                else
+                {
+                    FWE_LOG_ERROR( logMessage );
+                }
+                callback( ConnectivityError::TransmissionError );
+                return;
+            }
+
             FWE_LOG_TRACE( "Publish succeeded" );
             mPayloadCountSent++;
             callback( ConnectivityError::Success );
-        }
-        else
-        {
-            auto errorString = Aws::Crt::ErrorDebugString( errorCode );
-            auto logMessage = "Publish failed with error: " +
-                              ( errorString != nullptr ? std::string( errorString ) : std::string( "Unknown error" ) );
-            if ( errorCode == AWS_ERROR_MQTT5_USER_REQUESTED_STOP )
-            {
-                FWE_LOG_TRACE( logMessage );
-            }
-            else
-            {
-                FWE_LOG_ERROR( logMessage );
-            }
-            callback( ConnectivityError::TransmissionError );
-        }
-    };
+        };
 
     std::shared_ptr<Aws::Crt::Mqtt5::PublishPacket> publishPacket = std::make_shared<Aws::Crt::Mqtt5::PublishPacket>(
         topic.c_str(), Aws::Crt::ByteCursorFromByteBuf( payload ), qos );
-    if ( !mMqttClient->Publish( publishPacket, onPublishComplete ) )
+    if ( !mMqttClient.Publish( publishPacket, onPublishComplete ) )
     {
         callback( ConnectivityError::TransmissionError );
     }

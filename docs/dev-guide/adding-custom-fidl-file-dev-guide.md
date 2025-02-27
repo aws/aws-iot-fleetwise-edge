@@ -70,9 +70,10 @@ Copy
       } );
       ```
 
-1. Make changes to the existing [`SomeipDataSource.h`](../../src/SomeipDataSource.h). Replace the
-   current signals with the signals in `custom_someip.fidl` in a similar way as already implemented
-   in the `SomeipDataSource.h`.
+1. Make changes to the existing
+   [`SomeipDataSource.h`](../../include/aws/iotfleetwise/SomeipDataSource.h). Replace the current
+   signals with the signals in `custom_someip.fidl` in a similar way as already implemented in the
+   `SomeipDataSource.h`.
 
    For example lets consider we are adding a signal `Temperature` of type `INT32` :
 
@@ -114,7 +115,7 @@ Copy
    }
    ```
 
-   Under `bool SomeipDataSource::init()` define `mXXXXSubscription`.
+   Under `bool SomeipDataSource::connect()` define `mXXXXSubscription`.
 
    For example:
 

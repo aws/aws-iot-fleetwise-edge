@@ -1,0 +1,9 @@
+[
+  {
+    "interfaceId": "MY_CUSTOM",
+    "type": "CUSTOM_DECODING_INTERFACE",
+    "customDecodingInterface": {
+      "name": "MyCustomInterface"
+    }
+  }
+]

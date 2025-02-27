@@ -1,0 +1,10 @@
+[
+  {
+    "fullyQualifiedName": "Vehicle.MySomeipInterface.X",
+    "interfaceId": "MY_SOMEIP",
+    "type": "CUSTOM_DECODING_SIGNAL",
+    "customDecodingSignal": {
+      "id": "Vehicle.MySomeipInterface.X"
+    }
+  }
+]

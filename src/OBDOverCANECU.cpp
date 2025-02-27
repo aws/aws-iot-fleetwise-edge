@@ -1,14 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "OBDOverCANECU.h"
-#include "CollectionInspectionAPITypes.h"
-#include "EnumUtility.h"
-#include "ISOTPOverCANOptions.h"
-#include "LoggingModule.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/OBDOverCANECU.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/EnumUtility.h"
+#include "aws/iotfleetwise/ISOTPOverCANOptions.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <algorithm>
 #include <array>
 #include <iterator>
@@ -24,30 +23,29 @@ namespace IoTFleetWise
 
 // NOLINT below due to C++17 warning of redundant declarations that are required to maintain C++14 compatibility
 constexpr size_t OBDOverCANECU::MAX_PID_RANGE; // NOLINT
+                                               //
+OBDOverCANECU::OBDOverCANECU( const std::string &gatewayCanInterfaceName,
+                              OBDDataDecoder &obdDataDecoder,
+                              const uint32_t rxId,
+                              const uint32_t txId,
+                              bool isExtendedId,
+                              SignalBufferDistributor &signalBufferDistributor,
+                              int broadcastSocket )
+    : mOBDDataDecoder( obdDataDecoder )
+    , mSignalBufferDistributor( signalBufferDistributor )
+    , mISOTPSenderReceiver(
+          ISOTPOverCANSenderReceiverOptions{ gatewayCanInterfaceName, txId, rxId, isExtendedId, broadcastSocket } )
 
-bool
-OBDOverCANECU::init( const std::string &gatewayCanInterfaceName,
-                     const std::shared_ptr<OBDDataDecoder> &obdDataDecoder,
-                     const uint32_t rxId,
-                     const uint32_t txId,
-                     bool isExtendedId,
-                     SignalBufferDistributorPtr &signalBufferDistributor,
-                     int broadcastSocket )
 {
-    ISOTPOverCANSenderReceiverOptions optionsECU;
-    optionsECU.mSocketCanIFName = gatewayCanInterfaceName;
-    optionsECU.mSourceCANId = txId;
-    optionsECU.mDestinationCANId = rxId;
-    optionsECU.mIsExtendedId = isExtendedId;
-    optionsECU.mBroadcastSocket = broadcastSocket;
-    mOBDDataDecoder = obdDataDecoder;
-    mSignalBufferDistributor = signalBufferDistributor;
-
     std::stringstream streamRx;
     streamRx << std::hex << rxId;
     mStreamRxID = streamRx.str();
+}
 
-    if ( mISOTPSenderReceiver.init( optionsECU ) && mISOTPSenderReceiver.connect() )
+bool
+OBDOverCANECU::init()
+{
+    if ( mISOTPSenderReceiver.connect() )
     {
         FWE_LOG_TRACE( "Successfully initialized ECU with ecu id: " + mStreamRxID );
     }
@@ -140,7 +138,7 @@ OBDOverCANECU::requestReceiveEmissionPIDs( const SID sid )
 void
 OBDOverCANECU::pushPIDs( const EmissionInfo &info,
                          Timestamp receptionTime,
-                         SignalBufferDistributorPtr &signalBufferDistributor,
+                         SignalBufferDistributor &signalBufferDistributor,
                          const std::string &streamRxID )
 {
     CollectedSignalsGroup collectedSignalsGroup;
@@ -175,7 +173,7 @@ OBDOverCANECU::pushPIDs( const EmissionInfo &info,
         }
     }
 
-    signalBufferDistributor->push( CollectedDataFrame( collectedSignalsGroup ) );
+    signalBufferDistributor.push( CollectedDataFrame( collectedSignalsGroup ) );
 }
 
 bool
@@ -234,7 +232,8 @@ OBDOverCANECU::receiveSupportedPIDs( const SID sid, SupportedPIDs &supportedPIDs
     {
         return false;
     }
-    if ( ( !ecuResponse.empty() ) && mOBDDataDecoder->decodeSupportedPIDs( sid, ecuResponse, supportedPIDs ) )
+    if ( ( !ecuResponse.empty() ) &&
+         Aws::IoTFleetWise::OBDDataDecoder::decodeSupportedPIDs( sid, ecuResponse, supportedPIDs ) )
     {
         return true;
     }
@@ -281,7 +280,7 @@ OBDOverCANECU::receivePIDs( const SID sid, const std::vector<PID> &pids, Emissio
     // The info structure will be appended with the new decoded PIDs
     if ( !ecuResponse.empty() )
     {
-        static_cast<void>( mOBDDataDecoder->decodeEmissionPIDs( sid, pids, ecuResponse, info ) );
+        static_cast<void>( mOBDDataDecoder.decodeEmissionPIDs( sid, pids, ecuResponse, info ) );
     }
     else
     {
@@ -310,7 +309,7 @@ OBDOverCANECU::receiveDTCs( const SID sid, DTCInfo &info )
         return false;
     }
     // The info structure will be appended with the new decoded DTCs
-    if ( ( !ecuResponse.empty() ) && mOBDDataDecoder->decodeDTCs( sid, ecuResponse, info ) )
+    if ( ( !ecuResponse.empty() ) && Aws::IoTFleetWise::OBDDataDecoder::decodeDTCs( sid, ecuResponse, info ) )
     {
         return true;
     }

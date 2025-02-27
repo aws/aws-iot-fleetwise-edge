@@ -1,9 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DataFetchManager.h"
-#include "DataFetchManagerAPITypes.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/DataFetchManager.h"
+#include "aws/iotfleetwise/DataFetchManagerAPITypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/QueueTypes.h"
 #include <algorithm>
 #include <cstdint>
 #include <functional>
@@ -16,8 +17,9 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-DataFetchManager::DataFetchManager()
+DataFetchManager::DataFetchManager( const std::shared_ptr<FetchRequestQueue> fetchQueue )
     : mFetchRequestTimer()
+    , mFetchQueue( fetchQueue )
 {
 }
 
@@ -27,7 +29,9 @@ DataFetchManager::start()
     // Prevent concurrent stop/init
     std::lock_guard<std::mutex> lock( mThreadMutex );
     mShouldStop.store( false );
-    if ( !mThread.create( doWork, this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "Data Fetch Manager Thread failed to start" );
     }
@@ -64,37 +68,30 @@ DataFetchManager::shouldStop()
 }
 
 void
-DataFetchManager::doWork( void *data )
+DataFetchManager::doWork()
 {
-    DataFetchManager *fetchManager = static_cast<DataFetchManager *>( data );
-    while ( !fetchManager->shouldStop() )
+    while ( !shouldStop() )
     {
         uint64_t minTimeToWaitMs = UINT64_MAX;
-        if ( fetchManager->mUpdatedFetchMatrixAvailable )
+        if ( mUpdatedFetchMatrixAvailable )
         {
-            std::lock_guard<std::mutex> lock( fetchManager->mFetchMatrixMutex );
-            fetchManager->mUpdatedFetchMatrixAvailable = false;
-            fetchManager->mCurrentFetchMatrix = fetchManager->mFetchMatrix;
+            std::lock_guard<std::mutex> lock( mFetchMatrixMutex );
+            mUpdatedFetchMatrixAvailable = false;
+            mCurrentFetchMatrix = mFetchMatrix;
         }
 
-        if ( fetchManager->mCurrentFetchMatrix )
+        if ( mCurrentFetchMatrix )
         {
-            {
-                std::lock_guard<std::mutex> lock( fetchManager->mFetchQueueMutex );
-                // If the queue is not empty, pop an element and process it
-                while ( ( !fetchManager->mFetchQueue.empty() ) && ( !fetchManager->shouldStop() ) )
-                {
-                    auto requestID = fetchManager->mFetchQueue.front();
-                    fetchManager->executeFetch( requestID );
-                    fetchManager->mFetchQueue.pop();
-                }
-            }
+            mFetchQueue->consumeAll( [this]( FetchRequestID &reqID ) -> FetchErrorCode {
+                return executeFetch( reqID );
+            } );
+
             // Iterate over the fetch matrix and schedule periodic requests
-            auto currentTime = fetchManager->mClock->monotonicTimeSinceEpochMs();
-            for ( const auto &periodicalRequest : fetchManager->mCurrentFetchMatrix->periodicalFetchRequestSetup )
+            auto currentTime = mClock->monotonicTimeSinceEpochMs();
+            for ( const auto &periodicalRequest : mCurrentFetchMatrix->periodicalFetchRequestSetup )
             {
                 auto requestID = periodicalRequest.first;
-                auto &executionInfo = fetchManager->mLastExecutionInformation[requestID];
+                auto &executionInfo = mLastExecutionInformation[requestID];
 
                 // Check if it's time to execute this request
                 if ( ( executionInfo.lastExecutionMonotonicTimeMs == 0 ) ||
@@ -103,7 +100,7 @@ DataFetchManager::doWork( void *data )
                 {
                     // TODO: max executions and reset interval parameters are not yet supported by the cloud and are
                     // ignored on edge Push the request to the queue
-                    fetchManager->executeFetch( requestID );
+                    executeFetch( requestID );
                     // Update execution info
                     executionInfo.lastExecutionMonotonicTimeMs = currentTime;
                 }
@@ -117,34 +114,18 @@ DataFetchManager::doWork( void *data )
         if ( minTimeToWaitMs < UINT64_MAX )
         {
             FWE_LOG_TRACE( "Waiting for: " + std::to_string( minTimeToWaitMs ) + " ms." );
-            fetchManager->mWait.wait( static_cast<uint32_t>( minTimeToWaitMs ) );
+            mWait.wait( static_cast<uint32_t>( minTimeToWaitMs ) );
         }
         else
         {
-            fetchManager->mWait.wait( Signal::WaitWithPredicate );
+            mWait.wait( Signal::WaitWithPredicate );
         }
     }
 }
 
 void
-DataFetchManager::onFetchRequest( const FetchRequestID &fetchRequestID, const bool &evaluationResult )
+DataFetchManager::onNewFetchRequestAvailable()
 {
-    std::lock_guard<std::mutex> lock( mFetchQueueMutex );
-    // Interface is extendable to have start/stop fetch in place
-    // Ignore "false/stop" for now
-    if ( !evaluationResult )
-    {
-        return;
-    }
-
-    if ( mFetchQueue.size() >= mFetchQueueMaxSize )
-    {
-        FWE_LOG_WARN( "Fetch Queue full, discarding fetch request ID " + std::to_string( fetchRequestID ) );
-        return;
-    }
-
-    mFetchQueue.push( fetchRequestID );
-    FWE_LOG_TRACE( "New fetch request was handed over" );
     mWait.notify();
 }
 
@@ -152,10 +133,6 @@ void
 DataFetchManager::onChangeFetchMatrix( std::shared_ptr<const FetchMatrix> fetchMatrix )
 {
     std::lock_guard<std::mutex> lock( mFetchMatrixMutex );
-    if ( fetchMatrix == nullptr )
-    {
-        FWE_LOG_ERROR( "Cannot set an empty fetch matrix" );
-    }
     mFetchMatrix = fetchMatrix;
     mUpdatedFetchMatrixAvailable = true;
     FWE_LOG_INFO( "Fetch Matrix updated" );
@@ -165,6 +142,11 @@ DataFetchManager::onChangeFetchMatrix( std::shared_ptr<const FetchMatrix> fetchM
 FetchErrorCode
 DataFetchManager::executeFetch( const FetchRequestID &fetchRequestID )
 {
+    if ( shouldStop() )
+    {
+        // Abort fetch executions if thread needs to stop
+        return FetchErrorCode::NOT_IMPLEMENTED;
+    }
     if ( mFetchMatrix == nullptr )
     {
         return FetchErrorCode::NOT_IMPLEMENTED;
@@ -195,7 +177,7 @@ DataFetchManager::executeFetch( const FetchRequestID &fetchRequestID )
                        std::to_string( request.signalID ) );
         auto result = functionIt->second( request.signalID, fetchRequestID, request.args );
 
-        if ( result != FetchErrorCode::SUCCESSFUL )
+        if ( ( result != FetchErrorCode::SUCCESSFUL ) && ( result != FetchErrorCode::REQUESTED_TO_STOP ) )
         {
             FWE_LOG_ERROR( "Failed to execute Custom function: " + request.functionName + " for SignalID " +
                            std::to_string( request.signalID ) );

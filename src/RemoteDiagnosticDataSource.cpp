@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "RemoteDiagnosticDataSource.h"
-#include "LoggingModule.h"
+#include "aws/iotfleetwise/RemoteDiagnosticDataSource.h"
+#include "aws/iotfleetwise/LoggingModule.h"
 #include <algorithm>
 #include <functional>
 #include <iomanip>
@@ -17,10 +17,10 @@ namespace IoTFleetWise
 {
 
 RemoteDiagnosticDataSource::RemoteDiagnosticDataSource( std::shared_ptr<NamedSignalDataSource> namedSignalDataSource,
-                                                        std::shared_ptr<RawData::BufferManager> rawDataBufferManager,
+                                                        RawData::BufferManager *rawDataBufferManager,
                                                         std::shared_ptr<IRemoteDiagnostics> diagnosticInterface )
     : mNamedSignalDataSource( std::move( namedSignalDataSource ) )
-    , mRawBufferManager( std::move( rawDataBufferManager ) )
+    , mRawDataBufferManager( rawDataBufferManager )
     , mDiagnosticInterface( std::move( diagnosticInterface ) )
 {
 }
@@ -30,7 +30,7 @@ RemoteDiagnosticDataSource::pushSnapshotJsonToRawDataBufferManager( const std::s
                                                                     FetchRequestID fetchRequestID,
                                                                     const std::string &jsonString )
 {
-    if ( ( mRawBufferManager == nullptr ) || ( mNamedSignalDataSource == nullptr ) )
+    if ( ( mRawDataBufferManager == nullptr ) || ( mNamedSignalDataSource == nullptr ) )
     {
         FWE_LOG_WARN( "Raw message for signal name " + signalName + " can not be handed over to RawBufferManager" );
         return;
@@ -45,7 +45,7 @@ RemoteDiagnosticDataSource::pushSnapshotJsonToRawDataBufferManager( const std::s
 
     auto receiveTime = mClock->systemTimeSinceEpochMs();
     std::vector<uint8_t> buffer( jsonString.begin(), jsonString.end() );
-    auto bufferHandle = mRawBufferManager->push( ( buffer.data() ), buffer.size(), receiveTime, signalID );
+    auto bufferHandle = mRawDataBufferManager->push( ( buffer.data() ), buffer.size(), receiveTime, signalID );
 
     if ( bufferHandle == RawData::INVALID_BUFFER_HANDLE )
     {
@@ -53,7 +53,7 @@ RemoteDiagnosticDataSource::pushSnapshotJsonToRawDataBufferManager( const std::s
         return;
     }
     // immediately set usage hint so buffer handle does not get directly deleted again
-    mRawBufferManager->increaseHandleUsageHint(
+    mRawDataBufferManager->increaseHandleUsageHint(
         signalID, bufferHandle, RawData::BufferHandleUsageStage::COLLECTED_NOT_IN_HISTORY_BUFFER );
 
     mNamedSignalDataSource->ingestSignalValue(
@@ -65,7 +65,9 @@ RemoteDiagnosticDataSource::start()
 {
     std::lock_guard<std::mutex> lock( mThreadMutex );
     mShouldStop.store( false );
-    if ( !mThread.create( doWork, this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "Remote Diagnostics Module Thread failed to start" );
     }
@@ -116,17 +118,15 @@ RemoteDiagnosticDataSource::isAlive()
 }
 
 void
-RemoteDiagnosticDataSource::doWork( void *data )
+RemoteDiagnosticDataSource::doWork()
 {
-    RemoteDiagnosticDataSource *remoteDiagnosticDataSource = static_cast<RemoteDiagnosticDataSource *>( data );
-
-    while ( !remoteDiagnosticDataSource->shouldStop() )
+    while ( !shouldStop() )
     {
-        remoteDiagnosticDataSource->mWait.wait( Signal::WaitWithPredicate );
+        mWait.wait( Signal::WaitWithPredicate );
 
-        std::lock_guard<std::mutex> lock( remoteDiagnosticDataSource->mQueryMapMutex );
-        auto it = remoteDiagnosticDataSource->mQueuedDTCQueries.begin();
-        while ( it != remoteDiagnosticDataSource->mQueuedDTCQueries.end() )
+        std::lock_guard<std::mutex> lock( mQueryMapMutex );
+        auto it = mQueuedDTCQueries.begin();
+        while ( it != mQueuedDTCQueries.end() )
         {
             if ( it->second.pendingQueries == 0 )
             {
@@ -140,13 +140,13 @@ RemoteDiagnosticDataSource::doWork( void *data )
                     std::string jsonString = Json::writeString( builder, root );
 
                     FWE_LOG_TRACE( "Retrieved DTCs and Snapshot: " + jsonString );
-                    remoteDiagnosticDataSource->pushSnapshotJsonToRawDataBufferManager(
+                    pushSnapshotJsonToRawDataBufferManager(
                         it->second.signalName, it->second.fetchRequestID, jsonString );
                 }
                 auto queryID = it->first;
-                it = remoteDiagnosticDataSource->mQueuedDTCQueries.erase( it );
+                it = mQueuedDTCQueries.erase( it );
                 // Erase from all maps
-                remoteDiagnosticDataSource->mQueuedDTCQueries.erase( queryID );
+                mQueuedDTCQueries.erase( queryID );
             }
             else
             {
@@ -163,8 +163,8 @@ RemoteDiagnosticDataSource::DTC_QUERY( SignalID receivedSignalID,
 {
     if ( ( shouldStop() ) || ( !isAlive() ) )
     {
-        // Don't process response if thread is shutting down
-        return FetchErrorCode::SIGNAL_NOT_FOUND;
+        // Don't process request if thread is shutting down
+        return FetchErrorCode::REQUESTED_TO_STOP;
     }
 
     if ( ( mNamedSignalDataSource == nullptr ) || ( mDiagnosticInterface == nullptr ) )
@@ -333,6 +333,11 @@ FetchErrorCode
 RemoteDiagnosticDataSource::processDtcQueryRequest( const std::string &parentQueryID,
                                                     const UdsQueryRequestParameters &requestParameters )
 {
+    if ( ( shouldStop() ) || ( !isAlive() ) )
+    {
+        // Don't process request if thread is shutting down
+        return FetchErrorCode::REQUESTED_TO_STOP;
+    }
     std::string newQueryID = generateRandomString( 24 );
     FWE_LOG_TRACE( "Sending DTC query request " + newQueryID + " for original request " + parentQueryID +
                    " for target address " + std::to_string( requestParameters.ecuID ) + ", subfunction " +
@@ -356,6 +361,11 @@ FetchErrorCode
 RemoteDiagnosticDataSource::processDtcSnapshotQueryRequest( const std::string &parentQueryID,
                                                             const UdsQueryRequestParameters &requestParameters )
 {
+    if ( ( shouldStop() ) || ( !isAlive() ) )
+    {
+        // Don't process request if thread is shutting down
+        return FetchErrorCode::REQUESTED_TO_STOP;
+    }
     std::string newQueryID = generateRandomString( 24 );
     FWE_LOG_TRACE( "Sending DTC snapshot query request " + newQueryID + " for original request " + parentQueryID +
                    " for target address " + std::to_string( requestParameters.ecuID ) + ", subfunction " +

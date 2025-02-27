@@ -1,13 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ActuatorCommandManager.h"
-#include "Assert.h"
-#include "CollectionInspectionAPITypes.h"
-#include "ICommandDispatcher.h"
-#include "LoggingModule.h"
-#include "QueueTypes.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/ActuatorCommandManager.h"
+#include "aws/iotfleetwise/Assert.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -19,10 +19,10 @@ namespace IoTFleetWise
 
 ActuatorCommandManager::ActuatorCommandManager( std::shared_ptr<DataSenderQueue> commandResponses,
                                                 size_t maxConcurrentCommandRequests,
-                                                std::shared_ptr<RawData::BufferManager> rawBufferManager )
+                                                RawData::BufferManager *rawDataBufferManager )
     : mMaxConcurrentCommandRequests( maxConcurrentCommandRequests )
     , mCommandResponses( std::move( commandResponses ) )
-    , mRawBufferManager( std::move( rawBufferManager ) )
+    , mRawDataBufferManager( rawDataBufferManager )
 {
 }
 
@@ -76,7 +76,9 @@ ActuatorCommandManager::start()
     // Prevent concurrent stop/init
     std::lock_guard<std::mutex> lock( mThreadMutex );
     mShouldStop.store( false );
-    if ( !mThread.create( doWork, this ) )
+    if ( !mThread.create( [this]() {
+             this->doWork();
+         } ) )
     {
         FWE_LOG_TRACE( "Command Manager Thread failed to start" );
     }
@@ -90,30 +92,27 @@ ActuatorCommandManager::start()
 }
 
 void
-ActuatorCommandManager::doWork( void *data )
+ActuatorCommandManager::doWork()
 {
-    ActuatorCommandManager *commandManager = static_cast<ActuatorCommandManager *>( data );
-
     // Initialize dispatchers on this thread to avoid delaying bootstrap. Commands may be received
     // directly after connection to the cloud, which will be queued until this initialization loop
     // has completed.
-    for ( auto interfaceDispatcherIt = commandManager->mInterfaceIDToCommandDispatcherMap.begin();
-          ( interfaceDispatcherIt != commandManager->mInterfaceIDToCommandDispatcherMap.end() ) &&
-          ( !commandManager->shouldStop() );
+    for ( auto interfaceDispatcherIt = mInterfaceIDToCommandDispatcherMap.begin();
+          ( interfaceDispatcherIt != mInterfaceIDToCommandDispatcherMap.end() ) && ( !shouldStop() );
           interfaceDispatcherIt++ )
     {
         FWE_GRACEFUL_FATAL_ASSERT( interfaceDispatcherIt->second->init(), "Fatal error initializing dispatcher", );
     }
 
-    while ( !commandManager->shouldStop() )
+    while ( !shouldStop() )
     {
-        commandManager->mWait.wait( Signal::WaitWithPredicate );
+        mWait.wait( Signal::WaitWithPredicate );
 
-        while ( !commandManager->mCommandRequestQueue.empty() )
+        while ( !mCommandRequestQueue.empty() )
         {
-            auto &commandRequest = commandManager->mCommandRequestQueue.front();
-            commandManager->processCommandRequest( commandRequest );
-            commandManager->mCommandRequestQueue.pop();
+            auto &commandRequest = mCommandRequestQueue.front();
+            processCommandRequest( commandRequest );
+            mCommandRequestQueue.pop();
             TraceModule::get().decrementAtomicVariable( TraceAtomicVariable::QUEUE_PENDING_COMMAND_REQUESTS );
         }
     }
@@ -129,14 +128,10 @@ ActuatorCommandManager::processCommandRequest( const ActuatorCommandRequest &com
         FWE_LOG_ERROR( "Decoder manifest sync id does not match with the decoder manifest used by the agent, cannot "
                        "process Command with ID " +
                        commandRequest.commandID );
-        queueCommandResponse(
-            commandRequest,
-            CommandStatus::EXECUTION_FAILED,
-            REASON_CODE_DECODER_MANIFEST_OUT_OF_SYNC,
-            // TODO: ALLOW_ALL_CHARS_FOR_REASON_DESCRIPTION: Add the detailed message back when the commands backend
-            // team remove the restriction on allowed chars for description
-            // commandRequest.decoderID + " vs " + mCurrentDecoderManifestID );
-            "The decoder manifest associated to the command is different from the one received by the device" );
+        queueCommandResponse( commandRequest,
+                              CommandStatus::EXECUTION_FAILED,
+                              REASON_CODE_DECODER_MANIFEST_OUT_OF_SYNC,
+                              commandRequest.decoderID + " vs " + mCurrentDecoderManifestID );
         return;
     }
 
@@ -210,9 +205,9 @@ ActuatorCommandManager::queueCommandResponse( const ActuatorCommandRequest &comm
 {
     if ( commandRequest.signalValueWrapper.type == SignalType::STRING )
     {
-        mRawBufferManager->decreaseHandleUsageHint( commandRequest.signalValueWrapper.value.rawDataVal.signalId,
-                                                    commandRequest.signalValueWrapper.value.rawDataVal.handle,
-                                                    RawData::BufferHandleUsageStage::UPLOADING );
+        mRawDataBufferManager->decreaseHandleUsageHint( commandRequest.signalValueWrapper.value.rawDataVal.signalId,
+                                                        commandRequest.signalValueWrapper.value.rawDataVal.handle,
+                                                        RawData::BufferHandleUsageStage::UPLOADING );
     }
 
     // Emit metrics for command execution

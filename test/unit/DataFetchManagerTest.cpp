@@ -1,11 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DataFetchManager.h"
-#include "CollectionInspectionAPITypes.h"
-#include "DataFetchManagerAPITypes.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/DataFetchManager.h"
 #include "WaitUntil.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/DataFetchManagerAPITypes.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include <chrono>
 #include <gtest/gtest.h>
 #include <memory>
@@ -27,15 +28,18 @@ protected:
     void
     SetUp() override
     {
-        mDataFetchManager = std::make_unique<DataFetchManager>();
+        mTestFetchQueue = std::make_shared<FetchRequestQueue>( 1000, "Test Fetch Request Queue" );
+        mDataFetchManager = std::make_unique<DataFetchManager>( mTestFetchQueue );
     }
 
     void
     TearDown() override
     {
+        mTestFetchQueue.reset();
         mDataFetchManager.reset();
     }
 
+    std::shared_ptr<FetchRequestQueue> mTestFetchQueue;
     std::unique_ptr<DataFetchManager> mDataFetchManager;
 };
 
@@ -50,8 +54,8 @@ TEST_F( DataFetchManagerTest, TestNoFetchMatrix )
             return FetchErrorCode::SUCCESSFUL;
         } );
 
-    mDataFetchManager->onFetchRequest( 1, true );
-    ASSERT_FALSE( functionCalled );
+    ASSERT_TRUE( mTestFetchQueue->push( 1 ) );
+    WAIT_ASSERT_FALSE( functionCalled );
     mDataFetchManager->stop();
 }
 
@@ -77,9 +81,8 @@ TEST_F( DataFetchManagerTest, TestUnknownFetchFunction )
     fetchRequest.args.emplace_back();
     mDataFetchManager->onChangeFetchMatrix( fetchMatrix );
 
-    mDataFetchManager->onFetchRequest( 1, true );
-
-    ASSERT_FALSE( functionCalled );
+    ASSERT_TRUE( mTestFetchQueue->push( 1 ) );
+    WAIT_ASSERT_FALSE( functionCalled );
     mDataFetchManager->stop();
 }
 
@@ -98,9 +101,8 @@ TEST_F( DataFetchManagerTest, TestNoActionsSet )
     fetchMatrix->fetchRequests.emplace( 1, std::vector<FetchRequest>() ).first->second;
 
     mDataFetchManager->onChangeFetchMatrix( fetchMatrix );
-    mDataFetchManager->onFetchRequest( 1, true );
-
-    ASSERT_FALSE( functionCalled );
+    ASSERT_TRUE( mTestFetchQueue->push( 1 ) );
+    WAIT_ASSERT_FALSE( functionCalled );
     mDataFetchManager->stop();
 }
 
@@ -125,9 +127,8 @@ TEST_F( DataFetchManagerTest, TestUnknownFetchRequestID )
     fetchRequest.args.emplace_back();
     mDataFetchManager->onChangeFetchMatrix( fetchMatrix );
 
-    mDataFetchManager->onFetchRequest( 2, true );
-
-    ASSERT_FALSE( functionCalled );
+    ASSERT_TRUE( mTestFetchQueue->push( 2 ) );
+    WAIT_ASSERT_FALSE( functionCalled );
     mDataFetchManager->stop();
 }
 
@@ -152,8 +153,7 @@ TEST_F( DataFetchManagerTest, TestRegisterCustomFetchFunction )
     fetchRequest.args.emplace_back();
     mDataFetchManager->onChangeFetchMatrix( fetchMatrix );
 
-    mDataFetchManager->onFetchRequest( 1, true );
-
+    ASSERT_TRUE( mTestFetchQueue->push( 1 ) );
     WAIT_ASSERT_TRUE( functionCalled );
     mDataFetchManager->stop();
 }
@@ -177,11 +177,11 @@ TEST_F( DataFetchManagerTest, TestPeriodicFetchRequest )
     fetchRequest.functionName = "testFunction";
     fetchRequest.args.emplace_back();
     fetchMatrix->periodicalFetchRequestSetup[1] = {
-        100, 3, 1000 }; // execute every 100ms, max 3 executions, reset every 1000ms
+        500, 3, 5000 }; // execute every 500ms, max 3 executions, reset every 5000ms
     mDataFetchManager->onChangeFetchMatrix( fetchMatrix );
     // TODO: max executions and reset interval parameters are not yet supported by the cloud and are ignored on edge
-    // Expect function calls every 100ms
-    std::this_thread::sleep_for( std::chrono::milliseconds( 450 ) );
+    // Expect function calls every 500ms
+    std::this_thread::sleep_for( std::chrono::milliseconds( 2250 ) );
     ASSERT_EQ( callCount, 5 );
     mDataFetchManager->stop();
 }

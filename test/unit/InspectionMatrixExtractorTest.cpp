@@ -1,18 +1,23 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CANInterfaceIDTranslator.h"
-#include "CheckinSender.h"
 #include "CollectionSchemeManagerMock.h"
 #include "CollectionSchemeManagerTest.h" // IWYU pragma: associated
 #include "RawDataBufferManagerSpy.h"
-#include "RawDataManager.h"
+#include "aws/iotfleetwise/CANInterfaceIDTranslator.h"
+#include "aws/iotfleetwise/CheckinSender.h"
+#include "aws/iotfleetwise/ICollectionSchemeList.h"
+#include "aws/iotfleetwise/RawDataManager.h"
 #include <boost/optional/optional.hpp>
 #include <cstdio>
 #include <functional>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <queue>
+
+#ifdef FWE_FEATURE_VISION_SYSTEM_DATA
+#include "aws/iotfleetwise/IDecoderDictionary.h"
+#endif
 
 namespace Aws
 {
@@ -34,66 +39,57 @@ TEST( InspectionMatrixExtractorTest, MatrixUpdaterTest )
         nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ) );
 
     // Mock two Inspection Engine Mock
-    std::shared_ptr<CollectionInspectionWorkerThreadMock> InspectionEnginePtr1;
-    std::shared_ptr<CollectionInspectionWorkerThreadMock> InspectionEnginePtr2;
-
-    InspectionEnginePtr1.reset( new CollectionInspectionWorkerThreadMock() );
-    InspectionEnginePtr2.reset( new CollectionInspectionWorkerThreadMock() );
+    CollectionInspectionWorkerThreadMock workerThread1;
+    CollectionInspectionWorkerThreadMock workerThread2;
 
     // Register two Inspection Engines as listeners to Inspection Matrix update
-    testPtr->subscribeToInspectionMatrixChange(
-        std::bind( &CollectionInspectionWorkerThreadMock::onChangeInspectionMatrix,
-                   InspectionEnginePtr1.get(),
-                   std::placeholders::_1 ) );
-    testPtr->subscribeToInspectionMatrixChange(
-        std::bind( &CollectionInspectionWorkerThreadMock::onChangeInspectionMatrix,
-                   InspectionEnginePtr2.get(),
-                   std::placeholders::_1 ) );
+    testPtr->subscribeToInspectionMatrixChange( std::bind(
+        &CollectionInspectionWorkerThreadMock::onChangeInspectionMatrix, &workerThread1, std::placeholders::_1 ) );
+    testPtr->subscribeToInspectionMatrixChange( std::bind(
+        &CollectionInspectionWorkerThreadMock::onChangeInspectionMatrix, &workerThread2, std::placeholders::_1 ) );
 
     // Clear Inspection Matrix update flag (this flag only exist in mock class for testing purpose)
-    InspectionEnginePtr1->setInspectionMatrixUpdateFlag( false );
-    InspectionEnginePtr2->setInspectionMatrixUpdateFlag( false );
+    workerThread1.setInspectionMatrixUpdateFlag( false );
+    workerThread2.setInspectionMatrixUpdateFlag( false );
 
     // Invoke Inspection Matrix updater
     testPtr->inspectionMatrixUpdater( std::make_shared<InspectionMatrix>() );
 
     // Check if both two consumers set Inspection Matrix update flag
-    ASSERT_TRUE( InspectionEnginePtr1->getInspectionMatrixUpdateFlag() );
-    ASSERT_TRUE( InspectionEnginePtr2->getInspectionMatrixUpdateFlag() );
+    ASSERT_TRUE( workerThread1.getInspectionMatrixUpdateFlag() );
+    ASSERT_TRUE( workerThread2.getInspectionMatrixUpdateFlag() );
 
     // Register Inspection Engine #1 as listeners to Fetch Matrix update
-    testPtr->subscribeToFetchMatrixChange( std::bind( &CollectionInspectionWorkerThreadMock::onChangeFetchMatrix,
-                                                      InspectionEnginePtr1.get(),
-                                                      std::placeholders::_1 ) );
+    testPtr->subscribeToFetchMatrixChange( std::bind(
+        &CollectionInspectionWorkerThreadMock::onChangeFetchMatrix, &workerThread1, std::placeholders::_1 ) );
 
     // Clear Fetch Matrix update flag (this flag only exist in mock class for testing purpose)
-    InspectionEnginePtr1->setFetchMatrixUpdateFlag( false );
-    InspectionEnginePtr2->setFetchMatrixUpdateFlag( false );
+    workerThread1.setFetchMatrixUpdateFlag( false );
+    workerThread2.setFetchMatrixUpdateFlag( false );
 
     // Invoke Fetch Matrix updater
     testPtr->fetchMatrixUpdater( std::make_shared<FetchMatrix>() );
 
     // Check if both two consumers set Fetch Matrix update flag appropriately
     // Only Inspection Engine #1 should receive Fetch Matrix update
-    ASSERT_TRUE( InspectionEnginePtr1->getFetchMatrixUpdateFlag() );
-    ASSERT_FALSE( InspectionEnginePtr2->getFetchMatrixUpdateFlag() );
+    ASSERT_TRUE( workerThread1.getFetchMatrixUpdateFlag() );
+    ASSERT_FALSE( workerThread2.getFetchMatrixUpdateFlag() );
 
     // Register Inspection Engine #2 as listeners to Fetch Matrix update, too
-    testPtr->subscribeToFetchMatrixChange( std::bind( &CollectionInspectionWorkerThreadMock::onChangeFetchMatrix,
-                                                      InspectionEnginePtr2.get(),
-                                                      std::placeholders::_1 ) );
+    testPtr->subscribeToFetchMatrixChange( std::bind(
+        &CollectionInspectionWorkerThreadMock::onChangeFetchMatrix, &workerThread2, std::placeholders::_1 ) );
 
     // Clear Fetch Matrix update flag (this flag only exist in mock class for testing purpose)
-    InspectionEnginePtr1->setFetchMatrixUpdateFlag( false );
-    InspectionEnginePtr2->setFetchMatrixUpdateFlag( false );
+    workerThread1.setFetchMatrixUpdateFlag( false );
+    workerThread2.setFetchMatrixUpdateFlag( false );
 
     // Invoke Fetch Matrix updater
     testPtr->fetchMatrixUpdater( std::make_shared<FetchMatrix>() );
 
     // Check if both two consumers set Fetch Matrix update flag appropriately
     // Both Inspection Engines should receive Fetch Matrix update
-    ASSERT_TRUE( InspectionEnginePtr1->getFetchMatrixUpdateFlag() );
-    ASSERT_TRUE( InspectionEnginePtr2->getFetchMatrixUpdateFlag() );
+    ASSERT_TRUE( workerThread1.getFetchMatrixUpdateFlag() );
+    ASSERT_TRUE( workerThread2.getFetchMatrixUpdateFlag() );
 }
 
 ExpressionNode *
@@ -189,17 +185,13 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorTreeTest )
 {
 
     /* construct trees */
-    ExpressionNode *tree1, *tree2, *tree3;
-    tree1 = buildTree( 1, 20 );
-    tree2 = buildTree( 11, 20 );
-    tree3 = buildTree( 21, 20 );
-    ICollectionSchemePtr collectionScheme1 =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", 0, 10, tree1 );
-    ICollectionSchemePtr collectionScheme2 =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME2", "DM1", 0, 10, tree2 );
-    ICollectionSchemePtr collectionScheme3 =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME3", "DM1", 0, 10, tree3 );
-    std::vector<ICollectionSchemePtr> list1;
+    ExpressionNode *tree1 = buildTree( 1, 20 );
+    ExpressionNode *tree2 = buildTree( 11, 20 );
+    ExpressionNode *tree3 = buildTree( 21, 20 );
+    auto collectionScheme1 = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", 0, 10, tree1 );
+    auto collectionScheme2 = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME2", "DM1", 0, 10, tree2 );
+    auto collectionScheme3 = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME3", "DM1", 0, 10, tree3 );
+    std::vector<std::shared_ptr<ICollectionScheme>> list1;
     list1.emplace_back( collectionScheme1 );
     list1.emplace_back( collectionScheme2 );
     list1.emplace_back( collectionScheme3 );
@@ -212,23 +204,23 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorTreeTest )
     test.setCollectionSchemeList( PL1 );
     // All three polices are expected to be enabled
     ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
-    std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
-    std::shared_ptr<FetchMatrix> fetchMatrixOutput = std::make_shared<struct FetchMatrix>();
+    InspectionMatrix output;
+    FetchMatrix fetchMatrixOutput;
     test.matrixExtractor( output, fetchMatrixOutput );
 
     /* exam output */
-    for ( uint32_t i = 0; i < output->expressionNodeStorage.size(); i++ )
+    for ( uint32_t i = 0; i < output.expressionNodeStorage.size(); i++ )
     {
         if ( i % 10 == 0 )
         {
             printf( "\n\n" );
         }
-        printf( "%4d ", static_cast<uint32_t>( output->expressionNodeStorage[i].floatingValue ) );
+        printf( "%4d ", static_cast<uint32_t>( output.expressionNodeStorage[i].floatingValue ) );
     }
     printf( "\nPrinting and verifying trees pre-order:\n" );
-    for ( uint32_t i = 0; i < output->conditions.size(); i++ )
+    for ( uint32_t i = 0; i < output.conditions.size(); i++ )
     {
-        const ExpressionNode *root = output->conditions[i].condition;
+        const ExpressionNode *root = output.conditions[i].condition;
         printAndVerifyTree( root );
     }
     deleteTree( tree1 );
@@ -243,16 +235,9 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorConditionDataTest )
     Signals.sampleBufferSize = 2;
     Signals.minimumSampleIntervalMs = 3;
     Signals.fixedWindowPeriod = 4;
-    struct CanFrameCollectionInfo CANFrame;
-    CANFrame.frameID = 101;
-    CANFrame.interfaceID = "102";
-    CANFrame.sampleBufferSize = 103;
-    CANFrame.minimumSampleIntervalMs = 104;
     std::vector<SignalCollectionInfo> testSignals = { Signals };
-    std::vector<CanFrameCollectionInfo> testCANFrames = { CANFrame };
-    ICollectionSchemePtr collectionScheme =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", 0, 10, testSignals, testCANFrames );
-    std::vector<ICollectionSchemePtr> list1;
+    auto collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", 0, 10, testSignals );
+    std::vector<std::shared_ptr<ICollectionScheme>> list1;
     list1.emplace_back( collectionScheme );
     CANInterfaceIDTranslator canIDTranslator;
     canIDTranslator.add( "102" );
@@ -263,10 +248,10 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorConditionDataTest )
     test.setCollectionSchemeList( PL1 );
 
     ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
-    std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
-    std::shared_ptr<FetchMatrix> fetchMatrixOutput = std::make_shared<struct FetchMatrix>();
+    InspectionMatrix output;
+    FetchMatrix fetchMatrixOutput;
     test.matrixExtractor( output, fetchMatrixOutput );
-    for ( auto conditionData : output->conditions )
+    for ( auto conditionData : output.conditions )
     {
         // Signals
         ASSERT_EQ( conditionData.signals.size(), 1 );
@@ -275,12 +260,6 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorConditionDataTest )
         ASSERT_EQ( Signals.minimumSampleIntervalMs, conditionData.signals[0].minimumSampleIntervalMs );
         ASSERT_EQ( Signals.fixedWindowPeriod, conditionData.signals[0].fixedWindowPeriod );
         ASSERT_EQ( Signals.isConditionOnlySignal, conditionData.signals[0].isConditionOnlySignal );
-        // Raw Frames
-        ASSERT_EQ( conditionData.canFrames.size(), 1 );
-        ASSERT_EQ( CANFrame.frameID, conditionData.canFrames[0].frameID );
-        ASSERT_EQ( CANFrame.interfaceID, canIDTranslator.getInterfaceID( conditionData.canFrames[0].channelID ) );
-        ASSERT_EQ( CANFrame.sampleBufferSize, conditionData.canFrames[0].sampleBufferSize );
-        ASSERT_EQ( CANFrame.minimumSampleIntervalMs, conditionData.canFrames[0].minimumSampleIntervalMs );
         // Decoder and CollectionScheme IDs
         ASSERT_EQ( conditionData.metadata.decoderID, collectionScheme->getDecoderManifestID() );
         ASSERT_EQ( conditionData.metadata.collectionSchemeID, collectionScheme->getCollectionSchemeID() );
@@ -307,26 +286,9 @@ addSignalCollectionInfo( std::vector<SignalCollectionInfo> &collectSignals,
 }
 
 static void
-addCanFrameCollectionInfo( std::vector<CanFrameCollectionInfo> &collectRawCanFrames,
-                           CANRawFrameID canMessageID,
-                           InterfaceID canInterfaceID,
-                           uint32_t sampleBufferSize,
-                           uint32_t minimumSamplePeriodMs )
-{
-    collectRawCanFrames.emplace_back();
-
-    CanFrameCollectionInfo &collectRawCanFrame = collectRawCanFrames.back();
-
-    collectRawCanFrame.frameID = canMessageID;
-    collectRawCanFrame.interfaceID = canInterfaceID;
-    collectRawCanFrame.sampleBufferSize = sampleBufferSize;
-    collectRawCanFrame.minimumSampleIntervalMs = minimumSamplePeriodMs;
-}
-
-static void
 addFetchInformation( std::vector<FetchInformation> &fetchInformations,
-                     const std::shared_ptr<std::vector<ExpressionNode>> &nodesForFetchCondition,
-                     const std::shared_ptr<std::vector<ExpressionNode>> &nodesForFetchAction,
+                     std::shared_ptr<std::vector<ExpressionNode>> nodesForFetchCondition,
+                     std::shared_ptr<std::vector<ExpressionNode>> nodesForFetchAction,
                      SignalID signalID,
                      bool isTimeBased,
                      uint64_t maxExecutionCount,
@@ -414,7 +376,6 @@ addFetchInformation( std::vector<FetchInformation> &fetchInformations,
 TEST( CollectionSchemeManager, MatrixExtractorTest )
 {
     std::vector<SignalCollectionInfo> collectSignals;
-    std::vector<CanFrameCollectionInfo> collectRawCanFrames;
     std::vector<FetchInformation> fetchInformations;
     ExpressionNode *tree = new ExpressionNode();
     tree->nodeType = ExpressionNodeType::IS_NULL_FUNCTION;
@@ -433,7 +394,6 @@ TEST( CollectionSchemeManager, MatrixExtractorTest )
     addSignalCollectionInfo( collectSignals, signalID1, 11, 12, 13, false );
     addSignalCollectionInfo( collectSignals, signalID2, 21, 22, 23, false );
     addSignalCollectionInfo( collectSignals, signalID3, 31, 32, 33, true );
-    addCanFrameCollectionInfo( collectRawCanFrames, 100, "110", 120, 130 );
 
     // refer to addFetchInformation implementation
     // each FetchInformations need 0-1 ExpressionNode for condition and 1-2 ExpressionNodes for actions
@@ -534,22 +494,21 @@ TEST( CollectionSchemeManager, MatrixExtractorTest )
                          true,
                          ExpressionNodeType::FLOAT );
 
-    ICollectionSchemePtr collectionScheme = std::make_shared<ICollectionSchemeTest>( "CollectionScheme 1",
-                                                                                     "DecoderManifest 1",
-                                                                                     10000,
-                                                                                     11000,
-                                                                                     12000,
-                                                                                     13000,
-                                                                                     true,
-                                                                                     false,
-                                                                                     14000,
-                                                                                     false,
-                                                                                     true,
-                                                                                     collectSignals,
-                                                                                     collectRawCanFrames,
-                                                                                     tree,
-                                                                                     fetchInformations );
-    std::vector<ICollectionSchemePtr> collectionSchemes;
+    auto collectionScheme = std::make_shared<ICollectionSchemeTest>( "CollectionScheme 1",
+                                                                     "DecoderManifest 1",
+                                                                     10000,
+                                                                     11000,
+                                                                     12000,
+                                                                     13000,
+                                                                     true,
+                                                                     false,
+                                                                     14000,
+                                                                     false,
+                                                                     true,
+                                                                     collectSignals,
+                                                                     tree,
+                                                                     fetchInformations );
+    std::vector<std::shared_ptr<ICollectionScheme>> collectionSchemes;
 
     collectionSchemes.emplace_back( collectionScheme );
 
@@ -567,8 +526,8 @@ TEST( CollectionSchemeManager, MatrixExtractorTest )
 
     ASSERT_TRUE( test.updateMapsandTimeLine( { 10000, 10000 } ) );
 
-    std::shared_ptr<InspectionMatrix> inspectionMatrix = std::make_shared<InspectionMatrix>();
-    std::shared_ptr<FetchMatrix> fetchMatrix = std::make_shared<FetchMatrix>();
+    InspectionMatrix inspectionMatrix;
+    FetchMatrix fetchMatrix;
 
     test.matrixExtractor( inspectionMatrix, fetchMatrix );
 
@@ -577,59 +536,59 @@ TEST( CollectionSchemeManager, MatrixExtractorTest )
     // FetchRequestID 1 is condition-based and for signalID1
     // FetchRequestID 2 is time-based and for signalID2
     // FetchRequestID 3 is condition-based and for signalID2
-    ASSERT_EQ( fetchMatrix->fetchRequests.size(), 4 );
+    ASSERT_EQ( fetchMatrix.fetchRequests.size(), 4 );
 
-    ASSERT_EQ( fetchMatrix->fetchRequests.count( 0 ), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[0].size(), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[0].at( 0 ).signalID, signalID1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[0].at( 0 ).functionName, "Custom_Function_Name" );
-    ASSERT_EQ( fetchMatrix->fetchRequests[0].at( 0 ).args.size(), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[0].at( 0 ).args.at( 0 ).type, InspectionValue::DataType::DOUBLE );
-    ASSERT_EQ( fetchMatrix->fetchRequests[0].at( 0 ).args.at( 0 ).doubleVal, 1.0 );
+    ASSERT_EQ( fetchMatrix.fetchRequests.count( 0 ), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[0].size(), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[0].at( 0 ).signalID, signalID1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[0].at( 0 ).functionName, "Custom_Function_Name" );
+    ASSERT_EQ( fetchMatrix.fetchRequests[0].at( 0 ).args.size(), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[0].at( 0 ).args.at( 0 ).type, InspectionValue::DataType::DOUBLE );
+    ASSERT_EQ( fetchMatrix.fetchRequests[0].at( 0 ).args.at( 0 ).doubleVal, 1.0 );
 
-    ASSERT_EQ( fetchMatrix->fetchRequests.count( 1 ), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[1].size(), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[1].at( 0 ).signalID, signalID1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[1].at( 0 ).functionName, "Custom_Function_Name" );
-    ASSERT_EQ( fetchMatrix->fetchRequests[1].at( 0 ).args.size(), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[1].at( 0 ).args.at( 0 ).type, InspectionValue::DataType::STRING );
-    ASSERT_EQ( *( fetchMatrix->fetchRequests[1].at( 0 ).args.at( 0 ).stringVal ), "test_string" );
+    ASSERT_EQ( fetchMatrix.fetchRequests.count( 1 ), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[1].size(), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[1].at( 0 ).signalID, signalID1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[1].at( 0 ).functionName, "Custom_Function_Name" );
+    ASSERT_EQ( fetchMatrix.fetchRequests[1].at( 0 ).args.size(), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[1].at( 0 ).args.at( 0 ).type, InspectionValue::DataType::STRING );
+    ASSERT_EQ( *( fetchMatrix.fetchRequests[1].at( 0 ).args.at( 0 ).stringVal ), "test_string" );
 
-    ASSERT_EQ( fetchMatrix->fetchRequests.count( 2 ), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[2].size(), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[2].at( 0 ).signalID, signalID2 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[2].at( 0 ).functionName, "Custom_Function_Name" );
-    ASSERT_EQ( fetchMatrix->fetchRequests[2].at( 0 ).args.size(), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[2].at( 0 ).args.at( 0 ).type, InspectionValue::DataType::BOOL );
-    ASSERT_EQ( fetchMatrix->fetchRequests[2].at( 0 ).args.at( 0 ).boolVal, true );
+    ASSERT_EQ( fetchMatrix.fetchRequests.count( 2 ), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[2].size(), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[2].at( 0 ).signalID, signalID2 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[2].at( 0 ).functionName, "Custom_Function_Name" );
+    ASSERT_EQ( fetchMatrix.fetchRequests[2].at( 0 ).args.size(), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[2].at( 0 ).args.at( 0 ).type, InspectionValue::DataType::BOOL );
+    ASSERT_EQ( fetchMatrix.fetchRequests[2].at( 0 ).args.at( 0 ).boolVal, true );
 
-    ASSERT_EQ( fetchMatrix->fetchRequests.count( 3 ), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[3].size(), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[3].at( 0 ).signalID, signalID2 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[3].at( 0 ).functionName, "Custom_Function_Name" );
-    ASSERT_EQ( fetchMatrix->fetchRequests[3].at( 0 ).args.size(), 1 );
-    ASSERT_EQ( fetchMatrix->fetchRequests[3].at( 0 ).args.at( 0 ).type, InspectionValue::DataType::BOOL );
-    ASSERT_EQ( fetchMatrix->fetchRequests[3].at( 0 ).args.at( 0 ).boolVal, true );
+    ASSERT_EQ( fetchMatrix.fetchRequests.count( 3 ), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[3].size(), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[3].at( 0 ).signalID, signalID2 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[3].at( 0 ).functionName, "Custom_Function_Name" );
+    ASSERT_EQ( fetchMatrix.fetchRequests[3].at( 0 ).args.size(), 1 );
+    ASSERT_EQ( fetchMatrix.fetchRequests[3].at( 0 ).args.at( 0 ).type, InspectionValue::DataType::BOOL );
+    ASSERT_EQ( fetchMatrix.fetchRequests[3].at( 0 ).args.at( 0 ).boolVal, true );
 
-    ASSERT_EQ( fetchMatrix->periodicalFetchRequestSetup.size(), 2 );
+    ASSERT_EQ( fetchMatrix.periodicalFetchRequestSetup.size(), 2 );
 
-    ASSERT_EQ( fetchMatrix->periodicalFetchRequestSetup.count( 0 ), 1 );
-    ASSERT_EQ( fetchMatrix->periodicalFetchRequestSetup[0].maxExecutionCount, 1000 );
-    ASSERT_EQ( fetchMatrix->periodicalFetchRequestSetup[0].fetchFrequencyMs, 1100 );
-    ASSERT_EQ( fetchMatrix->periodicalFetchRequestSetup[0].maxExecutionCountResetPeriodMs, 1200 );
+    ASSERT_EQ( fetchMatrix.periodicalFetchRequestSetup.count( 0 ), 1 );
+    ASSERT_EQ( fetchMatrix.periodicalFetchRequestSetup[0].maxExecutionCount, 1000 );
+    ASSERT_EQ( fetchMatrix.periodicalFetchRequestSetup[0].fetchFrequencyMs, 1100 );
+    ASSERT_EQ( fetchMatrix.periodicalFetchRequestSetup[0].maxExecutionCountResetPeriodMs, 1200 );
 
-    ASSERT_EQ( fetchMatrix->periodicalFetchRequestSetup.count( 2 ), 1 );
-    ASSERT_EQ( fetchMatrix->periodicalFetchRequestSetup[2].maxExecutionCount, 5000 );
-    ASSERT_EQ( fetchMatrix->periodicalFetchRequestSetup[2].fetchFrequencyMs, 5100 );
-    ASSERT_EQ( fetchMatrix->periodicalFetchRequestSetup[2].maxExecutionCountResetPeriodMs, 5200 );
+    ASSERT_EQ( fetchMatrix.periodicalFetchRequestSetup.count( 2 ), 1 );
+    ASSERT_EQ( fetchMatrix.periodicalFetchRequestSetup[2].maxExecutionCount, 5000 );
+    ASSERT_EQ( fetchMatrix.periodicalFetchRequestSetup[2].fetchFrequencyMs, 5100 );
+    ASSERT_EQ( fetchMatrix.periodicalFetchRequestSetup[2].maxExecutionCountResetPeriodMs, 5200 );
 
     // main condition is nullptr => contribute 0 ExpressionNode
     // FetchRequestID 1 is condition-based => contribute 1 ExpressionNode (because ExpressionNodeType::SIGNAL is used)
     // FetchRequestID 3 is condition-based => contribute 1 ExpressionNode (because ExpressionNodeType::SIGNAL is used)
     // Two more nodes for condition expression
-    ASSERT_EQ( inspectionMatrix->expressionNodeStorage.size(), 4 );
+    ASSERT_EQ( inspectionMatrix.expressionNodeStorage.size(), 4 );
 
-    for ( auto conditionData : inspectionMatrix->conditions )
+    for ( auto conditionData : inspectionMatrix.conditions )
     {
         ASSERT_NE( conditionData.condition, nullptr );
         ASSERT_EQ( conditionData.minimumPublishIntervalMs, 12000 );
@@ -673,23 +632,16 @@ TEST( CollectionSchemeManager, MatrixExtractorTest )
         ASSERT_EQ( conditionData.signals[2].isConditionOnlySignal, true );
         ASSERT_EQ( conditionData.signals[2].fetchRequestIDs.size(), 0 );
 
-        // canFrames
-        ASSERT_EQ( conditionData.canFrames.size(), 1 );
-        ASSERT_EQ( conditionData.canFrames[0].frameID, 100 );
-        ASSERT_EQ( canIDTranslator.getInterfaceID( conditionData.canFrames[0].channelID ), "110" );
-        ASSERT_EQ( conditionData.canFrames[0].sampleBufferSize, 120 );
-        ASSERT_EQ( conditionData.canFrames[0].minimumSampleIntervalMs, 130 );
-
         // fetchConditions
         ASSERT_EQ( conditionData.fetchConditions.size(), 2 );
 
-        ASSERT_EQ( conditionData.fetchConditions[0].condition, &inspectionMatrix->expressionNodeStorage[2] );
+        ASSERT_EQ( conditionData.fetchConditions[0].condition, &inspectionMatrix.expressionNodeStorage[2] );
         ASSERT_EQ( conditionData.fetchConditions[0].condition->nodeType, ExpressionNodeType::SIGNAL );
         ASSERT_EQ( conditionData.fetchConditions[0].condition->signalID, signalID1 );
         ASSERT_EQ( conditionData.fetchConditions[0].triggerOnlyOnRisingEdge, true );
         ASSERT_EQ( conditionData.fetchConditions[0].fetchRequestID, 1 );
 
-        ASSERT_EQ( conditionData.fetchConditions[1].condition, &inspectionMatrix->expressionNodeStorage[3] );
+        ASSERT_EQ( conditionData.fetchConditions[1].condition, &inspectionMatrix.expressionNodeStorage[3] );
         ASSERT_EQ( conditionData.fetchConditions[1].condition->nodeType, ExpressionNodeType::SIGNAL );
         ASSERT_EQ( conditionData.fetchConditions[1].condition->signalID, signalID2 );
         ASSERT_EQ( conditionData.fetchConditions[1].triggerOnlyOnRisingEdge, true );
@@ -720,34 +672,29 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterTest 
     signal3.minimumSampleIntervalMs = 3;
     signal3.fixedWindowPeriod = 4;
     std::vector<SignalCollectionInfo> testSignals = { signal1, signal2, signal3 };
-    std::vector<CanFrameCollectionInfo> testCANFrames = {};
-    ICollectionSchemePtr collectionScheme =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DMBM1", 0, 10, testSignals, testCANFrames );
-    std::vector<ICollectionSchemePtr> list1;
+    auto collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DMBM1", 0, 10, testSignals );
+    std::vector<std::shared_ptr<ICollectionScheme>> list1;
     list1.emplace_back( collectionScheme );
 
-    // Create a Raw Data Buffer Manager
-    auto rawDataBufferManager =
-        std::make_shared<RawData::BufferManager>( RawData::BufferManagerConfig::create().get() );
-
+    RawData::BufferManager rawDataBufferManager( RawData::BufferManagerConfig::create().get() );
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerWrapper test(
-        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", rawDataBufferManager );
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", &rawDataBufferManager );
     IDecoderManifestPtr DMBM1 = std::make_shared<IDecoderManifestTest>( "DMBM1" );
     ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DMBM1 );
     test.setCollectionSchemeList( PL1 );
 
     // Config not set so no Buffer should be allocated
-    ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 0 );
+    ASSERT_EQ( rawDataBufferManager.getActiveBuffers(), 0 );
 
     ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
     std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
     std::unordered_map<RawData::BufferTypeId, Aws::IoTFleetWise::RawData::SignalUpdateConfig> updatedSignals;
     test.updateRawDataBufferConfigComplexSignals( nullptr, updatedSignals );
     // The Config should be updated and 3 Raw Data Buffer should be Allocated
-    rawDataBufferManager->updateConfig( updatedSignals );
-    ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 3 );
+    rawDataBufferManager.updateConfig( updatedSignals );
+    ASSERT_EQ( rawDataBufferManager.getActiveBuffers(), 3 );
 }
 
 /** @brief
@@ -771,37 +718,35 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterMemLo
     signal3.minimumSampleIntervalMs = 3;
     signal3.fixedWindowPeriod = 4;
     std::vector<SignalCollectionInfo> testSignals = { signal1, signal2, signal3 };
-    std::vector<CanFrameCollectionInfo> testCANFrames = {};
-    ICollectionSchemePtr collectionScheme =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DMBM1", 0, 10, testSignals, testCANFrames );
-    std::vector<ICollectionSchemePtr> list1;
+    auto collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DMBM1", 0, 10, testSignals );
+    std::vector<std::shared_ptr<ICollectionScheme>> list1;
     list1.emplace_back( collectionScheme );
 
     size_t maxBytes = 10000;
     size_t reservedBytesPerSignal = 5000;
     std::vector<RawData::SignalBufferOverrides> overridesPerSignal;
-    auto rawDataBufferManager = std::make_shared<RawData::BufferManager>(
+    RawData::BufferManager rawDataBufferManager(
         RawData::BufferManagerConfig::create( maxBytes, reservedBytesPerSignal, {}, {}, {}, overridesPerSignal )
             .get() );
 
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerWrapper test(
-        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", rawDataBufferManager );
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", &rawDataBufferManager );
     IDecoderManifestPtr DMBM1 = std::make_shared<IDecoderManifestTest>( "DMBM1" );
     ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DMBM1 );
     test.setCollectionSchemeList( PL1 );
 
     // Config not set so no Buffer should be allocated
-    ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 0 );
+    ASSERT_EQ( rawDataBufferManager.getActiveBuffers(), 0 );
 
     ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
     std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
     std::unordered_map<RawData::BufferTypeId, Aws::IoTFleetWise::RawData::SignalUpdateConfig> updatedSignals;
     test.updateRawDataBufferConfigComplexSignals( nullptr, updatedSignals );
-    rawDataBufferManager->updateConfig( updatedSignals );
+    rawDataBufferManager.updateConfig( updatedSignals );
     // The Config should be updated and have only 2 Raw Data Buffer due to limited memory
-    ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 2 );
+    ASSERT_EQ( rawDataBufferManager.getActiveBuffers(), 2 );
 }
 
 TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithComplexDataDictionary )
@@ -830,19 +775,14 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithC
     signal4.fixedWindowPeriod = 4;
 
     std::vector<SignalCollectionInfo> testSignals = { signal1, signal2, signal3, signal4 };
-    std::vector<CanFrameCollectionInfo> testCANFrames = {};
-    ICollectionSchemePtr collectionScheme =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DMBM1", 0, 10, testSignals, testCANFrames );
-    std::vector<ICollectionSchemePtr> list1;
+    auto collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DMBM1", 0, 10, testSignals );
+    std::vector<std::shared_ptr<ICollectionScheme>> list1;
     list1.emplace_back( collectionScheme );
 
-    // Create a Raw Data Buffer Manager
-    auto rawDataBufferManager =
-        std::make_shared<NiceMock<Testing::RawDataBufferManagerSpy>>( RawData::BufferManagerConfig::create().get() );
-
+    NiceMock<Testing::RawDataBufferManagerSpy> rawDataBufferManager( RawData::BufferManagerConfig::create().get() );
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerWrapper test(
-        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", rawDataBufferManager );
+        nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", &rawDataBufferManager );
 
     std::unordered_map<InterfaceID, std::unordered_map<CANRawFrameID, CANMessageFormat>> formatMap;
     std::unordered_map<SignalID, std::pair<CANRawFrameID, InterfaceID>> signalToFrameAndNodeID;
@@ -865,7 +805,7 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithC
     test.setCollectionSchemeList( PL1 );
 
     // Config not set so no Buffer should be allocated
-    ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 0 );
+    ASSERT_EQ( rawDataBufferManager.getActiveBuffers(), 0 );
 
     ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
     std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
@@ -886,12 +826,12 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithC
 
     std::unordered_map<RawData::BufferTypeId, Aws::IoTFleetWise::RawData::SignalUpdateConfig> updatedSignals;
 
-    EXPECT_CALL( *rawDataBufferManager, mockedUpdateConfig( _ ) ).WillOnce( [&updatedSignals]( auto arg ) {
+    EXPECT_CALL( rawDataBufferManager, mockedUpdateConfig( _ ) ).WillOnce( [&updatedSignals]( auto arg ) {
         updatedSignals = arg;
         return RawData::BufferErrorCode::SUCCESSFUL;
     } );
     // Verify that the list of updatedSignals isn't overwritten
-    test.updateRawDataBufferConfigComplexSignals( complexDataDictionary, updatedSignals );
+    test.updateRawDataBufferConfigComplexSignals( complexDataDictionary.get(), updatedSignals );
     test.updateRawDataBufferConfigStringSignals( updatedSignals );
 
     ASSERT_EQ( updatedSignals.size(), 4 );
@@ -918,10 +858,10 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithC
     ASSERT_EQ( updatedSignals[signal4.signalID].interfaceId, "30" );
     ASSERT_EQ( updatedSignals[signal4.signalID].messageId, "custom-decoder-0" );
 
-    rawDataBufferManager->updateConfig( updatedSignals );
+    rawDataBufferManager.updateConfig( updatedSignals );
 
     // The Config should be updated and 4 Raw Data Buffer should be Allocated
-    ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 4 );
+    ASSERT_EQ( rawDataBufferManager.getActiveBuffers(), 4 );
 }
 #endif
 
@@ -939,22 +879,17 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithC
     signal2.minimumSampleIntervalMs = 3;
     signal2.fixedWindowPeriod = 4;
     std::vector<SignalCollectionInfo> testSignals = { signal1, signal2 };
-    std::vector<CanFrameCollectionInfo> testCANFrames = {};
-    ICollectionSchemePtr collectionScheme =
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DMBM1", 0, 10, testSignals, testCANFrames );
-    std::vector<ICollectionSchemePtr> list1;
+    auto collectionScheme = std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DMBM1", 0, 10, testSignals );
+    std::vector<std::shared_ptr<ICollectionScheme>> list1;
     list1.emplace_back( collectionScheme );
 
-    // Create a Raw Data Buffer Manager
-    auto rawDataBufferManager =
-        std::make_shared<NiceMock<Testing::RawDataBufferManagerSpy>>( RawData::BufferManagerConfig::create().get() );
-
+    NiceMock<Testing::RawDataBufferManagerSpy> rawDataBufferManager( RawData::BufferManagerConfig::create().get() );
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerWrapper test( nullptr,
                                          canIDTranslator,
                                          std::make_shared<CheckinSender>( nullptr ),
                                          "DMBM1",
-                                         rawDataBufferManager
+                                         &rawDataBufferManager
 #ifdef FWE_FEATURE_REMOTE_COMMANDS
                                          ,
                                          []() {
@@ -978,14 +913,14 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithC
     test.setCollectionSchemeList( PL1 );
 
     // Config not set so no Buffer should be allocated
-    ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 0 );
+    ASSERT_EQ( rawDataBufferManager.getActiveBuffers(), 0 );
 
     ASSERT_TRUE( test.updateMapsandTimeLine( { 0, 0 } ) );
     std::shared_ptr<InspectionMatrix> output = std::make_shared<struct InspectionMatrix>();
 
     std::unordered_map<RawData::BufferTypeId, Aws::IoTFleetWise::RawData::SignalUpdateConfig> updatedSignals;
 
-    EXPECT_CALL( *rawDataBufferManager, mockedUpdateConfig( _ ) ).WillOnce( [&updatedSignals]( auto arg ) {
+    EXPECT_CALL( rawDataBufferManager, mockedUpdateConfig( _ ) ).WillOnce( [&updatedSignals]( auto arg ) {
         updatedSignals = arg;
         return RawData::BufferErrorCode::SUCCESSFUL;
     } );
@@ -999,10 +934,10 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithC
     ASSERT_EQ( updatedSignals[signal1.signalID].interfaceId, "30" );
     ASSERT_EQ( updatedSignals[signal1.signalID].messageId, "custom-decoder-0" );
 
-    rawDataBufferManager->updateConfig( updatedSignals );
+    rawDataBufferManager.updateConfig( updatedSignals );
 
     // The Config should be updated and 1 Raw Data Buffer should be Allocated
-    ASSERT_EQ( rawDataBufferManager->getActiveBuffers(), 1 );
+    ASSERT_EQ( rawDataBufferManager.getActiveBuffers(), 1 );
 }
 
 } // namespace IoTFleetWise

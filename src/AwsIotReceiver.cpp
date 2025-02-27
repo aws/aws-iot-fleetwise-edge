@@ -1,11 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "AwsIotReceiver.h"
-#include "IConnectivityModule.h"
-#include "LoggingModule.h"
-#include "TimeTypes.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/AwsIotReceiver.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TimeTypes.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <aws/crt/Api.h>
 #include <aws/crt/Optional.h>
 #include <aws/crt/Types.h>
@@ -20,11 +19,8 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-AwsIotReceiver::AwsIotReceiver( IConnectivityModule *connectivityModule,
-                                std::shared_ptr<MqttClientWrapper> &mqttClient,
-                                std::string topicName )
-    : mConnectivityModule( connectivityModule )
-    , mMqttClient( mqttClient )
+AwsIotReceiver::AwsIotReceiver( MqttClientWrapper &mqttClient, std::string topicName )
+    : mMqttClient( mqttClient )
     , mTopicName( std::move( topicName ) )
     , mSubscribed( false )
 {
@@ -33,23 +29,6 @@ AwsIotReceiver::AwsIotReceiver( IConnectivityModule *connectivityModule,
 AwsIotReceiver::~AwsIotReceiver()
 {
     unsubscribe();
-}
-
-bool
-AwsIotReceiver::isAlive()
-{
-    std::lock_guard<std::mutex> connectivityLock( mConnectivityMutex );
-    return isAliveNotThreadSafe();
-}
-
-bool
-AwsIotReceiver::isAliveNotThreadSafe()
-{
-    if ( mConnectivityModule == nullptr )
-    {
-        return false;
-    }
-    return mConnectivityModule->isAlive() && mSubscribed;
 }
 
 ConnectivityError
@@ -65,11 +44,6 @@ AwsIotReceiver::subscribe()
     {
         FWE_LOG_ERROR( "Empty ingestion topic name provided" );
         return ConnectivityError::NotConfigured;
-    }
-    if ( !mConnectivityModule->isAlive() )
-    {
-        FWE_LOG_ERROR( "MQTT Connection not established, failed to subscribe" );
-        return ConnectivityError::NoConnection;
     }
 
     /*
@@ -133,7 +107,7 @@ AwsIotReceiver::subscribe()
     auto subPacket = std::make_shared<Aws::Crt::Mqtt5::SubscribePacket>();
     subPacket->WithSubscription( std::move( sub1 ) );
 
-    if ( !mMqttClient->Subscribe( subPacket, onSubAck ) )
+    if ( !mMqttClient.Subscribe( subPacket, onSubAck ) )
     {
         FWE_LOG_ERROR( "Subscribe failed for topic " + mTopicName );
         return ConnectivityError::NoConnection;
@@ -186,7 +160,7 @@ AwsIotReceiver::unsubscribeAsync()
     auto unsubscribeFinishedPromise = std::make_shared<std::promise<bool>>();
     auto unsubscribeFuture = unsubscribeFinishedPromise->get_future();
 
-    if ( !isAliveNotThreadSafe() )
+    if ( !mSubscribed )
     {
         unsubscribeFinishedPromise->set_value( false );
         return unsubscribeFuture;
@@ -196,7 +170,7 @@ AwsIotReceiver::unsubscribeAsync()
     auto unsubPacket = std::make_shared<Aws::Crt::Mqtt5::UnsubscribePacket>();
     // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
     unsubPacket->WithTopicFilter( mTopicName.c_str() );
-    mMqttClient->Unsubscribe(
+    mMqttClient.Unsubscribe(
         unsubPacket,
         [this, unsubscribeFinishedPromise]( int errorCode, std::shared_ptr<UnSubAckPacket> unsubAckPacket ) {
             if ( errorCode != 0 )

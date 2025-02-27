@@ -1,12 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DataSenderProtoWriter.h"
-#include "LoggingModule.h"
-#include "SignalTypes.h"
-#include <array>
+#include "aws/iotfleetwise/DataSenderProtoWriter.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include <google/protobuf/message.h>
-#include <memory>
 #include <utility>
 
 namespace Aws
@@ -15,10 +13,10 @@ namespace IoTFleetWise
 {
 
 DataSenderProtoWriter::DataSenderProtoWriter( CANInterfaceIDTranslator &canIDTranslator,
-                                              std::shared_ptr<RawData::BufferManager> rawDataBufferManager )
+                                              RawData::BufferManager *rawDataBufferManager )
     : mTriggerTime( 0U )
     , mIDTranslator( canIDTranslator )
-    , mRawDataBufferManager( std::move( rawDataBufferManager ) )
+    , mRawDataBufferManager( rawDataBufferManager )
 {
 }
 
@@ -28,18 +26,18 @@ DataSenderProtoWriter::~DataSenderProtoWriter()
 }
 
 void
-DataSenderProtoWriter::setupVehicleData(
-    std::shared_ptr<const TriggeredCollectionSchemeData> triggeredCollectionSchemeData, uint32_t collectionEventID )
+DataSenderProtoWriter::setupVehicleData( const TriggeredCollectionSchemeData &triggeredCollectionSchemeData,
+                                         uint32_t collectionEventID )
 {
     mVehicleData.Clear();
-    mVehicleData.set_campaign_sync_id( triggeredCollectionSchemeData->metadata.collectionSchemeID );
-    mVehicleData.set_decoder_sync_id( triggeredCollectionSchemeData->metadata.decoderID );
+    mVehicleData.set_campaign_sync_id( triggeredCollectionSchemeData.metadata.collectionSchemeID );
+    mVehicleData.set_decoder_sync_id( triggeredCollectionSchemeData.metadata.decoderID );
     mVehicleData.set_collection_event_id( collectionEventID );
-    mTriggerTime = triggeredCollectionSchemeData->triggerTime;
+    mTriggerTime = triggeredCollectionSchemeData.triggerTime;
     mVehicleData.set_collection_event_time_ms_epoch( mTriggerTime );
     mMetaDataEstimatedSize = sizeof( collectionEventID ) + sizeof( mTriggerTime ) + STRING_OVERHEAD +
-                             triggeredCollectionSchemeData->metadata.collectionSchemeID.size() + STRING_OVERHEAD +
-                             triggeredCollectionSchemeData->metadata.decoderID.size();
+                             triggeredCollectionSchemeData.metadata.collectionSchemeID.size() + STRING_OVERHEAD +
+                             triggeredCollectionSchemeData.metadata.decoderID.size();
     mVehicleDataEstimatedSize = mMetaDataEstimatedSize;
 }
 
@@ -156,20 +154,6 @@ DataSenderProtoWriter::append( const CollectedSignal &msg )
 }
 
 void
-DataSenderProtoWriter::append( const CollectedCanRawFrame &msg )
-{
-    auto rawCanFrames = mVehicleData.add_can_frames();
-    auto relativeTime = static_cast<int64_t>( msg.receiveTime ) - static_cast<int64_t>( mTriggerTime );
-    rawCanFrames->set_relative_time_ms( relativeTime );
-    rawCanFrames->set_message_id( msg.frameID );
-    auto interfaceId = mIDTranslator.getInterfaceID( msg.channelId );
-    rawCanFrames->set_interface_id( interfaceId );
-    rawCanFrames->set_byte_values( reinterpret_cast<char const *>( msg.data.data() ), msg.size );
-    mVehicleDataEstimatedSize += sizeof( relativeTime ) + sizeof( msg.frameID ) + STRING_OVERHEAD + interfaceId.size() +
-                                 STRING_OVERHEAD + msg.size;
-}
-
-void
 DataSenderProtoWriter::setupDTCInfo( const DTCInfo &msg )
 {
     auto dtcData = mVehicleData.mutable_dtc_data();
@@ -224,10 +208,6 @@ DataSenderProtoWriter::splitVehicleData( Schemas::VehicleDataMsg::VehicleData &d
     {
         data.mutable_captured_signals()->AddAllocated( mVehicleData.mutable_captured_signals()->ReleaseLast() );
     }
-    while ( mVehicleData.can_frames_size() > data.can_frames_size() )
-    {
-        data.mutable_can_frames()->AddAllocated( mVehicleData.mutable_can_frames()->ReleaseLast() );
-    }
     while ( mVehicleData.dtc_data().active_dtc_codes_size() > data.dtc_data().active_dtc_codes_size() )
     {
         data.mutable_dtc_data()->mutable_active_dtc_codes()->AddAllocated(
@@ -248,11 +228,6 @@ DataSenderProtoWriter::mergeVehicleData( Schemas::VehicleDataMsg::VehicleData &d
     while ( data.captured_signals_size() > 0 )
     {
         mVehicleData.mutable_captured_signals()->AddAllocated( data.mutable_captured_signals()->ReleaseLast() );
-    }
-    mVehicleData.mutable_can_frames()->Clear();
-    while ( data.can_frames_size() > 0 )
-    {
-        mVehicleData.mutable_can_frames()->AddAllocated( data.mutable_can_frames()->ReleaseLast() );
     }
     mVehicleData.mutable_dtc_data()->mutable_active_dtc_codes()->Clear();
     while ( data.dtc_data().active_dtc_codes_size() > 0 )

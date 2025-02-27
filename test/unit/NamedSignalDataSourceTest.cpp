@@ -1,13 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "NamedSignalDataSource.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IDecoderDictionary.h"
-#include "IDecoderManifest.h"
-#include "QueueTypes.h"
-#include "SignalTypes.h"
-#include "VehicleDataSourceTypes.h"
+#include "aws/iotfleetwise/NamedSignalDataSource.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/IDecoderDictionary.h"
+#include "aws/iotfleetwise/IDecoderManifest.h"
+#include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/VehicleDataSourceTypes.h"
 #include <gtest/gtest.h>
 #include <memory>
 #include <string>
@@ -44,8 +44,8 @@ protected:
 TEST_F( NamedSignalDataSourceTest, testNoDecoderDictionary )
 {
     auto signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
+    SignalBufferDistributor signalBufferDistributor;
+    signalBufferDistributor.registerQueue( signalBuffer );
     NamedSignalDataSource namedSignalSource( "5", signalBufferDistributor );
 
     namedSignalSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::RAW_SOCKET );
@@ -67,8 +67,8 @@ TEST_F( NamedSignalDataSourceTest, testNoDecoderDictionary )
 TEST_F( NamedSignalDataSourceTest, wrongInterface )
 {
     auto signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
+    SignalBufferDistributor signalBufferDistributor;
+    signalBufferDistributor.registerQueue( signalBuffer );
     NamedSignalDataSource namedSignalSource( "2", signalBufferDistributor ); // Unknown interface
     namedSignalSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::CUSTOM_DECODING );
     ASSERT_EQ( namedSignalSource.getNamedSignalID( "Vehicle.MySignal1" ), INVALID_SIGNAL_ID );
@@ -84,8 +84,8 @@ TEST_F( NamedSignalDataSourceTest, wrongInterface )
 TEST_F( NamedSignalDataSourceTest, testDecoding )
 {
     auto signalBuffer = std::make_shared<SignalBuffer>( 2, "Signal Buffer" );
-    auto signalBufferDistributor = std::make_shared<SignalBufferDistributor>();
-    signalBufferDistributor->registerQueue( signalBuffer );
+    SignalBufferDistributor signalBufferDistributor;
+    signalBufferDistributor.registerQueue( signalBuffer );
     NamedSignalDataSource namedSignalSource( "5", signalBufferDistributor );
 
     namedSignalSource.onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::CUSTOM_DECODING );

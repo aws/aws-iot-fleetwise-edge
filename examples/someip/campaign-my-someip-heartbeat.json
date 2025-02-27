@@ -1,0 +1,13 @@
+{
+  "compression": "SNAPPY",
+  "collectionScheme": {
+    "timeBasedCollectionScheme": {
+      "periodMs": 10000
+    }
+  },
+  "signalsToCollect": [
+    {
+      "name": "Vehicle.MySomeipInterface.X"
+    }
+  ]
+}

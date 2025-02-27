@@ -1,17 +1,18 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "SomeipCommandDispatcher.h"
-#include "Clock.h"
-#include "ClockHandler.h"
-#include "CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/SomeipCommandDispatcher.h"
 #include "CommonAPIProxyMock.h"
 #include "ExampleSomeipInterfaceProxyMock.h"
-#include "ExampleSomeipInterfaceWrapper.h"
-#include "ICommandDispatcher.h"
 #include "RawDataBufferManagerSpy.h"
-#include "RawDataManager.h"
-#include "SignalTypes.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/ExampleSomeipInterfaceWrapper.h"
+#include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/RawDataManager.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "v1/commonapi/ExampleSomeipInterfaceProxy.hpp"
 #include <CommonAPI/CommonAPI.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstdint>
@@ -46,8 +47,7 @@ protected:
     SomeipCommandDispatcherTest()
         : mCommonAPIProxy( std::make_shared<StrictMock<CommonAPIProxyMock>>() )
         , mProxy( std::make_shared<StrictMock<ExampleSomeipInterfaceProxyMock<>>>( mCommonAPIProxy ) )
-        , mRawBufferManagerSpy( std::make_shared<NiceMock<Testing::RawDataBufferManagerSpy>>(
-              RawData::BufferManagerConfig::create().get() ) )
+        , mRawDataBufferManagerSpy( RawData::BufferManagerConfig::create().get() )
         , mLRCEvent( std::make_shared<NiceMock<CommonAPIEventMock<std::string, int32_t, int32_t, std::string>>>() )
         , mProxyStatusEventMock( std::make_shared<NiceMock<CommonAPIEventMock<CommonAPI::AvailabilityStatus>>>() )
         , mExampleSomeipInterfaceWrapper( std::make_shared<ExampleSomeipInterfaceWrapper>(
@@ -57,7 +57,7 @@ protected:
               [this]( std::string, std::string, std::string ) {
                   return mProxy;
               },
-              mRawBufferManagerSpy,
+              &mRawDataBufferManagerSpy,
               true ) )
         , mCommandDispatcher( std::make_shared<SomeipCommandDispatcher>( mExampleSomeipInterfaceWrapper ) )
     {
@@ -78,7 +78,7 @@ protected:
 
     std::shared_ptr<StrictMock<CommonAPIProxyMock>> mCommonAPIProxy;
     std::shared_ptr<StrictMock<ExampleSomeipInterfaceProxyMock<>>> mProxy;
-    std::shared_ptr<NiceMock<Testing::RawDataBufferManagerSpy>> mRawBufferManagerSpy;
+    NiceMock<Testing::RawDataBufferManagerSpy> mRawDataBufferManagerSpy;
     std::shared_ptr<NiceMock<CommonAPIEventMock<std::string, int32_t, int32_t, std::string>>> mLRCEvent;
     std::shared_ptr<NiceMock<CommonAPIEventMock<CommonAPI::AvailabilityStatus>>> mProxyStatusEventMock;
     std::shared_ptr<ExampleSomeipInterfaceWrapper> mExampleSomeipInterfaceWrapper;
@@ -310,11 +310,11 @@ TEST_F( SomeipCommandDispatcherTest, dispatcherInvokeCommandSuccessfulInt32LRC )
 
 TEST_F( SomeipCommandDispatcherTest, dispatcherInvokeCommandSuccessfulString )
 {
-    mRawBufferManagerSpy->updateConfig( { { 1, { 1, "", "" } } } );
+    mRawDataBufferManagerSpy.updateConfig( { { 1, { 1, "", "" } } } );
     std::string stringVal = "dog";
-    auto handle =
-        mRawBufferManagerSpy->push( reinterpret_cast<const uint8_t *>( stringVal.data() ), stringVal.size(), 1234, 1 );
-    mRawBufferManagerSpy->increaseHandleUsageHint( 1, handle, RawData::BufferHandleUsageStage::UPLOADING );
+    auto handle = mRawDataBufferManagerSpy.push(
+        reinterpret_cast<const uint8_t *>( stringVal.data() ), stringVal.size(), 1234, 1 );
+    mRawDataBufferManagerSpy.increaseHandleUsageHint( 1, handle, RawData::BufferHandleUsageStage::UPLOADING );
     ASSERT_TRUE( mCommandDispatcher->init() );
     EXPECT_CALL( *mProxy, isAvailable() ).Times( 1 ).WillOnce( Return( true ) );
     EXPECT_CALL( *mProxy, setStringAsync( "dog", _, _ ) )

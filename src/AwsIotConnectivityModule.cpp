@@ -1,11 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "AwsIotConnectivityModule.h"
-#include "IConnectionTypes.h"
-#include "LoggingModule.h"
-#include "Thread.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/AwsIotConnectivityModule.h"
+#include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/Thread.h"
+#include "aws/iotfleetwise/TraceModule.h"
 #include <aws/crt/Api.h>
 #include <aws/crt/Optional.h>
 #include <aws/crt/Types.h>
@@ -14,6 +14,7 @@
 #include <aws/crt/mqtt/Mqtt5Types.h>
 #include <chrono>
 #include <sstream>
+#include <stdexcept>
 #include <utility>
 
 namespace Aws
@@ -23,12 +24,12 @@ namespace IoTFleetWise
 
 AwsIotConnectivityModule::AwsIotConnectivityModule( std::string rootCA,
                                                     std::string clientId,
-                                                    std::shared_ptr<MqttClientBuilderWrapper> mqttClientBuilder,
+                                                    MqttClientBuilderWrapper &mqttClientBuilder,
                                                     const TopicConfig &topicConfig,
                                                     AwsIotConnectivityConfig connectionConfig )
     : mRootCA( std::move( rootCA ) )
     , mClientId( std::move( clientId ) )
-    , mMqttClientBuilder( std::move( mqttClientBuilder ) )
+    , mMqttClientBuilder( mqttClientBuilder )
     , mTopicConfig( topicConfig )
     , mConnectionConfig( std::move( connectionConfig ) )
     , mInitialConnectionThread(
@@ -46,6 +47,10 @@ AwsIotConnectivityModule::AwsIotConnectivityModule( std::string rootCA,
     , mConnected( false )
     , mConnectionEstablished( false )
 {
+    if ( !createMqttClient() )
+    {
+        throw std::runtime_error( "Failed to create MQTT client" );
+    }
 }
 
 /*
@@ -56,20 +61,13 @@ bool
 AwsIotConnectivityModule::connect()
 {
     mConnected = false;
-
-    FWE_LOG_INFO( "Establishing an MQTT Connection" );
-    if ( !createMqttClient() )
-    {
-        return false;
-    }
-
     return mInitialConnectionThread.start();
 }
 
 std::shared_ptr<ISender>
 AwsIotConnectivityModule::createSender()
 {
-    auto sender = std::make_shared<AwsIotSender>( this, mMqttClient, mTopicConfig );
+    auto sender = std::make_shared<AwsIotSender>( this, *mMqttClient, mTopicConfig );
     mSenders.emplace_back( sender );
     return sender;
 }
@@ -77,7 +75,7 @@ AwsIotConnectivityModule::createSender()
 std::shared_ptr<IReceiver>
 AwsIotConnectivityModule::createReceiver( const std::string &topicName )
 {
-    auto receiver = std::make_shared<AwsIotReceiver>( this, mMqttClient, topicName );
+    auto receiver = std::make_shared<AwsIotReceiver>( *mMqttClient, topicName );
     mReceivers.emplace_back( receiver );
 
     std::lock_guard<std::mutex> lock( mTopicsMutex );
@@ -109,7 +107,7 @@ AwsIotConnectivityModule::resetConnection()
     // So that we indicate to the broker that we intend to close the session,
     // Otherwise, the socket will simply be closed and thus the broker thinks
     // the connection is lost.
-    // Default constructor of DisconnectPacket sets the diconnectReason to
+    // Default constructor of DisconnectPacket sets the disconnectReason to
     // CLIENT_INITIATED_DISCONNECT which is what we want here.
     auto disconnectPacket = std::make_shared<Aws::Crt::Mqtt5::DisconnectPacket>();
 
@@ -162,10 +160,6 @@ AwsIotConnectivityModule::disconnect()
     {
         sender->invalidateConnection();
     }
-    for ( auto receiver : mReceivers )
-    {
-        receiver->invalidateConnection();
-    }
     return resetConnection();
 }
 
@@ -187,11 +181,7 @@ AwsIotConnectivityModule::renameEventLoopTask()
 bool
 AwsIotConnectivityModule::createMqttClient()
 {
-    if ( mMqttClientBuilder == nullptr )
-    {
-        FWE_LOG_ERROR( "Invalid MQTT client builder" );
-        return false;
-    }
+    FWE_LOG_INFO( "Creating MQTT client" );
 
     if ( mClientId.empty() )
     {
@@ -212,7 +202,7 @@ AwsIotConnectivityModule::createMqttClient()
     }
 
     mMqttClientBuilder
-        ->WithClientExtendedValidationAndFlowControl(
+        .WithClientExtendedValidationAndFlowControl(
             Aws::Crt::Mqtt5::ClientExtendedValidationAndFlowControl::AWS_MQTT5_EVAFCO_AWS_IOT_CORE_DEFAULTS )
         // Make queued packets fail on disconnection so we can better control how to handle those failures
         // (e.g. drop, persist). Otherwise, using the default behavior, packets with QoS1 could stay in the
@@ -224,16 +214,16 @@ AwsIotConnectivityModule::createMqttClient()
 
     if ( mConnectionConfig.sessionExpiryIntervalSeconds > 0 )
     {
-        mMqttClientBuilder->WithSessionBehavior(
+        mMqttClientBuilder.WithSessionBehavior(
             Aws::Crt::Mqtt5::ClientSessionBehaviorType::AWS_MQTT5_CSBT_REJOIN_ALWAYS );
     }
 
     if ( !mRootCA.empty() )
     {
-        mMqttClientBuilder->WithCertificateAuthority( Crt::ByteCursorFromCString( mRootCA.c_str() ) );
+        mMqttClientBuilder.WithCertificateAuthority( Crt::ByteCursorFromCString( mRootCA.c_str() ) );
     }
 
-    mMqttClientBuilder->WithClientConnectionSuccessCallback(
+    mMqttClientBuilder.WithClientConnectionSuccessCallback(
         [&]( const Aws::Crt::Mqtt5::OnConnectionSuccessEventData &eventData ) {
             std::string logMessage = "Connection completed successfully";
             bool rejoinedSession = false;
@@ -282,7 +272,7 @@ AwsIotConnectivityModule::createMqttClient()
             }
         } );
 
-    mMqttClientBuilder->WithClientConnectionFailureCallback(
+    mMqttClientBuilder.WithClientConnectionFailureCallback(
         [&]( const Aws::Crt::Mqtt5::OnConnectionFailureEventData &eventData ) {
             TraceModule::get().incrementAtomicVariable( TraceAtomicVariable::CONNECTION_FAILED );
             if ( eventData.connAckPacket != nullptr )
@@ -304,12 +294,12 @@ AwsIotConnectivityModule::createMqttClient()
             renameEventLoopTask();
         } );
 
-    mMqttClientBuilder->WithClientAttemptingConnectCallback( [&]( const OnAttemptingConnectEventData &eventData ) {
+    mMqttClientBuilder.WithClientAttemptingConnectCallback( [&]( const OnAttemptingConnectEventData &eventData ) {
         static_cast<void>( eventData );
         FWE_LOG_INFO( "Attempting MQTT connection" );
     } );
 
-    mMqttClientBuilder->WithClientDisconnectionCallback( [&]( const OnDisconnectionEventData &eventData ) {
+    mMqttClientBuilder.WithClientDisconnectionCallback( [&]( const OnDisconnectionEventData &eventData ) {
         // If the disconnect packet is present, it means that the client was disconnected by the server.
         if ( eventData.disconnectPacket != nullptr )
         {
@@ -331,10 +321,9 @@ AwsIotConnectivityModule::createMqttClient()
                            std::string( errorString != nullptr ? errorString : "Unknown error" ) );
         }
         mConnected = false;
-        mConnectionCompletedPromise = std::promise<bool>();
     } );
 
-    mMqttClientBuilder->WithClientStoppedCallback( [&]( const Aws::Crt::Mqtt5::OnStoppedEventData &eventData ) {
+    mMqttClientBuilder.WithClientStoppedCallback( [&]( const Aws::Crt::Mqtt5::OnStoppedEventData &eventData ) {
         static_cast<void>( eventData );
         FWE_LOG_INFO( "The MQTT connection is closed and client stopped" );
         mConnectionClosedPromise.set_value();
@@ -343,7 +332,7 @@ AwsIotConnectivityModule::createMqttClient()
         mConnectionCompletedPromise = std::promise<bool>();
     } );
 
-    mMqttClientBuilder->WithPublishReceivedCallback( [&]( const Aws::Crt::Mqtt5::PublishReceivedEventData &eventData ) {
+    mMqttClientBuilder.WithPublishReceivedCallback( [&]( const Aws::Crt::Mqtt5::PublishReceivedEventData &eventData ) {
         std::ostringstream os;
         os << "Data received on the topic: " << eventData.publishPacket->getTopic()
            << " with a payload length of: " << eventData.publishPacket->getPayload().len;
@@ -367,11 +356,11 @@ AwsIotConnectivityModule::createMqttClient()
     } );
 
     TraceModule::get().sectionBegin( TraceSection::BUILD_MQTT );
-    mMqttClient = mMqttClientBuilder->Build();
+    mMqttClient = mMqttClientBuilder.Build();
     TraceModule::get().sectionEnd( TraceSection::BUILD_MQTT );
     if ( !mMqttClient )
     {
-        int lastError = mMqttClientBuilder->LastError();
+        int lastError = mMqttClientBuilder.LastError();
         auto errorString = Aws::Crt::ErrorDebugString( lastError );
         FWE_LOG_ERROR( "MQTT Client building failed with error code " + std::to_string( lastError ) + ": " +
                        std::string( errorString != nullptr ? errorString : "Unknown error" ) );
@@ -423,6 +412,12 @@ AwsIotConnectivityModule::connectMqttClient()
 RetryStatus
 AwsIotConnectivityModule::subscribeAllReceivers()
 {
+    if ( !isAlive() )
+    {
+        FWE_LOG_ERROR( "MQTT Connection not established, failed to subscribe" );
+        return RetryStatus::RETRY;
+    }
+
     auto result = RetryStatus::SUCCESS;
 
     // We make a copy because the subscribe() call is blocking and can take very long. So we should

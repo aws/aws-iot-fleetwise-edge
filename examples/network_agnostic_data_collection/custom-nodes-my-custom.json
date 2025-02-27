@@ -1,0 +1,15 @@
+[
+  {
+    "branch": {
+      "fullyQualifiedName": "Vehicle",
+      "description": "Vehicle"
+    }
+  },
+  {
+    "actuator": {
+      "fullyQualifiedName": "Vehicle.MyCustom",
+      "description": "Vehicle.MyCustom",
+      "dataType": "DOUBLE"
+    }
+  }
+]

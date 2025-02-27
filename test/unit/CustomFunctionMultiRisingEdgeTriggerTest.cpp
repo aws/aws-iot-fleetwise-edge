@@ -1,16 +1,15 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CustomFunctionMultiRisingEdgeTrigger.h"
-#include "CollectionInspectionAPITypes.h"
-#include "IDecoderDictionary.h"
-#include "IDecoderManifest.h"
-#include "NamedSignalDataSource.h"
-#include "QueueTypes.h"
+#include "aws/iotfleetwise/CustomFunctionMultiRisingEdgeTrigger.h"
 #include "RawDataBufferManagerSpy.h"
-#include "RawDataManager.h"
-#include "SignalTypes.h"
-#include "VehicleDataSourceTypes.h"
+#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
+#include "aws/iotfleetwise/IDecoderDictionary.h"
+#include "aws/iotfleetwise/IDecoderManifest.h"
+#include "aws/iotfleetwise/NamedSignalDataSource.h"
+#include "aws/iotfleetwise/RawDataManager.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/VehicleDataSourceTypes.h"
 #include <boost/optional/optional.hpp>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -33,16 +32,14 @@ public:
     CustomFunctionMultiRisingEdgeTriggerTest()
         : mDictionary( std::make_shared<CustomDecoderDictionary>() )
         , mSignalBuffer( std::make_shared<SignalBuffer>( 100, "Signal Buffer" ) )
-        , mSignalBufferDistributor( std::make_shared<SignalBufferDistributor>() )
         , mNamedSignalDataSource( std::make_shared<NamedSignalDataSource>( "NAMED_SIGNAL", mSignalBufferDistributor ) )
-        , mRawBufferManagerSpy( std::make_shared<NiceMock<Testing::RawDataBufferManagerSpy>>(
-              RawData::BufferManagerConfig::create().get() ) )
+        , mRawDataBufferManagerSpy( RawData::BufferManagerConfig::create().get() )
     {
         mDictionary->customDecoderMethod["NAMED_SIGNAL"]["Vehicle.MultiRisingEdgeTrigger"] =
             CustomSignalDecoderFormat{ "NAMED_SIGNAL", "Vehicle.MultiRisingEdgeTrigger", 1, SignalType::STRING };
         mNamedSignalDataSource->onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::CUSTOM_DECODING );
-        mSignalBufferDistributor->registerQueue( mSignalBuffer );
-        mRawBufferManagerSpy->updateConfig( { { 1, { 1, "", "" } } } );
+        mSignalBufferDistributor.registerQueue( mSignalBuffer );
+        mRawDataBufferManagerSpy.updateConfig( { { 1, { 1, "", "" } } } );
     }
     void
     SetUp() override
@@ -50,14 +47,14 @@ public:
     }
     std::shared_ptr<CustomDecoderDictionary> mDictionary;
     std::shared_ptr<SignalBuffer> mSignalBuffer;
-    std::shared_ptr<SignalBufferDistributor> mSignalBufferDistributor;
+    SignalBufferDistributor mSignalBufferDistributor;
     std::shared_ptr<NamedSignalDataSource> mNamedSignalDataSource;
-    std::shared_ptr<NiceMock<Testing::RawDataBufferManagerSpy>> mRawBufferManagerSpy;
+    NiceMock<Testing::RawDataBufferManagerSpy> mRawDataBufferManagerSpy;
 };
 
 TEST_F( CustomFunctionMultiRisingEdgeTriggerTest, wrongArgs )
 {
-    CustomFunctionMultiRisingEdgeTrigger customFunc( mNamedSignalDataSource, mRawBufferManagerSpy );
+    CustomFunctionMultiRisingEdgeTrigger customFunc( mNamedSignalDataSource, &mRawDataBufferManagerSpy );
     std::vector<InspectionValue> args;
     std::unordered_set<SignalID> collectedSignalIds = { 1 };
     CollectionInspectionEngineOutput collectedData;
@@ -102,7 +99,7 @@ TEST_F( CustomFunctionMultiRisingEdgeTriggerTest, wrongArgs )
 
 TEST_F( CustomFunctionMultiRisingEdgeTriggerTest, multiTrigger )
 {
-    CustomFunctionMultiRisingEdgeTrigger customFunc( mNamedSignalDataSource, mRawBufferManagerSpy );
+    CustomFunctionMultiRisingEdgeTrigger customFunc( mNamedSignalDataSource, &mRawDataBufferManagerSpy );
     std::vector<InspectionValue> args;
     std::unordered_set<SignalID> collectedSignalIds = { 1 };
     CollectionInspectionEngineOutput collectedData;
@@ -130,7 +127,7 @@ TEST_F( CustomFunctionMultiRisingEdgeTriggerTest, multiTrigger )
     customFunc.conditionEnd( collectedSignalIds, 0, collectedData );
     ASSERT_EQ( collectedData.triggeredCollectionSchemeData->signals.size(), 1 );
     auto &signal = collectedData.triggeredCollectionSchemeData->signals[0];
-    auto loanedFrame = mRawBufferManagerSpy->borrowFrame( signal.signalID, signal.value.value.uint32Val );
+    auto loanedFrame = mRawDataBufferManagerSpy.borrowFrame( signal.signalID, signal.value.value.uint32Val );
     ASSERT_FALSE( loanedFrame.isNull() );
     std::string collectedStringVal;
     collectedStringVal.assign( reinterpret_cast<const char *>( loanedFrame.getData() ), loanedFrame.getSize() );
@@ -149,7 +146,7 @@ TEST_F( CustomFunctionMultiRisingEdgeTriggerTest, multiTrigger )
     customFunc.conditionEnd( collectedSignalIds, 0, collectedData );
     ASSERT_EQ( collectedData.triggeredCollectionSchemeData->signals.size(), 1 );
     signal = collectedData.triggeredCollectionSchemeData->signals[0];
-    loanedFrame = mRawBufferManagerSpy->borrowFrame( signal.signalID, signal.value.value.uint32Val );
+    loanedFrame = mRawDataBufferManagerSpy.borrowFrame( signal.signalID, signal.value.value.uint32Val );
     ASSERT_FALSE( loanedFrame.isNull() );
     collectedStringVal.assign( reinterpret_cast<const char *>( loanedFrame.getData() ), loanedFrame.getSize() );
     EXPECT_EQ( collectedStringVal, "[\"def\"]" );
@@ -169,7 +166,7 @@ TEST_F( CustomFunctionMultiRisingEdgeTriggerTest, multiTrigger )
     customFunc.conditionEnd( collectedSignalIds, 0, collectedData );
     ASSERT_EQ( collectedData.triggeredCollectionSchemeData->signals.size(), 1 );
     signal = collectedData.triggeredCollectionSchemeData->signals[0];
-    loanedFrame = mRawBufferManagerSpy->borrowFrame( signal.signalID, signal.value.value.uint32Val );
+    loanedFrame = mRawDataBufferManagerSpy.borrowFrame( signal.signalID, signal.value.value.uint32Val );
     ASSERT_FALSE( loanedFrame.isNull() );
     collectedStringVal.assign( reinterpret_cast<const char *>( loanedFrame.getData() ), loanedFrame.getSize() );
     EXPECT_EQ( collectedStringVal, "[\"abc\",\"def\"]" );
@@ -195,7 +192,7 @@ TEST_F( CustomFunctionMultiRisingEdgeTriggerTest, multiTrigger )
     // Collect signal again:
     collectedSignalIds.emplace( 1 );
     // Remove raw buffer manager config:
-    mRawBufferManagerSpy->updateConfig( {} );
+    mRawDataBufferManagerSpy.updateConfig( {} );
 
     // Rising edge:
     args[1] = false;
@@ -205,7 +202,7 @@ TEST_F( CustomFunctionMultiRisingEdgeTriggerTest, multiTrigger )
     ASSERT_EQ( collectedData.triggeredCollectionSchemeData->signals.size(), 0 );
 
     // Add raw buffer config again:
-    mRawBufferManagerSpy->updateConfig( { { 1, { 1, "", "" } } } );
+    mRawDataBufferManagerSpy.updateConfig( { { 1, { 1, "", "" } } } );
     // Change of decoder manifest removes custom decoders
     mDictionary->customDecoderMethod.clear();
     mNamedSignalDataSource->onChangeOfActiveDictionary( mDictionary, VehicleDataSourceProtocol::CUSTOM_DECODING );
@@ -221,7 +218,7 @@ TEST_F( CustomFunctionMultiRisingEdgeTriggerTest, multiTrigger )
 
 TEST_F( CustomFunctionMultiRisingEdgeTriggerTest, noNamedSignalDataSource )
 {
-    CustomFunctionMultiRisingEdgeTrigger customFunc( nullptr, mRawBufferManagerSpy );
+    CustomFunctionMultiRisingEdgeTrigger customFunc( nullptr, &mRawDataBufferManagerSpy );
     std::vector<InspectionValue> args;
     std::unordered_set<SignalID> collectedSignalIds = { 1 };
     CollectionInspectionEngineOutput collectedData;

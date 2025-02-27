@@ -1,15 +1,15 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "CANInterfaceIDTranslator.h"
-#include "CheckinSender.h"
-#include "Clock.h"
-#include "ClockHandler.h"
-#include "CollectionSchemeManager.h"
 #include "CollectionSchemeManagerMock.h"
 #include "CollectionSchemeManagerTest.h" // IWYU pragma: associated
 #include "Testing.h"
-#include "TimeTypes.h"
+#include "aws/iotfleetwise/CANInterfaceIDTranslator.h"
+#include "aws/iotfleetwise/CheckinSender.h"
+#include "aws/iotfleetwise/Clock.h"
+#include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/CollectionSchemeManager.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <functional>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -51,7 +51,7 @@ TEST( CollectionSchemeManagerGtest, RebuildUpdateAndTimeLineTest )
     std::shared_ptr<mockDecoderManifest> testDM1 = std::make_shared<mockDecoderManifest>();
     std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
     std::shared_ptr<mockCollectionSchemeList> testPL = std::make_shared<mockCollectionSchemeList>();
-    std::vector<ICollectionSchemePtr> testCP, emptyCP;
+    std::vector<std::shared_ptr<ICollectionScheme>> testCP, emptyCP;
     testCP.emplace_back( collectionScheme1 );
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerWrapper gmocktest(
@@ -122,7 +122,7 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_ADD_DELETE )
     std::shared_ptr<mockDecoderManifest> testDM1 = std::make_shared<mockDecoderManifest>();
     std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
     std::shared_ptr<mockCollectionSchemeList> testPL = std::make_shared<mockCollectionSchemeList>();
-    std::vector<ICollectionSchemePtr> testCP, emptyCP;
+    std::vector<std::shared_ptr<ICollectionScheme>> testCP, emptyCP;
     // 3 collectionSchemes on the list, one enabled and one idle, one bad
     testCP.emplace_back( collectionScheme1 );
     testCP.emplace_back( collectionScheme1 );
@@ -205,23 +205,26 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_IDLE_BRANCHES )
         std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startIdleTime, stopIdleTime );
 
     // test code
-    gmocktest.setCollectionSchemeList(
-        std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{ idleCollectionScheme } ) );
+    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>(
+        std::vector<std::shared_ptr<ICollectionScheme>>{ idleCollectionScheme } ) );
     ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
 
     // 1st update bad setting
-    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start2Time, stop2Time ) } ) );
+    gmocktest.setCollectionSchemeList(
+        std::make_shared<ICollectionSchemeListTest>( std::vector<std::shared_ptr<ICollectionScheme>>{
+            std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start2Time, stop2Time ) } ) );
     ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
 
     // 2nd update new idle time
-    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start1Time, stop1Time ) } ) );
+    gmocktest.setCollectionSchemeList(
+        std::make_shared<ICollectionSchemeListTest>( std::vector<std::shared_ptr<ICollectionScheme>>{
+            std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start1Time, stop1Time ) } ) );
     ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
 
     // 3rd update move to enable
-    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startEnableTime, stopEnableTime ) } ) );
+    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>(
+        std::vector<std::shared_ptr<ICollectionScheme>>{ std::make_shared<ICollectionSchemeTest>(
+            "COLLECTIONSCHEME1", "DM1", startEnableTime, stopEnableTime ) } ) );
     ASSERT_TRUE( gmocktest.updateMapsandTimeLine( currTime ) );
 }
 
@@ -266,23 +269,26 @@ TEST( CollectionSchemeManagerGtest, updateMapsandTimeLineTest_ENABLED_BRANCHES )
         std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startEnableTime, stopEnableTime );
 
     // test code
-    gmocktest.setCollectionSchemeList(
-        std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{ enabledCollectionScheme } ) );
+    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>(
+        std::vector<std::shared_ptr<ICollectionScheme>>{ enabledCollectionScheme } ) );
     ASSERT_TRUE( gmocktest.updateMapsandTimeLine( currTime ) );
 
     // 2nd update new idle time
-    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start1Time, stop1Time ) } ) );
+    gmocktest.setCollectionSchemeList(
+        std::make_shared<ICollectionSchemeListTest>( std::vector<std::shared_ptr<ICollectionScheme>>{
+            std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start1Time, stop1Time ) } ) );
     ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
 
     // 1st update bad setting
-    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start2Time, stop2Time ) } ) );
+    gmocktest.setCollectionSchemeList(
+        std::make_shared<ICollectionSchemeListTest>( std::vector<std::shared_ptr<ICollectionScheme>>{
+            std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", start2Time, stop2Time ) } ) );
     ASSERT_FALSE( gmocktest.updateMapsandTimeLine( currTime ) );
 
     // 3rd update move to enable
-    gmocktest.setCollectionSchemeList( std::make_shared<ICollectionSchemeListTest>( std::vector<ICollectionSchemePtr>{
-        std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startExpTime, stopExpTime ) } ) );
+    gmocktest.setCollectionSchemeList(
+        std::make_shared<ICollectionSchemeListTest>( std::vector<std::shared_ptr<ICollectionScheme>>{
+            std::make_shared<ICollectionSchemeTest>( "COLLECTIONSCHEME1", "DM1", startExpTime, stopExpTime ) } ) );
     ASSERT_TRUE( gmocktest.updateMapsandTimeLine( currTime ) );
 }
 
@@ -302,9 +308,10 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_IDLE_BRANCHES )
     // create empty collectionScheme map
     std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
     std::shared_ptr<mockCollectionScheme> collectionScheme2 = std::make_shared<mockCollectionScheme>();
-    std::map<SyncID, ICollectionSchemePtr> mapEmpty;
-    std::map<SyncID, ICollectionSchemePtr> mapIdle = { { strCollectionSchemeIDCollectionScheme1, collectionScheme1 },
-                                                       { strCollectionSchemeIDCollectionScheme2, collectionScheme2 } };
+    std::map<SyncID, std::shared_ptr<ICollectionScheme>> mapEmpty;
+    std::map<SyncID, std::shared_ptr<ICollectionScheme>> mapIdle = {
+        { strCollectionSchemeIDCollectionScheme1, collectionScheme1 },
+        { strCollectionSchemeIDCollectionScheme2, collectionScheme2 } };
 
     // setup maps
     CANInterfaceIDTranslator canIDTranslator;
@@ -361,8 +368,8 @@ TEST( CollectionSchemeManagerGtest, checkTimeLineTest_ENABLED_BRANCHES )
     // create empty collectionScheme map
     std::shared_ptr<mockCollectionScheme> collectionScheme1 = std::make_shared<mockCollectionScheme>();
     std::shared_ptr<mockCollectionScheme> collectionScheme2 = std::make_shared<mockCollectionScheme>();
-    std::map<SyncID, ICollectionSchemePtr> mapEmpty;
-    std::map<SyncID, ICollectionSchemePtr> mapEnable = {
+    std::map<SyncID, std::shared_ptr<ICollectionScheme>> mapEmpty;
+    std::map<SyncID, std::shared_ptr<ICollectionScheme>> mapEnable = {
         { strCollectionSchemeIDCollectionScheme1, collectionScheme1 },
         { strCollectionSchemeIDCollectionScheme2, collectionScheme2 } };
 

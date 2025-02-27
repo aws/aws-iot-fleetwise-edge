@@ -1,11 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "DeviceShadowOverSomeip.h"
-#include "IConnectionTypes.h"
-#include "IReceiver.h"
-#include "ISender.h"
+#include "aws/iotfleetwise/DeviceShadowOverSomeip.h"
 #include "SenderMock.h"
+#include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/IReceiver.h"
+#include "aws/iotfleetwise/ISender.h"
 #include "v1/commonapi/DeviceShadowOverSomeipInterface.hpp"
 #include <cstddef>
 #include <cstdint>
@@ -13,7 +13,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <json/json.h>
-#include <memory>
 #include <string>
 
 namespace Aws
@@ -32,8 +31,7 @@ class DeviceShadowOverSomeipTest : public ::testing::Test
 {
 protected:
     DeviceShadowOverSomeipTest()
-        : mSenderMock( std::make_shared<StrictMock<Testing::SenderMock>>() )
-        , mDeviceShadowOverSomeip( std::make_shared<DeviceShadowOverSomeip>( mSenderMock ) )
+        : mDeviceShadowOverSomeip( mSenderMock )
     {
     }
     void
@@ -46,8 +44,8 @@ protected:
     {
     }
 
-    std::shared_ptr<StrictMock<Testing::SenderMock>> mSenderMock;
-    std::shared_ptr<DeviceShadowOverSomeip> mDeviceShadowOverSomeip;
+    StrictMock<Testing::SenderMock> mSenderMock;
+    DeviceShadowOverSomeip mDeviceShadowOverSomeip;
 };
 
 TEST_F( DeviceShadowOverSomeipTest, updateInvalidSentJson )
@@ -61,12 +59,12 @@ TEST_F( DeviceShadowOverSomeipTest, updateInvalidSentJson )
                        Eq( "JSON parse error" ),
                        _ ) )
         .Times( 1 );
-    mDeviceShadowOverSomeip->updateShadow( nullptr, "", "invalid", callback.AsStdFunction() );
+    mDeviceShadowOverSomeip.updateShadow( nullptr, "", "invalid", callback.AsStdFunction() );
 }
 
 TEST_F( DeviceShadowOverSomeipTest, updateConnectivityErrorInvalidRequest )
 {
-    EXPECT_CALL( *mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
+    EXPECT_CALL( mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
         .Times( 1 )
         .WillOnce( InvokeArgument<3>( ConnectivityError::NotConfigured ) );
     MockFunction<void( v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode errorCode,
@@ -78,12 +76,12 @@ TEST_F( DeviceShadowOverSomeipTest, updateConnectivityErrorInvalidRequest )
                        Eq( "NotConfigured" ),
                        _ ) )
         .Times( 1 );
-    mDeviceShadowOverSomeip->updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
+    mDeviceShadowOverSomeip.updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
 }
 
 TEST_F( DeviceShadowOverSomeipTest, updateConnectivityErrorUnreachable )
 {
-    EXPECT_CALL( *mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
+    EXPECT_CALL( mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
         .Times( 1 )
         .WillOnce( InvokeArgument<3>( ConnectivityError::TransmissionError ) );
     MockFunction<void( v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode errorCode,
@@ -95,12 +93,12 @@ TEST_F( DeviceShadowOverSomeipTest, updateConnectivityErrorUnreachable )
                        Eq( "TransmissionError" ),
                        _ ) )
         .Times( 1 );
-    mDeviceShadowOverSomeip->updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
+    mDeviceShadowOverSomeip.updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
 }
 
 TEST_F( DeviceShadowOverSomeipTest, updateInvalidReceivedJson )
 {
-    EXPECT_CALL( *mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
+    EXPECT_CALL( mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
         .Times( 1 )
         .WillOnce( InvokeArgument<3>( ConnectivityError::Success ) );
     MockFunction<void( v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode errorCode,
@@ -108,20 +106,20 @@ TEST_F( DeviceShadowOverSomeipTest, updateInvalidReceivedJson )
                        const std::string &responseDocument )>
         callback;
     EXPECT_CALL( callback, Call( _, _, _ ) ).Times( 0 );
-    mDeviceShadowOverSomeip->updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
+    mDeviceShadowOverSomeip.updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
     {
         std::string payload = "invalid";
         ReceivedConnectivityMessage message( reinterpret_cast<const uint8_t *>( payload.data() ),
                                              payload.size(),
                                              0,
                                              "$aws/things/thing-name/shadow/update/accepted" );
-        mDeviceShadowOverSomeip->onDataReceived( message );
+        mDeviceShadowOverSomeip.onDataReceived( message );
     }
 }
 
 TEST_F( DeviceShadowOverSomeipTest, updateOtherClient )
 {
-    EXPECT_CALL( *mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
+    EXPECT_CALL( mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
         .Times( 1 )
         .WillOnce( InvokeArgument<3>( ConnectivityError::Success ) );
     MockFunction<void( v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode errorCode,
@@ -129,21 +127,21 @@ TEST_F( DeviceShadowOverSomeipTest, updateOtherClient )
                        const std::string &responseDocument )>
         callback;
     EXPECT_CALL( callback, Call( _, _, _ ) ).Times( 0 );
-    mDeviceShadowOverSomeip->updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
+    mDeviceShadowOverSomeip.updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
     {
         std::string payload = "{}";
         ReceivedConnectivityMessage message( reinterpret_cast<const uint8_t *>( payload.data() ),
                                              payload.size(),
                                              0,
                                              "$aws/things/thing-name/shadow/update/accepted" );
-        mDeviceShadowOverSomeip->onDataReceived( message );
+        mDeviceShadowOverSomeip.onDataReceived( message );
     }
 }
 
 TEST_F( DeviceShadowOverSomeipTest, updateAcceptedClassic )
 {
     std::string clientToken;
-    EXPECT_CALL( *mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
+    EXPECT_CALL( mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
         .Times( 1 )
         .WillOnce(
             Invoke( [&clientToken](
@@ -163,21 +161,21 @@ TEST_F( DeviceShadowOverSomeipTest, updateAcceptedClassic )
     EXPECT_CALL( callback,
                  Call( Eq( v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode::NO_ERROR ), Eq( "" ), _ ) )
         .Times( 1 );
-    mDeviceShadowOverSomeip->updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
+    mDeviceShadowOverSomeip.updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
     {
         std::string payload = "{\"clientToken\":\"" + clientToken + "\"}";
         ReceivedConnectivityMessage message( reinterpret_cast<const uint8_t *>( payload.data() ),
                                              payload.size(),
                                              0,
                                              "$aws/things/thing-name/shadow/update/accepted" );
-        mDeviceShadowOverSomeip->onDataReceived( message );
+        mDeviceShadowOverSomeip.onDataReceived( message );
     }
 }
 
 TEST_F( DeviceShadowOverSomeipTest, updateRejectedNamed )
 {
     std::string clientToken;
-    EXPECT_CALL( *mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/name/test/update", _, _, _ ) )
+    EXPECT_CALL( mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/name/test/update", _, _, _ ) )
         .Times( 1 )
         .WillOnce(
             Invoke( [&clientToken](
@@ -197,7 +195,7 @@ TEST_F( DeviceShadowOverSomeipTest, updateRejectedNamed )
     EXPECT_CALL( callback,
                  Call( Eq( v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode::REJECTED ), Eq( "abc" ), _ ) )
         .Times( 1 );
-    mDeviceShadowOverSomeip->updateShadow( nullptr, "test", "{}", callback.AsStdFunction() );
+    mDeviceShadowOverSomeip.updateShadow( nullptr, "test", "{}", callback.AsStdFunction() );
     {
         // Check receiving own request is ignored
         std::string payload = "{\"clientToken\":\"" + clientToken + "\"}";
@@ -205,7 +203,7 @@ TEST_F( DeviceShadowOverSomeipTest, updateRejectedNamed )
                                              payload.size(),
                                              0,
                                              "$aws/things/thing-name/shadow/update" );
-        mDeviceShadowOverSomeip->onDataReceived( message );
+        mDeviceShadowOverSomeip.onDataReceived( message );
     }
     {
         std::string payload = "{\"clientToken\":\"" + clientToken + "\",\"message\":\"abc\"}";
@@ -213,14 +211,14 @@ TEST_F( DeviceShadowOverSomeipTest, updateRejectedNamed )
                                              payload.size(),
                                              0,
                                              "$aws/things/thing-name/shadow/name/test/update/rejected" );
-        mDeviceShadowOverSomeip->onDataReceived( message );
+        mDeviceShadowOverSomeip.onDataReceived( message );
     }
 }
 
 TEST_F( DeviceShadowOverSomeipTest, updateUnknown )
 {
     std::string clientToken;
-    EXPECT_CALL( *mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
+    EXPECT_CALL( mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/update", _, _, _ ) )
         .Times( 1 )
         .WillOnce(
             Invoke( [&clientToken](
@@ -240,13 +238,13 @@ TEST_F( DeviceShadowOverSomeipTest, updateUnknown )
     EXPECT_CALL( callback,
                  Call( Eq( v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode::UNKNOWN ), Eq( "" ), _ ) )
         .Times( 1 );
-    mDeviceShadowOverSomeip->updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
+    mDeviceShadowOverSomeip.updateShadow( nullptr, "", "{}", callback.AsStdFunction() );
     std::string payload = "{\"clientToken\":\"" + clientToken + "\"}";
     ReceivedConnectivityMessage message( reinterpret_cast<const uint8_t *>( payload.data() ),
                                          payload.size(),
                                          0,
                                          "$aws/things/thing-name/shadow/update/blah" );
-    mDeviceShadowOverSomeip->onDataReceived( message );
+    mDeviceShadowOverSomeip.onDataReceived( message );
 }
 
 TEST_F( DeviceShadowOverSomeipTest, documentsUpdateClassic )
@@ -256,7 +254,7 @@ TEST_F( DeviceShadowOverSomeipTest, documentsUpdateClassic )
                                          payload.size(),
                                          0,
                                          "$aws/things/thing-name/shadow/update/documents" );
-    mDeviceShadowOverSomeip->onDataReceived( message );
+    mDeviceShadowOverSomeip.onDataReceived( message );
 }
 
 TEST_F( DeviceShadowOverSomeipTest, documentsUpdateNamed )
@@ -266,7 +264,7 @@ TEST_F( DeviceShadowOverSomeipTest, documentsUpdateNamed )
                                          payload.size(),
                                          0,
                                          "$aws/things/thing-name/shadow/name/test/update/documents" );
-    mDeviceShadowOverSomeip->onDataReceived( message );
+    mDeviceShadowOverSomeip.onDataReceived( message );
 }
 
 TEST_F( DeviceShadowOverSomeipTest, documentsUpdateWrongPrefix )
@@ -276,13 +274,13 @@ TEST_F( DeviceShadowOverSomeipTest, documentsUpdateWrongPrefix )
                                          payload.size(),
                                          0,
                                          "wrong_$aws/things/thing-name/shadow/update/documents" );
-    mDeviceShadowOverSomeip->onDataReceived( message );
+    mDeviceShadowOverSomeip.onDataReceived( message );
 }
 
 TEST_F( DeviceShadowOverSomeipTest, getAccepted )
 {
     std::string clientToken;
-    EXPECT_CALL( *mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/get", _, _, _ ) )
+    EXPECT_CALL( mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/get", _, _, _ ) )
         .Times( 1 )
         .WillOnce(
             Invoke( [&clientToken](
@@ -302,21 +300,21 @@ TEST_F( DeviceShadowOverSomeipTest, getAccepted )
     EXPECT_CALL( callback,
                  Call( Eq( v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode::NO_ERROR ), Eq( "" ), _ ) )
         .Times( 1 );
-    mDeviceShadowOverSomeip->getShadow( nullptr, "", callback.AsStdFunction() );
+    mDeviceShadowOverSomeip.getShadow( nullptr, "", callback.AsStdFunction() );
     {
         std::string payload = "{\"clientToken\":\"" + clientToken + "\"}";
         ReceivedConnectivityMessage message( reinterpret_cast<const uint8_t *>( payload.data() ),
                                              payload.size(),
                                              0,
                                              "$aws/things/thing-name/shadow/get/accepted" );
-        mDeviceShadowOverSomeip->onDataReceived( message );
+        mDeviceShadowOverSomeip.onDataReceived( message );
     }
 }
 
 TEST_F( DeviceShadowOverSomeipTest, deleteAccepted )
 {
     std::string clientToken;
-    EXPECT_CALL( *mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/delete", _, _, _ ) )
+    EXPECT_CALL( mSenderMock, mockedSendBuffer( "$aws/things/thing-name/shadow/delete", _, _, _ ) )
         .Times( 1 )
         .WillOnce(
             Invoke( [&clientToken](
@@ -334,14 +332,14 @@ TEST_F( DeviceShadowOverSomeipTest, deleteAccepted )
         callback;
     EXPECT_CALL( callback, Call( Eq( v1::commonapi::DeviceShadowOverSomeipInterface::ErrorCode::NO_ERROR ), Eq( "" ) ) )
         .Times( 1 );
-    mDeviceShadowOverSomeip->deleteShadow( nullptr, "", callback.AsStdFunction() );
+    mDeviceShadowOverSomeip.deleteShadow( nullptr, "", callback.AsStdFunction() );
     {
         std::string payload = "{\"clientToken\":\"" + clientToken + "\"}";
         ReceivedConnectivityMessage message( reinterpret_cast<const uint8_t *>( payload.data() ),
                                              payload.size(),
                                              0,
                                              "$aws/things/thing-name/shadow/delete/accepted" );
-        mDeviceShadowOverSomeip->onDataReceived( message );
+        mDeviceShadowOverSomeip.onDataReceived( message );
     }
 }
 

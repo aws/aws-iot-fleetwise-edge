@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "IWaveGpsSource.h"
-#include "LoggingModule.h"
-#include "SignalTypes.h"
-#include "Thread.h"
+#include "aws/iotfleetwise/IWaveGpsSource.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/SignalTypes.h"
+#include "aws/iotfleetwise/Thread.h"
 #include <chrono>
 #include <cmath>
 #include <cstdlib>

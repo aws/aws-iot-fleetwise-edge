@@ -1,18 +1,18 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "LastKnownStateSchema.h"
-#include "LoggingModule.h"
-#include "TraceModule.h"
+#include "aws/iotfleetwise/LastKnownStateSchema.h"
+#include "aws/iotfleetwise/LoggingModule.h"
+#include "aws/iotfleetwise/TraceModule.h"
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
 
-LastKnownStateSchema::LastKnownStateSchema( std::shared_ptr<IReceiver> receiverLastKnownState )
+LastKnownStateSchema::LastKnownStateSchema( IReceiver &receiverLastKnownState )
 {
-    receiverLastKnownState->subscribeToDataReceived( [this]( const ReceivedConnectivityMessage &receivedMessage ) {
+    receiverLastKnownState.subscribeToDataReceived( [this]( const ReceivedConnectivityMessage &receivedMessage ) {
         onLastKnownStateReceived( receivedMessage );
     } );
 }
