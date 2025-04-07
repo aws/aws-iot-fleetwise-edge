@@ -228,75 +228,75 @@ Mappings:
   # Ubuntu 20.04 arm64 AMIs
   AMIRegionMapArm64:
     ap-northeast-1:
-      AMIID: ami-0762153e2efe46684
+      AMIID: ami-0b0746f258294d579
     ap-northeast-2:
-      AMIID: ami-0e2cb74a96156bc0d
+      AMIID: ami-02bb63f25623be6a5
     ap-northeast-3:
-      AMIID: ami-0d3b08664b21a0fbd
+      AMIID: ami-0f36f6a01cf003323
     ap-south-1:
-      AMIID: ami-0722012506f142ef5
+      AMIID: ami-0220b23b02dcd7472
     ap-southeast-1:
-      AMIID: ami-0ec3b5e07654f26d0
+      AMIID: ami-042165b0543f0ee50
     ap-southeast-2:
-      AMIID: ami-09ff873c9248c7e89
+      AMIID: ami-016e8b2be3ed7321e
     ca-central-1:
-      AMIID: ami-042dfa95fdbb05f29
+      AMIID: ami-05f568c35d0a96179
     eu-central-1:
-      AMIID: ami-0fdc47d37a9120bc7
+      AMIID: ami-0f87c5201e047e11b
     eu-north-1:
-      AMIID: ami-0a42da5227ad096db
+      AMIID: ami-0323408b68ffad5bb
     eu-west-1:
-      AMIID: ami-041e674fc2bfbc67e
+      AMIID: ami-04f0b66bc81784626
     eu-west-2:
-      AMIID: ami-093d54ae55653bd8d
+      AMIID: ami-059b0d19b2a216c1c
     eu-west-3:
-      AMIID: ami-08056ebe80c381e04
+      AMIID: ami-0ec91324f8291f6d9
     sa-east-1:
-      AMIID: ami-065d0cf19a8b783c7
+      AMIID: ami-0f89fce798bed5bd8
     us-east-1:
-      AMIID: ami-0de267fcccc5a245a
+      AMIID: ami-0ca0034f838ce18c6
     us-east-2:
-      AMIID: ami-0c2a18772e7b431f6
+      AMIID: ami-0db71bb387bb47853
     us-west-1:
-      AMIID: ami-006b207aeadbbcc1b
+      AMIID: ami-0a4cb059a5d26a7e7
     us-west-2:
-      AMIID: ami-0c196f852fb509179
+      AMIID: ami-0e12dfe7437a61feb
   # Ubuntu 20.04 amd64 AMIs
   AMIRegionMapAmd64:
     ap-northeast-1:
-      AMIID: ami-0add83f98587ac221
+      AMIID: ami-0a5d789f51005e017
     ap-northeast-2:
-      AMIID: ami-097732458b96001a9
+      AMIID: ami-08df3100bf18ce27f
     ap-northeast-3:
-      AMIID: ami-01f6009350deb77e6
+      AMIID: ami-00880873dc92cb2bd
     ap-south-1:
-      AMIID: ami-0385f6d2820fab076
+      AMIID: ami-0ec5741cef7cccfa1
     ap-southeast-1:
-      AMIID: ami-0d4a9e871999d699b
+      AMIID: ami-094a05f758cfa0c85
     ap-southeast-2:
-      AMIID: ami-01ff552750e1c3b54
+      AMIID: ami-09ac1f936d01ad8a0
     ca-central-1:
-      AMIID: ami-04cb6f9c24cdd72f8
+      AMIID: ami-07e9398c3d79d0a53
     eu-central-1:
-      AMIID: ami-0b4251973abc8c547
+      AMIID: ami-0a0bfc6462a1bba50
     eu-north-1:
-      AMIID: ami-0d49bd8a094867c99
+      AMIID: ami-006a6296aa17e4546
     eu-west-1:
-      AMIID: ami-09cba89b0e91c8130
+      AMIID: ami-0520e200eb4f308f2
     eu-west-2:
-      AMIID: ami-0a6d7143c497a47c1
+      AMIID: ami-093026fc8263198b0
     eu-west-3:
-      AMIID: ami-0ceac0e83f4066a60
+      AMIID: ami-0cc56a88164d6391b
     sa-east-1:
-      AMIID: ami-035e482746bdea96f
+      AMIID: ami-0ec1e6f31a5c70e13
     us-east-1:
-      AMIID: ami-02c78647b95a018b6
+      AMIID: ami-0069aa073aac75299
     us-east-2:
-      AMIID: ami-084df8ab17b2f1d5f
+      AMIID: ami-014d2a8190b1bdeb4
     us-west-1:
-      AMIID: ami-09b3e59052c3e621c
+      AMIID: ami-02fd5efc30e766ac2
     us-west-2:
-      AMIID: ami-0819a13b911cc3dd0
+      AMIID: ami-057439a71140a950c
 Outputs:
   Ec2InstanceId:
     Description: "EC2 instance ID"
