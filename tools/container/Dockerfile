@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-FROM public.ecr.aws/ubuntu/ubuntu:20.04 AS temp
+FROM public.ecr.aws/ubuntu/ubuntu:22.04 AS temp
 
 # Provided by buildx, e.g.: 'linux/amd64', 'linux/arm64', etc.:
 ARG TARGETPLATFORM
@@ -11,7 +11,7 @@ COPY ${TARGETPLATFORM}/opt.tar.gz                     /tmp/
 RUN tar -zxf /tmp/aws-iot-fleetwise-edge.tar.gz -C /usr/bin \
     && tar -zxf /tmp/opt.tar.gz -C /
 
-FROM public.ecr.aws/ubuntu/ubuntu:20.04
+FROM public.ecr.aws/ubuntu/ubuntu:22.04
 ENV DEBIAN_FRONTEND="noninteractive"
 SHELL ["/bin/bash", "-c"]
 

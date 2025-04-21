@@ -72,13 +72,12 @@ parse_args() {
 parse_args "$@"
 
 if ${INSTALL_BUILD_TIME_DEPS}; then
-    apt update
-    apt install -y \
+    apt-get update
+    apt-get install -y \
         build-essential \
         clang-tidy-12 \
         cmake \
         doxygen \
-        faketime \
         git \
         graphviz \
         libsnappy-dev \
@@ -89,36 +88,41 @@ if ${INSTALL_BUILD_TIME_DEPS}; then
         unzip \
         wget \
         zlib1g-dev
+    git clone -b ${VERSION_FAKETIME} https://github.com/wolfcw/libfaketime.git
+    cd libfaketime
+    make install -j `nproc`
+    cd ..
     update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-12 1000
     python3 -m pip install -r ${SCRIPT_DIR}/requirements-unit-test.txt
 fi
 
 if ${WITH_ROS2_SUPPORT}; then
-    command -v wget > /dev/null || ( apt update && apt install -y wget)
+    command -v wget > /dev/null || ( apt-get update && apt-get install -y wget)
     wget -q https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O /usr/share/keyrings/ros-archive-keyring.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(source /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list
-    apt update
-    apt install -y \
-        ros-galactic-rclcpp \
-        ros-galactic-rosbag2 \
-        ros-galactic-ros2topic \
-        ros-galactic-sensor-msgs
+    apt-get update
+    apt-get install -y \
+        ros-humble-rclcpp \
+        ros-humble-rosbag2 \
+        ros-humble-ros2topic \
+        ros-humble-sensor-msgs \
+        ros-humble-rmw-cyclonedds-cpp
     if ${INSTALL_BUILD_TIME_DEPS}; then
-        apt install -y \
-            ros-galactic-rosidl-default-generators \
+        apt-get install -y \
+            ros-humble-rosidl-default-generators \
             python3-colcon-common-extensions
     fi
 fi
 
 if ${WITH_SOMEIP_SUPPORT}; then
-    apt install -y \
+    apt-get install -y \
         default-jre \
         python3-distutils \
         libpython3-dev
 fi
 
 if ${WITH_CPYTHON_SUPPORT}; then
-    apt install -y \
+    apt-get install -y \
         libpython3-dev
 fi
 
@@ -279,6 +283,7 @@ if ${INSTALL_BUILD_TIME_DEPS} && ( ! ${USE_CACHE} || [ ! -d ${PREFIX} ] ); then
             -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
             -DCMAKE_POSITION_INDEPENDENT_CODE=On \
             -DCMAKE_INSTALL_PREFIX=${PREFIX} \
+            -DSTORE_BUILD_EXAMPLE=OFF \
             ..
         make install -j`nproc`
         cd ../..
@@ -318,6 +323,7 @@ if ${INSTALL_BUILD_TIME_DEPS} && ( ! ${USE_CACHE} || [ ! -d ${PREFIX} ] ); then
         --without-ca-bundle
         --without-ca-path
         --with-ca-fallback
+        --without-brotli
         --prefix=${PREFIX}"
     if [ "${SHARED_LIBS}" == "OFF" ]; then
         LDFLAGS="-static" PKG_CONFIG="pkg-config --static" \

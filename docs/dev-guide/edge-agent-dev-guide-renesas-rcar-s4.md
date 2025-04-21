@@ -37,7 +37,7 @@ This section describes how to get started on a Renesas
 
 ## Build an SD-Card Image
 
-The following instructions use the development machine(Ubuntu 20.04) to build an SD-card image based
+The following instructions use the development machine(Ubuntu 22.04) to build an SD-card image based
 on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 
 1. Run the following _on the development machine_ to install the dependencies:
@@ -50,7 +50,7 @@ on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 
    ```bash
    cd ~/aws-iot-fleetwise-edge \
-   && sudo ./tools/renesas-rcar-s4/make-rootfs.sh 20.04.5 spider -sd
+   && sudo ./tools/renesas-rcar-s4/make-rootfs.sh 22.04.1 spider -sd
    ```
 
 ## Flash the SD-Card Image
@@ -58,7 +58,7 @@ on the Ubuntu variant of the Renesas Linux BSP version 5.10.41.
 1. Run the following to write the image to micro SD-card:
 
    ```bash
-   sudo dd if=./Ubuntu-20.04.5-rootfs-image-rcar-spider-sdcard.ext4 of=/dev/sdc bs=1M status=progress
+   sudo dd if=./Ubuntu-22.04.1-rootfs-image-rcar-spider-sdcard.ext4 of=/dev/sdc bs=1M status=progress
    ```
 
 ## Specify Initial Board Configuration

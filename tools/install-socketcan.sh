@@ -27,14 +27,14 @@ parse_args "$@"
 
 if ! command -v cansend > /dev/null; then
     # Install packages
-    apt update
-    apt install -y can-utils
+    apt-get update
+    apt-get install -y can-utils
 fi
 
 # For EC2, the SocketCAN modules vcan and can-gw are included in a separate package:
 if uname -r | grep -q aws; then
-    apt update
-    apt install -y linux-modules-extra-aws
+    apt-get update
+    apt-get install -y linux-modules-extra-aws
 fi
 
 # Install can-isotp kernel module if not installed
@@ -44,8 +44,8 @@ echo "Installing kernel module: $MODULE"
 if modinfo $MODULE &> /dev/null ; then
     echo "$MODULE is already in system. There is no need to install it."
 else
-    apt update
-    apt install -y build-essential dkms git
+    apt-get update
+    apt-get install -y build-essential dkms git
     git clone https://github.com/hartkopp/can-isotp.git
     cd can-isotp
     git checkout beb4650660179963a8ed5b5cbf2085cc1b34f608

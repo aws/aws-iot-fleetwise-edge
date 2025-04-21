@@ -95,8 +95,8 @@ to take action based on your use of AWS IoT FleetWise._**
 
 ## Step 1: Setup the Raspberry Pi
 
-1. Download Ubuntu 20.04 for Raspberry Pi
-   (https://cdimage.ubuntu.com/ubuntu/releases/20.04/release/) on a local Windows, Mac, or Linux
+1. Download Ubuntu 22.04 for Raspberry Pi
+   (https://cdimage.ubuntu.com/ubuntu/releases/22.04/release/) on a local Windows, Mac, or Linux
    machine. Look for the "Raspberry Pi Generic (64-bit ARM) preinstalled server image".
 1. To flash (write operating system image) to the SD card, use
    [Balena Etcher](https://www.balena.io/etcher/) (available for Windows, Mac and Linux).
@@ -155,7 +155,7 @@ to take action based on your use of AWS IoT FleetWise._**
 
 ## Step 2: Launch your development machine
 
-These steps require an Ubuntu 20.04 development machine with 10 GB free disk space. If necessary,
+These steps require an Ubuntu 22.04 development machine with 10 GB free disk space. If necessary,
 you can use a local Intel x86_64 (amd64) machine. We recommended using the following instructions to
 launch an AWS EC2 Graviton (arm64) instance. For more information about Amazon EC2 pricing, see
 [Amazon EC2 On-Demand Pricing](https://aws.amazon.com/ec2/pricing/on-demand/).

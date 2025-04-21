@@ -13,12 +13,12 @@
 #include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
-#include <openssl/bn.h>
 #include <openssl/evp.h>
-#include <openssl/ossl_typ.h>
+#include <openssl/ocsp.h> // IWYU pragma: keep
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
-#include <openssl/x509.h>
+#include <openssl/types.h>
+#include <openssl/x509.h> // IWYU pragma: keep
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
@@ -32,22 +32,33 @@ namespace IoTFleetWise
 void
 makeCert( std::string &keyPem, std::string &certPem )
 {
-    std::unique_ptr<BIGNUM, decltype( &BN_free )> bn( BN_new(), BN_free );
-    if ( !BN_set_word( bn.get(), RSA_F4 ) )
+    // Create a new key context
+    std::unique_ptr<EVP_PKEY_CTX, decltype( &EVP_PKEY_CTX_free )> pctx( EVP_PKEY_CTX_new_id( EVP_PKEY_RSA, NULL ),
+                                                                        EVP_PKEY_CTX_free );
+    if ( !pctx )
     {
-        throw std::runtime_error( "error initializing big num" );
+        throw std::runtime_error( "error creating key context" );
     }
-    auto rsa = RSA_new(); // Ownership passed to pkey below
-    if ( !RSA_generate_key_ex( rsa, 512, bn.get(), NULL ) )
+
+    // Initialize key generation
+    if ( EVP_PKEY_keygen_init( pctx.get() ) <= 0 )
     {
-        RSA_free( rsa );
+        throw std::runtime_error( "error initializing key generation" );
+    }
+
+    // Set RSA key length
+    if ( EVP_PKEY_CTX_set_rsa_keygen_bits( pctx.get(), 512 ) <= 0 )
+    {
+        throw std::runtime_error( "error setting key length" );
+    }
+
+    // Generate the key
+    EVP_PKEY *pkeyRaw = NULL;
+    if ( EVP_PKEY_keygen( pctx.get(), &pkeyRaw ) <= 0 )
+    {
         throw std::runtime_error( "error generating key" );
     }
-    std::unique_ptr<EVP_PKEY, decltype( &EVP_PKEY_free )> pkey( EVP_PKEY_new(), EVP_PKEY_free );
-    if ( !EVP_PKEY_assign_RSA( pkey.get(), rsa ) )
-    {
-        throw std::runtime_error( "error assigning key" );
-    }
+    std::unique_ptr<EVP_PKEY, decltype( &EVP_PKEY_free )> pkey( pkeyRaw, EVP_PKEY_free );
 
     std::unique_ptr<X509, decltype( &X509_free )> cert( X509_new(), X509_free );
     X509_set_version( cert.get(), 2 );

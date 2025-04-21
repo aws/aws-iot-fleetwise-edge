@@ -55,7 +55,7 @@ runs:
         # If the output file changes, make sure to update the upload-asset job below
         mv build/aws-iot-fleetwise-edge.tar.gz build/${{ inputs.dist-name }}-${{ inputs.upload-arch }}.tar.gz
         if [ "${{ inputs.dist-name }}" == "aws-iot-fleetwise-edge-ros2" ]; then
-          tar --exclude /opt/ros/galactic/include --exclude /opt/ros/galactic/cmake -zcf build/opt.tar.gz /opt/ros
+          tar --exclude /opt/ros/humble/include --exclude /opt/ros/humble/cmake -zcf build/opt.tar.gz /opt/ros
         fi
 
     - name: unit-test

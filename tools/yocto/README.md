@@ -1,23 +1,23 @@
 # Yocto Reference Project for AWS IoTFleetWise
 
-The project is based on NXP Linux BSP 37.0 for the S32G-VNP-RDB2 board which can be downloaded from:
+The project is based on NXP Linux BSP 38.0 for the S32G-VNP-RDB2 board which can be downloaded from:
 https://github.com/nxp-auto-linux/auto_yocto_bsp
 
-This folder provides an additional meta layer on top of BSP 37.0, in order to add the following:
+This folder provides an additional meta layer on top of BSP 38.0, in order to add the following:
 
 - `linux-s32` - Adds the CAN ISO-TP kernel module
 - `setup-socketcan` - Adds a `systemd` service to bring up SocketCAN interfaces at startup
 
 ## Prerequisites
 
-Run the following script to install the prerequisites on an Ubuntu 20.04 host machine (assuming you
+Run the following script to install the prerequisites on an Ubuntu 22.04 host machine (assuming you
 have cloned this repo in `~/aws-iot-fleetwise-edge`):
 
     sudo ~/aws-iot-fleetwise-edge/tools/install-deps-yocto.sh
 
 ## Setup Yocto Project
 
-Run the following script to clone the NXP Linux BSP 37.0 Yocto project for the S32G and add the
+Run the following script to clone the NXP Linux BSP 38.0 Yocto project for the S32G and add the
 `meta-aws-iot-fleetwise` layer:
 
     mkdir -p ~/yocto-build && cd ~/yocto-build

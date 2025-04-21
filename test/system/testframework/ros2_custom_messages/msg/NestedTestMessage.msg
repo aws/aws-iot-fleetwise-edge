@@ -1,0 +1,2 @@
+bool nested_value_bool
+Nested2TestMessage nested_message_2

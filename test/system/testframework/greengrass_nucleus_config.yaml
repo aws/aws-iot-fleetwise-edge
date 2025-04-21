@@ -1,0 +1,32 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+# For reference of what is available, check:
+# https://docs.aws.amazon.com/greengrass/v2/developerguide/greengrass-nucleus-component.html
+# https://github.com/aws-greengrass/aws-greengrass-nucleus/blob/main/README_CONFIG_SCHEMA.md
+system:
+  rootpath: "ROOT_PATH_PLACEHOLDER"
+  certificateFilePath: "CERTIFICATE_FILENAME_PLACEHOLDER"
+  privateKeyPath: "PRIVATE_KEY_FILENAME_PLACEHOLDER"
+  rootCaPath: "ROOT_CA_FILENAME_PLACEHOLDER"
+  thingName: "THING_NAME_PLACEHOLDER"
+  ipcSocketPath: "IPC_SOCKET_PATH_PLACEHOLDER"
+services:
+  aws.greengrass.Nucleus:
+    version: "2.14.2"
+    configuration:
+      awsRegion: "AWS_REGION_PLACEHOLDER"
+      deploymentPollingFrequencySeconds: 5
+      iotRoleAlias: "IOT_ROLE_ALIAS_PLACEHOLDER"
+      iotDataEndpoint: "IOT_DATA_ENDPOINT_PLACEHOLDER"
+      iotCredEndpoint: "IOT_CRED_ENDPOINT_PLACEHOLDER"
+      logging:
+        level: DEBUG
+        fileSizeKB: 10240
+        totalLogsSizeKB: 102400
+        format: TEXT
+        outputDirectory: "LOG_DIR_PLACEHOLDER"
+        outputType: FILE
+      mqtt:
+        keepAliveTimeoutMs: "KEEP_ALIVE_TIMEOUT_MS_PLACEHOLDER"
+        pingTimeoutMs: "PING_TIMEOUT_MS_PLACEHOLDER"
+        sessionExpirySeconds: "SESSION_EXPIRY_SECONDS_PLACEHOLDER"

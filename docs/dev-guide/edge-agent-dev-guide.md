@@ -112,9 +112,13 @@ instance.
 
 1. Click here to
    [**Launch CloudFormation Template**](https://us-east-1.console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-iot-fleetwise.s3.us-west-2.amazonaws.com%2Flatest%2Fcfn-templates%2Ffwdemo.yml&stackName=fwdemo).
-1. (Optional) You can increase the number of simulated vehicles by updating the `FleetSize`
-   parameter. You can also specify the region IoT Things are created in by updating the
-   `IoTCoreRegion` parameter, by default it is `us-east-1`.
+   1. (Optional) You can run FWE as a Greengrass component by setting `MqttConnectionType` parameter
+      to `iotGreengrassV2`.
+   1. (Optional) If `MqttConnectionType` is `iotCore` you can increase the number of simulated
+      vehicles by updating the `FleetSize` parameter. When using Greengrass, only `FleeSize=1` is
+      supported.
+   1. (Optional) You can also specify the region IoT Things are created in by updating the
+      `IoTCoreRegion` parameter, by default it is `us-east-1`.
 1. Select the checkbox next to _'I acknowledge that AWS CloudFormation might create IAM resources
    with custom names.'_
 1. Choose **Create stack**.
@@ -305,7 +309,7 @@ This section describes how to get started on a development machine.
 
 ### Launch your development machine
 
-An Ubuntu 20.04 development machine with 200GB free disk space will be required. A local Intel
+An Ubuntu 22.04 development machine with 200GB free disk space will be required. A local Intel
 x86_64 (amd64) machine can be used, however it is recommended to use the following instructions to
 launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
 [here](https://aws.amazon.com/ec2/pricing/on-demand/).

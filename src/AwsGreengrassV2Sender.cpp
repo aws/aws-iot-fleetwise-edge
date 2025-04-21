@@ -8,6 +8,7 @@
 #include "aws/iotfleetwise/LoggingModule.h"
 #include <aws/crt/Optional.h>
 #include <aws/crt/Types.h>
+#include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <chrono>
 #include <functional>
 #include <future>
@@ -19,10 +20,10 @@ namespace IoTFleetWise
 {
 
 AwsGreengrassV2Sender::AwsGreengrassV2Sender( IConnectivityModule *connectivityModule,
-                                              Aws::Greengrass::GreengrassCoreIpcClient &greengrassClient,
+                                              AwsGreengrassCoreIpcClientWrapper &greengrassClientWrapper,
                                               const TopicConfig &topicConfig )
     : mConnectivityModule( connectivityModule )
-    , mGreengrassClient( greengrassClient )
+    , mGreengrassClientWrapper( greengrassClientWrapper )
     , mTopicConfig( topicConfig )
 {
 }
@@ -91,6 +92,7 @@ AwsGreengrassV2Sender::sendBuffer(
         callback( ConnectivityError::QuotaReached );
         return;
     }
+    ReservedMemoryReleaser reservedMemoryReleaser( AwsSDKMemoryManager::getInstance(), size );
 
     auto greengrassPublishQoS = Aws::Greengrass::QOS_AT_MOST_ONCE;
     switch ( qos )
@@ -103,7 +105,7 @@ AwsGreengrassV2Sender::sendBuffer(
         break;
     }
 
-    auto publishOperation = mGreengrassClient.NewPublishToIoTCore();
+    auto publishOperation = mGreengrassClientWrapper.NewPublishToIoTCore();
     Aws::Greengrass::PublishToIoTCoreRequest publishRequest;
     publishRequest.SetTopicName( topic.c_str() != nullptr ? topic.c_str() : "" );
     Aws::Crt::Vector<uint8_t> payload( buf, buf + size );
@@ -111,17 +113,7 @@ AwsGreengrassV2Sender::sendBuffer(
     publishRequest.SetQos( greengrassPublishQoS );
 
     FWE_LOG_TRACE( "Attempting to publish to " + topic + " topic" );
-    auto onMessageFlushCallback = [callback, topicName = topic]( int errorCode ) {
-        if ( errorCode != 0 )
-        {
-            FWE_LOG_ERROR( "Failed to publish to " + topicName + " topic with error code " +
-                           std::to_string( errorCode ) );
-            callback( ConnectivityError::TransmissionError );
-            return;
-        }
-        callback( ConnectivityError::Success );
-    };
-    auto requestStatus = publishOperation->Activate( publishRequest, onMessageFlushCallback ).get();
+    auto requestStatus = publishOperation->Activate( publishRequest ).get();
     if ( !requestStatus )
     {
         auto errString = requestStatus.StatusToString();
@@ -157,21 +149,20 @@ AwsGreengrassV2Sender::sendBuffer(
              */
             if ( error->GetMessage().has_value() )
             {
-                auto errString = error->GetMessage().value().c_str();
-                FWE_LOG_ERROR( "Greengrass Core responded with an error: " +
-                               ( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) ) );
+                auto errString = error->GetMessage().value();
+                FWE_LOG_ERROR( "Greengrass Core responded with an error: " + std::string( errString.c_str() ) );
             }
         }
         else
         {
-            auto errString = publishResult.GetRpcError().StatusToString();
-            FWE_LOG_ERROR( "Attempting to receive the response from the server failed with error code " +
-                           std::string( errString.c_str() != nullptr ? errString.c_str() : "Unknown error" ) );
+            auto errString = std::string( publishResult.GetRpcError().StatusToString().c_str() );
+            FWE_LOG_ERROR( "Attempting to receive the response from the server failed with error code " + errString );
         }
-        callback( ConnectivityError::NoConnection );
+        callback( ConnectivityError::TransmissionError );
         return;
     }
 
+    mPayloadCountSent++;
     callback( ConnectivityError::Success );
 }
 

@@ -1,0 +1,116 @@
+{
+  "obd_pid_signals": [
+    {
+      "obd_signal_name": "ENGINE_SPEED",
+      "pid_response_length": 2,
+      "service_mode": 1,
+      "pid": "0x0C",
+      "scaling": 0.25,
+      "offset": 0.0,
+      "start_byte": 0,
+      "byte_length": 2,
+      "bit_right_shift": 0,
+      "bit_mask_length": 8,
+      "signal_value_type": "INTEGER"
+    },
+    {
+      "obd_signal_name": "ENGINE_OIL_TEMPERATURE",
+      "pid_response_length": 1,
+      "service_mode": 1,
+      "pid": "0x5C",
+      "scaling": 1.0,
+      "offset": -40.0,
+      "start_byte": 0,
+      "byte_length": 1,
+      "bit_right_shift": 0,
+      "bit_mask_length": 8
+    },
+    {
+      "obd_signal_name": "CONTROL_MODULE_VOLTAGE",
+      "pid_response_length": 2,
+      "service_mode": 1,
+      "pid": "0x42",
+      "scaling": 0.001,
+      "offset": 0.0,
+      "start_byte": 0,
+      "byte_length": 2,
+      "bit_right_shift": 0,
+      "bit_mask_length": 8
+    },
+    {
+      "obd_signal_name": "Intake Air Temperature Bank1 Sensor 1",
+      "pid_response_length": 7,
+      "service_mode": 1,
+      "pid": "0x68",
+      "scaling": 1.0,
+      "offset": -40.0,
+      "start_byte": 1,
+      "byte_length": 1,
+      "bit_right_shift": 0,
+      "bit_mask_length": 8
+    },
+    {
+      "obd_signal_name": "Intake Air Temperature Bank1 Sensor 2",
+      "pid_response_length": 7,
+      "service_mode": 1,
+      "pid": "0x68",
+      "scaling": 1.0,
+      "offset": -40.0,
+      "start_byte": 2,
+      "byte_length": 1,
+      "bit_right_shift": 0,
+      "bit_mask_length": 8
+    },
+    {
+      "obd_signal_name": "Fuel Rail Pressure A",
+      "pid_response_length": 11,
+      "service_mode": 1,
+      "pid": "0x6D",
+      "scaling": 10.0,
+      "offset": 0.0,
+      "start_byte": 3,
+      "byte_length": 2,
+      "bit_right_shift": 0,
+      "bit_mask_length": 8
+    },
+    {
+      "obd_signal_name": "EVAP_SYSTEM_VAPOR_PRESSURE_A",
+      "pid_response_length": 2,
+      "service_mode": 1,
+      "pid": "0xA3",
+      "scaling": 0.25,
+      "offset": 0.0,
+      "start_byte": 0,
+      "byte_length": 2,
+      "bit_right_shift": 0,
+      "bit_mask_length": 8,
+      "is_signed": true
+    },
+    {
+      "obd_signal_name": "CUSTOM_FLOAT",
+      "pid_response_length": 4,
+      "service_mode": 1,
+      "pid": "0xE1",
+      "scaling": 1.0,
+      "offset": 0.0,
+      "start_byte": 0,
+      "byte_length": 4,
+      "bit_right_shift": 0,
+      "bit_mask_length": 8,
+      "signal_value_type": "FLOATING_POINT"
+    },
+    {
+      "obd_signal_name": "CUSTOM_DOUBLE",
+      "pid_response_length": 8,
+      "service_mode": 1,
+      "pid": "0xE2",
+      "scaling": 1.0,
+      "offset": 0.0,
+      "start_byte": 0,
+      "byte_length": 8,
+      "bit_right_shift": 0,
+      "bit_mask_length": 8,
+      "signal_value_type": "FLOATING_POINT"
+    }
+  ]
+}

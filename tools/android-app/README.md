@@ -152,7 +152,7 @@ privileged VHAL properties. To demonstrate the app accessing privileged VHAL pro
     desired region in each place that it is mentioned below.
   - Note: AWS IoT FleetWise is currently available in
     [these](https://docs.aws.amazon.com/general/latest/gr/iotfleetwise.html) regions.
-- A local x86_64 Ubuntu 20.04 machine with the
+- A local x86_64 Ubuntu 22.04 machine with the
   [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
   installed.
 
@@ -248,7 +248,7 @@ Android apps.
 
 ### App build guide
 
-An x86_64 Ubuntu 20.04 development machine with 200GB free disk space should be used.
+An x86_64 Ubuntu 22.04 development machine with 200GB free disk space should be used.
 
 1. Clone the source code:
 
@@ -299,9 +299,9 @@ signed with the platform certificate, which in this case will be the
 
 **Prerequisites:**
 
-- A high performance x86_64 Ubuntu 20.04 development machine (e.g. an `m6a.8xlarge` EC2 instance)
+- A high performance x86_64 Ubuntu 22.04 development machine (e.g. an `m6a.8xlarge` EC2 instance)
   with 300 GB free storage space.
-- A local x86_64 Ubuntu 20.04 machine with [Android Studio](https://developer.android.com/studio)
+- A local x86_64 Ubuntu 22.04 machine with [Android Studio](https://developer.android.com/studio)
   and the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
   installed.
 

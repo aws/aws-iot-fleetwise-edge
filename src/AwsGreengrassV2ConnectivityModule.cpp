@@ -12,11 +12,11 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-AwsGreengrassV2ConnectivityModule::AwsGreengrassV2ConnectivityModule( Aws::Crt::Io::ClientBootstrap *clientBootstrap,
-                                                                      const TopicConfig &topicConfig )
+AwsGreengrassV2ConnectivityModule::AwsGreengrassV2ConnectivityModule(
+    AwsGreengrassCoreIpcClientWrapper &greengrassClientWrapper, const TopicConfig &topicConfig )
     : mConnected( false )
     , mConnectionEstablished( false )
-    , mClientBootstrap( clientBootstrap )
+    , mGreengrassClientWrapper( greengrassClientWrapper )
     , mTopicConfig( topicConfig )
 {
 }
@@ -31,12 +31,11 @@ AwsGreengrassV2ConnectivityModule::connect()
 
     mConnected = false;
 
-    mLifecycleHandler = std::make_unique<IpcLifecycleHandler>();
-    mGreengrassClient = std::make_unique<Aws::Greengrass::GreengrassCoreIpcClient>( *( mClientBootstrap ) );
-    auto connectionStatus = mGreengrassClient->Connect( *mLifecycleHandler ).get();
+    RpcError connectionStatus = mGreengrassClientWrapper.Connect( mLifecycleHandler ).get();
     if ( !connectionStatus )
     {
-        FWE_LOG_ERROR( "Failed to establish connection with error " + std::to_string( connectionStatus ) );
+        FWE_LOG_ERROR( "Failed to establish connection with error " +
+                       std::string( connectionStatus.StatusToString().c_str() ) );
         return false;
     }
 
@@ -55,7 +54,7 @@ AwsGreengrassV2ConnectivityModule::connect()
 std::shared_ptr<ISender>
 AwsGreengrassV2ConnectivityModule::createSender()
 {
-    auto sender = std::make_shared<AwsGreengrassV2Sender>( this, *mGreengrassClient, mTopicConfig );
+    auto sender = std::make_shared<AwsGreengrassV2Sender>( this, mGreengrassClientWrapper, mTopicConfig );
     mSenders.emplace_back( sender );
     return sender;
 }
@@ -63,7 +62,7 @@ AwsGreengrassV2ConnectivityModule::createSender()
 std::shared_ptr<IReceiver>
 AwsGreengrassV2ConnectivityModule::createReceiver( const std::string &topicName )
 {
-    auto receiver = std::make_shared<AwsGreengrassV2Receiver>( this, *mGreengrassClient, topicName );
+    auto receiver = std::make_shared<AwsGreengrassV2Receiver>( this, mGreengrassClientWrapper, topicName );
     mReceivers.emplace_back( receiver );
     return receiver;
 }
@@ -86,6 +85,11 @@ AwsGreengrassV2ConnectivityModule::disconnect()
     for ( auto sender : mSenders )
     {
         sender->invalidateConnection();
+    }
+
+    if ( mGreengrassClientWrapper.IsConnected() )
+    {
+        mGreengrassClientWrapper.Close();
     }
 
     return true;

@@ -1,5 +1,24 @@
 # Change Log
 
+## v1.3.0 (2025-04-14)
+
+Bug fixes:
+
+- Fixed crash when using Greengrass V2 connection type.
+
+Improvements:
+
+- Improved [guide for Greengrass V2](./tools/greengrassV2/README.md)
+- Added an option to [fwdemo stack](./tools/cfn-templates/fwdemo.yml) to use Greengrass V2
+  connection type. When `MqttConnectionType` is set to `iotGreengrassV2`, the EC2 instance will be
+  configured as a Greengrass core device and FWE will be deployed as a Greengrass component.
+- Make SHA1 code compatible with Boost `1.86.0`. The `1.84.0` version is still being used as a
+  dependency, but the code should now compile with more recent versions too. Related to
+  https://github.com/aws/aws-iot-fleetwise-edge/issues/119
+- Added [system test framework](./test/system/) with 70 reference system tests
+- Update to Ubuntu 22.04 for the development environment
+  - Upgraded the ROS2 distribution from Galactic to Humble
+
 ## v1.2.1 (2025-02-27)
 
 New features:

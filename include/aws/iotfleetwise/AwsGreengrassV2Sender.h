@@ -3,11 +3,11 @@
 
 #pragma once
 
+#include "aws/iotfleetwise/AwsGreengrassCoreIpcClientWrapper.h"
 #include "aws/iotfleetwise/IConnectivityModule.h"
 #include "aws/iotfleetwise/ISender.h"
 #include "aws/iotfleetwise/TopicConfig.h"
 #include <atomic>
-#include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
@@ -30,7 +30,7 @@ class AwsGreengrassV2Sender : public ISender
 {
 public:
     AwsGreengrassV2Sender( IConnectivityModule *connectivityModule,
-                           Aws::Greengrass::GreengrassCoreIpcClient &greengrassClient,
+                           AwsGreengrassCoreIpcClientWrapper &greengrassClientWrapper,
                            const TopicConfig &topicConfig );
     ~AwsGreengrassV2Sender() override = default;
 
@@ -83,7 +83,7 @@ private:
     IConnectivityModule *mConnectivityModule;
 
     std::mutex mConnectivityMutex;
-    Aws::Greengrass::GreengrassCoreIpcClient &mGreengrassClient;
+    AwsGreengrassCoreIpcClientWrapper &mGreengrassClientWrapper;
     std::atomic<unsigned> mPayloadCountSent{};
 
     const TopicConfig &mTopicConfig;

@@ -72,6 +72,10 @@
 #include <aws/core/utils/threading/Executor.h>
 #endif
 #endif
+#ifdef FWE_FEATURE_GREENGRASSV2
+#include "aws/iotfleetwise/AwsGreengrassCoreIpcClientWrapper.h"
+#include <aws/greengrass/GreengrassCoreIpcClient.h>
+#endif
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include "aws/iotfleetwise/S3Sender.h"
 #endif
@@ -153,6 +157,11 @@ public:
      * @return String with the status summary
      */
     std::string getStatusSummary();
+
+#ifdef FWE_FEATURE_GREENGRASSV2
+    std::unique_ptr<Aws::Greengrass::GreengrassCoreIpcClient> mGreengrassClient;
+    std::unique_ptr<AwsGreengrassCoreIpcClientWrapper> mGreengrassClientWrapper;
+#endif
 
     std::shared_ptr<IConnectivityModule> mConnectivityModule;
     std::shared_ptr<NamedSignalDataSource> mNamedSignalDataSource;

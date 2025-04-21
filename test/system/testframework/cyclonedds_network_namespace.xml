@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/iceoryx/etc/cyclonedds.xsd">
+    <Domain id="any">
+        <General>
+            <NetworkInterfaceAddress>NETWORK_INTERFACE_ADDRESS_PLACEHOLDER</NetworkInterfaceAddress>
+            <AllowMulticast>true</AllowMulticast>
+        </General>
+        <Tracing><Verbosity>config</Verbosity><OutputFile>stderr</OutputFile></Tracing>
+    </Domain>
+    <Internal>
+        <!-- When not using lo as the network interface, the python process usually hangs waiting for
+        some CycloneDDS threads to stop. There are some reports like https://github.com/ros2/rmw_cyclonedds/issues/104
+        and https://github.com/ros2/rmw_cyclonedds/issues/85 with similar symptoms. There seems to be
+        some changes merged, so maybe newer versions don't have this issue. Since we are using an EOL
+        version of ROS2, for now disabling multiple threads avoid the issue. -->
+        <MultipleReceiveThreads>false</MultipleReceiveThreads>
+    </Internal>
+</CycloneDDS>

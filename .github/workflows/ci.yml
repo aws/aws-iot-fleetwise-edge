@@ -19,18 +19,18 @@ env:
 
 jobs:
   linting:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.8"
+          python-version: "3.10"
       - run: sudo apt-get install expect
       - run: pip install pre-commit
       - run: unbuffer pre-commit run --all-files
 
   build-amd64:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
@@ -46,7 +46,7 @@ jobs:
           dist-files: build/aws-iot-fleetwise-edge:.
 
   build-arm64:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
@@ -62,7 +62,7 @@ jobs:
           dist-files: build/aws-iot-fleetwise-edge:.
 
   build-armhf:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
@@ -78,7 +78,7 @@ jobs:
           dist-files: build/aws-iot-fleetwise-edge:.
 
   build-ros2-amd64:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
@@ -94,7 +94,7 @@ jobs:
           dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
 
   build-ros2-arm64:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
@@ -110,7 +110,7 @@ jobs:
           dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
 
   build-ros2-armhf:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
@@ -126,7 +126,7 @@ jobs:
           dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
 
   build-android:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: "./.github/template/fwe-build"
@@ -188,7 +188,7 @@ jobs:
           gh release upload ${RELEASE_VERSION} tools/android-app/app/build/outputs/apk/release/aws-iot-fleetwise-edge.apk
 
   build-docker:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
       - build-amd64
       - build-arm64
@@ -213,7 +213,7 @@ jobs:
           push-role: ${{ secrets.PUBLIC_ECR_PUSH_ROLE }}
 
   build-docker-ros2:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
       - build-ros2-amd64
       - build-ros2-arm64
@@ -238,7 +238,7 @@ jobs:
           push-role: ${{ secrets.PUBLIC_ECR_PUSH_ROLE }}
 
   copy-cfn-templates:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if:
       github.repository == 'aws/aws-iot-fleetwise-edge' && (github.ref_type == 'tag' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main'))

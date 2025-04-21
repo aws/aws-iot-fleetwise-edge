@@ -1,0 +1,22 @@
+{
+  "topics": [
+    {
+      "name": "ImageTopicROS2_TOPIC_NUMBER_PLACEHOLDER",
+      "module": "sensor_msgs.msg",
+      "type": "Image",
+      "period_sec": 0.01
+    },
+    {
+      "name": "PointFieldTopicROS2_TOPIC_NUMBER_PLACEHOLDER",
+      "module": "sensor_msgs.msg",
+      "type": "PointField",
+      "period_sec": 0.01
+    },
+    {
+      "name": "DifferentTypesTestTopicROS2_TOPIC_NUMBER_PLACEHOLDER",
+      "module": "ros2_custom_messages.msg",
+      "type": "DifferentTypesTest",
+      "period_sec": 0.01
+    }
+  ]
+}

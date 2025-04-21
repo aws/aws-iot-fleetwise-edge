@@ -10,6 +10,7 @@
 #include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
 #include "aws/iotfleetwise/ExampleSomeipInterfaceWrapper.h"
 #include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/ISomeipInterfaceWrapper.h"
 #include "aws/iotfleetwise/RawDataManager.h"
 #include "aws/iotfleetwise/SignalTypes.h"
 #include "v1/commonapi/ExampleSomeipInterfaceProxy.hpp"

@@ -23,6 +23,8 @@ can_sim = canigen.Canigen(
 NETWORK_TYPE = "NetworkType"
 BRAKE_PRESSURE_SIGNAL = "DemoBrakePedalPressure"
 ENGINE_TORQUE_SIGNAL = "DemoEngineTorque"
+SPEED_SIGNAL = "DemoSpeed"
+VOLTAGE_SIGNAL = "DemoVoltage"
 
 
 def set_with_print(func, name, val):
@@ -58,6 +60,8 @@ try:
                 # trigger is > 7000 so trigger
                 set_with_print(can_sim.set_sig, BRAKE_PRESSURE_SIGNAL, 8000)
             set_with_print(can_sim.set_sig, ENGINE_TORQUE_SIGNAL, i * 100)
+            set_with_print(can_sim.set_sig, SPEED_SIGNAL, (i * 10) + (1 / i))
+            set_with_print(can_sim.set_sig, VOLTAGE_SIGNAL, (i * 7) + (2 / i))
             time.sleep(0.5)
             set_with_print(can_sim.set_sig, BRAKE_PRESSURE_SIGNAL, i * 200)
             if i % 4 < 2:  # change network type every 10 seconds

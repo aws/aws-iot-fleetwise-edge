@@ -43,8 +43,8 @@ parse_args() {
 
 parse_args "$@"
 
-apt update
-apt install -y \
+apt-get update
+apt-get install -y \
     unzip \
     git \
     wget \
@@ -213,8 +213,8 @@ install_deps() {
     rm -rf openssl-${VERSION_OPENSSL}
     tar -zxf openssl-${VERSION_OPENSSL}.tar.gz
     cd openssl-${VERSION_OPENSSL}
-    ANDROID_NDK_HOME=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \
-        PATH=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin:${PATH} \
+    ANDROID_NDK_ROOT=${SDK_PREFIX}/ndk/${VERSION_ANDROID_NDK} \
+        PATH=${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin:${PATH} \
         INSTALL_PREFIX=${INSTALL_PREFIX} SSL_TARGET=${SSL_TARGET} VERSION_ANDROID_API=${VERSION_ANDROID_API} \
         bash -c './Configure ${SSL_TARGET} -D__ANDROID_API__=${VERSION_ANDROID_API} --prefix=${INSTALL_PREFIX} no-shared \
             && make -j`nproc`' > /dev/null

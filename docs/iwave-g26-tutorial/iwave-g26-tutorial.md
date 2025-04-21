@@ -346,7 +346,7 @@ Setting up the 4G LTE modem inside the G26 TCU is dependent on your SIM card ser
 
 ## Step 2: Launch your development machine
 
-These steps require an Ubuntu 20.04 development machine with 10 GB free disk space. If necessary,
+These steps require an Ubuntu 22.04 development machine with 10 GB free disk space. If necessary,
 you can use a local Intel x86_64 (amd64) machine. We recommended using the following instructions to
 launch an AWS EC2 Graviton (arm64) instance. For more information about Amazon EC2 pricing, see
 [Amazon EC2 On-Demand Pricing](https://aws.amazon.com/ec2/pricing/on-demand/).

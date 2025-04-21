@@ -25,7 +25,7 @@ parse_args() {
 parse_args "$@"
 
 if ${WITH_ROS2_SUPPORT}; then
-    source /opt/ros/galactic/setup.bash
+    source /opt/ros/humble/setup.bash
     cd build/iotfleetwise
 else
     cd build

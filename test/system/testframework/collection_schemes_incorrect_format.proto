@@ -1,0 +1,107 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+option java_package = "com.amazonaws.iot.autobahn.schemas";
+package Aws.IoTFleetWise.Schemas.IncorrectCollectionSchemesMsg;
+
+/*
+ * This collection scheme is used to mock incorrect schema in system test.
+ */
+message CollectionSchemes {
+
+    /*
+     * List of collectionSchemes. On receipt of this, FWE will discard all collectionSchemes it currently has and enact these.
+     */
+    repeated CollectionScheme collection_schemes = 1;
+
+    /*
+     * Timestamp of when the collectionScheme list was created.
+     */
+    uint64 timestamp_ms_epoch = 2;
+}
+
+/*
+ * A definition of an individual collectionScheme containing what/when/how to send vehicle data to cloud. A
+ * collectionScheme can be condition based, where data is sent whenever a condition evaluates to true, or it
+ * can be time based, where data is sent up at periodic intervals.
+ */
+message CollectionScheme {
+
+    /*
+     * Intentionally set to mismatch with the correct schema
+     */
+    uint32 campaign_sync_id = 1;
+
+    /*
+     * Synchronization ID of the required decoder manifest for this collectionScheme
+     */
+    string decoder_manifest_sync_id = 2;
+
+    /*
+     * When collectionScheme should start in milliseconds since the Unix epoch
+     */
+    uint64 start_time_ms_epoch = 3;
+
+    /*
+     * When collectionScheme should expire in milliseconds since the Unix epoch. This collectionScheme expiration date
+     * is meant to serve as an end date for a collectionScheme so it does not keep running forever in the case
+     * that the vehicle permanently loses internet connection to the cloud
+     */
+    uint64 expiry_time_ms_epoch = 4;
+
+    /*
+     * This specifies how much time to spend collecting data after a condition evaluates to true.
+     * When after_duration_ms elapses whatever data collected up to that point ( if any was present
+     * on the vehicle ) is sent to the cloud.
+     */
+    uint32 after_duration_ms = 5;
+
+    /*
+     * All active DTCs including the time they were first seen active will be sent when the collectionScheme
+     * triggers. TODO: After alpha allow customer to select which DTCs to send back.
+     */
+    bool include_active_dtcs = 6;
+
+    /*
+     * List of signal ids to collect or have attribute(s) required by a condition function node
+     */
+    repeated SignalInformation signal_information = 7;
+
+    /*
+     * When true all data will be written to persistant storage when vehicle doesn't not have an
+     * internet connection
+     */
+    bool persist_all_collected_data = 8;
+
+    /*
+     * When true, collected data will be compressed and then sent to cloud. TODO: Add type of
+     * compression used.
+     */
+    bool compress_collected_data = 9;
+
+    /*
+     * An integer between describing the priority for the data collection. CollectionSchemes with low
+     * priority numbers will have higher priority and will be processed first.
+     */
+    uint32 priority = 10;
+}
+
+/*
+ * This message contains information of signals that are to be collected and sent to cloud, or are
+ * part of the condition logic and require attribute information.
+ */
+message SignalInformation {
+
+    /*
+     * Unique identifier of a Signal. Maps directly to a signal defined in the decoder manifest.
+     * Signal can also be an OBD PID.
+     */
+    uint32 signal_id = 1;
+
+    /*
+     * Intentionally set to mismatch with the correct schema
+     */
+    bool incorrect_flag = 2;
+}

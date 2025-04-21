@@ -70,5 +70,35 @@ private:
     std::mutex mMutex;
 };
 
+/**
+ * @brief RAII class to release memory previously reserved by AwsSDKMemoryManager::reserveMemory
+ *
+ * Note that this doesn't reserve the memory. It is just to make it easier to guarantee that memory
+ * previously reserved will be released when a function returns.
+ */
+class ReservedMemoryReleaser
+{
+public:
+    ReservedMemoryReleaser( AwsSDKMemoryManager &memoryManager, size_t reservedBytes )
+        : mMemoryManager( memoryManager )
+        , mReservedBytes( reservedBytes )
+    {
+    }
+
+    ~ReservedMemoryReleaser()
+    {
+        mMemoryManager.releaseReservedMemory( mReservedBytes );
+    }
+
+    ReservedMemoryReleaser( const ReservedMemoryReleaser & ) = delete;
+    ReservedMemoryReleaser &operator=( const ReservedMemoryReleaser & ) = delete;
+    ReservedMemoryReleaser( ReservedMemoryReleaser && ) = delete;
+    ReservedMemoryReleaser &operator=( ReservedMemoryReleaser && ) = delete;
+
+private:
+    AwsSDKMemoryManager &mMemoryManager;
+    size_t mReservedBytes;
+};
+
 } // namespace IoTFleetWise
 } // namespace Aws

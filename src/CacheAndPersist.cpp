@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <boost/filesystem.hpp>
 #include <boost/uuid/detail/sha1.hpp>
+#include <boost/version.hpp>
+#include <cstdint>
 #include <cstdio>
 #include <fstream> // IWYU pragma: keep
 #include <iomanip>
@@ -22,17 +24,26 @@ namespace IoTFleetWise
 {
 
 constexpr auto SHA1_DIGEST_SIZE_BYTES = sizeof( boost::uuids::detail::sha1::digest_type );
-constexpr auto SHA1_DIGEST_SIZE_WORDS = SHA1_DIGEST_SIZE_BYTES / sizeof( uint32_t );
 
 namespace
 {
-std::string sha1DigestAsString( uint32_t ( &digest )[SHA1_DIGEST_SIZE_WORDS] )
+std::string
+sha1DigestAsString( boost::uuids::detail::sha1::digest_type &digest )
 {
     std::stringstream hashString;
+#if BOOST_VERSION >= 108600
+    for ( unsigned int i = 0; i < SHA1_DIGEST_SIZE_BYTES; i++ )
+    {
+        hashString << std::hex << std::setw( 2 ) << std::setfill( '0' ) << static_cast<unsigned int>( digest[i] );
+    }
+#else
+    constexpr auto SHA1_DIGEST_SIZE_WORDS = SHA1_DIGEST_SIZE_BYTES / sizeof( uint32_t );
     for ( unsigned int i = 0; i < SHA1_DIGEST_SIZE_WORDS; i++ )
     {
         hashString << std::hex << std::setw( sizeof( uint32_t ) * 2 ) << std::setfill( '0' ) << digest[i];
     }
+#endif
+
     return hashString.str();
 }
 
@@ -50,7 +61,8 @@ calculateSha1( const uint8_t *buf, size_t size )
         // SHA1 is 2^64 bits, so it should never happen in our case.
         FWE_FATAL_ASSERT( false, "Exception while calculating SHA1: " + std::string( e.what() ) );
     }
-    uint32_t digest[SHA1_DIGEST_SIZE_WORDS];
+
+    boost::uuids::detail::sha1::digest_type digest{};
     sha1.get_digest( digest );
     return sha1DigestAsString( digest );
 }
@@ -255,7 +267,7 @@ CacheAndPersist::write( std::streambuf &streambuf, DataType dataType, const std:
         file.write( chunkPtr, count );
     }
 
-    unsigned int digest[SHA1_DIGEST_SIZE_WORDS];
+    boost::uuids::detail::sha1::digest_type digest{};
     sha1.get_digest( digest );
     auto checksumStatus = writeChecksumForFile( path.string(), sha1DigestAsString( digest ) );
     if ( checksumStatus != ErrorCode::SUCCESS )
