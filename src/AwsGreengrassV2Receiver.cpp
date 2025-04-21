@@ -36,10 +36,10 @@ SubscribeStreamHandler::OnStreamEvent(
 }
 
 AwsGreengrassV2Receiver::AwsGreengrassV2Receiver( IConnectivityModule *connectivityModule,
-                                                  Aws::Greengrass::GreengrassCoreIpcClient &greengrassClient,
+                                                  AwsGreengrassCoreIpcClientWrapper &greengrassClientWrapper,
                                                   std::string topicName )
     : mConnectivityModule( connectivityModule )
-    , mGreengrassClient( greengrassClient )
+    , mGreengrassClientWrapper( greengrassClientWrapper )
     , mSubscribed( false )
     , mTopicName( std::move( topicName ) )
 {
@@ -59,18 +59,13 @@ AwsGreengrassV2Receiver::subscribe()
         FWE_LOG_ERROR( "Empty ingestion topic name provided" );
         return ConnectivityError::NotConfigured;
     }
-    if ( !mConnectivityModule->isAlive() )
-    {
-        FWE_LOG_ERROR( "MQTT Connection not established, failed to subscribe" );
-        return ConnectivityError::NoConnection;
-    }
 
     mSubscribeStreamHandler =
         std::make_shared<SubscribeStreamHandler>( [&]( const ReceivedConnectivityMessage &receivedMessage ) {
             mListeners.notify( receivedMessage );
         } );
 
-    mSubscribeOperation = mGreengrassClient.NewSubscribeToIoTCore( mSubscribeStreamHandler );
+    mSubscribeOperation = mGreengrassClientWrapper.NewSubscribeToIoTCore( mSubscribeStreamHandler );
     Aws::Greengrass::SubscribeToIoTCoreRequest subscribeRequest;
     subscribeRequest.SetQos( Aws::Greengrass::QOS_AT_LEAST_ONCE );
     subscribeRequest.SetTopicName( mTopicName.c_str() != nullptr ? mTopicName.c_str() : "" );
@@ -95,6 +90,7 @@ AwsGreengrassV2Receiver::subscribe()
     auto subscribeResult = subscribeResultFuture.get();
     if ( subscribeResult )
     {
+        mSubscribed = true;
         FWE_LOG_TRACE( "Successfully subscribed to " + mTopicName + " topic" );
     }
     else
@@ -110,16 +106,14 @@ AwsGreengrassV2Receiver::subscribe()
              */
             if ( error->GetMessage().has_value() )
             {
-                auto errString = error->GetMessage().value().c_str();
-                FWE_LOG_ERROR( "Greengrass Core responded with an error: " +
-                               ( errString != nullptr ? std::string( errString ) : std::string( "Unknown error" ) ) );
+                auto errString = error->GetMessage().value();
+                FWE_LOG_ERROR( "Greengrass Core responded with an error: " + std::string( errString.c_str() ) );
             }
         }
         else
         {
-            auto errString = subscribeResult.GetRpcError().StatusToString();
-            FWE_LOG_ERROR( "Attempting to receive the response from the server failed with error code: " +
-                           std::string( errString.c_str() != nullptr ? errString.c_str() : "Unknown error" ) );
+            auto errString = std::string( subscribeResult.GetRpcError().StatusToString().c_str() );
+            FWE_LOG_ERROR( "Attempting to receive the response from the server failed with error code: " + errString );
         }
         return ConnectivityError::NoConnection;
     }

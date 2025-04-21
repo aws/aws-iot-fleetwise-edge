@@ -487,13 +487,37 @@ for NODE_FILE in "${NODE_FILES[@]}"; do
 done
 
 echo "Creating model manifest..."
-# Make a list of all node names:
-NODE_LIST=`echo "${ALL_NODES}" | jq -r ".[] | .actuator,.sensor | .fullyQualifiedName" | grep Vehicle\\. | jq -Rn [inputs]`
 aws iotfleetwise create-model-manifest \
     ${ENDPOINT_URL_OPTION} --region ${REGION} \
     --name ${NAME}-model-manifest \
     --signal-catalog-arn ${SIGNAL_CATALOG_ARN} \
-    --nodes "${NODE_LIST}" | jq -r .arn
+    --nodes "[]" | jq -r .arn
+
+# Make a list of all node names:
+NODE_LIST=`echo "${ALL_NODES}" | jq -r ".[] | .actuator,.sensor | .fullyQualifiedName" | grep Vehicle\\. | jq -Rn [inputs]`
+NODE_COUNT=`echo ${NODE_LIST} | jq length`
+
+echo "Updating model manifest with ${NODE_COUNT} nodes in batches..."
+for ((i=0; i<${NODE_COUNT}; i+=499)); do
+    NODES_SUBSET=`echo ${NODE_LIST} | jq .[$i:$(($i+499))]`
+    echo "Processing batch starting at index $i..."
+    while true; do
+        if UPDATE_MODEL_MANIFEST_STATUS=`aws iotfleetwise update-model-manifest \
+            ${ENDPOINT_URL_OPTION} --region ${REGION} \
+            --name ${NAME}-model-manifest \
+            --nodes-to-add "${NODES_SUBSET}"`; then
+            echo ${UPDATE_MODEL_MANIFEST_STATUS} | jq -r .arn
+            break
+        elif ! echo ${UPDATE_MODEL_MANIFEST_STATUS} | grep -q "ConflictException"; then
+            echo "${UPDATE_MODEL_MANIFEST_STATUS}" >&2
+            exit -1
+        else
+            DELAY=5
+            echo "Signal catalog in use, waiting for ${DELAY} seconds and retrying..."
+            sleep ${DELAY}
+        fi
+    done
+done
 
 echo "Activating model manifest..."
 while true; do

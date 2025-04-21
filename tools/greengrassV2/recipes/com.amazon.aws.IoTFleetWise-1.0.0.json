@@ -24,7 +24,10 @@
         "os": "linux"
       },
       "Lifecycle": {
-        "Run": "{artifacts:path}/aws-iot-fleetwise-edge {artifacts:path}/config.json"
+        "Run": "{artifacts:path}/aws-iot-fleetwise-edge {artifacts:path}/config-0.json",
+        "SetEnv": {
+          "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp"
+        }
       }
     }
   ]

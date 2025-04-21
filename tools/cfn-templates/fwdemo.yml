@@ -41,6 +41,13 @@ Parameters:
     Description: "Endpoint URL for IoT Core (leave blank for automatic)"
     Type: String
     Default: ""
+  MqttConnectionType:
+    Description:
+      "Type of MQTT connection to use. If Greengrass V2, AWS IoT Greengrass Core cli will be
+      installed and FWE will run as a Greengrass component."
+    Type: String
+    Default: "iotCore"
+    AllowedValues: ["iotCore", "iotGreengrassV2"]
   IoTMqttTopicPrefix:
     Description: "IoT MQTT Topic prefix (leave as default)"
     Type: String
@@ -65,6 +72,7 @@ Parameters:
     AllowedValues: ["Trace", "Info", "Warning", "Error"]
 Conditions:
   KeyPairSpecifiedCondition: !Not [!Equals [!Ref Ec2KeyPair, ""]]
+  IsUsingGreengrassV2Connection: !Equals [!Ref MqttConnectionType, "iotGreengrassV2"]
 Resources:
   Ec2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -107,6 +115,32 @@ Resources:
                   - "s3:Get*"
                 Resource:
                   - arn:aws:s3:::*
+              - Effect: Allow
+                Action:
+                  - "iot:CancelJob"
+                  - "iot:CreateJob"
+                  - "iot:DeleteThingShadow"
+                  - "iot:DescribeJob"
+                  - "iot:DescribeJobExecution"
+                  - "iot:DescribeThing"
+                  - "iot:DescribeThingGroup"
+                  - "iot:GetThingShadow"
+                  - "iot:UpdateJob"
+                  - "iot:UpdateThingShadow"
+                Resource:
+                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:job/*
+                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:thing/${AWS::StackName}*
+              - Effect: Allow
+                Action:
+                  - "greengrass:CreateDeployment"
+                  - "greengrass:GetDeployment"
+                  - "greengrass:ListDeployments"
+                  - "greengrass:ListEffectiveDeployments"
+                  - "greengrass:ListInstalledComponents"
+                Resource:
+                  - !Sub arn:aws:greengrass:${IoTCoreRegion}:${AWS::AccountId}:deployments
+                  - !Sub arn:aws:greengrass:${IoTCoreRegion}:${AWS::AccountId}:deployments:*
+                  - !Sub arn:aws:greengrass:${IoTCoreRegion}:${AWS::AccountId}:coreDevices:${AWS::StackName}
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
   Ec2InstanceProfile:
@@ -148,8 +182,8 @@ Resources:
             trap print_process_list ERR
 
             # Upgrade system and reboot if required
-            apt update
-            apt upgrade -y
+            apt-get update
+            apt-get upgrade -y
             if [ -f /var/run/reboot-required ]; then
               # Delete the UserData info file so that we run again after reboot
               rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
@@ -158,19 +192,28 @@ Resources:
             fi
 
             # Install helper scripts:
-            apt update
-            apt install -y python3-setuptools
+            apt-get update
+            apt-get install -y python3-setuptools
+            apt-get install -y python3-pip
             mkdir -p /opt/aws/bin
+            cd /tmp
             wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-            python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
-            rm aws-cfn-bootstrap-py3-latest.tar.gz
+            tar -xvzf aws-cfn-bootstrap-py3-latest.tar.gz
+            rm -rf aws-cfn-bootstrap-py3-latest.tar.gz
+            cd aws-cfn-bootstrap-*
+            python3 setup.py install
+
+            # Create symlinks in /opt/aws/bin
+            ln -s /usr/local/bin/cfn-* /opt/aws/bin/
 
             # On error, signal back to cfn:
             error_handler() {
-              print_process_list
-              /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+              exit_code=$1
+              if [ "$exit_code" != "0" ]; then
+                /opt/aws/bin/cfn-signal --success false --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+              fi
             }
-            trap error_handler ERR
+            trap 'error_handler $?' EXIT
 
             # Increase pid_max:
             echo 1048576 > /proc/sys/kernel/pid_max
@@ -180,14 +223,85 @@ Resources:
             printf "RateLimitBurst=0\nSystemMaxUse=1G\n" >> /etc/systemd/journald.conf
 
             # Install packages
-            apt update
-            apt install -y wget ec2-instance-connect htop jq unzip
+            apt-get update
+            apt-get install -y wget ec2-instance-connect htop jq unzip
 
             # Install AWS CLI:
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+            curl --fail-with-body "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
             unzip -q awscliv2.zip
             ./aws/install
             rm awscliv2.zip
+
+            mkdir /etc/aws-iot-fleetwise
+            echo -n "${IoTThing.certificatePem}" > /etc/aws-iot-fleetwise/certificate.pem
+            echo -n "${IoTThing.privateKey}" > /etc/aws-iot-fleetwise/private-key.key
+
+            if [ ${MqttConnectionType} == "iotGreengrassV2" ]; then
+              useradd --system --create-home ggc_user
+              groupadd --system ggc_group
+
+              curl --fail-with-body https://www.amazontrust.com/repository/AmazonRootCA1.pem -o /etc/aws-iot-fleetwise/AmazonRootCA1.pem
+              curl --fail-with-body https://d2s8p88vqu9w66.cloudfront.net/releases/greengrass-2.14.2.zip -o greengrass.zip
+              unzip greengrass.zip -d GreengrassInstaller && rm greengrass.zip
+
+              apt-get install -y default-jre
+
+              cat > ./GreengrassInstaller/config.yaml <<EOT
+            ---
+            system:
+              rootpath: "/greengrass/v2"
+              certificateFilePath: "/etc/aws-iot-fleetwise/certificate.pem"
+              privateKeyPath: "/etc/aws-iot-fleetwise/private-key.key"
+              rootCaPath: "/etc/aws-iot-fleetwise/AmazonRootCA1.pem"
+              thingName: "${AWS::StackName}"
+            services:
+              aws.greengrass.Nucleus:
+                version: "2.14.2"
+                configuration:
+                  awsRegion: "${IoTCoreRegion}"
+                  iotRoleAlias: "${AWS::StackName}-GreengrassCoreTokenExchangeRoleAlias"
+                  iotDataEndpoint: "${IoTThing.iotEndpoint}"
+                  iotCredEndpoint: "${IoTThing.credsEndpoint}"
+            EOT
+
+              java -Droot="/greengrass/v2" -Dlog.store=FILE \
+                -jar ./GreengrassInstaller/lib/Greengrass.jar \
+                --init-config ./GreengrassInstaller/config.yaml \
+                --component-default-user ggc_user:ggc_group \
+                --setup-system-service true
+
+              wait-for-greengrass-deployment() {
+                DEPLOYMENT_ID=$1
+                OUTPUT=""
+                timeout 120s bash -xc "
+                  while ! echo \"\$OUTPUT\" | jq -r '.[].reason' | grep SUCCESSFUL; do
+                    OUTPUT=\$( \
+                      aws greengrassv2 --region ${IoTCoreRegion} \
+                        list-effective-deployments \
+                        --core-device-thing-name ${AWS::StackName} \
+                        --query \"effectiveDeployments[?deploymentId == '$DEPLOYMENT_ID']\" \
+                    )
+                    sleep 1
+                  done
+                "
+              }
+
+              # Install the CLI so we can trigger local deployments
+              DEPLOYMENT_ID=$(aws greengrassv2 --region ${IoTCoreRegion} create-deployment --cli-input-json '
+                {
+                  "targetArn": "arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:thing/${AWS::StackName}",
+                  "components": {
+                    "aws.greengrass.Cli": {
+                      "componentVersion": "2.14.2"
+                    }
+                  }
+                }
+              ' | jq -r '.deploymentId')
+              if ! wait-for-greengrass-deployment $DEPLOYMENT_ID; then
+                echo "Failed to deploy Greengrass CLI component"
+                exit 1
+              fi
+            fi
 
             # Download FWE:
             cd /home/ubuntu
@@ -218,24 +332,32 @@ Resources:
             fi
 
             # Install FWE credentials and config file
-            mkdir /etc/aws-iot-fleetwise
             mkdir /var/aws-iot-fleetwise
-            echo -n "${IoTThing.certificatePem}" > /etc/aws-iot-fleetwise/certificate.pem
-            echo -n "${IoTThing.privateKey}" > /etc/aws-iot-fleetwise/private-key.key
             if ${EnableROS2}; then
               VISION_SYSTEM_DATA_OPTIONS=" --creds-role-alias ${CredentialsProviderRoleAlias} --creds-endpoint-url ${IoTThing.credsEndpoint} --raw-data-buffer-size ${RawDataBufferSize} --enable-ros2-interface"
             else
               VISION_SYSTEM_DATA_OPTIONS=""
             fi
+
+            if [ ${MqttConnectionType} == "iotCore" ]; then
+              MQTT_CONNECTION_OPTIONS="--endpoint-url ${IoTThing.iotEndpoint}"
+              OUTPUT_CONFIG_FILE_PREFIX="/etc/aws-iot-fleetwise/"
+            else
+              mkdir -p tools/greengrassV2/artifacts/com.amazon.aws.IoTFleetWise/1.0.0
+              MQTT_CONNECTION_OPTIONS=""
+              OUTPUT_CONFIG_FILE_PREFIX="tools/greengrassV2/artifacts/com.amazon.aws.IoTFleetWise/1.0.0/"
+            fi
+
             if ((${FleetSize}==1)); then
               echo "Configuring ${AWS::StackName}..."
               ./tools/configure-fwe.sh \
                 --input-config-file "configuration/static-config.json" \
-                --output-config-file "/etc/aws-iot-fleetwise/config-0.json" \
+                --output-config-file "${!OUTPUT_CONFIG_FILE_PREFIX}config-0.json" \
                 --log-color Yes \
                 --log-level ${FweLogLevel} \
                 --vehicle-name "${AWS::StackName}" \
-                --endpoint-url "${IoTThing.iotEndpoint}" \
+                --connection-type ${MqttConnectionType} \
+                ${!MQTT_CONNECTION_OPTIONS} \
                 --iotfleetwise-topic-prefix '${IoTMqttTopicPrefix}' \
                 --can-bus0 "vcan0" \
                 ${!VISION_SYSTEM_DATA_OPTIONS}
@@ -250,9 +372,10 @@ Resources:
                     mkdir /var/aws-iot-fleetwise/fwe$((i+j)); \
                     ./tools/configure-fwe.sh \
                       --input-config-file "configuration/static-config.json" \
-                      --output-config-file "/etc/aws-iot-fleetwise/config-$((i+j)).json" \
+                      --output-config-file "${!OUTPUT_CONFIG_FILE_PREFIX}config-$((i+j)).json" \
                       --vehicle-name "${AWS::StackName}-$((i+j))" \
-                      --endpoint-url "${IoTThing.iotEndpoint}" \
+                      --connection-type ${MqttConnectionType} \
+                      ${!MQTT_CONNECTION_OPTIONS} \
                       --iotfleetwise-topic-prefix '${IoTMqttTopicPrefix}' \
                       --can-bus0 "vcan$((i+j))" \
                       --persistency-path "/var/aws-iot-fleetwise/fwe$((i+j))" \
@@ -265,7 +388,22 @@ Resources:
             fi
 
             # Install FWE
-            ./tools/install-fwe.sh
+            if [ ${MqttConnectionType} == "iotCore" ]; then
+              ./tools/install-fwe.sh
+            elif [ ${MqttConnectionType} == "iotGreengrassV2" ]; then
+              cp build/aws-iot-fleetwise-edge tools/greengrassV2/artifacts/com.amazon.aws.IoTFleetWise/1.0.0/
+              /greengrass/v2/bin/greengrass-cli deployment create \
+                --recipeDir tools/greengrassV2/recipes \
+                --artifactDir tools/greengrassV2/artifacts \
+                --merge "com.amazon.aws.IoTFleetWise=1.0.0"
+              if ! timeout 60s bash -xc "while ! /greengrass/v2/bin/greengrass-cli deployment list | grep 'Status: SUCCEEDED'; do sleep 1; done"; then
+                echo "Failed to deploy FWE component"
+                exit 1
+              fi
+            else
+              echo "Invalid MqttConnectionType: ${MqttConnectionType}"
+              exit 1
+            fi
 
             # Signal init complete:
             /opt/aws/bin/cfn-signal --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
@@ -279,6 +417,32 @@ Resources:
       LaunchTemplate:
         LaunchTemplateId: !Ref Ec2LaunchTemplate
         Version: !GetAtt Ec2LaunchTemplate.LatestVersionNumber
+  GreengrassCoreTokenExchangeRole:
+    Condition: IsUsingGreengrassV2Connection
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "credentials.iot.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-GreengrassCoreTokenExchangeRolePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "logs:DescribeLogStreams"
+                  - "s3:GetBucketLocation"
+                Resource: "*"
   IoTThing:
     Type: Custom::IoTThing
     Properties:
@@ -286,7 +450,12 @@ Resources:
       ThingName: !Ref AWS::StackName
       FleetSize: !Ref FleetSize
       IoTCoreRegion: !Ref IoTCoreRegion
+      MqttConnectionType: !Ref MqttConnectionType
       IoTCoreEndpointUrl: !Ref IoTCoreEndpointUrl
+      GreengrassCoreTokenExchangeRoleArn: !If
+        - IsUsingGreengrassV2Connection
+        - !Sub ${GreengrassCoreTokenExchangeRole.Arn}
+        - ""
   CreateThingFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -317,6 +486,7 @@ Resources:
                       'iot',
                       endpoint_url=None if iotCoreEndpointUrl=='' else iotCoreEndpointUrl,
                       region_name=iotCoreRegion)
+                  greengrass_v2_client = boto3.client('greengrassv2', region_name=iotCoreRegion)
                   inputThingName=event['ResourceProperties']['ThingName']
                   fleetSize=int(event['ResourceProperties']['FleetSize'])
                   if event['RequestType'] == 'Create':
@@ -348,13 +518,52 @@ Resources:
                               }
                           ]
                       }
+
                       if "${EnableROS2}" == "true":
                           policyDocument["Statement"][0]["Action"].append("iot:AssumeRoleWithCertificate")
                           policyDocument["Statement"][0]["Resource"].append(f"arn:aws:iot:{iotCoreRegion}:${AWS::AccountId}:rolealias/${CredentialsProviderRoleAlias}")
+
                       response = client.create_policy(
                           policyName=inputThingName+'-policy',
                           policyDocument=json.dumps(policyDocument)
                       )
+
+                      if "${MqttConnectionType}" == "iotGreengrassV2":
+                          response = client.create_role_alias(
+                              roleAlias=f"{inputThingName}-GreengrassCoreTokenExchangeRoleAlias",
+                              roleArn=event['ResourceProperties']['GreengrassCoreTokenExchangeRoleArn']
+                          )
+                          response = client.create_policy(
+                              policyName=f"{inputThingName}-GreengrassCoreTokenExchangeRoleAliasPolicy",
+                              policyDocument=json.dumps(
+                                  {
+                                      "Version": "2012-10-17",
+                                      "Statement": [
+                                          {
+                                              "Effect": "Allow",
+                                              "Action": "iot:AssumeRoleWithCertificate",
+                                              "Resource": f"arn:aws:iot:{iotCoreRegion}:${AWS::AccountId}:{inputThingName}-GreengrassCoreTokenExchangeRoleAlias"
+                                          }
+                                      ]
+                                  }
+                              )
+                          )
+                          response = client.create_policy(
+                              policyName=f"{inputThingName}-GreengrassCorePolicy",
+                              policyDocument=json.dumps(
+                                  {
+                                      "Version": "2012-10-17",
+                                      "Statement": [
+                                          {
+                                              "Effect": "Allow",
+                                              "Action": "greengrass:*",
+                                              "Resource": "*"
+                                          }
+                                      ]
+                                  }
+                              )
+                          )
+
                       for i in range(fleetSize):
                           thingName = inputThingName+("" if fleetSize==1 else "-"+str(i))
                           logger.info('Creating thing %s...' % thingName)
@@ -365,6 +574,17 @@ Resources:
                               policyName=inputThingName+'-policy',
                               target=certArn,
                           )
+
+                          if "${MqttConnectionType}" == "iotGreengrassV2":
+                              response = client.attach_policy(
+                                  policyName=f"{inputThingName}-GreengrassCoreTokenExchangeRoleAliasPolicy",
+                                  target=certArn,
+                              )
+                              response = client.attach_policy(
+                                  policyName=f"{inputThingName}-GreengrassCorePolicy",
+                                  target=certArn,
+                              )
+
                           response = client.attach_thing_principal(
                               thingName=thingName,
                               principal=certArn,
@@ -410,6 +630,25 @@ Resources:
                           certificateId=certId,
                           forceDelete=True
                       )
+
+                      if "${MqttConnectionType}" == "iotGreengrassV2":
+                          logger.info('Deleting role alias')
+                          response = client.delete_role_alias(
+                              roleAlias=f"{inputThingName}-GreengrassCoreTokenExchangeRoleAlias",
+                          )
+                          logger.info('Deleting GreengrassCoreTokenExchange policy')
+                          response = client.delete_policy(
+                              policyName=f"{inputThingName}-GreengrassCoreTokenExchangeRoleAliasPolicy",
+                          )
+                          logger.info('Deleting Greengrass policy')
+                          response = client.delete_policy(
+                              policyName=f"{inputThingName}-GreengrassCorePolicy",
+                          )
+                          logger.info('Deleting Greengrass core device')
+                          response = greengrass_v2_client.delete_core_device(
+                              coreDeviceThingName=inputThingName
+                          )
+
                       result = cfnresponse.SUCCESS
               except ClientError as e:
                   logger.error('Error: {}'.format(e))
@@ -460,47 +699,60 @@ Resources:
                   - "iot:DeleteCertificate"
                   - "iot:DeletePolicy"
                   - "iot:DeleteThing"
+                  # For Greengrass
+                  - "iot:CreateRoleAlias"
+                  - "iot:DeleteRoleAlias"
+                  - "iam:PassRole"
+                  - "greengrass:DeleteCoreDevice"
                 Resource:
                   - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:thing/${AWS::StackName}*
                   - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:cert/*
                   - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:policy/${AWS::StackName}-policy
+                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:policy/${AWS::StackName}-GreengrassCoreTokenExchangeRoleAliasPolicy
+                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:policy/${AWS::StackName}-GreengrassCorePolicy
+                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:rolealias/${AWS::StackName}-GreengrassCoreTokenExchangeRoleAlias
+                  - !Sub arn:aws:greengrass:${IoTCoreRegion}:${AWS::AccountId}:coreDevices:${AWS::StackName}
+                  - !If
+                    - IsUsingGreengrassV2Connection
+                    - !Sub ${GreengrassCoreTokenExchangeRole.Arn}
+                    - !Ref AWS::NoValue
 Mappings:
-  # Ubuntu 20.04 arm64 AMIs
+  # Ubuntu 22.04 arm64 AMIs
   AMIRegionMap:
     ap-northeast-1:
-      AMIID: ami-0b0746f258294d579
+      AMIID: ami-0afd895fb29a1e0b9
     ap-northeast-2:
-      AMIID: ami-02bb63f25623be6a5
+      AMIID: ami-0c1f7601b444c48f3
     ap-northeast-3:
-      AMIID: ami-0f36f6a01cf003323
+      AMIID: ami-0f0f3ed7317c81989
     ap-south-1:
-      AMIID: ami-0220b23b02dcd7472
+      AMIID: ami-041165fe06f559aa8
     ap-southeast-1:
-      AMIID: ami-042165b0543f0ee50
+      AMIID: ami-0edc2b8974fff28e1
     ap-southeast-2:
-      AMIID: ami-016e8b2be3ed7321e
+      AMIID: ami-0f68b991adc3e7a19
     ca-central-1:
-      AMIID: ami-05f568c35d0a96179
+      AMIID: ami-0a0a9ea071d927900
     eu-central-1:
-      AMIID: ami-0f87c5201e047e11b
+      AMIID: ami-053a930223e62365b
     eu-north-1:
-      AMIID: ami-0323408b68ffad5bb
+      AMIID: ami-005479989bb4481b2
     eu-west-1:
-      AMIID: ami-04f0b66bc81784626
+      AMIID: ami-0e8144f0468c1f78c
     eu-west-2:
-      AMIID: ami-059b0d19b2a216c1c
+      AMIID: ami-037976dcb97b37b9e
     eu-west-3:
-      AMIID: ami-0ec91324f8291f6d9
+      AMIID: ami-055cce57d5f2211b5
     sa-east-1:
-      AMIID: ami-0f89fce798bed5bd8
+      AMIID: ami-00c5abaca93ddbb26
     us-east-1:
-      AMIID: ami-0ca0034f838ce18c6
+      AMIID: ami-03ff0f16432517259
     us-east-2:
-      AMIID: ami-0db71bb387bb47853
+      AMIID: ami-082e5deb4356a22a6
     us-west-1:
-      AMIID: ami-0a4cb059a5d26a7e7
+      AMIID: ami-006ed54ae3d267a19
     us-west-2:
-      AMIID: ami-0e12dfe7437a61feb
+      AMIID: ami-042b846990847f3ad
   FleetSizeEc2InstanceTypeMap:
     "1":
       InstanceType: m6g.xlarge

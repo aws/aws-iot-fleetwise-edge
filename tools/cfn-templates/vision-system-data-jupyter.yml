@@ -165,7 +165,7 @@ Resources:
                 aquirdturtle_collapsible_headings = "==3.1.0"
                 bash_kernel = "==0.9.1"
                 bokeh = "==3.1.1"
-                boto3 = "==1.29.6"
+                boto3 = "==1.20.34"
                 cantools = "==39.4.0"
                 catkin_pkg = "==1.0.0"
                 jupyter = "==1.0.0"
@@ -173,8 +173,8 @@ Resources:
                 jupyterlab = "==3.6.6"
                 matplotlib = "==3.7.4"
                 notebook = "==6.5.6"
-                numpy = "==1.24.4"
-                pandas = "==2.0.3"
+                numpy = "==1.26.4"
+                pandas = "==2.1.4"
                 plotly = "==5.18.0"
                 pyarrow = "==14.0.1"
                 pyyaml = "==6.0.1"
@@ -351,8 +351,8 @@ Resources:
             trap print_process_tree ERR
 
             # Upgrade system and reboot if required
-            apt update
-            apt upgrade -y
+            apt-get update
+            apt-get upgrade -y
             if [ -f /var/run/reboot-required ]; then
               # Delete the UserData info file so that we run again after reboot
               rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
@@ -361,12 +361,19 @@ Resources:
             fi
             # Install helper scripts:
             configsets=OnCreate
-            apt update
-            apt install -y python3-setuptools python3-pip git markdown
+            apt-get update
+            apt-get install -y python3-setuptools python3-pip git markdown
             mkdir -p /opt/aws/bin
+            cd /tmp
             wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-            python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
-            rm aws-cfn-bootstrap-py3-latest.tar.gz
+            tar -xvzf aws-cfn-bootstrap-py3-latest.tar.gz
+            rm -rf aws-cfn-bootstrap-py3-latest.tar.gz
+            cd aws-cfn-bootstrap-*
+            python3 setup.py install
+
+            # Create symlinks in /opt/aws/bin
+            ln -s /usr/local/bin/cfn-* /opt/aws/bin/
+
             #install awslogs
             wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb
             dpkg -i -E ./amazon-cloudwatch-agent.deb
@@ -382,8 +389,8 @@ Resources:
             }
             trap error_handler ERR
             # Install packages
-            apt update
-            apt install -y ec2-instance-connect htop jq unzip zip
+            apt-get update
+            apt-get install -y ec2-instance-connect htop jq unzip zip
             # Install AWS CLI:
             curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
             unzip -q awscliv2.zip
@@ -446,39 +453,39 @@ Outputs:
         ],
       ]
 Mappings:
-  # Ubuntu 20.04 arm64 AMIs
+  # Ubuntu 22.04 arm64 AMIs
   AMIRegionMap:
     ap-northeast-1:
-      AMIID: ami-0b0746f258294d579
+      AMIID: ami-0afd895fb29a1e0b9
     ap-northeast-2:
-      AMIID: ami-02bb63f25623be6a5
+      AMIID: ami-0c1f7601b444c48f3
     ap-northeast-3:
-      AMIID: ami-0f36f6a01cf003323
+      AMIID: ami-0f0f3ed7317c81989
     ap-south-1:
-      AMIID: ami-0220b23b02dcd7472
+      AMIID: ami-041165fe06f559aa8
     ap-southeast-1:
-      AMIID: ami-042165b0543f0ee50
+      AMIID: ami-0edc2b8974fff28e1
     ap-southeast-2:
-      AMIID: ami-016e8b2be3ed7321e
+      AMIID: ami-0f68b991adc3e7a19
     ca-central-1:
-      AMIID: ami-05f568c35d0a96179
+      AMIID: ami-0a0a9ea071d927900
     eu-central-1:
-      AMIID: ami-0f87c5201e047e11b
+      AMIID: ami-053a930223e62365b
     eu-north-1:
-      AMIID: ami-0323408b68ffad5bb
+      AMIID: ami-005479989bb4481b2
     eu-west-1:
-      AMIID: ami-04f0b66bc81784626
+      AMIID: ami-0e8144f0468c1f78c
     eu-west-2:
-      AMIID: ami-059b0d19b2a216c1c
+      AMIID: ami-037976dcb97b37b9e
     eu-west-3:
-      AMIID: ami-0ec91324f8291f6d9
+      AMIID: ami-055cce57d5f2211b5
     sa-east-1:
-      AMIID: ami-0f89fce798bed5bd8
+      AMIID: ami-00c5abaca93ddbb26
     us-east-1:
-      AMIID: ami-0ca0034f838ce18c6
+      AMIID: ami-03ff0f16432517259
     us-east-2:
-      AMIID: ami-0db71bb387bb47853
+      AMIID: ami-082e5deb4356a22a6
     us-west-1:
-      AMIID: ami-0a4cb059a5d26a7e7
+      AMIID: ami-006ed54ae3d267a19
     us-west-2:
-      AMIID: ami-0e12dfe7437a61feb
+      AMIID: ami-042b846990847f3ad

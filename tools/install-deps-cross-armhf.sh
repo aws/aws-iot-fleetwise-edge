@@ -97,10 +97,16 @@ sed -i -E "s#(archive|security).ubuntu.com/ubuntu#ports.ubuntu.com/ubuntu-ports#
 print_file "After patching" /etc/apt/sources.list.d/armhf.list
 
 dpkg --add-architecture armhf
-apt update
-apt install -y \
+apt-get update
+# Workaround for installing linux-libc-dev as multiarch.
+# Multiarch packages are required to have exactly the same version. Around Apr 2025 the
+# i386 and amd64 packages were updated to 5.15.0-138.148 but the other architectures were kept
+# on version 5.15.0-136.147. So for now we try to install both packages with the same version.
+LINUX_LIBC_DEV_VERSION=$(apt-cache policy linux-libc-dev:armhf | grep Candidate | sed 's/.*Candidate: //')
+apt-get install -y --allow-downgrades linux-libc-dev=$LINUX_LIBC_DEV_VERSION linux-libc-dev:armhf=$LINUX_LIBC_DEV_VERSION
+apt-get install -y \
     build-essential
-apt install -y \
+apt-get install -y \
     cmake \
     crossbuild-essential-armhf \
     curl \
@@ -114,8 +120,8 @@ apt install -y \
 if ${WITH_ROS2_SUPPORT}; then
     wget -q https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O /usr/share/keyrings/ros-archive-keyring.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(source /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list
-    apt update
-    apt install -y \
+    apt-get update
+    apt-get install -y \
         bison \
         python3-numpy \
         python3-lark \
@@ -128,14 +134,14 @@ if ${WITH_ROS2_SUPPORT}; then
 fi
 
 if ${WITH_SOMEIP_SUPPORT}; then
-    apt install -y \
+    apt-get install -y \
         default-jre \
         python3-distutils \
         libpython3-dev:armhf
 fi
 
 if ${WITH_CPYTHON_SUPPORT}; then
-    apt install -y \
+    apt-get install -y \
         libpython3-dev:armhf
 fi
 
@@ -291,10 +297,12 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         cmake \
             -DCMAKE_BUILD_TYPE=Release \
             -DSTORE_BUILD_TESTS=OFF \
+            -DSTORE_USE_LTO=OFF \
             -DBUILD_SHARED_LIBS=${SHARED_LIBS} \
             -DCMAKE_POSITION_INDEPENDENT_CODE=On \
             -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
             -DCMAKE_INSTALL_PREFIX=/usr/local/arm-linux-gnueabihf \
+            -DSTORE_BUILD_EXAMPLE=OFF \
             ..
         make install -j`nproc`
         cd ../..
@@ -347,6 +355,7 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         --without-ca-bundle
         --without-ca-path
         --with-ca-fallback
+        --without-brotli
         --prefix=/usr/local/arm-linux-gnueabihf"
     if [ "${SHARED_LIBS}" == "OFF" ]; then
         LDFLAGS="-static" PKG_CONFIG="pkg-config --static" CC=arm-linux-gnueabihf-gcc PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf \
@@ -434,30 +443,22 @@ if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_
         make install -j`nproc`
         cd ../..
 
-        git clone -b 0.8.0 https://github.com/eclipse-cyclonedds/cyclonedds.git
-        cd cyclonedds
-        mkdir build && cd build
-        cmake ..
-        make install -j`nproc`
-        cp bin/ddsconf /usr/local/bin
-        cd ../..
         mkdir -p ros2_build/src && cd ros2_build
-        vcs import --input https://raw.githubusercontent.com/ros2/ros2/release-galactic-20221209/ros2.repos src
+        vcs import --input https://raw.githubusercontent.com/ros2/ros2/release-humble-20241205/ros2.repos src
         rosdep init
         rosdep update
-        git apply ${SCRIPT_DIR}/patches/ros2_fix_cross_compile.patch
         # Without setting PythonExtra_EXTENSION_SUFFIX the .so file are armhf but have x86_64 in the name
         colcon build \
             --merge-install \
-            --install-base /opt/ros/galactic \
+            --install-base /opt/ros/humble \
             --packages-up-to rclcpp rosbag2 sensor_msgs \
             --cmake-args \
             -DCMAKE_TOOLCHAIN_FILE=/usr/local/arm-linux-gnueabihf/lib/cmake/armhf-toolchain.cmake \
             -DBUILD_TESTING=OFF \
-            -DPythonExtra_EXTENSION_SUFFIX=.cpython-38-arm-linux-gnueabihf \
+            -DPythonExtra_EXTENSION_SUFFIX=.cpython-310-arm-linux-gnueabihf \
             --no-warn-unused-cli
         cd ..
-        apt remove -y ros-dev-tools
+        apt-get remove -y ros-dev-tools
     fi
 
     cd ..

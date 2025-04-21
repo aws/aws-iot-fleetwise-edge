@@ -31,8 +31,8 @@ if [ "${CAN_IF}" != "null" ]; then
     done
 fi
 
-if [ -f /opt/ros/galactic/setup.bash ]; then
-    source /opt/ros/galactic/setup.bash
+if [ -f /opt/ros/humble/setup.bash ]; then
+    source /opt/ros/humble/setup.bash
 fi
 
 /usr/bin/aws-iot-fleetwise-edge ${CONFIG_FILE}

@@ -16,7 +16,7 @@ systemctl enable rossim
 systemctl start rossim
 
 # Check that the simulator started correctly and is generating data
-source /opt/ros/galactic/setup.bash
+source /opt/ros/humble/setup.bash
 if ! timeout 5s bash -c "while ! ros2 topic list | grep -q -v -E '(/parameter_events|/rosout)'; do sleep 1; done"; then
     echo "No ROS2 messages are being sent by the simuator"
     exit 1

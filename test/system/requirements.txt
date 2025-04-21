@@ -1,0 +1,26 @@
+awsiotsdk==1.17.0
+boto3==1.20.34
+botocore==1.23.54
+urllib3==1.26.20
+protobuf==3.20.2
+can-isotp==1.7
+prompt_toolkit==3.0.21
+cantools==36.4.0
+matplotlib==3.4.3 # via cantools
+python-can==3.3.4 # via cantools
+wrapt==1.10.0 # via python-can
+pytest==8.3.2
+pytest-html==4.1.1
+ansi2html==1.9.2
+pytest-metadata==3.1.1
+pytest-random-order==1.1.1
+pytest-xdist==3.6.1
+python-snappy==0.6.1
+tenacity==8.2.3
+amazon.ion==0.10.0
+numpy==1.26.4
+python-dynamodb-lock==0.9.1
+pyparsing==2.4.6
+someip==0.3.0
+filelock==3.15.4
+jsonschema==4.23.0

@@ -27,7 +27,7 @@ This section describes how to get started on an NXP S32G-VNP-RDB2 board.
 ## Build an SD-Card Image
 
 The following instructions use the development machine to build an SD-card image based on the Ubuntu
-variant of the NXP Linux BSP version 37.0, with the addition of the `can-isotp` kernel module
+variant of the NXP Linux BSP version 38.0, with the addition of the `can-isotp` kernel module
 required by FWE and a `systemd` service called `setup-socketcan` for bringing up the CAN interfaces
 at startup.
 

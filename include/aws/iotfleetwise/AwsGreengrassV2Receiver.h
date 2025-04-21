@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "aws/iotfleetwise/AwsGreengrassCoreIpcClientWrapper.h"
 #include "aws/iotfleetwise/Clock.h"
 #include "aws/iotfleetwise/ClockHandler.h"
 #include "aws/iotfleetwise/IConnectionTypes.h"
@@ -57,7 +58,7 @@ class AwsGreengrassV2Receiver : public IReceiver
 {
 public:
     AwsGreengrassV2Receiver( IConnectivityModule *connectivityModule,
-                             Aws::Greengrass::GreengrassCoreIpcClient &greengrassClient,
+                             AwsGreengrassCoreIpcClientWrapper &greengrassClientWrapper,
                              std::string topicName );
     ~AwsGreengrassV2Receiver() override;
 
@@ -97,12 +98,12 @@ private:
     ThreadSafeListeners<OnDataReceivedCallback> mListeners;
 
     std::mutex mConnectivityMutex;
-    Aws::Greengrass::GreengrassCoreIpcClient &mGreengrassClient;
+    AwsGreengrassCoreIpcClientWrapper &mGreengrassClientWrapper;
     std::atomic<bool> mSubscribed;
 
     std::string mTopicName;
     std::shared_ptr<SubscribeStreamHandler> mSubscribeStreamHandler;
-    std::shared_ptr<Aws::Greengrass::SubscribeToIoTCoreOperation> mSubscribeOperation;
+    std::shared_ptr<SubscribeToIoTCoreOperationWrapper> mSubscribeOperation;
 };
 
 } // namespace IoTFleetWise

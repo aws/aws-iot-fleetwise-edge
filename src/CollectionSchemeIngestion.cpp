@@ -5,6 +5,7 @@
 #include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
 #include "aws/iotfleetwise/LoggingModule.h"
 #include <boost/uuid/detail/sha1.hpp>
+#include <boost/version.hpp>
 #include <exception>
 #include <google/protobuf/message.h>
 #include <string>
@@ -705,11 +706,16 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
                 FWE_LOG_ERROR( "Error calculating SHA1: " + std::string( e.what() ) );
                 return nullptr;
             }
-            uint32_t digest[5]{}; // SHA1 is 160-bit
+            boost::uuids::detail::sha1::digest_type digest{};
             invocationHash.get_digest( digest );
+#if BOOST_VERSION >= 108600
+            auto digestAsUint32 = reinterpret_cast<const uint32_t *>( digest );
+#else
+            auto digestAsUint32 = digest;
+#endif
             // Use the first 64-bits:
             currentNode->function.customFunctionInvocationId =
-                static_cast<uint64_t>( digest[0] ) | static_cast<uint64_t>( digest[1] ) << 32;
+                static_cast<uint64_t>( digestAsUint32[0] ) | static_cast<uint64_t>( digestAsUint32[1] ) << 32;
             FWE_LOG_TRACE( "Invocation ID " +
                            customFunctionInvocationIdToHexString( currentNode->function.customFunctionInvocationId ) +
                            ": " + collectionSchemeId + ", invocation " +

@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.10.2)
 
-project(iotfleetwise VERSION 1.2.1)
+project(iotfleetwise VERSION 1.3.0)
 
 # FWE uses C++14 for compatibility reasons with Automotive middlewares (Adaptive AUTOSAR, ROS2)
 # Note: When built with FWE_FEATURE_ROS2, colcon will override these settings
@@ -348,6 +348,7 @@ if(FWE_FEATURE_GREENGRASSV2)
     src/AwsGreengrassV2Receiver.cpp
     src/AwsGreengrassV2Sender.cpp
   )
+  set(TEST_FILES ${TEST_FILES} test/unit/AwsGreengrassV2ConnectivityModuleTest.cpp)
 endif()
 if(FWE_FEATURE_S3)
   set(SRC_FILES ${SRC_FILES} src/Credentials.cpp)

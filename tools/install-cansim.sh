@@ -26,8 +26,8 @@ parse_args() {
 parse_args "$@"
 
 # Install Python 3 and pip
-apt update
-apt install -y python3 python3-pip
+apt-get update
+apt-get install -y python3 python3-pip
 
 # Install pip packages
 pip3 install \

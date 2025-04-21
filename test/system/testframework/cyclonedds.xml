@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/iceoryx/etc/cyclonedds.xsd">
+    <Domain id="any">
+        <General>
+            <NetworkInterfaceAddress>lo</NetworkInterfaceAddress>
+        </General>
+        <Tracing><Verbosity>config</Verbosity><OutputFile>stderr</OutputFile></Tracing>
+    </Domain>
+    <Discovery>
+        <ParticipantIndex>auto</ParticipantIndex>
+        <!-- This is needed to allow more tests to run in parallel -->
+        <MaxAutoParticipantIndex>100</MaxAutoParticipantIndex>
+    </Discovery>
+</CycloneDDS>

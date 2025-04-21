@@ -11,9 +11,10 @@ fi
 
 EXTRA_ARGS=""
 
-if [ -f /opt/ros/galactic/setup.sh ]; then
-    . /opt/ros/galactic/setup.sh
+if [ -f /opt/ros/humble/setup.sh ]; then
+    . /opt/ros/humble/setup.sh
     EXTRA_ARGS="${EXTRA_ARGS} --ros-args --disable-external-lib-logs"
 fi
 
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 /usr/bin/aws-iot-fleetwise-edge /etc/aws-iot-fleetwise/config-$1.json ${EXTRA_ARGS}

@@ -127,8 +127,8 @@ Resources:
               trap print_process_tree ERR
 
               # Upgrade system and reboot if required
-              apt update
-              apt upgrade -y
+              apt-get update
+              apt-get upgrade -y
               if [ -f /var/run/reboot-required ]; then
                 # Delete the UserData info file so that we run again after reboot
                 rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
@@ -137,12 +137,19 @@ Resources:
               fi
 
               # Install helper scripts:
-              apt update
-              apt install -y python3-setuptools
+              apt-get update
+              apt-get install -y python3-setuptools
+              apt-get install -y python3-pip
               mkdir -p /opt/aws/bin
+              cd /tmp
               wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-              python3 -m easy_install --script-dir /opt/aws/bin aws-cfn-bootstrap-py3-latest.tar.gz
-              rm aws-cfn-bootstrap-py3-latest.tar.gz
+              tar -xvzf aws-cfn-bootstrap-py3-latest.tar.gz
+              rm -rf aws-cfn-bootstrap-py3-latest.tar.gz
+              cd aws-cfn-bootstrap-*
+              python3 setup.py install
+
+              # Create symlinks in /opt/aws/bin
+              ln -s /usr/local/bin/cfn-* /opt/aws/bin/
 
               # On error, signal back to cfn:
               error_handler() {
@@ -152,8 +159,8 @@ Resources:
               trap error_handler ERR
 
               # Install packages
-              apt update
-              apt install -y ec2-instance-connect htop jq unzip zip
+              apt-get update
+              apt-get install -y ec2-instance-connect htop jq unzip zip
 
               # Install AWS CLI:
               curl "https://awscli.amazonaws.com/awscli-exe-linux-${Arch}.zip" -o "awscliv2.zip"
@@ -203,7 +210,7 @@ Mappings:
       Arch: aarch64
     m5.large:
       AmiRegionMap: AMIRegionMapAmd64
-      Arch: aarch64
+      Arch: x86_64
     m5.xlarge:
       AmiRegionMap: AMIRegionMapAmd64
       Arch: x86_64
@@ -225,78 +232,78 @@ Mappings:
     m5.24xlarge:
       AmiRegionMap: AMIRegionMapAmd64
       Arch: x86_64
-  # Ubuntu 20.04 arm64 AMIs
+  # Ubuntu 22.04 arm64 AMIs
   AMIRegionMapArm64:
     ap-northeast-1:
-      AMIID: ami-0b0746f258294d579
+      AMIID: ami-0afd895fb29a1e0b9
     ap-northeast-2:
-      AMIID: ami-02bb63f25623be6a5
+      AMIID: ami-0c1f7601b444c48f3
     ap-northeast-3:
-      AMIID: ami-0f36f6a01cf003323
+      AMIID: ami-0f0f3ed7317c81989
     ap-south-1:
-      AMIID: ami-0220b23b02dcd7472
+      AMIID: ami-041165fe06f559aa8
     ap-southeast-1:
-      AMIID: ami-042165b0543f0ee50
+      AMIID: ami-0edc2b8974fff28e1
     ap-southeast-2:
-      AMIID: ami-016e8b2be3ed7321e
+      AMIID: ami-0f68b991adc3e7a19
     ca-central-1:
-      AMIID: ami-05f568c35d0a96179
+      AMIID: ami-0a0a9ea071d927900
     eu-central-1:
-      AMIID: ami-0f87c5201e047e11b
+      AMIID: ami-053a930223e62365b
     eu-north-1:
-      AMIID: ami-0323408b68ffad5bb
+      AMIID: ami-005479989bb4481b2
     eu-west-1:
-      AMIID: ami-04f0b66bc81784626
+      AMIID: ami-0e8144f0468c1f78c
     eu-west-2:
-      AMIID: ami-059b0d19b2a216c1c
+      AMIID: ami-037976dcb97b37b9e
     eu-west-3:
-      AMIID: ami-0ec91324f8291f6d9
+      AMIID: ami-055cce57d5f2211b5
     sa-east-1:
-      AMIID: ami-0f89fce798bed5bd8
+      AMIID: ami-00c5abaca93ddbb26
     us-east-1:
-      AMIID: ami-0ca0034f838ce18c6
+      AMIID: ami-03ff0f16432517259
     us-east-2:
-      AMIID: ami-0db71bb387bb47853
+      AMIID: ami-082e5deb4356a22a6
     us-west-1:
-      AMIID: ami-0a4cb059a5d26a7e7
+      AMIID: ami-006ed54ae3d267a19
     us-west-2:
-      AMIID: ami-0e12dfe7437a61feb
-  # Ubuntu 20.04 amd64 AMIs
+      AMIID: ami-042b846990847f3ad
+  # Ubuntu 22.04 amd64 AMIs
   AMIRegionMapAmd64:
     ap-northeast-1:
-      AMIID: ami-0a5d789f51005e017
+      AMIID: ami-0a332444d8ec3a4ab
     ap-northeast-2:
-      AMIID: ami-08df3100bf18ce27f
+      AMIID: ami-0c1989c90aa86e7cf
     ap-northeast-3:
-      AMIID: ami-00880873dc92cb2bd
+      AMIID: ami-0f1d42c7eaeb89ce2
     ap-south-1:
-      AMIID: ami-0ec5741cef7cccfa1
+      AMIID: ami-0d01904ee0d806ca5
     ap-southeast-1:
-      AMIID: ami-094a05f758cfa0c85
+      AMIID: ami-0aebd6a41cf6ab2eb
     ap-southeast-2:
-      AMIID: ami-09ac1f936d01ad8a0
+      AMIID: ami-09e970c8f1107e4f7
     ca-central-1:
-      AMIID: ami-07e9398c3d79d0a53
+      AMIID: ami-0cfa8e416cf8965e5
     eu-central-1:
-      AMIID: ami-0a0bfc6462a1bba50
+      AMIID: ami-012a41984655c6c83
     eu-north-1:
-      AMIID: ami-006a6296aa17e4546
+      AMIID: ami-034afa84ca3c1f21f
     eu-west-1:
-      AMIID: ami-0520e200eb4f308f2
+      AMIID: ami-01c7096235204c7be
     eu-west-2:
-      AMIID: ami-093026fc8263198b0
+      AMIID: ami-0fef583e486727263
     eu-west-3:
-      AMIID: ami-0cc56a88164d6391b
+      AMIID: ami-031e7dbab5571668f
     sa-east-1:
-      AMIID: ami-0ec1e6f31a5c70e13
+      AMIID: ami-01d0400732d6d9396
     us-east-1:
-      AMIID: ami-0069aa073aac75299
+      AMIID: ami-0655cec52acf2717b
     us-east-2:
-      AMIID: ami-014d2a8190b1bdeb4
+      AMIID: ami-08c18c49bdb7f38f7
     us-west-1:
-      AMIID: ami-02fd5efc30e766ac2
+      AMIID: ami-0f2efd606ca61f0c7
     us-west-2:
-      AMIID: ami-057439a71140a950c
+      AMIID: ami-0c1ade727754a7a75
 Outputs:
   Ec2InstanceId:
     Description: "EC2 instance ID"

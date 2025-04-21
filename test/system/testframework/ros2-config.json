@@ -1,0 +1,22 @@
+{
+  "messages": [
+    {
+      "fullyQualifiedName": "ImageTopicROS2_TOPIC_NUMBER_PLACEHOLDER",
+      "interfaceId": "10",
+      "topic": "ImageTopicROS2_TOPIC_NUMBER_PLACEHOLDER",
+      "type": "sensor_msgs/msg/Image"
+    },
+    {
+      "fullyQualifiedName": "PointFieldTopicROS2_TOPIC_NUMBER_PLACEHOLDER",
+      "interfaceId": "10",
+      "topic": "PointFieldTopicROS2_TOPIC_NUMBER_PLACEHOLDER",
+      "type": "sensor_msgs/msg/PointField"
+    },
+    {
+      "fullyQualifiedName": "DifferentTypesTestTopicROS2_TOPIC_NUMBER_PLACEHOLDER",
+      "interfaceId": "10",
+      "topic": "DifferentTypesTestTopicROS2_TOPIC_NUMBER_PLACEHOLDER",
+      "type": "ros2_custom_messages/msg/DifferentTypesTest"
+    }
+  ]
+}

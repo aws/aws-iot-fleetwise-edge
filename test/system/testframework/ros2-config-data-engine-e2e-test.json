@@ -1,0 +1,28 @@
+{
+  "messages": [
+    {
+      "fullyQualifiedName": "Vehicle.DifferentTypesTestTopic",
+      "interfaceId": "3",
+      "topic": "DifferentTypesTestTopic",
+      "type": "ros2_custom_messages/msg/DifferentTypesTest"
+    },
+    {
+      "fullyQualifiedName": "Vehicle.CompressedImageTopic1",
+      "interfaceId": "3",
+      "topic": "CompressedImageTopic1",
+      "type": "sensor_msgs/msg/CompressedImage"
+    },
+    {
+      "fullyQualifiedName": "Vehicle.CompressedImageTopic2",
+      "interfaceId": "3",
+      "topic": "CompressedImageTopic2",
+      "type": "sensor_msgs/msg/CompressedImage"
+    },
+    {
+      "fullyQualifiedName": "Vehicle.ImageTopic1",
+      "interfaceId": "3",
+      "topic": "ImageTopic1",
+      "type": "sensor_msgs/msg/Image"
+    }
+  ]
+}

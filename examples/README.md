@@ -31,7 +31,7 @@ to the [Edge Agent Developer Guide](../docs/dev-guide/edge-agent-dev-guide.md).
 
 ### Launch your development machine
 
-An Ubuntu 20.04 development machine with 200GB free disk space will be required. A local Intel
+An Ubuntu 22.04 development machine with 200GB free disk space will be required. A local Intel
 x86_64 (amd64) machine can be used, however it is recommended to use the following instructions to
 launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
 [here](https://aws.amazon.com/ec2/pricing/on-demand/).

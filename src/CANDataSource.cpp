@@ -7,6 +7,7 @@
 #include "aws/iotfleetwise/LoggingModule.h"
 #include "aws/iotfleetwise/TraceModule.h"
 #include <cerrno>
+#include <cstdint>
 #include <cstring>
 #include <ctime> // IWYU pragma: keep
 #include <linux/can.h>
@@ -194,7 +195,7 @@ CANDataSource::doWork()
 
         for ( int i = 0; i < nmsgs; i++ )
         {
-            // After waking up the Socket Can old messages in the kernel queue need to be ignored
+            // After waking up the Socket Can, old messages in the kernel queue need to be ignored
             if ( !wokeUpFromSleep )
             {
                 Timestamp timestamp = extractTimestamp( msg[i].msg_hdr );
@@ -204,12 +205,13 @@ CANDataSource::doWork()
                 }
                 lastFrameTime = timestamp;
                 mReceivedMessages++;
-                TraceVariable traceFrames =
-                    static_cast<TraceVariable>( mChannelId + toUType( TraceVariable::READ_SOCKET_FRAMES_0 ) );
-                TraceModule::get().setVariable( ( traceFrames < TraceVariable::READ_SOCKET_FRAMES_19 )
-                                                    ? traceFrames
-                                                    : TraceVariable::READ_SOCKET_FRAMES_19,
-                                                mReceivedMessages );
+                TraceVariable traceFrames = TraceVariable::READ_SOCKET_FRAMES_19; // Safe default ;
+                uint32_t calculatedValue = mChannelId + toUType( TraceVariable::READ_SOCKET_FRAMES_0 );
+                if ( calculatedValue <= toUType( TraceVariable::READ_SOCKET_FRAMES_19 ) )
+                {
+                    traceFrames = static_cast<TraceVariable>( calculatedValue );
+                }
+                TraceModule::get().setVariable( traceFrames, mReceivedMessages );
                 std::lock_guard<std::mutex> lock( mDecoderDictMutex );
                 mConsumer.processMessage(
                     mChannelId, mDecoderDictionary.get(), frame[i].can_id, frame[i].data, frame[i].len, timestamp );
@@ -341,7 +343,8 @@ CANDataSource::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dicti
     mDecoderDictionary = std::dynamic_pointer_cast<const CANDecoderDictionary>( dictionary );
     if ( dictionary == nullptr )
     {
-        FWE_LOG_TRACE( "Going to sleep until a the resume signal. CAN Data Source: " + std::to_string( mChannelId ) );
+        FWE_LOG_TRACE( "CAN Data Source : " + std::to_string( mChannelId ) +
+                       " thread going to sleep until the decoder dictionary becomes active." );
     }
     else
     {

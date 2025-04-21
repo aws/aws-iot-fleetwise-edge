@@ -24,7 +24,10 @@
         "os": "linux"
       },
       "Lifecycle": {
-        "Run": "{artifacts:path}/aws-iot-fleetwise-edge {artifacts:path}/config.json",
+        "Run": "{artifacts:path}/aws-iot-fleetwise-edge {artifacts:path}/config-0.json",
+        "SetEnv": {
+          "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp"
+        },
         "RequiresPrivilege": "true"
       },
       "Artifacts": [
@@ -36,7 +39,7 @@
           }
         },
         {
-          "Uri": "s3://URI-TO-FWE-STATIC-CONFIG/com.amazon.aws.IoTFleetWise/2.0.0/config.json",
+          "Uri": "s3://URI-TO-FWE-STATIC-CONFIG/com.amazon.aws.IoTFleetWise/2.0.0/config-0.json",
           "Permission": {
             "Read": "ALL",
             "Execute": "ALL"

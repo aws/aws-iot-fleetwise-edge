@@ -32,7 +32,9 @@
 #include <utility>
 
 #ifdef FWE_FEATURE_GREENGRASSV2
+#include "aws/iotfleetwise/AwsGreengrassCoreIpcClientWrapper.h"
 #include "aws/iotfleetwise/AwsGreengrassV2ConnectivityModule.h"
+#include <aws/greengrass/GreengrassCoreIpcClient.h>
 #ifdef FWE_FEATURE_S3
 #include <aws/core/auth/AWSCredentialsProviderChain.h>
 #endif
@@ -503,7 +505,10 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         else if ( connectionType == "iotGreengrassV2" )
         {
             FWE_LOG_INFO( "ConnectionType is iotGreengrassV2" );
-            mConnectivityModule = std::make_shared<AwsGreengrassV2ConnectivityModule>( bootstrapPtr, *mTopicConfig );
+            mGreengrassClient = std::make_unique<Aws::Greengrass::GreengrassCoreIpcClient>( *bootstrapPtr );
+            mGreengrassClientWrapper = std::make_unique<AwsGreengrassCoreIpcClientWrapper>( mGreengrassClient.get() );
+            mConnectivityModule =
+                std::make_shared<AwsGreengrassV2ConnectivityModule>( *mGreengrassClientWrapper, *mTopicConfig );
 #ifdef FWE_FEATURE_S3
             mAwsCredentialsProvider = std::make_shared<Aws::Auth::DefaultAWSCredentialsProviderChain>();
 #endif

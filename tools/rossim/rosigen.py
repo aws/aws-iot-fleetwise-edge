@@ -48,7 +48,10 @@ class Rosigen:
         self._publishers[name].publish(self._vals[name])
 
     def _publish_thread(self):
-        rclpy.spin(self._node)
+        try:
+            rclpy.spin(self._node)
+        except rclpy.executors.ExternalShutdownException:
+            pass
 
     def _is_list(self, item):
         return type(item) in [numpy.ndarray, list, array.array]
@@ -201,7 +204,10 @@ class Rosigen:
         # collected. But explicitly destroying makes it more predictable and also allows us to
         # reinitialize ROS2 with a different config.
         self._node.destroy_node()
-        rclpy.shutdown()
+        # After ROS2 Humble, rclpy.shutdown() could fail on SIGTERM because ROS2 signal handler
+        # already called it. That is why we use try_shutdown() instead, which checks whether the
+        # context is already shutdown.
+        rclpy.utilities.try_shutdown()
         self._thread.join()
 
     def topic(self, topic):

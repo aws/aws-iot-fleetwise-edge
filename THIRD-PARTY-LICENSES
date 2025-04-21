@@ -5,8 +5,8 @@ software/licensing:
 ** AWS IoT Device SDK for C++ v2: v1.32.2 - https://github.com/aws/aws-iot-device-sdk-cpp-v2
 ** Google Benchmark: v1.6.1 - https://github.com/google/benchmark
 ** OpenSSL: v1.1.1 - https://github.com/openssl/openssl
-** ROS2: Galactic - https://github.com/ros2/rclcpp
-** Fast-CDR: v1.0.21 - https://github.com/eProsima/Fast-CDR
+** ROS2: Humble - https://github.com/ros2/rclcpp
+** Fast-CDR: v1.0.24 - https://github.com/eProsima/Fast-CDR
 ** Amazon Ion: v1.1.2 - https://github.com/amazon-ion/ion-c
 ** device-storelibrary-cpp: v1.0.0 - https://github.com/aws/device-storelibrary-cpp
 
@@ -451,7 +451,7 @@ Copyright notice:
 
 ----------------
 
-** Cyclone DDS: 0.8.0 - https://github.com/eclipse-cyclonedds/cyclonedds
+** Cyclone DDS: 0.10.5 - https://github.com/eclipse-cyclonedds/cyclonedds
 
 This program and the accompanying materials are made available under the
 terms of the Eclipse Public License v. 2.0 which is available at
@@ -1180,7 +1180,7 @@ THE SOFTWARE.
 
 ----------------
 
-** CPython: v3.8.10 - https://github.com/python/cpython
+** CPython: v3.10.4 - https://github.com/python/cpython
 
 PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
 --------------------------------------------

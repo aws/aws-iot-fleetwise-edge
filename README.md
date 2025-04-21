@@ -117,7 +117,7 @@ FWE was also tested on an EC2 Instance with the following details:
 - **AvailabilityZone**: us-east-1
 - **Architecture**: x86_64
 - **CpuOptions**: {'CoreCount': 18, 'ThreadsPerCore': 2}
-- **AMI name**: ubuntu-focal-20.04-amd64-server-20230112
+- **AMI name**: ubuntu-jammy-22.04-amd64-server-20241205
 
 ## AWS IoT FleetWise Client-Server Communication
 
@@ -161,9 +161,9 @@ Optional: The following dependencies are only required when the option
 Optional: The following dependencies are only required when the option `FWE_FEATURE_ROS2` is
 enabled.
 
-- [ROS2: Galactic](https://github.com/ros2/rclcpp)
-- [Cyclone DDS: 0.8.0](https://github.com/eclipse-cyclonedds/cyclonedds)
-- [Fast-CDR: v1.0.21](https://github.com/eProsima/Fast-CDR)
+- [ROS2: Humble](https://github.com/ros2/rclcpp)
+- [Cyclone DDS: 0.10.5](https://github.com/eclipse-cyclonedds/cyclonedds)
+- [Fast-CDR: v1.0.24](https://github.com/eProsima/Fast-CDR)
 
 Optional: The following dependencies are only required when the option `FWE_FEATURE_SOMEIP` is
 enabled.
@@ -180,7 +180,7 @@ Optional: The following dependencies are only required when the option
 Optional: The following dependencies are only required when the option `FWE_FEATURE_CPYTHON` is
 enabled.
 
-- [CPython: v3.8.10](https://github.com/python/cpython)
+- [CPython: v3.10.4](https://github.com/python/cpython)
 
 Optional: The following dependencies are only required when the option `FWE_FEATURE_MICROPYTHON` is
 enabled.

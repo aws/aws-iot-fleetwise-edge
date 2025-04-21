@@ -1,0 +1,238 @@
+VERSION ""
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+
+BS_:
+
+BU_:
+VAL_TABLE_ Brake_Lights 1 "True" 0 "False" ;
+VAL_TABLE_ Main_Light_Switch 0 "Auto" 1 "Off" 2 "Parking light" 3 "Headlights" ;
+VAL_TABLE_ Low_Beam 0 "False" 1 "True" ;
+VAL_TABLE_ High_Beam 0 "False" 1 "True" ;
+VAL_TABLE_ Electric_Park_Brake_Switch 0 "Not On " 1 "Release" 2 "apply" 3 "Active" ;
+VAL_TABLE_ Brake_to_release_Parking_Brake 1 "True" ;
+VAL_TABLE_ Parking_Brake_State 1 "Parking Brake Active" 0 "Parking Brake Inactive" ;
+VAL_TABLE_ HndsOffStrWhlDtSt 0 "Hands Off" 1 "Hands On" ;
+VAL_TABLE_ HndsOffStrWhlDtMd 0 "Disabled" 1 "Enabled" 2 "Failed" ;
+VAL_TABLE_ ABSPr 1 "true" 0 "false" ;
+VAL_TABLE_ ABSIO 1 "true" 0 "false" ;
+VAL_TABLE_ AutoBrkngAvlbl 1 "true" 0 "false" ;
+VAL_TABLE_ ABSActvProt 1 "true" 0 "false" ;
+VAL_TABLE_ AutoBrkngAct 1 "true" 0 "false" ;
+VAL_TABLE_ TCSysDisSwAtv_12A 1 "true" 0 "false" ;
+VAL_TABLE_ Ky_IdDevPr 1 "true" 0 "false" ;
+VAL_TABLE_ PsSbltAtc 1 "true" 0 "false" ;
+VAL_TABLE_ LnCat 3 "Four Or More Lanes" 2 "Two Or Three Lanes" 1 "One lane" 0 "no info available" ;
+VAL_TABLE_ RRDoorAjarSwAct 1 "true" 0 "false" ;
+VAL_TABLE_ PDAjrSwAtv 1 "true" 0 "false" ;
+VAL_TABLE_ DDAjrSwAtv 1 "true" 0 "false" ;
+VAL_TABLE_ RLDoorAjarSwAct 1 "true" 0 "false" ;
+VAL_TABLE_ DrSbltAtc 1 "true" 0 "false" ;
+VAL_TABLE_ FwdClnAlrtPr 1 "true" 0 "false" ;
+VAL_TABLE_ ACCAct370 1 "true" 0 "false" ;
+VAL_TABLE_ DrvThrtlOvrdIO 1 "true" 0 "false" ;
+
+
+BO_ 401 Throttle_Position___Air_Flow___T: 8 Vector__XXX
+ SG_ Throttle__Position : 63|8@0+ (0.392157,0) [0|100.000035] "%" Vector__XXX
+ SG_ Engine_Airflow : 19|12@0+ (0.5,-848) [-848|1199.5] "Nm" Vector__XXX
+ SG_ Engine_Torque : 3|12@0+ (0.5,-848) [-848|1199.5] "Nm" Vector__XXX
+
+BO_ 320 Brake_Pedal___Headlight_Switch: 3 Vector__XXX
+ SG_ Brake_Lights : 6|1@0+ (1,0) [0|1] "" Vector__XXX
+ SG_ Main_Light_Switch : 12|2@0+ (1,0) [0|3] "N/A" Vector__XXX
+ SG_ Low_Beam : 1|1@0+ (1,0) [0|1] "" Vector__XXX
+ SG_ High_Beam : 7|1@0+ (1,0) [0|1] "" Vector__XXX
+
+BO_ 560 EPB___Parking_Brake: 8 Vector__XXX
+ SG_ Electric_Park_Brake_Switch : 7|2@0+ (1,0) [0|3] "" Vector__XXX
+ SG_ Brake_to_release_Parking_Brake : 30|1@0+ (1,0) [0|1] "" Vector__XXX
+ SG_ Parking_Brake_State : 12|1@0+ (1,0) [0|1] "" Vector__XXX
+
+BO_ 288 ODO_Odometer: 5 Vector__XXX
+ SG_ Vehicle_Odometer : 7|32@0+ (0.015625,0) [0|67108863.984375] "km" Vector__XXX
+
+BO_ 1322 TPMS_Tire_Pressure: 6 Vector__XXX
+ SG_ TireRRPrs : 47|8@0+ (4,0) [0|1020] "kPaG" CGM_HS,LVMPC_HS,EDI_HS,ICCM_OBD_HS,ICCM_HS,RDCM_HS,EBCM_OBD_HS,EBCM_HS
+ SG_ TireRFPrs : 39|8@0+ (4,0) [0|1020] "kPaG" CGM_HS,LVMPC_HS,EDI_HS,ICCM_OBD_HS,ICCM_HS,RDCM_HS,EBCM_OBD_HS,EBCM_HS
+ SG_ TireLRPrs : 31|8@0+ (4,0) [0|1020] "kPaG" CGM_HS,LVMPC_HS,EDI_HS,ICCM_OBD_HS,ICCM_HS,RDCM_HS,EBCM_OBD_HS,EBCM_HS
+ SG_ TireLFPrs : 23|8@0+ (4,0) [0|1020] "kPaG" CGM_HS,LVMPC_HS,EDI_HS,ICCM_OBD_HS,ICCM_HS,RDCM_HS,EBCM_OBD_HS,EBCM_HS
+
+BO_ 1020 OAT_Outside_Air_Temperature: 8 Vector__XXX
+ SG_ OtsAirTmp : 31|8@0+ (0.5,-40) [-40|87.5] "deg C" CGM_HS,EPB_HS,BSM_HS,VICM_HS,PFAF_HS,BCM_HS
+
+BO_ 388 LKA_Lane_Keeping_Assist___Active: 8 Vector__XXX
+ SG_ HndsOffStrWhlDtSt : 21|1@0+ (1,0) [0|1] "" CGM_HS,EOCM_F_HS,FCM_HS
+ SG_ HndsOffStrWhlDtMd : 20|2@0+ (1,0) [0|2] "" CGM_HS,EOCM_F_HS,FCM_HS
+
+BO_ 381 ABS: 8 Vector__XXX
+ SG_ ABSPr : 22|1@0+ (1,0) [0|1] "" CGM_HS,BCP_HS,APPS_HS,BCM_HS,EPB_HS
+ SG_ ABSIO : 12|1@0+ (1,0) [0|1] "" CGM_HS,FCM_HS,EOCM_F_HS,BCM_HS
+
+BO_ 532 ABS_2___Automatic_Braking: 6 Vector__XXX
+ SG_ AutoBrkngAvlbl : 17|1@0+ (1,0) [0|1] "" FCM_HS,CGM_HS,EPS_HS,EOCM_F_HS,EPB_HS
+ SG_ ABSActvProt : 46|1@0+ (1,0) [0|1] "" CGM_HS,EPS_HS,EOCM_F_HS,ICCM_OBD_HS,ICCM_HS
+ SG_ BPDAPS_BkPDrvApP : 0|8@0+ (75,0) [0|19125] "kPa" CGM_HS,FCM_HS,EOCM_F_HS,ICCM_OBD_HS,ICCM_HS,BCM_HS,ACC_HS,SADS_HS,EPB_HS
+ SG_ AutoBrkngAct : 18|1@0+ (1,0) [0|1] "" CGM_HS,ICCM_OBD_HS,ICCM_HS,EPB_HS,ACC_HS
+
+BO_ 298 Doors_Ajar___Key_Present___Seatb: 8 Vector__XXX
+ SG_ TCSysDisSwAtv_12A : 62|1@0+ (1,0) [0|1] "" CGM_HS,ECM_HS
+ SG_ Ky_IdDevPr : 56|1@0+ (1,0) [0|1] "" CGM_HS,EBCM_OBD_HS,EBCM_HS,EPB_HS
+ SG_ PsSbltAtc : 53|1@0+ (1,0) [0|1] "" CGM_HS,EBCM_OBD_HS,EBCM_HS
+ SG_ LnCat : 47|2@0+ (1,0) [0|3] "" CGM_HS,FCM_HS,AHL_AFL_HS
+ SG_ RRDoorAjarSwAct : 23|1@0+ (1,0) [0|1] "" CGM_HS,ICCM_OBD_HS,ICCM_HS,ALC_HS,EPB_HS,SADS_HS
+ SG_ PDAjrSwAtv : 10|1@0+ (1,0) [0|1] "" CGM_HS,EPB_HS,ICCM_OBD_HS,ICCM_HS,ALC_HS,SADS_HS
+ SG_ DDAjrSwAtv : 9|1@0+ (1,0) [0|1] "" CGM_HS,ECM_HS,EBCM_OBD_HS,EBCM_HS,ACC_HS,EPB_HS,ICCM_OBD_HS,ICCM_HS,ALC_HS,SADS_HS
+ SG_ RLDoorAjarSwAct : 8|1@0+ (1,0) [0|1] "" CGM_HS,ICCM_OBD_HS,ICCM_HS,ALC_HS,EPB_HS,SADS_HS
+ SG_ DrSbltAtc : 12|1@0+ (1,0) [0|1] "" CGM_HS,ECM_HS,ACC_HS,EPB_HS,EBCM_OBD_HS,EBCM_HS
+
+BO_ 880 ADAS___FCA___Adapt_Cruise: 6 Vector__XXX
+ SG_ FwdClnAlrtPr : 0|1@0+ (1,0) [0|1] "" BCM_HS
+ SG_ ACCAct370 : 23|1@0+ (1,0) [0|1] "" EBCM_OBD_HS,EBCM_HS,TCM_HS,BCM_HS
+ SG_ DrvThrtlOvrdIO : 3|1@0+ (1,0) [0|1] "" BCM_HS
+ SG_ ACCDrvrSeltdSpd : 19|12@0+ (0.0625,0) [0|255.9375] "km / h" ECM_HS,BCM_HS
+
+BO_ 1217 Engine_Cooling_Temperature: 8 Vector__XXX
+ SG_ Engine_Cooling_Temperature_ECT : 23|8@0+ (1,-40) [-40|215] "deg C" Vector__XXX
+
+BO_ 810 GPS_Lat_Lon: 8 Vector__XXX
+ SG_ PsngSysLong : 38|31@0- (1,0) [-1073741824|1073741823] "ms arc" CGM_HS,LVMPC_HS,EBCM_OBD_HS,EBCM_HS,ACC_HS
+ SG_ PsngSysLat : 5|30@0- (1,0) [-536870912|536870911] "ms arc" CGM_HS,LVMPC_HS,EBCM_OBD_HS,EBCM_HS,ACC_HS
+
+BO_ 1343 VEI: 6 Vector__XXX
+ SG_ Speed : 3|32@1+ (1,0) [-300.0|300.0] "km / h" Vector__XXX
+
+BO_ 1452 BMS: 8 Vector__XXX
+ SG_ Voltage : 7|64@0+ (1,0) [0.0|192.0] "V" Vector__XXX
+
+BA_DEF_ SG_  "SignalType" STRING ;
+BA_DEF_ SG_  "SignalLongName" STRING ;
+BA_DEF_ BO_  "GenMsgCycleTime" INT 0 10000;
+BA_DEF_DEF_  "SignalType" "";
+BA_DEF_DEF_  "SignalLongName" "";
+BA_DEF_DEF_  "GenMsgCycleTime" 0;
+BA_ "GenMsgCycleTime" BO_ 401 12;
+BA_ "GenMsgCycleTime" BO_ 320 1000;
+BA_ "GenMsgCycleTime" BO_ 560 50;
+BA_ "GenMsgCycleTime" BO_ 288 5000;
+BA_ "GenMsgCycleTime" BO_ 1322 1000;
+BA_ "GenMsgCycleTime" BO_ 1020 250;
+BA_ "GenMsgCycleTime" BO_ 388 100;
+BA_ "GenMsgCycleTime" BO_ 381 100;
+BA_ "GenMsgCycleTime" BO_ 532 50;
+BA_ "GenMsgCycleTime" BO_ 298 100;
+BA_ "GenMsgCycleTime" BO_ 810 100;
+BA_ "GenMsgCycleTime" BO_ 880 40;
+BA_ "GenMsgCycleTime" BO_ 1217 500;
+BA_ "GenMsgCycleTime" BO_ 1343 50;
+BA_ "GenMsgCycleTime" BO_ 1452 50;
+BA_ "SignalType" SG_ 320 Brake_Lights "ENM";
+BA_ "SignalType" SG_ 320 Main_Light_Switch "ENM";
+BA_ "SignalType" SG_ 320 Low_Beam "ENM";
+BA_ "SignalType" SG_ 320 High_Beam "ENM";
+BA_ "SignalType" SG_ 560 Electric_Park_Brake_Switch "ENM";
+BA_ "SignalType" SG_ 560 Brake_to_release_Parking_Brake "ENM";
+BA_ "SignalType" SG_ 560 Parking_Brake_State "ENM";
+BA_ "SignalLongName" SG_ 1322 TireRRPrs "Tire Right Rear Pressure";
+BA_ "SignalLongName" SG_ 1322 TireRFPrs "Tire Right Front Pressure";
+BA_ "SignalLongName" SG_ 1322 TireLRPrs "Tire Left Rear Pressure";
+BA_ "SignalLongName" SG_ 1322 TireLFPrs "Tire Left Front Pressure";
+BA_ "SignalLongName" SG_ 1020 OtsAirTmp "Outside Air Temperature";
+BA_ "SignalType" SG_ 388 HndsOffStrWhlDtSt "ENM";
+BA_ "SignalLongName" SG_ 388 HndsOffStrWhlDtSt "Hands Off Steering State";
+BA_ "SignalType" SG_ 388 HndsOffStrWhlDtMd "ENM";
+BA_ "SignalLongName" SG_ 388 HndsOffStrWhlDtMd "Hands Off Steering Mode";
+BA_ "SignalType" SG_ 381 ABSPr "ENM";
+BA_ "SignalLongName" SG_ 381 ABSPr "ABS  Present";
+BA_ "SignalType" SG_ 381 ABSIO "ENM";
+BA_ "SignalLongName" SG_ 381 ABSIO "ABS Indication On";
+BA_ "SignalType" SG_ 532 AutoBrkngAvlbl "ENM";
+BA_ "SignalLongName" SG_ 532 AutoBrkngAvlbl "Auto Braking available";
+BA_ "SignalType" SG_ 532 ABSActvProt "ENM";
+BA_ "SignalLongName" SG_ 532 ABSActvProt "Antilock Brake  Active";
+BA_ "SignalLongName" SG_ 532 BPDAPS_BkPDrvApP "Brake Pedal Pressure";
+BA_ "SignalType" SG_ 532 AutoBrkngAct "ENM";
+BA_ "SignalLongName" SG_ 532 AutoBrkngAct "Auto Braking Active";
+BA_ "SignalType" SG_ 298 TCSysDisSwAtv_12A "ENM";
+BA_ "SignalLongName" SG_ 298 TCSysDisSwAtv_12A "Traction Control System Disable Switch";
+BA_ "SignalType" SG_ 298 Ky_IdDevPr "ENM";
+BA_ "SignalLongName" SG_ 298 Ky_IdDevPr "Key  Present";
+BA_ "SignalType" SG_ 298 PsSbltAtc "ENM";
+BA_ "SignalLongName" SG_ 298 PsSbltAtc "Passenger Seatbelt Attached";
+BA_ "SignalType" SG_ 298 LnCat "ENM";
+BA_ "SignalLongName" SG_ 298 LnCat "Lane Category";
+BA_ "SignalType" SG_ 298 RRDoorAjarSwAct "ENM";
+BA_ "SignalLongName" SG_ 298 RRDoorAjarSwAct "Rear Right Door Ajar Switch";
+BA_ "SignalType" SG_ 298 PDAjrSwAtv "ENM";
+BA_ "SignalLongName" SG_ 298 PDAjrSwAtv "Passenger Door Ajar Switch";
+BA_ "SignalType" SG_ 298 DDAjrSwAtv "ENM";
+BA_ "SignalLongName" SG_ 298 DDAjrSwAtv "Driver Door Ajar Switch";
+BA_ "SignalType" SG_ 298 RLDoorAjarSwAct "ENM";
+BA_ "SignalLongName" SG_ 298 RLDoorAjarSwAct "Rear Left Door Ajar Switch";
+BA_ "SignalType" SG_ 298 DrSbltAtc "ENM";
+BA_ "SignalLongName" SG_ 298 DrSbltAtc "Driver Seatbelt Attached";
+BA_ "SignalType" SG_ 880 FwdClnAlrtPr "ENM";
+BA_ "SignalLongName" SG_ 880 FwdClnAlrtPr "Forward Collision Alert";
+BA_ "SignalType" SG_ 880 ACCAct370 "ENM";
+BA_ "SignalLongName" SG_ 880 ACCAct370 "Adaptive Cruise Active";
+BA_ "SignalType" SG_ 880 DrvThrtlOvrdIO "ENM";
+BA_ "SignalLongName" SG_ 880 DrvThrtlOvrdIO "Throttle Override Indication";
+BA_ "SignalLongName" SG_ 880 ACCDrvrSeltdSpd "Adaptive Cruise Selected Speed";
+BA_ "SignalLongName" SG_ 810 PsngSysLong "Positioning   Longitude";
+BA_ "SignalLongName" SG_ 810 PsngSysLat "Positioning   Latitude";
+VAL_ 320 Brake_Lights 1 "True" 0 "False" ;
+VAL_ 320 Main_Light_Switch 0 "Auto" 1 "Off" 2 "Parking light" 3 "Headlights" ;
+VAL_ 320 Low_Beam 0 "False" 1 "True" ;
+VAL_ 320 High_Beam 0 "False" 1 "True" ;
+VAL_ 560 Electric_Park_Brake_Switch 0 "Not On " 1 "Release" 2 "apply" 3 "Active" ;
+VAL_ 560 Brake_to_release_Parking_Brake 1 "True" ;
+VAL_ 560 Parking_Brake_State 1 "Parking Brake Active" 0 "Parking Brake Inactive" ;
+VAL_ 388 HndsOffStrWhlDtSt 0 "Hands Off" 1 "Hands On" ;
+VAL_ 388 HndsOffStrWhlDtMd 0 "Disabled" 1 "Enabled" 2 "Failed" ;
+VAL_ 381 ABSPr 1 "true" 0 "false" ;
+VAL_ 381 ABSIO 1 "true" 0 "false" ;
+VAL_ 532 AutoBrkngAvlbl 1 "true" 0 "false" ;
+VAL_ 532 ABSActvProt 1 "true" 0 "false" ;
+VAL_ 532 AutoBrkngAct 1 "true" 0 "false" ;
+VAL_ 298 TCSysDisSwAtv_12A 1 "true" 0 "false" ;
+VAL_ 298 Ky_IdDevPr 1 "true" 0 "false" ;
+VAL_ 298 PsSbltAtc 1 "true" 0 "false" ;
+VAL_ 298 LnCat 3 "Four Or More Lanes" 2 "Two Or Three Lanes" 1 "One lane" 0 "no info available" ;
+VAL_ 298 RRDoorAjarSwAct 1 "true" 0 "false" ;
+VAL_ 298 PDAjrSwAtv 1 "true" 0 "false" ;
+VAL_ 298 DDAjrSwAtv 1 "true" 0 "false" ;
+VAL_ 298 RLDoorAjarSwAct 1 "true" 0 "false" ;
+VAL_ 298 DrSbltAtc 1 "true" 0 "false" ;
+VAL_ 880 FwdClnAlrtPr 1 "true" 0 "false" ;
+VAL_ 880 ACCAct370 1 "true" 0 "false" ;
+VAL_ 880 DrvThrtlOvrdIO 1 "true" 0 "false" ;
+
+SIG_VALTYPE_ 1343 Speed : 1;
+SIG_VALTYPE_ 1452 Voltage : 2;

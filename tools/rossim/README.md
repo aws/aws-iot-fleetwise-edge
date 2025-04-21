@@ -15,12 +15,12 @@ Starting in your ROS2 workspace directory and having already built the interface
 packages using `colcon`, source the ROS2 and local environments:
 
 ```bash
-source /opt/ros/galactic/setup.bash
+source /opt/ros/humble/setup.bash
 source install/local_setup.bash
 ```
 
 The second line is only needed if you use custom messages not part of pre-installed message like
-`sensor_msgs.msg` installed by package `ros-galactic-sensor-msgs`.
+`sensor_msgs.msg` installed by package `ros-humble-sensor-msgs`.
 
 Change to this folder, then run:
 

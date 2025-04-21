@@ -17,6 +17,12 @@
     },
     {
       "name": "Vehicle.ABS.DemoBrakePedalPressure"
+    },
+    {
+      "name": "Vehicle.VEI.DemoSpeed"
+    },
+    {
+      "name": "Vehicle.BMS.DemoVoltage"
     }
   ]
 }

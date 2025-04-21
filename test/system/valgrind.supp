@@ -1,0 +1,130 @@
+{
+   _dl_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_dl_init
+   ...
+}
+{
+   _dl_open
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_dl_open
+   ...
+}
+{
+   ROS2 - rclcpp
+   Memcheck:Leak
+   match-leak-kinds: definite,reachable,possible
+   ...
+   fun:_ZN6rclcpp*
+   ...
+}
+{
+   ROD2 - rclcpp SizeMismatch
+   Memcheck:SizeMismatch
+   ...
+   fun:_ZN6rclcpp*
+   ...
+}
+{
+   ROS2 - rmw_dds_common
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_ZN14rmw_dds_common*
+   ...
+}
+{
+   ROS2 - rcpputils
+   Memcheck:Leak
+   match-leak-kinds: indirect,reachable
+   ...
+   fun:_ZN9rcpputils*
+   ...
+}
+{
+   MicroPythonGcCond
+   Memcheck:Cond
+   ...
+   fun:gc_collect*
+   ...
+}
+{
+   MicroPythonGcValue8
+   Memcheck:Value8
+   ...
+   fun:gc_collect*
+   ...
+}
+{
+   __libc_csu_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:__libc_csu_init
+   ...
+}
+{
+   _dl_init
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_dl_init
+   ...
+}
+{
+   _ion_writer_initialize_local_symbol_table
+   Memcheck:Leak
+   match-leak-kinds: reachable,definite
+   ...
+   fun:_ion_writer_initialize_local_symbol_table
+   ...
+}
+{
+   PythonReachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   obj:*libpython3*
+   ...
+}
+{
+   PythonUninitialized
+   Memcheck:Cond
+   ...
+   obj:*libpython3*
+   ...
+}
+{
+   PythonBadAccess
+   Memcheck:Addr4
+   ...
+   obj:*libpython3*
+   ...
+}
+{
+   PythonBadAccess2
+   Memcheck:Value8
+   ...
+   obj:*libpython3*
+   ...
+}
+{
+   PythonPossible
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   obj:*libpython3*
+   ...
+}
+{
+   PythonPyThreadLock
+   Memcheck:Leak
+   match-leak-kinds: definite
+   ...
+   fun:PyThread_allocate_lock
+   ...
+}

@@ -4,5 +4,5 @@
 
 set -eo pipefail
 
-source /opt/ros/galactic/setup.bash
+source /opt/ros/humble/setup.bash
 ros2 bag play --loop rosbag2_vision_system_data_demo.db3

@@ -82,6 +82,7 @@ for message in db.messages:
         signal_to_add["length"] = signal.length
         signal_to_add["offset"] = signal.offset
         signal_to_add["messageId"] = message.frame_id
+        signal_to_add["signalValueType"] = "FLOATING_POINT" if signal.is_float else "INTEGER"
 
         # In a DBC file, the start bit indicates the LSB for little endian and MSB for big endian
         # signals. AWS IoT FleetWise considers start bit to always be the LSB regardless of
