@@ -88,6 +88,7 @@ if [ -f /etc/apt/apt-mirrors.txt ]; then
     cp /etc/apt/apt-mirrors.txt /etc/apt/apt-mirrors-armhf.txt
     sed -i "s#/etc/apt/apt-mirrors.txt#/etc/apt/apt-mirrors-armhf.txt#g" /etc/apt/sources.list.d/armhf.list
     PATCH_FILE="/etc/apt/apt-mirrors-armhf.txt"
+    sed -i -E "s#(archive|security).ubuntu.com/ubuntu#ports.ubuntu.com/ubuntu-ports#g" /etc/apt/sources.list.d/armhf.list
     print_file "After patching" /etc/apt/apt-mirrors-armhf.txt
 else
     PATCH_FILE="/etc/apt/sources.list.d/armhf.list"

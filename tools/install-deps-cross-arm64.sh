@@ -88,6 +88,7 @@ if [ -f /etc/apt/apt-mirrors.txt ]; then
     cp /etc/apt/apt-mirrors.txt /etc/apt/apt-mirrors-arm64.txt
     sed -i "s#/etc/apt/apt-mirrors.txt#/etc/apt/apt-mirrors-arm64.txt#g" /etc/apt/sources.list.d/arm64.list
     PATCH_FILE="/etc/apt/apt-mirrors-arm64.txt"
+    sed -i -E "s#(archive|security).ubuntu.com/ubuntu#ports.ubuntu.com/ubuntu-ports#g" /etc/apt/sources.list.d/arm64.list
     print_file "After patching" /etc/apt/apt-mirrors-arm64.txt
 else
     PATCH_FILE="/etc/apt/sources.list.d/arm64.list"
