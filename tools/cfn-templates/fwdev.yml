@@ -128,7 +128,7 @@ Resources:
 
               # Upgrade system and reboot if required
               apt-get update
-              apt-get upgrade -y
+              apt-get dist-upgrade -y
               if [ -f /var/run/reboot-required ]; then
                 # Delete the UserData info file so that we run again after reboot
                 rm -f /var/lib/cloud/instances/*/sem/config_scripts_user
