@@ -146,7 +146,7 @@ RemoteDiagnosticDataSource::doWork()
                 auto queryID = it->first;
                 it = mQueuedDTCQueries.erase( it );
                 // Erase from all maps
-                mQueuedDTCQueries.erase( queryID );
+                removeQuery( queryID );
             }
             else
             {

@@ -98,12 +98,6 @@ print_file "After patching" /etc/apt/sources.list.d/arm64.list
 
 dpkg --add-architecture arm64
 apt-get update
-# Workaround for installing linux-libc-dev as multiarch.
-# Multiarch packages are required to have exactly the same version. Around Apr 2025 the
-# i386 and amd64 packages were updated to 5.15.0-138.148 but the other architectures were kept
-# on version 5.15.0-136.147. So for now we try to install both packages with the same version.
-LINUX_LIBC_DEV_VERSION=$(apt-cache policy linux-libc-dev:arm64 | grep Candidate | sed 's/.*Candidate: //')
-apt-get install -y --allow-downgrades linux-libc-dev=$LINUX_LIBC_DEV_VERSION linux-libc-dev:arm64=$LINUX_LIBC_DEV_VERSION
 apt-get install -y \
     build-essential
 apt-get install -y \
