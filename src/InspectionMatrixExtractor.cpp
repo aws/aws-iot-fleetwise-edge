@@ -460,6 +460,16 @@ CollectionSchemeManager::matrixExtractor( InspectionMatrix &inspectionMatrix, Fe
 
             conditionForFetch.condition = &inspectionMatrix.expressionNodeStorage[conditionIndex];
         }
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        for ( auto &conditionForForward : conditionWithCollectedData.forwardConditions )
+        {
+            if ( conditionForForward.condition != nullptr )
+            {
+                uint32_t conditionIndex = expressionNodeToIndexMap.at( conditionForForward.condition );
+                conditionForForward.condition = &inspectionMatrix.expressionNodeStorage[conditionIndex];
+            }
+        }
+#endif
     }
 }
 

@@ -1,5 +1,12 @@
 # Change Log
 
+## v1.3.1 (2025-04-25)
+
+Bug fixes:
+
+- Fixed memory growth in DTC
+- Fixed for use-after-free bug in CollectionInspectionEngine `eval()` function
+
 ## v1.3.0 (2025-04-14)
 
 Bug fixes:
