@@ -26,7 +26,7 @@ set -euo pipefail
 : ${CREDS_ENDPOINT_URL:=""}
 : ${CREDS_ROLE_ALIAS:=""}
 : ${RAW_DATA_BUFFER_SIZE:=1073741824}
-: ${ENABLE_RO2_INTERFACE:=false}
+: ${ENABLE_ROS2_INTERFACE:=false}
 : ${ENABLE_CAN_TO_SOMEIP_BRIDGE_INTERFACE:=false}
 : ${ENABLE_SOMEIP_INTERFACE:=false}
 : ${ENABLE_IWAVE_GPS_INTERFACE:=false}
@@ -127,7 +127,7 @@ parse_args() {
             shift
             ;;
         --enable-ros2-interface)
-            ENABLE_RO2_INTERFACE=true
+            ENABLE_ROS2_INTERFACE=true
             ;;
         --enable-can-to-someip-bridge-interface)
             ENABLE_CAN_TO_SOMEIP_BRIDGE_INTERFACE=true
@@ -374,7 +374,7 @@ if [ "${CREDS_ENDPOINT_URL}" != "" ] || [ "${CREDS_ROLE_ALIAS}" != "" ]; then
         | jq ".staticConfig.credentialsProvider.roleAlias=\"${CREDS_ROLE_ALIAS}\""`
 fi
 
-if ${ENABLE_RO2_INTERFACE}; then
+if ${ENABLE_ROS2_INTERFACE}; then
     ROS2_INTERFACE=`echo "{}" | jq ".interfaceId=\"10\"" \
         | jq ".type=\"ros2Interface\"" \
         | jq ".ros2Interface.subscribeQueueLength=100" \
