@@ -832,7 +832,9 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                     Aws::Transfer::TransferManager::Create( transferManagerConfiguration ) );
             };
             mS3Sender = std::make_unique<S3Sender>(
-                createTransferManagerWrapper, config["staticConfig"]["s3Upload"]["multipartSize"].asSizeRequired() );
+                createTransferManagerWrapper,
+                config["staticConfig"]["s3Upload"]["multipartSize"].asSizeRequired(),
+                config["staticConfig"]["s3Upload"]["connectTimeoutMs"].asU32Optional().get_value_or( 0 ) );
             auto ionWriterPtr = std::make_unique<DataSenderIonWriter>( mRawDataBufferManager.get(), clientId );
             ionWriter = ionWriterPtr.get();
             auto visionSystemDataSenderPtr = std::make_unique<VisionSystemDataSender>(

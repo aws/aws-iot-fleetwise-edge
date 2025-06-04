@@ -80,7 +80,7 @@ INSTANTIATE_TEST_SUITE_P( AllCanceledStatuses,
 
 TEST_P( S3SenderCanceledStatusTest, AsyncStreamUploadInitiatedCallbackCanceled )
 {
-    S3Sender sender{ createTransferManagerWrapper, 5 * 1024 * 1024 };
+    S3Sender sender{ createTransferManagerWrapper, 5 * 1024 * 1024, 3000 };
     MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback;
     auto transferHandle = std::make_shared<Aws::Transfer::TransferHandle>( TEST_BUCKET_NAME, TEST_OBJECT_KEY );
 
@@ -107,7 +107,7 @@ TEST_P( S3SenderCanceledStatusTest, AsyncStreamUploadInitiatedCallbackCanceled )
 
 TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackFailedFirstAttempt )
 {
-    S3Sender sender{ createTransferManagerWrapper, 5 * 1024 * 1024 };
+    S3Sender sender{ createTransferManagerWrapper, 5 * 1024 * 1024, 3000 };
     MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback;
     auto transferHandle = std::make_shared<Aws::Transfer::TransferHandle>( TEST_BUCKET_NAME, TEST_OBJECT_KEY );
 
@@ -146,7 +146,7 @@ TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackFailedFirstAttempt )
 
 TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackFailedAllAttempts )
 {
-    S3Sender sender{ createTransferManagerWrapper, 5 * 1024 * 1024 };
+    S3Sender sender{ createTransferManagerWrapper, 5 * 1024 * 1024, 3000 };
     MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback;
     auto transferHandle = std::make_shared<Aws::Transfer::TransferHandle>( TEST_BUCKET_NAME, TEST_OBJECT_KEY );
 
@@ -192,7 +192,7 @@ TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackFailedAllAttempts )
 
 TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackSucceeded )
 {
-    S3Sender sender{ createTransferManagerWrapper, 0 };
+    S3Sender sender{ createTransferManagerWrapper, 0, 3000 };
     MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback;
     auto transferHandle = std::make_shared<Aws::Transfer::TransferHandle>( TEST_BUCKET_NAME, TEST_OBJECT_KEY );
 
@@ -227,7 +227,7 @@ TEST_F( S3SenderTest, AsyncStreamUploadInitiatedCallbackSucceeded )
 
 TEST_F( S3SenderTest, LimitNumberOfSimultaneousUploadsAndQueueTheRemaining )
 {
-    S3Sender sender{ createTransferManagerWrapper, 0 };
+    S3Sender sender{ createTransferManagerWrapper, 0, 3000 };
     MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback;
     auto transferHandle1 = std::make_shared<Aws::Transfer::TransferHandle>( TEST_BUCKET_NAME, "objectKey1" );
 
@@ -289,7 +289,7 @@ TEST_F( S3SenderTest, LimitNumberOfSimultaneousUploadsAndQueueTheRemaining )
 
 TEST_F( S3SenderTest, SkipQueuedUploadWhoseDataIsNotAvailableAnymore )
 {
-    S3Sender sender{ createTransferManagerWrapper, 0 };
+    S3Sender sender{ createTransferManagerWrapper, 0, 3000 };
     auto transferHandle1 = std::make_shared<Aws::Transfer::TransferHandle>( TEST_BUCKET_NAME, "objectKey1" );
 
     EXPECT_CALL( *transferManagerWrapperMock,
@@ -347,7 +347,7 @@ TEST_F( S3SenderTest, SkipQueuedUploadWhoseDataIsNotAvailableAnymore )
 
 TEST_F( S3SenderTest, CancelAllOngoingUploadsOnDisconnection )
 {
-    S3Sender sender{ createTransferManagerWrapper, 0 };
+    S3Sender sender{ createTransferManagerWrapper, 0, 3000 };
     MockFunction<void( ConnectivityError, std::shared_ptr<std::streambuf> )> resultCallback;
     auto transferHandle1 = std::make_shared<Aws::Transfer::TransferHandle>( TEST_BUCKET_NAME, "objectKey1" );
 

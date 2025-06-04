@@ -26,7 +26,8 @@ public:
                   Aws::Transfer::TransferManagerConfiguration & ) -> std::shared_ptr<TransferManagerWrapper> {
                   return nullptr;
               },
-              0 )
+              0,
+              3000 )
     {
     }
 

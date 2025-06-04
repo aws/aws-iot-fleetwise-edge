@@ -34,8 +34,11 @@ public:
     /**
      * @param createTransferManagerWrapper a factory function that creates a new Transfer Manager instance
      * @param multipartSize the size that will be used to decide whether to try a multipart upload
+     * @param connectTimeoutMs the connection timeout for S3 client in milliseconds
      */
-    S3Sender( CreateTransferManagerWrapper createTransferManagerWrapper, size_t multipartSize );
+    S3Sender( CreateTransferManagerWrapper createTransferManagerWrapper,
+              size_t multipartSize,
+              uint32_t connectTimeoutMs );
     virtual ~S3Sender() = default;
 
     S3Sender() = delete;
@@ -53,6 +56,7 @@ public:
 
 private:
     size_t mMultipartSize;
+    uint32_t mConnectTimeoutMs;
     std::unordered_map<std::string, std::shared_ptr<TransferManagerWrapper>> mRegionToTransferManagerWrapper;
     CreateTransferManagerWrapper mCreateTransferManagerWrapper;
 
