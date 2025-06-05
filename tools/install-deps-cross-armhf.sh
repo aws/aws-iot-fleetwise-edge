@@ -80,27 +80,13 @@ print_file() {
 
 print_file "Before patching" /etc/apt/sources.list
 sed -i -E "s/deb (http|mirror\+file)/deb [arch=${ARCH}] \1/g" /etc/apt/sources.list
-cp /etc/apt/sources.list /etc/apt/sources.list.d/armhf.list
-sed -i -E "s/deb \[arch=${ARCH}\] (http|mirror\+file)/deb [arch=armhf] \1/g" /etc/apt/sources.list.d/armhf.list
-# GitHub uses a separate mirrors file
-if [ -f /etc/apt/apt-mirrors.txt ]; then
-    print_file "Before patching" /etc/apt/apt-mirrors.txt
-    cp /etc/apt/apt-mirrors.txt /etc/apt/apt-mirrors-armhf.txt
-    sed -i "s#/etc/apt/apt-mirrors.txt#/etc/apt/apt-mirrors-armhf.txt#g" /etc/apt/sources.list.d/armhf.list
-    PATCH_FILE="/etc/apt/apt-mirrors-armhf.txt"
-    sed -i -E "s#(archive|security).ubuntu.com/ubuntu#ports.ubuntu.com/ubuntu-ports#g" /etc/apt/sources.list.d/armhf.list
-    print_file "After patching" /etc/apt/apt-mirrors-armhf.txt
-else
-    PATCH_FILE="/etc/apt/sources.list.d/armhf.list"
-fi
-sed -i -E "s#(archive|security).ubuntu.com/ubuntu#ports.ubuntu.com/ubuntu-ports#g" ${PATCH_FILE}
-print_file "After patching" /etc/apt/sources.list.d/armhf.list
+print_file "After patching" /etc/apt/sources.list
 
+cp ${SCRIPT_DIR}/armhf.list /etc/apt/sources.list.d/
 dpkg --add-architecture armhf
 apt-get update
 apt-get install -y \
-    build-essential
-apt-get install -y \
+    build-essential \
     cmake \
     crossbuild-essential-armhf \
     curl \
