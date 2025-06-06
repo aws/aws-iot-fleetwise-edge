@@ -68,7 +68,8 @@
     "s3Upload": {
       "maxEnvelopeSize": 104857600,
       "multipartSize": 5242880,
-      "maxConnections": 2
+      "maxConnections": 2,
+      "connectTimeoutMs": 3000
     },
     "visionSystemDataCollection": {
       "rawDataBuffer": {

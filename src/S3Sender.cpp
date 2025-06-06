@@ -24,6 +24,7 @@ constexpr size_t DEFAULT_MULTIPART_SIZE = 5 * 1024 * 1024; // 5MB
 constexpr char ALLOCATION_TAG[] = "FWE_S3Sender";
 constexpr uint8_t MAX_ATTEMPTS = 2;
 constexpr uint8_t MAX_SIMULTANEOUS_FILES = 1;
+constexpr uint32_t DEFAULT_CONNECT_TIMEOUT_MS = 3000; // 3 seconds default
 } // namespace
 
 namespace Aws
@@ -39,8 +40,11 @@ transferStatusToString( Aws::Transfer::TransferStatus transferStatus )
     return ss.str();
 }
 
-S3Sender::S3Sender( CreateTransferManagerWrapper createTransferManagerWrapper, size_t multipartSize )
+S3Sender::S3Sender( CreateTransferManagerWrapper createTransferManagerWrapper,
+                    size_t multipartSize,
+                    uint32_t connectTimeoutMs )
     : mMultipartSize{ multipartSize == 0 ? DEFAULT_MULTIPART_SIZE : multipartSize }
+    , mConnectTimeoutMs{ connectTimeoutMs > 0 ? connectTimeoutMs : DEFAULT_CONNECT_TIMEOUT_MS }
     , mCreateTransferManagerWrapper( std::move( createTransferManagerWrapper ) )
 {
     if ( mCreateTransferManagerWrapper == nullptr )
@@ -166,6 +170,8 @@ S3Sender::getTransferManagerWrapper( const S3UploadMetadata &uploadMetadata )
         initValues.shouldDisableIMDS = true;
         Aws::Client::ClientConfiguration clientConfig( initValues );
         clientConfig.region = uploadMetadata.region;
+
+        clientConfig.connectTimeoutMs = static_cast<long int>( mConnectTimeoutMs );
 
         Aws::Transfer::TransferManagerConfiguration transferConfig( nullptr );
         transferConfig.bufferSize = mMultipartSize;

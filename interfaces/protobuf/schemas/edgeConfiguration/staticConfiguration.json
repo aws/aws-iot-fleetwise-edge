@@ -683,6 +683,10 @@
             "multipartSize": {
               "type": "integer",
               "description": "Size of part for S3 multipart upload in bytes. S3 limitation is 5 MiB to 5 GiB"
+            },
+            "connectTimeoutMs": {
+              "type": "integer",
+              "description": "Connection timeout for S3 client in milliseconds"
             }
           },
           "required": ["maxEnvelopeSize", "maxConnections", "multipartSize"]
