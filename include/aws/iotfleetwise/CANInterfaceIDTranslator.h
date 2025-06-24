@@ -28,7 +28,7 @@ public:
     CANChannelNumericID
     getChannelNumericID( const InterfaceID &iid ) const
     {
-        for ( auto l : mLookup )
+        for ( const auto &l : mLookup )
         {
             if ( l.second == iid )
             {
@@ -39,9 +39,13 @@ public:
     };
 
     InterfaceID
+    // coverity[autosar_cpp14_m3_2_2_violation:FALSE] not defined anywhere else
+    // coverity[misra_cpp_2008_rule_3_2_2_violation:FALSE] not defined anywhere else
+    // coverity[cert_dcl60_cpp_violation:FALSE] not defined anywhere else
+    // coverity[ODR_VIOLATION:FALSE] not defined anywhere else
     getInterfaceID( CANChannelNumericID cid ) const
     {
-        for ( auto l : mLookup )
+        for ( const auto &l : mLookup )
         {
             if ( l.first == cid )
             {

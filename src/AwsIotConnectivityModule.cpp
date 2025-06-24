@@ -87,7 +87,7 @@ AwsIotConnectivityModule::createReceiver( const std::string &topicName )
 void
 AwsIotConnectivityModule::subscribeToConnectionEstablished( OnConnectionEstablishedCallback callback )
 {
-    mConnectionEstablishedListeners.subscribe( callback );
+    mConnectionEstablishedListeners.subscribe( std::move( callback ) );
 }
 
 bool
@@ -109,9 +109,7 @@ AwsIotConnectivityModule::resetConnection()
     // the connection is lost.
     // Default constructor of DisconnectPacket sets the disconnectReason to
     // CLIENT_INITIATED_DISCONNECT which is what we want here.
-    auto disconnectPacket = std::make_shared<Aws::Crt::Mqtt5::DisconnectPacket>();
-
-    if ( !mMqttClient->Stop( disconnectPacket ) )
+    if ( !mMqttClient->Stop( std::make_shared<Aws::Crt::Mqtt5::DisconnectPacket>() ) )
     {
         FWE_LOG_ERROR( "Failed to close the MQTT Connection" );
         return false;
@@ -189,28 +187,31 @@ AwsIotConnectivityModule::createMqttClient()
         return false;
     }
 
-    // Setup connection options
-    auto connectOptions = std::make_shared<Aws::Crt::Mqtt5::ConnectPacket>();
-    // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
-    connectOptions->WithClientId( mClientId.c_str() )
-        .WithSessionExpiryIntervalSec( mConnectionConfig.sessionExpiryIntervalSeconds )
-        .WithKeepAliveIntervalSec( mConnectionConfig.keepAliveIntervalSeconds );
-
-    if ( mConnectionConfig.sessionExpiryIntervalSeconds > 0 )
     {
-        connectOptions->WithSessionExpiryIntervalSec( mConnectionConfig.sessionExpiryIntervalSeconds );
-    }
+        // Setup connection options
+        auto connectOptions = std::make_unique<Aws::Crt::Mqtt5::ConnectPacket>();
+        // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
+        connectOptions->WithClientId( mClientId.c_str() )
+            .WithSessionExpiryIntervalSec( mConnectionConfig.sessionExpiryIntervalSeconds )
+            .WithKeepAliveIntervalSec( mConnectionConfig.keepAliveIntervalSeconds );
 
-    mMqttClientBuilder
-        .WithClientExtendedValidationAndFlowControl(
-            Aws::Crt::Mqtt5::ClientExtendedValidationAndFlowControl::AWS_MQTT5_EVAFCO_AWS_IOT_CORE_DEFAULTS )
-        // Make queued packets fail on disconnection so we can better control how to handle those failures
-        // (e.g. drop, persist). Otherwise, using the default behavior, packets with QoS1 could stay in the
-        // queue for a long time and be transmitted even if they are no longer relevant.
-        .WithOfflineQueueBehavior(
-            Aws::Crt::Mqtt5::ClientOperationQueueBehaviorType::AWS_MQTT5_COQBT_FAIL_ALL_ON_DISCONNECT )
-        .WithConnectOptions( connectOptions )
-        .WithPingTimeoutMs( mConnectionConfig.pingTimeoutMs );
+        if ( mConnectionConfig.sessionExpiryIntervalSeconds > 0 )
+        {
+            connectOptions->WithSessionExpiryIntervalSec( mConnectionConfig.sessionExpiryIntervalSeconds );
+        }
+
+        mMqttClientBuilder
+            .WithClientExtendedValidationAndFlowControl(
+                Aws::Crt::Mqtt5::ClientExtendedValidationAndFlowControl::AWS_MQTT5_EVAFCO_AWS_IOT_CORE_DEFAULTS )
+            // Make queued packets fail on disconnection so we can better control how to handle those failures
+            // (e.g. drop, persist). Otherwise, using the default behavior, packets with QoS1 could stay in the
+            // queue for a long time and be transmitted even if they are no longer relevant.
+            .WithOfflineQueueBehavior(
+                Aws::Crt::Mqtt5::ClientOperationQueueBehaviorType::AWS_MQTT5_COQBT_FAIL_ALL_ON_DISCONNECT )
+            // coverity[autosar_cpp14_a20_8_6_violation] can't use make_shared as unique_ptr is moved
+            .WithConnectOptions( std::move( connectOptions ) )
+            .WithPingTimeoutMs( mConnectionConfig.pingTimeoutMs );
+    }
 
     if ( mConnectionConfig.sessionExpiryIntervalSeconds > 0 )
     {

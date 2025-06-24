@@ -27,6 +27,7 @@ namespace IoTFleetWise
 struct ExpressionNode;
 
 static constexpr uint32_t MAX_NUMBER_OF_ACTIVE_CONDITION = 256; /**< More active conditions will be ignored */
+// coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
 static constexpr uint32_t MAX_NUMBER_OF_ACTIVE_FETCH_CONDITION = 256;
 static constexpr uint32_t ALL_CONDITIONS = 0xFFFFFFFF;
 static constexpr uint32_t MAX_EQUATION_DEPTH =
@@ -115,6 +116,10 @@ struct InspectionMatrix
                                                         * locality). The traversal is depth first preorder */
 };
 
+// coverity[autosar_cpp14_m3_2_2_violation:FALSE] not defined anywhere else
+// coverity[misra_cpp_2008_rule_3_2_2_violation:FALSE] not defined anywhere else
+// coverity[cert_dcl60_cpp_violation:FALSE] not defined anywhere else
+// coverity[ODR_VIOLATION:FALSE] not defined anywhere else
 struct InspectionValue
 {
     InspectionValue() = default;
@@ -151,6 +156,10 @@ struct InspectionValue
     InspectionValue( const InspectionValue & ) = delete;
     InspectionValue &operator=( const InspectionValue & ) = delete;
     InspectionValue( InspectionValue && ) = default;
+    // coverity[autosar_cpp14_m3_2_2_violation:FALSE] not defined anywhere else
+    // coverity[misra_cpp_2008_rule_3_2_2_violation:FALSE] not defined anywhere else
+    // coverity[cert_dcl60_cpp_violation:FALSE] not defined anywhere else
+    // coverity[ODR_VIOLATION:FALSE] not defined anywhere else
     InspectionValue &operator=( InspectionValue && ) = default;
     ~InspectionValue() = default;
     enum class DataType
@@ -265,7 +274,7 @@ private:
 template <typename T>
 struct SignalSample : SampleConsumed
 {
-    T mValue;
+    T mValue{};
     Timestamp mTimestamp{ 0 };
 };
 
@@ -522,7 +531,6 @@ struct UploadedS3Object
 
 // Vector of collected decoded signals or raw buffer handles
 using CollectedSignalsGroup = std::vector<CollectedSignal>;
-using DTCInfoPtr = std::shared_ptr<DTCInfo>;
 
 // Each collected data frame is processed and evaluated separately by collection inspection engine
 struct CollectedDataFrame
@@ -532,33 +540,29 @@ struct CollectedDataFrame
         : mCollectedSignals( std::move( collectedSignals ) )
     {
     }
-    CollectedDataFrame( DTCInfoPtr dtcInfo )
+    CollectedDataFrame( std::shared_ptr<DTCInfo> dtcInfo )
         : mActiveDTCs( std::move( dtcInfo ) )
     {
     }
     CollectedSignalsGroup mCollectedSignals;
-    DTCInfoPtr mActiveDTCs;
+    std::shared_ptr<DTCInfo> mActiveDTCs;
 };
 
 // Buffer that sends data to Collection Engine
 using SignalBuffer = LockedQueue<CollectedDataFrame>;
-// Shared Pointer type to the buffer that sends data to Collection Engine
-// coverity[misra_cpp_2008_rule_0_1_5_violation] definition needed for tests
-// coverity[autosar_cpp14_a0_1_6_violation] same
-using SignalBufferPtr = std::shared_ptr<SignalBuffer>;
 using SignalBufferDistributor = LockedQueueDistributor<CollectedDataFrame>;
 
 // Output of collection Inspection Engine
 struct TriggeredCollectionSchemeData : DataToSend
 {
     PassThroughMetadata metadata;
-    Timestamp triggerTime;
+    Timestamp triggerTime{ 0 };
     std::vector<CollectedSignal> signals;
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     std::vector<UploadedS3Object> uploadedS3Objects;
 #endif
     DTCInfo mDTCInfo;
-    EventID eventID;
+    EventID eventID{ 0 };
 
     ~TriggeredCollectionSchemeData() override = default;
 
@@ -573,9 +577,9 @@ struct TriggeredCollectionSchemeData : DataToSend
 struct TriggeredVisionSystemData : DataToSend
 {
     PassThroughMetadata metadata;
-    Timestamp triggerTime;
+    Timestamp triggerTime{ 0 };
     std::vector<CollectedSignal> signals;
-    EventID eventID;
+    EventID eventID{ 0 };
 
     ~TriggeredVisionSystemData() override = default;
 

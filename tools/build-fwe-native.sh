@@ -48,6 +48,10 @@ parse_args() {
         --with-micropython-support)
             WITH_MICROPYTHON_SUPPORT="true"
             ;;
+        --prefix)
+            PREFIX="$2"
+            shift
+            ;;
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --with-greengrassv2-support       Build with Greengrass V2 support"
@@ -60,6 +64,7 @@ parse_args() {
             echo "  --with-remote-commands-support    Build with remote commands support"
             echo "  --with-cpython-support            Build with CPython support"
             echo "  --with-micropython-support        Build with MicroPython support"
+            echo "  --prefix <PREFIX>                 Install prefix, default ${PREFIX}"
             exit 0
             ;;
         esac
@@ -69,7 +74,7 @@ parse_args() {
 
 parse_args "$@"
 
-PREFIX="/usr/local/`gcc -dumpmachine`"
+: ${PREFIX:="/usr/local"}
 export PATH=${PREFIX}/bin:${PATH}
 
 CMAKE_OPTIONS="

@@ -1,5 +1,21 @@
 # Change Log
 
+## v1.3.2 (2025-06-24)
+
+Bug fixes:
+
+- Fixed race conditions in `OBDOverCANModule`, `DataSenderIonWriter`,
+  `CollectionInspectionWorkerThread` and `CANDataSource` found by coverity 2024.3.1.
+
+Improvements:
+
+- Refactored telemetry data serialization to ensure Store and Forward uses the same payload size
+  optimizations as regular telemetry data.
+- Updated the default dependency installation prefix to `/usr/local`, enabling CMake to locate
+  dependencies using its standard search paths without requiring explicit `CMAKE_PREFIX_PATH`
+  argument.
+- Fixed various Coverity regressions.
+
 ## v1.3.1 (2025-04-25)
 
 Bug fixes:

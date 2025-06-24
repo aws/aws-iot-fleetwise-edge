@@ -6,7 +6,6 @@
 #include "RawDataBufferManagerSpy.h"
 #include "aws/iotfleetwise/CANInterfaceIDTranslator.h"
 #include "aws/iotfleetwise/CheckinSender.h"
-#include "aws/iotfleetwise/ICollectionSchemeList.h"
 #include "aws/iotfleetwise/RawDataManager.h"
 #include <boost/optional/optional.hpp>
 #include <cstdio>
@@ -198,8 +197,8 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorTreeTest )
 
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerWrapper test( nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM1" );
-    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
-    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    auto DM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    auto PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DM1 );
     test.setCollectionSchemeList( PL1 );
     // All three polices are expected to be enabled
@@ -242,8 +241,8 @@ TEST( CollectionSchemeManager, InspectionMatrixExtractorConditionDataTest )
     CANInterfaceIDTranslator canIDTranslator;
     canIDTranslator.add( "102" );
     CollectionSchemeManagerWrapper test( nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DM1" );
-    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
-    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    auto DM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    auto PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DM1 );
     test.setCollectionSchemeList( PL1 );
 
@@ -518,8 +517,8 @@ TEST( CollectionSchemeManager, MatrixExtractorTest )
 
     CollectionSchemeManagerWrapper test(
         nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DecoderManifest 1" );
-    IDecoderManifestPtr decoderManifest = std::make_shared<IDecoderManifestTest>( "DecoderManifest 1" );
-    ICollectionSchemeListPtr collectionSchemeList = std::make_shared<ICollectionSchemeListTest>( collectionSchemes );
+    auto decoderManifest = std::make_shared<IDecoderManifestTest>( "DecoderManifest 1" );
+    auto collectionSchemeList = std::make_shared<ICollectionSchemeListTest>( collectionSchemes );
 
     test.setDecoderManifest( decoderManifest );
     test.setCollectionSchemeList( collectionSchemeList );
@@ -680,8 +679,8 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterTest 
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerWrapper test(
         nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", &rawDataBufferManager );
-    IDecoderManifestPtr DMBM1 = std::make_shared<IDecoderManifestTest>( "DMBM1" );
-    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    auto DMBM1 = std::make_shared<IDecoderManifestTest>( "DMBM1" );
+    auto PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DMBM1 );
     test.setCollectionSchemeList( PL1 );
 
@@ -732,8 +731,8 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterMemLo
     CANInterfaceIDTranslator canIDTranslator;
     CollectionSchemeManagerWrapper test(
         nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), "DMBM1", &rawDataBufferManager );
-    IDecoderManifestPtr DMBM1 = std::make_shared<IDecoderManifestTest>( "DMBM1" );
-    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    auto DMBM1 = std::make_shared<IDecoderManifestTest>( "DMBM1" );
+    auto PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DMBM1 );
     test.setCollectionSchemeList( PL1 );
 
@@ -793,14 +792,14 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithC
     std::unordered_map<SignalID, ComplexSignalDecoderFormat> complexSignalMap = {
         { signal1.signalID, { "interfaceId1", "ImageTopic:sensor_msgs/msg/Image", 100 } },
         { signal2.signalID, { "interfaceId2", "PointFieldTopic:sensor_msgs/msg/PointField", 200 } } };
-    IDecoderManifestPtr DMBM1 = std::make_shared<IDecoderManifestTest>( "DMBM1",
-                                                                        formatMap,
-                                                                        signalToFrameAndNodeID,
-                                                                        signalIDToPIDDecoderFormat,
-                                                                        signalIDToCustomDecoderFormat,
-                                                                        complexSignalMap,
-                                                                        complexDataTypeMap );
-    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    auto DMBM1 = std::make_shared<IDecoderManifestTest>( "DMBM1",
+                                                         formatMap,
+                                                         signalToFrameAndNodeID,
+                                                         signalIDToPIDDecoderFormat,
+                                                         signalIDToCustomDecoderFormat,
+                                                         complexSignalMap,
+                                                         complexDataTypeMap );
+    auto PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DMBM1 );
     test.setCollectionSchemeList( PL1 );
 
@@ -906,9 +905,9 @@ TEST( InspectionMatrixExtractorTest, InspectionMatrixRawBufferConfigUpdaterWithC
         { 0x2001, CustomSignalDecoderFormat{ "30", "custom-decoder-0", 0x2001, SignalType::STRING } },
         { 0x2002, CustomSignalDecoderFormat{ "30", "custom-decoder-1", 0x2002, SignalType::DOUBLE } } };
 
-    IDecoderManifestPtr DMBM1 = std::make_shared<IDecoderManifestTest>(
+    auto DMBM1 = std::make_shared<IDecoderManifestTest>(
         "DMBM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, signalIDToCustomDecoderFormat );
-    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    auto PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setDecoderManifest( DMBM1 );
     test.setCollectionSchemeList( PL1 );
 

@@ -110,7 +110,7 @@ public:
             return;
         }
 
-        currentNode->mReceiver = receiver;
+        currentNode->mReceiver = std::move( receiver );
     }
 
     std::shared_ptr<AwsIotReceiver>
@@ -118,6 +118,7 @@ public:
     {
         size_t start = 0;
         size_t foundPos = topic.find( '/', start );
+        // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used later
         TopicNode *currentNode = nullptr;
         auto *currentChildren = &mChildren;
         while ( true )
@@ -167,7 +168,9 @@ private:
 class AwsIotConnectivityModule : public IConnectivityModule
 {
 public:
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used in the cpp file
     constexpr static uint32_t RETRY_FIRST_CONNECTION_START_BACKOFF_MS = 1000; // start retry after one second
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used in the cpp file
     constexpr static uint32_t RETRY_FIRST_CONNECTION_MAX_BACKOFF_MS = 256000; // retry at least every 256 seconds
 
     /**

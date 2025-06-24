@@ -144,7 +144,10 @@ DataSenderManager::checkAndSendRetrievedData()
         }
 
         sender->second->processPersistedData(
-            payload.data(), payloadSize, payloadMetadata, [this, item, filename]( bool success ) {
+            payload.data(),
+            payloadSize,
+            payloadMetadata,
+            [this, item, filename = std::move( filename )]( bool success ) {
                 if ( !success )
                 {
                     FWE_LOG_ERROR( "Payload transmission for file " + filename + " failed. Saving its metadata back." );

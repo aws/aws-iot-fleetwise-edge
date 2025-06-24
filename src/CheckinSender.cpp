@@ -106,6 +106,7 @@ CheckinSender::doWork()
 
             if ( !mCheckinDocuments.has_value() )
             {
+                // coverity[LOCK:FALSE] unique_lock's destructor won't try to unlock again
                 lock.unlock();
                 FWE_LOG_TRACE( "List of checkin documents not available yet. Sleeping until it is available" );
                 mWait.wait( Signal::WaitWithPredicate );

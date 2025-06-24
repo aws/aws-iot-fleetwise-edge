@@ -17,9 +17,8 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-DataFetchManager::DataFetchManager( const std::shared_ptr<FetchRequestQueue> fetchQueue )
-    : mFetchRequestTimer()
-    , mFetchQueue( fetchQueue )
+DataFetchManager::DataFetchManager( std::shared_ptr<FetchRequestQueue> fetchQueue )
+    : mFetchQueue( std::move( fetchQueue ) )
 {
 }
 
@@ -133,7 +132,7 @@ void
 DataFetchManager::onChangeFetchMatrix( std::shared_ptr<const FetchMatrix> fetchMatrix )
 {
     std::lock_guard<std::mutex> lock( mFetchMatrixMutex );
-    mFetchMatrix = fetchMatrix;
+    mFetchMatrix = std::move( fetchMatrix );
     mUpdatedFetchMatrixAvailable = true;
     FWE_LOG_INFO( "Fetch Matrix updated" );
     mWait.notify();

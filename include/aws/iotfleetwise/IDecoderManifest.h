@@ -176,7 +176,6 @@ public:
 };
 
 using SignalIDToCustomSignalDecoderFormatMap = std::unordered_map<SignalID, CustomSignalDecoderFormat>;
-using SignalIDToCustomSignalDecoderFormatMapPtr = std::shared_ptr<const SignalIDToCustomSignalDecoderFormatMap>;
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 /**
@@ -307,7 +306,8 @@ public:
      * @brief Get custom signal decoder format map
      * @return empty map if no map is present in the decoder manifest
      */
-    virtual SignalIDToCustomSignalDecoderFormatMapPtr getSignalIDToCustomSignalDecoderFormatMap() const = 0;
+    virtual std::shared_ptr<const SignalIDToCustomSignalDecoderFormatMap> getSignalIDToCustomSignalDecoderFormatMap()
+        const = 0;
 
     /**
      * @brief Used by the AWS IoT MQTT callback to copy data received from Cloud into this object without any further
@@ -341,8 +341,6 @@ public:
      */
     virtual ~IDecoderManifest() = default;
 };
-
-using IDecoderManifestPtr = std::shared_ptr<IDecoderManifest>;
 
 } // namespace IoTFleetWise
 } // namespace Aws

@@ -3,10 +3,12 @@
 
 #pragma once
 
+#include "aws/iotfleetwise/Assert.h"
 #include "aws/iotfleetwise/Clock.h"
 #include "aws/iotfleetwise/ClockHandler.h"
 #include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
 #include "aws/iotfleetwise/ICommandDispatcher.h"
+#include "aws/iotfleetwise/TimeTypes.h"
 #include <CommonAPI/CommonAPI.hpp>
 #include <functional>
 #include <string>
@@ -71,7 +73,11 @@ commonapiGetRemainingTimeout( Timestamp issuedTimestampMs, Timestamp executionTi
     {
         return 0; // Already timed-out
     }
-    return static_cast<CommonAPI::Timeout_t>( issuedTimestampMs + executionTimeoutMs - currentTimeMs );
+    Timestamp remainingTimeout = issuedTimestampMs + executionTimeoutMs - currentTimeMs;
+    FWE_GRACEFUL_FATAL_ASSERT( remainingTimeout <= std::numeric_limits<CommonAPI::Timeout_t>::max(),
+                               "Command execution timeout larger than max CommonAPI::Timeout_t",
+                               0 );
+    return static_cast<CommonAPI::Timeout_t>( remainingTimeout );
 }
 
 // type for someip method wrapper

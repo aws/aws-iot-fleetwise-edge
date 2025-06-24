@@ -28,14 +28,14 @@ public:
     MOCK_METHOD( void,
                  beginForward,
                  ( const Aws::IoTFleetWise::Store::CampaignName &campaignID,
-                   Aws::IoTFleetWise::Store::PartitionID pID,
+                   Aws::IoTFleetWise::PartitionID pID,
                    Aws::IoTFleetWise::Store::StreamForwarder::Source source ),
                  ( override ) );
 
     MOCK_METHOD( void,
                  cancelForward,
                  ( const Aws::IoTFleetWise::Store::CampaignName &campaignID,
-                   Aws::IoTFleetWise::Store::PartitionID pID,
+                   Aws::IoTFleetWise::PartitionID pID,
                    Aws::IoTFleetWise::Store::StreamForwarder::Source source ),
                  ( override ) );
 };

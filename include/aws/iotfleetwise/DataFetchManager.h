@@ -24,7 +24,7 @@ namespace IoTFleetWise
 class DataFetchManager
 {
 public:
-    DataFetchManager( const std::shared_ptr<FetchRequestQueue> fetchQueue );
+    DataFetchManager( std::shared_ptr<FetchRequestQueue> fetchQueue );
     ~DataFetchManager();
 
     DataFetchManager( const DataFetchManager & ) = delete;

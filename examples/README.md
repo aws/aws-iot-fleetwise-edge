@@ -68,7 +68,7 @@ launch an AWS EC2 Graviton (arm64) instance. Pricing for EC2 can be found,
 
    ```bash
    cd ~/aws-iot-fleetwise-edge \
-   && ./tools/install-deps-native.sh \
+   && sudo ./tools/install-deps-native.sh \
      --with-someip-support
    ```
 

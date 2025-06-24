@@ -165,6 +165,7 @@ CommandSchema::onCommandRequestReceived( const ReceivedConnectivityMessage &rece
     if ( !protoCommandRequest.ParseFromArray( receivedMessage.buf, static_cast<int>( receivedMessage.size ) ) )
     {
         FWE_LOG_ERROR( "Failed to parse CommandRequest proto" );
+        TraceModule::get().incrementVariable( TraceVariable::COMMAND_REQUEST_PARSING_FAILURE );
         mCommandResponses->push( std::make_shared<CommandResponse>(
             "", CommandStatus::EXECUTION_FAILED, REASON_CODE_COMMAND_REQUEST_PARSING_FAILED, "" ) );
         return;
@@ -186,6 +187,7 @@ CommandSchema::onCommandRequestReceived( const ReceivedConnectivityMessage &rece
          ( ( issuedTimestampMs + protoCommandRequest.timeout_ms() ) <= currentTimeMs ) )
     {
         FWE_LOG_ERROR( "Command Request with ID " + protoCommandRequest.command_id() + " timed out" );
+        TraceModule::get().incrementVariable( TraceVariable::COMMAND_EXECUTION_TIMEOUT_BEFORE_DISPATCH );
         mCommandResponses->push( std::make_shared<CommandResponse>( protoCommandRequest.command_id(),
                                                                     CommandStatus::EXECUTION_TIMEOUT,
                                                                     REASON_CODE_TIMED_OUT_BEFORE_DISPATCH,
@@ -209,12 +211,13 @@ CommandSchema::onCommandRequestReceived( const ReceivedConnectivityMessage &rece
         auto reasonCode = setSignalValue( protoActuatorCommand, commandRequest, currentTimeMs, mRawDataBufferManager );
         if ( reasonCode != REASON_CODE_UNSPECIFIED )
         {
+            TraceModule::get().incrementVariable( TraceVariable::COMMAND_SETTING_SIGNAL_VALUE_FAILURE );
             mCommandResponses->push( std::make_shared<CommandResponse>(
                 commandRequest.commandID, CommandStatus::EXECUTION_FAILED, reasonCode, "" ) );
             return;
         }
 
-        mActuatorCommandRequestListeners.notify( commandRequest );
+        mActuatorCommandRequestListeners.notify( std::move( commandRequest ) );
     }
     else if ( protoCommandRequest.has_last_known_state_command() )
     {
@@ -257,7 +260,7 @@ CommandSchema::onCommandRequestReceived( const ReceivedConnectivityMessage &rece
                 continue;
             }
 
-            mLastKnownStateCommandRequestListeners.notify( commandRequest );
+            mLastKnownStateCommandRequestListeners.notify( std::move( commandRequest ) );
         }
     }
     else

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "aws/iotfleetwise/IConnectionTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include "aws/iotfleetwise/TopicConfig.h"
 #include <boost/optional.hpp>
 #include <functional>
@@ -14,19 +15,6 @@ namespace Aws
 {
 namespace IoTFleetWise
 {
-
-/**
- * @brief Struct that specifies the persistence and transmission attributes
- *        regarding the edge to cloud payload
- */
-struct CollectionSchemeParams
-{
-    bool persist{ false };     // specifies if data needs to be persisted in case of connection loss
-    bool compression{ false }; // specifies if data needs to be compressed for cloud
-    uint32_t priority{ 0 };    // collectionScheme priority specified by the cloud
-    uint64_t triggerTime{ 0 }; // timestamp of event ocurred
-    uint32_t eventID{ 0 };     // event id
-};
 
 /**
  * @brief called after data is sent

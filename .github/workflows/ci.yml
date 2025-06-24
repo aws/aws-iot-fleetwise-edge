@@ -40,7 +40,7 @@ jobs:
           extra-options:
             "--with-someip-support --with-lks-support --with-greengrassv2-support
             --with-custom-function-examples --with-store-and-forward-support --with-uds-dtc-example
-            --with-micropython-support"
+            --with-micropython-support --prefix /usr/local/x86_64-linux-gnu"
           dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/x86_64-linux-gnu
           dist-files: build/aws-iot-fleetwise-edge:.
@@ -56,7 +56,7 @@ jobs:
           extra-options:
             "--with-greengrassv2-support --with-someip-support --with-lks-support
             --with-custom-function-examples --with-store-and-forward-support --with-uds-dtc-example
-            --with-micropython-support"
+            --with-micropython-support --native-prefix /usr/local/x86_64-linux-gnu"
           dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/aarch64-linux-gnu:/usr/local/x86_64-linux-gnu
           dist-files: build/aws-iot-fleetwise-edge:.
@@ -72,7 +72,8 @@ jobs:
           extra-options:
             "--with-greengrassv2-support --with-someip-support --with-lks-support
             --with-iwave-gps-support --with-custom-function-examples
-            --with-store-and-forward-support --with-uds-dtc-example --with-micropython-support"
+            --with-store-and-forward-support --with-uds-dtc-example --with-micropython-support
+            --native-prefix /usr/local/x86_64-linux-gnu"
           dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/arm-linux-gnueabihf:/usr/local/x86_64-linux-gnu
           dist-files: build/aws-iot-fleetwise-edge:.
@@ -88,7 +89,7 @@ jobs:
           extra-options:
             "--with-greengrassv2-support --with-ros2-support --with-someip-support
             --with-lks-support --with-custom-function-examples --with-store-and-forward-support
-            --with-uds-dtc-example --with-micropython-support"
+            --with-uds-dtc-example --with-micropython-support --prefix /usr/local/x86_64-linux-gnu"
           dist-name: "aws-iot-fleetwise-edge-ros2"
           cache-paths: /usr/local/x86_64-linux-gnu:/opt/ros
           dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
@@ -104,7 +105,8 @@ jobs:
           extra-options:
             "--with-greengrassv2-support --with-ros2-support --with-someip-support
             --with-lks-support --with-custom-function-examples --with-store-and-forward-support
-            --with-uds-dtc-example --with-micropython-support"
+            --with-uds-dtc-example --with-micropython-support --native-prefix
+            /usr/local/x86_64-linux-gnu"
           dist-name: "aws-iot-fleetwise-edge-ros2"
           cache-paths: /usr/local/aarch64-linux-gnu:/usr/local/x86_64-linux-gnu:/opt/ros
           dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
@@ -120,7 +122,8 @@ jobs:
           extra-options:
             "--with-greengrassv2-support --with-ros2-support --with-someip-support
             --with-lks-support --with-custom-function-examples --with-store-and-forward-support
-            --with-uds-dtc-example --with-micropython-support"
+            --with-uds-dtc-example --with-micropython-support --native-prefix
+            /usr/local/x86_64-linux-gnu"
           dist-name: "aws-iot-fleetwise-edge-ros2"
           cache-paths: /usr/local/arm-linux-gnueabihf:/usr/local/x86_64-linux-gnu:/opt/ros
           dist-files: build/iotfleetwise/aws-iot-fleetwise-edge:.
@@ -133,7 +136,9 @@ jobs:
         with:
           build-arch: "cross-android"
           upload-arch: "android"
-          extra-options: "--with-lks-support --with-custom-function-examples"
+          extra-options:
+            "--with-lks-support --with-custom-function-examples --native-prefix
+            /usr/local/x86_64-linux-gnu"
           dist-name: "aws-iot-fleetwise-edge"
           cache-paths: /usr/local/x86_64-linux-android:/usr/local/aarch64-linux-android:/usr/local/armv7a-linux-androideabi:/usr/local/x86_64-linux-gnu
           dist-files:

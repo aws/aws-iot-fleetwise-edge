@@ -3,6 +3,7 @@
 
 import json
 import logging
+import os
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -131,7 +132,10 @@ class GreengrassHelper:
             .replace("ROOT_CA_FILENAME_PLACEHOLDER", str(self._aws_thing.root_ca_path))
             .replace("THING_NAME_PLACEHOLDER", self._aws_thing.thing_name)
             .replace("AWS_REGION_PLACEHOLDER", self._aws_region)
-            .replace("IOT_ROLE_ALIAS_PLACEHOLDER", self._aws_thing.greengrass_role_alias_name)
+            .replace(
+                "IOT_ROLE_ALIAS_PLACEHOLDER",
+                os.environ.get("TEST_ROLE_ALIAS", "ROLE_ALIAS_NOT_CONFIGURED"),
+            )
             .replace("IOT_DATA_ENDPOINT_PLACEHOLDER", self._aws_thing.endpoint)
             .replace("IOT_CRED_ENDPOINT_PLACEHOLDER", self._aws_thing.creds_endpoint)
             .replace("LOG_DIR_PLACEHOLDER", str(self.logs_path))

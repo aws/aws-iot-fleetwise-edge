@@ -33,7 +33,7 @@ protected:
     std::shared_ptr<InspectionMatrix> collectionSchemes;
     std::shared_ptr<const InspectionMatrix> consCollectionSchemes;
     std::vector<std::shared_ptr<ExpressionNode>> expressionNodes;
-    SignalBufferPtr signalBuffer;
+    std::shared_ptr<SignalBuffer> signalBuffer;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     std::shared_ptr<DataSenderQueue> outputCollectedData;
 

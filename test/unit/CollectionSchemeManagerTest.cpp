@@ -151,7 +151,7 @@ TEST_F( CollectionSchemeManagerTest, StopMain )
 
     /* build DMs */
     ASSERT_TRUE( mCollectionSchemeManager.connect() );
-    IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    auto testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
     std::vector<std::shared_ptr<ICollectionScheme>> testList1;
 
     /* build collectionScheme list1 */
@@ -514,8 +514,8 @@ TEST_F( CollectionSchemeManagerTest, MockProducer )
     ASSERT_TRUE( mCollectionSchemeManager.connect() );
 
     /* build DMs */
-    IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
-    IDecoderManifestPtr testDM2 = std::make_shared<IDecoderManifestTest>( "DM2" );
+    auto testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    auto testDM2 = std::make_shared<IDecoderManifestTest>( "DM2" );
     std::vector<std::shared_ptr<ICollectionScheme>> testList1;
     std::vector<std::shared_ptr<ICollectionScheme>> testList2;
     std::vector<std::shared_ptr<ICollectionScheme>> testList3;
@@ -608,7 +608,7 @@ TEST_F( CollectionSchemeManagerTest, getCollectionSchemeArns )
     ASSERT_EQ( mCollectionSchemeManager.getCollectionSchemeArns(), std::vector<SyncID>() );
 
     /* build DMs */
-    IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    auto testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
     std::vector<std::shared_ptr<ICollectionScheme>> testList1;
 
     /* build collectionScheme list1 */
@@ -661,7 +661,7 @@ TEST_F( CollectionSchemeManagerTest, SendCheckinPeriodically )
     WAIT_ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), 0 );
 
     /* build DMs */
-    IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    auto testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
     std::vector<std::shared_ptr<ICollectionScheme>> testList1;
     /* build collectionScheme list1 */
     TimePoint currTime = mTestClock->timeSinceEpoch();
@@ -838,7 +838,7 @@ TEST_F( CollectionSchemeManagerTest, RetryCheckinOnFailure )
     WAIT_ASSERT_EQ( schemaListenerMock->getLastSentDocuments( sentDocuments ), 0 );
 
     /* build DMs */
-    IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    auto testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
     collectionSchemeManager.mDmTest = testDM1;
     collectionSchemeManager.myInvokeDecoderManifest();
 
@@ -849,7 +849,7 @@ TEST_F( CollectionSchemeManagerTest, RetryCheckinOnFailure )
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 TEST_F( CollectionSchemeManagerTest, ReceiveCollectionSchemeUpdateWithExistingSchemes )
 {
-    IDecoderManifestPtr testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
+    auto testDM1 = std::make_shared<IDecoderManifestTest>( "DM1" );
     mCollectionSchemeManager.mDmTest = testDM1;
     mCollectionSchemeManager.myInvokeDecoderManifest();
     ASSERT_TRUE( mCollectionSchemeManager.connect() );

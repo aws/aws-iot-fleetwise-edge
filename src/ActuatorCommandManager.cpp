@@ -240,10 +240,10 @@ ActuatorCommandManager::queueCommandResponse( const ActuatorCommandRequest &comm
 void
 ActuatorCommandManager::onChangeOfCustomSignalDecoderFormatMap(
     const SyncID &currentDecoderManifestID,
-    const SignalIDToCustomSignalDecoderFormatMapPtr &customSignalDecoderFormatMap )
+    std::shared_ptr<const SignalIDToCustomSignalDecoderFormatMap> customSignalDecoderFormatMap )
 {
     std::lock_guard<std::mutex> lock( mCustomSignalDecoderFormatMapUpdateMutex );
-    mCustomSignalDecoderFormatMap = customSignalDecoderFormatMap;
+    mCustomSignalDecoderFormatMap = std::move( customSignalDecoderFormatMap );
     mCurrentDecoderManifestID = currentDecoderManifestID;
     FWE_LOG_TRACE( "Custom Signal Decoder Format Map was handed over to the Command Manager" );
 }

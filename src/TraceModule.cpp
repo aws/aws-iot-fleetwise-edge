@@ -171,6 +171,12 @@ TraceModule::getVariableName( TraceVariable variable )
         return "CommandExecutionTimeout";
     case TraceVariable::COMMAND_DECODER_MANIFEST_FAILURE:
         return "CommandDecoderFailure";
+    case TraceVariable::COMMAND_REQUEST_PARSING_FAILURE:
+        return "CommandRequestParsingFailure";
+    case TraceVariable::COMMAND_EXECUTION_TIMEOUT_BEFORE_DISPATCH:
+        return "CommandExecutionTimeoutBeforeDispatch";
+    case TraceVariable::COMMAND_SETTING_SIGNAL_VALUE_FAILURE:
+        return "CommandSettingSignalValueFailure";
     case TraceVariable::STATE_TEMPLATES_RECEIVED:
         return "LastKnownStateReceived";
     case TraceVariable::LAST_KNOWN_STATE_COLLECTION_TRIGGERS:
@@ -405,8 +411,8 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
     {
         auto &v = mVariableData[i];
         auto variableNamePtr = getVariableName( static_cast<TraceVariable>( i ) );
-        auto variableName =
-            variableNamePtr != nullptr ? variableNamePtr : std::string( "UnknownVariable_id" ) + std::to_string( i );
+        std::string variableName =
+            variableNamePtr != nullptr ? variableNamePtr : "UnknownVariable_id" + std::to_string( i );
         profiler->setMetric(
             std::string( "variableMaxSinceLast_" ) + variableName, static_cast<double>( v.mMaxValue ), "Count" );
         profiler->setMetric( std::string( "variableMaxSinceStartup_" ) + variableName,
@@ -417,9 +423,8 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
     {
         auto &v = mAtomicVariableData[i];
         auto atomicVariableNamePtr = getAtomicVariableName( static_cast<TraceAtomicVariable>( i ) );
-        auto atomicVariableName = atomicVariableNamePtr != nullptr
-                                      ? atomicVariableNamePtr
-                                      : std::string( "UnknownVariable_id" ) + std::to_string( i );
+        std::string atomicVariableName =
+            atomicVariableNamePtr != nullptr ? atomicVariableNamePtr : "UnknownVariable_id" + std::to_string( i );
         profiler->setMetric( std::string( "variableMaxSinceStartup_atomic_" ) + atomicVariableName,
                              static_cast<double>( v.mMaxValueAllTime ),
                              "Count" );
@@ -431,8 +436,8 @@ TraceModule::forwardAllMetricsToMetricsReceiver( IMetricsReceiver *profiler )
     {
         auto &v = mSectionData[i];
         auto sectionNamePtr = getSectionName( static_cast<TraceSection>( i ) );
-        auto sectionName =
-            sectionNamePtr != nullptr ? sectionNamePtr : std::string( "UnknownSection_id" ) + std::to_string( i );
+        std::string sectionName =
+            sectionNamePtr != nullptr ? sectionNamePtr : "UnknownSection_id" + std::to_string( i );
         profiler->setMetric( std::string( "sectionAvgSinceStartup_" ) + sectionName,
                              ( v.mHitCounter == 0 ? 0 : v.mTimeSpentSum / v.mHitCounter ),
                              "Seconds" );
@@ -450,8 +455,8 @@ TraceModule::print()
     {
         auto &v = mVariableData[i];
         auto variableNamePtr = getVariableName( static_cast<TraceVariable>( i ) );
-        auto variableName =
-            variableNamePtr != nullptr ? variableNamePtr : std::string( "UnknownVariable_id" ) + std::to_string( i );
+        std::string variableName =
+            variableNamePtr != nullptr ? variableNamePtr : "UnknownVariable_id" + std::to_string( i );
         FWE_LOG_TRACE( std::string{ " TraceModule-ConsoleLogging-Variable '" } + variableName + "' [" +
                        std::to_string( i ) + "] current value: [" + std::to_string( v.mCurrentValue ) +
                        "] max value since last print: [" + std::to_string( v.mMaxValue ) + "] overall max value: [" +
@@ -461,9 +466,8 @@ TraceModule::print()
     {
         auto &v = mAtomicVariableData[i];
         auto atomicVariableNamePtr = getAtomicVariableName( static_cast<TraceAtomicVariable>( i ) );
-        auto atomicVariableName = atomicVariableNamePtr != nullptr
-                                      ? atomicVariableNamePtr
-                                      : std::string( "UnknownVariable_id" ) + std::to_string( i );
+        std::string atomicVariableName =
+            atomicVariableNamePtr != nullptr ? atomicVariableNamePtr : "UnknownVariable_id" + std::to_string( i );
         FWE_LOG_TRACE( std::string{ " TraceModule-ConsoleLogging-TraceAtomicVariable '" } + atomicVariableName + "' [" +
                        std::to_string( i ) + "] current value: [" + std::to_string( v.mCurrentValue.load() ) +
                        "] max value since last print: [" + std::to_string( v.mMaxValue ) + "] overall max value: [" +
@@ -474,8 +478,8 @@ TraceModule::print()
         auto &v = mSectionData[i];
         auto currentHitCounter = v.mHitCounter - ( v.mCurrentlyActive ? 0 : 1 );
         auto sectionNamePtr = getSectionName( static_cast<TraceSection>( i ) );
-        auto sectionName =
-            sectionNamePtr != nullptr ? sectionNamePtr : std::string( "UnknownSection_id" ) + std::to_string( i );
+        std::string sectionName =
+            sectionNamePtr != nullptr ? sectionNamePtr : "UnknownSection_id" + std::to_string( i );
         FWE_LOG_TRACE( std::string{ " TraceModule-ConsoleLogging-Section '" } + sectionName + "' [" +
                        std::to_string( i ) + "] times section executed: [" + std::to_string( v.mHitCounter ) +
                        "] avg execution time: [" +

@@ -17,8 +17,8 @@ namespace Aws
 namespace IoTFleetWise
 {
 
-// coverity[autosar_cpp14_a0_1_3_violation] false positive - function overrides sdk's virtual function.
 void
+// coverity[autosar_cpp14_a0_1_3_violation:FALSE] function overrides sdk's virtual function.
 SubscribeStreamHandler::OnStreamEvent(
     // coverity[autosar_cpp14_a8_4_10_violation] raw pointer needed to match the expected signature
     Aws::Greengrass::IoTCoreMessage *response )
@@ -31,7 +31,8 @@ SubscribeStreamHandler::OnStreamEvent(
         auto payloadBytes = message.value().GetPayload().value();
         auto mqttTopic = std::string( message.value().GetTopicName().value().c_str() );
 
-        mCallback( ReceivedConnectivityMessage{ payloadBytes.data(), payloadBytes.size(), currentTime, mqttTopic } );
+        mCallback( ReceivedConnectivityMessage{
+            payloadBytes.data(), payloadBytes.size(), currentTime, std::move( mqttTopic ) } );
     }
 }
 
@@ -124,7 +125,7 @@ AwsGreengrassV2Receiver::subscribe()
 void
 AwsGreengrassV2Receiver::subscribeToDataReceived( OnDataReceivedCallback callback )
 {
-    mListeners.subscribe( callback );
+    mListeners.subscribe( std::move( callback ) );
 }
 
 bool

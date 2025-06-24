@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "aws/iotfleetwise/Schema.h"
+#include "aws/iotfleetwise/CollectionSchemeIngestionList.h"
+#include "aws/iotfleetwise/DecoderManifestIngestion.h"
 #include "aws/iotfleetwise/IConnectionTypes.h"
 #include "aws/iotfleetwise/LoggingModule.h"
 #include "aws/iotfleetwise/TopicConfig.h"
@@ -33,8 +35,7 @@ Schema::onDecoderManifestReceived( const uint8_t *buf, size_t size )
         return;
     }
 
-    // Create an empty shared pointer which we'll copy the data to
-    DecoderManifestPtr decoderManifestPtr = std::make_shared<DecoderManifestIngestion>();
+    auto decoderManifestPtr = std::make_unique<DecoderManifestIngestion>();
 
     // Try to copy the binary data into the decoderManifest object
     if ( !decoderManifestPtr->copyData( buf, size ) )
@@ -44,7 +45,8 @@ Schema::onDecoderManifestReceived( const uint8_t *buf, size_t size )
     }
 
     // Successful copy, so we cache the decoderManifest in the Schema object
-    mDecoderManifestListeners.notify( decoderManifestPtr );
+    // coverity[autosar_cpp14_a20_8_6_violation] can't use make_shared as unique_ptr is moved
+    mDecoderManifestListeners.notify( std::shared_ptr<DecoderManifestIngestion>( std::move( decoderManifestPtr ) ) );
     FWE_LOG_TRACE( "Received Decoder Manifest in PI DecoderManifestCb" );
 }
 
@@ -58,8 +60,7 @@ Schema::onCollectionSchemeReceived( const uint8_t *buf, size_t size )
         return;
     }
 
-    // Create an empty shared pointer which we'll copy the data to
-    CollectionSchemeListPtr collectionSchemeListPtr = std::make_shared<CollectionSchemeIngestionList>();
+    auto collectionSchemeListPtr = std::make_unique<CollectionSchemeIngestionList>();
 
     // Try to copy the binary data into the collectionSchemeList object
     if ( !collectionSchemeListPtr->copyData( buf, size ) )
@@ -68,7 +69,9 @@ Schema::onCollectionSchemeReceived( const uint8_t *buf, size_t size )
         return;
     }
 
-    mCollectionSchemeListeners.notify( collectionSchemeListPtr );
+    mCollectionSchemeListeners.notify(
+        // coverity[autosar_cpp14_a20_8_6_violation] can't use make_shared as unique_ptr is moved
+        std::shared_ptr<CollectionSchemeIngestionList>( std::move( collectionSchemeListPtr ) ) );
     FWE_LOG_TRACE( "Received CollectionSchemeList" );
 }
 
@@ -95,7 +98,7 @@ Schema::sendCheckin( const std::vector<SyncID> &documentARNs, OnCheckinSentCallb
 
     // transmit the data to the cloud
     FWE_LOG_TRACE( "Sending a Checkin message to the backend" );
-    transmitCheckin( callback );
+    transmitCheckin( std::move( callback ) );
 }
 
 void
@@ -119,7 +122,8 @@ Schema::transmitCheckin( OnCheckinSentCallback callback )
     mMqttSender.sendBuffer( mMqttSender.getTopicConfig().checkinsTopic,
                             reinterpret_cast<const uint8_t *>( mProtoCheckinMsgOutput.data() ),
                             mProtoCheckinMsgOutput.size(),
-                            [checkinDebugString, callback]( ConnectivityError result ) {
+                            [checkinDebugString = std::move( checkinDebugString ),
+                             callback = std::move( callback )]( ConnectivityError result ) {
                                 if ( result == ConnectivityError::Success )
                                 {
                                     FWE_LOG_TRACE( "Checkin Message sent to the backend" );

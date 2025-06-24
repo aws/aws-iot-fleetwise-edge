@@ -11,6 +11,7 @@
 #include "decoder_manifest.pb.h"
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -64,7 +65,8 @@ public:
 
     CustomSignalDecoderFormat getCustomSignalDecoderFormat( SignalID signalID ) const override;
 
-    SignalIDToCustomSignalDecoderFormatMapPtr getSignalIDToCustomSignalDecoderFormatMap() const override;
+    std::shared_ptr<const SignalIDToCustomSignalDecoderFormatMap> getSignalIDToCustomSignalDecoderFormatMap()
+        const override;
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     ComplexSignalDecoderFormat getComplexSignalDecoderFormat( SignalID signalID ) const override;
@@ -152,7 +154,7 @@ private:
     /**
      * @brief A dictionary used to obtain the custom decoder for a given signal
      */
-    SignalIDToCustomSignalDecoderFormatMapPtr mSignalToCustomDecoder;
+    std::shared_ptr<const SignalIDToCustomSignalDecoderFormatMap> mSignalToCustomDecoder;
 };
 
 } // namespace IoTFleetWise

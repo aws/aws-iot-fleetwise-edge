@@ -66,18 +66,6 @@ class AwsThing:
             self._iam_client = boto3.client("iam")
         self.thing_name = name
         self._policy_name = f"{self.thing_name}-policy"
-        # This is an IAM role, which is limited to 64 chars, so we should try to make it as short
-        # as possible.
-        self._greengrass_token_exchange_role_name = f"{self.thing_name}-GG"
-        self._greengrass_token_exchange_policy_name = (
-            f"{self.thing_name}-GreengrassCoreTokenExchange"
-        )
-        self.greengrass_role_alias_name = f"{self.thing_name}-GreengrassCoreTokenExchangeRoleAlias"
-        self._greengrass_role_alias_policy_name = (
-            f"{self.thing_name}-GreengrassCoreTokenExchangeRoleAliasPolicy"
-        )
-        self._greengrass_core_policy_name = f"{self.thing_name}-GreengrassCorePolicy"
-
         self._create_thing()
 
     def _create_thing(self):
@@ -89,6 +77,10 @@ class AwsThing:
         self._cert_arn = response["certificateArn"]
         self.cert_pem = response["certificatePem"]
         self.private_key = response["keyPair"]["PrivateKey"]
+
+        response = self._iot_client.attach_thing_principal(
+            thingName=self.thing_name, principal=self._cert_arn
+        )
 
         self.cert_pem_path = self._tmp_path / f"{self.thing_name}-certificate.crt"
         self.cert_pem_path.write_text(self.cert_pem)
@@ -103,123 +95,20 @@ class AwsThing:
         self.creds_endpoint = self._iot_client.describe_endpoint(
             endpointType="iot:CredentialProvider"
         )["endpointAddress"]
+        policy_document = {
+            "Version": "2012-10-17",
+            "Statement": [{"Effect": "Allow", "Action": ["iot:*"], "Resource": ["*"]}],
+        }
+        if self._use_greengrass:
+            policy_document["Statement"][0]["Action"] += ["greengrass:*"]
         response = self._iot_client.create_policy(
             policyName=self._policy_name,
-            policyDocument=json.dumps(
-                {
-                    "Version": "2012-10-17",
-                    "Statement": [{"Effect": "Allow", "Action": ["iot:*"], "Resource": ["*"]}],
-                }
-            ),
+            policyDocument=json.dumps(policy_document),
         )
         response = self._iot_client.attach_policy(
             policyName=self._policy_name, target=self._cert_arn
         )
 
-        if self._use_greengrass:
-            response = self._iam_client.create_role(
-                RoleName=self._greengrass_token_exchange_role_name,
-                AssumeRolePolicyDocument=json.dumps(
-                    {
-                        "Version": "2012-10-17",
-                        "Statement": [
-                            {
-                                "Effect": "Allow",
-                                "Principal": {"Service": "credentials.iot.amazonaws.com"},
-                                "Action": "sts:AssumeRole",
-                            }
-                        ],
-                    }
-                ),
-            )
-            role_arn = response["Role"]["Arn"]
-            policy_document = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "logs:CreateLogGroup",
-                            "logs:CreateLogStream",
-                            "logs:PutLogEvents",
-                            "logs:DescribeLogStreams",
-                            "s3:GetBucketLocation",
-                        ],
-                        "Resource": "*",
-                    }
-                ],
-            }
-            if self._s3_bucket_name:
-                # The token exchange role is offered by Greengrass' TokenExchangeService component
-                # and it will be assumed by FWE when creating AWS clients.
-                # So we need to add the needed S3 permissions for FWE to upload data.
-                policy_document["Statement"].append(
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "s3:ListBucket",
-                            "s3:PutObject",
-                            "s3:PutObjectAcl",
-                        ],
-                        "Resource": [
-                            f"arn:aws:s3:::{self._s3_bucket_name}",
-                            (
-                                f"arn:aws:s3:::{self._s3_bucket_name}"
-                                "/*raw-data/${credentials-iot:ThingName}/*"
-                            ),
-                        ],
-                    }
-                )
-
-            response = self._iam_client.put_role_policy(
-                RoleName=self._greengrass_token_exchange_role_name,
-                PolicyName=self._greengrass_token_exchange_policy_name,
-                PolicyDocument=json.dumps(policy_document),
-            )
-
-            response = self._iot_client.create_role_alias(
-                roleAlias=self.greengrass_role_alias_name,
-                roleArn=role_arn,
-            )
-            role_alias_arn = response["roleAliasArn"]
-            response = self._iot_client.create_policy(
-                policyName=self._greengrass_role_alias_policy_name,
-                policyDocument=json.dumps(
-                    {
-                        "Version": "2012-10-17",
-                        "Statement": [
-                            {
-                                "Effect": "Allow",
-                                "Action": "iot:AssumeRoleWithCertificate",
-                                "Resource": role_alias_arn,
-                            }
-                        ],
-                    }
-                ),
-            )
-            response = self._iot_client.create_policy(
-                policyName=self._greengrass_core_policy_name,
-                policyDocument=json.dumps(
-                    {
-                        "Version": "2012-10-17",
-                        "Statement": [
-                            {"Effect": "Allow", "Action": "greengrass:*", "Resource": "*"}
-                        ],
-                    }
-                ),
-            )
-            response = self._iot_client.attach_policy(
-                policyName=self._greengrass_role_alias_policy_name,
-                target=self._cert_arn,
-            )
-            response = self._iot_client.attach_policy(
-                policyName=self._greengrass_core_policy_name,
-                target=self._cert_arn,
-            )
-
-        response = self._iot_client.attach_thing_principal(
-            thingName=self.thing_name, principal=self._cert_arn
-        )
         log.info("Created thing")
 
     def _delete_thing(self):
@@ -230,17 +119,6 @@ class AwsThing:
                 thingName=self.thing_name, principal=i
             )
             response = self._iot_client.detach_policy(policyName=self._policy_name, target=i)
-
-            if self._use_greengrass:
-                response = self._iot_client.detach_policy(
-                    policyName=self._greengrass_role_alias_policy_name,
-                    target=i,
-                )
-                response = self._iot_client.detach_policy(
-                    policyName=self._greengrass_core_policy_name,
-                    target=i,
-                )
-
             response = self._iot_client.update_certificate(
                 certificateId=i.split("/")[-1], newStatus="INACTIVE"
             )
@@ -250,21 +128,6 @@ class AwsThing:
             response = self._iot_client.delete_thing(thingName=self.thing_name)
 
         self._delete_iot_policy(self._policy_name)
-        if self._use_greengrass:
-            self._delete_iot_policy(self._greengrass_role_alias_policy_name)
-            self._delete_iot_policy(self._greengrass_core_policy_name)
-
-            log.info(f"Deleting IoT role alias '{self.greengrass_role_alias_name}'")
-            response = self._iot_client.delete_role_alias(roleAlias=self.greengrass_role_alias_name)
-            log.info(f"Deleting IAM role policy'{self._greengrass_token_exchange_role_name}'")
-            response = self._iam_client.delete_role_policy(
-                RoleName=self._greengrass_token_exchange_role_name,
-                PolicyName=self._greengrass_token_exchange_policy_name,
-            )
-            log.info(f"Deleting IAM role '{self._greengrass_token_exchange_role_name}'")
-            response = self._iam_client.delete_role(
-                RoleName=self._greengrass_token_exchange_role_name
-            )
         log.info("Deleted thing")
 
     def _delete_iot_policy(self, policy_name):

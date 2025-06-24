@@ -581,11 +581,9 @@ class TestStoreAndForwardCampaign:
         # set endTime after we collect the first batch of data
         # Add 5s buffer to allow forwarding of data which is collected
         future_time = datetime.fromtimestamp(datetime.now().timestamp() + 5)
-        end_time = future_time.replace(microsecond=0).isoformat() + "+00:00"
-        # Parse the string into a datetime object
-        end_time_dt = datetime.fromisoformat(end_time)
-        # Convert the datetime object to milliseconds since the Unix epoch
-        end_time_ms = int(end_time_dt.timestamp() * 1000)
+        future_time = future_time.replace(microsecond=0)  # Remove microseconds
+        end_time = future_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        end_time_ms = int(future_time.timestamp() * 1000)
         # setup some signal value
         self.context.set_can_signal(collect_signal, 1)
         time.sleep(5)

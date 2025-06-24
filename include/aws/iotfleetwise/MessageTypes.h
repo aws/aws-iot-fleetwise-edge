@@ -188,12 +188,12 @@ struct ComplexDataMessageFormat
     /**
      * @brief Should the full raw message be collected
      */
-    bool mCollectRaw;
+    bool mCollectRaw{ false };
 
     /**
      * @brief root Id that can be used to traves the full tree of the message
      */
-    ComplexDataTypeId mRootTypeId;
+    ComplexDataTypeId mRootTypeId{ 0 };
 
     /**
      * @brief Always sorted by the SignalPath for example {10,1,5} {500,0,8} {500,1,0} is the valid order for the signal

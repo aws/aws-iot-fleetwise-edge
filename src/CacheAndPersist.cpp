@@ -16,6 +16,7 @@
 #include <iostream> // IWYU pragma: keep
 #include <memory>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace Aws
@@ -331,6 +332,8 @@ CacheAndPersist::getSize( const std::string &path )
     std::uintmax_t fileSize = boost::filesystem::file_size( path );
     // In theory this should never happen as we only read the files created in this system, but it could
     // happen if someone copies persisted files from a different architecture (e.g. from arm64 to armhf).
+    // coverity[misra_cpp_2008_rule_0_1_2_violation]
+    // coverity[DEADCODE]
     if ( fileSize > SIZE_MAX )
     {
         FWE_LOG_ERROR( "Filesize is larger than SIZE_MAX. File content can't be fully stored in memory." );
@@ -654,8 +657,11 @@ CacheAndPersist::cleanupPersistedData()
     for ( const auto &file : mPersistedMetadata["files"] )
     {
         // Handle the legacy metadata. file["filename"] is the old one and file["payload"]["filename"] the new one
-        auto filename =
-            file["filename"].asString().empty() ? file["payload"]["filename"].asString() : file["filename"].asString();
+        std::string filename = file["filename"].asString();
+        if ( filename.empty() )
+        {
+            filename = file["payload"]["filename"].asString();
+        }
         filenames.push_back( mCollectedDataPath + filename );
     }
     // coverity[misra_cpp_2008_rule_14_8_2_violation] - boost filesystem path header defines both template and and
@@ -687,12 +693,13 @@ CacheAndPersist::cleanupPersistedData()
                 {
                     // Delete files after iterating over directory
                     // TODO: do not skip ion files but add the metadata for them so they don't get deleted
-                    // coverity[misra_cpp_2008_rule_14_8_2_violation] - boost filesystem path header defines both
-                    // template and and non-template function
+                    // clang-format off
+                    // coverity[misra_cpp_2008_rule_14_8_2_violation] - boost filesystem path header defines both template and and non-template function
                     if ( it->path().extension() != ".10n" ) // skip ion files
                     {
-                        filesToDelete.push_back( filename );
+                        filesToDelete.push_back( std::move( filename ) );
                     }
+                    // clang-format on
                 }
             }
         }
@@ -748,7 +755,7 @@ CacheAndPersist::cleanupDeprecatedFiles()
                      ( filename == ( mPersistencyPath + DEPRECATED_COLLECTED_DATA_FILE ) ) )
                 {
                     // Delete files after iterating over directory
-                    filesToDelete.push_back( filename );
+                    filesToDelete.push_back( std::move( filename ) );
                 }
             }
         }
@@ -776,8 +783,7 @@ CacheAndPersist::writeMetadata( Json::Value &metadata )
 {
     Json::StreamWriterBuilder builder;
     builder["indentation"] = "";
-    // coverity[autosar_cpp14_a20_8_5_violation] Calling newStreamWriter() is a recommended usage from boost
-    // documentation
+    // coverity[autosar_cpp14_a20_8_5_violation] newStreamWriter() is the recommended usage
     std::unique_ptr<Json::StreamWriter> writer( builder.newStreamWriter() );
     std::ofstream outputFileStream( mPayloadMetadataFile );
     writer->write( metadata, &outputFileStream );

@@ -69,7 +69,7 @@ DeviceShadowOverSomeip::onDataReceived( const ReceivedConnectivityMessage &recei
             return;
         }
         std::string shadowName;
-        auto namedPrefix = mMqttSender.getTopicConfig().namedDeviceShadowPrefix;
+        const auto &namedPrefix = mMqttSender.getTopicConfig().namedDeviceShadowPrefix;
         if ( boost::starts_with( receivedMessage.mqttTopic, namedPrefix ) )
         {
             shadowName = receivedMessage.mqttTopic.substr( namedPrefix.size(),
@@ -164,7 +164,7 @@ DeviceShadowOverSomeip::sendRequest( const std::string &topic,
         topic,
         reinterpret_cast<const uint8_t *>( requestDocumentWithClientToken.data() ),
         requestDocumentWithClientToken.size(),
-        [this, clientToken, callback]( ConnectivityError result ) {
+        [this, clientToken = std::move( clientToken ), callback = std::move( callback )]( ConnectivityError result ) {
             if ( result != ConnectivityError::Success )
             {
                 FWE_LOG_ERROR( "Connectivity error: " + connectivityErrorToString( result ) );
@@ -210,12 +210,13 @@ DeviceShadowOverSomeip::deleteShadow( const std::shared_ptr<CommonAPI::ClientId>
 {
     static_cast<void>( _client );
     TraceModule::get().incrementVariable( TraceVariable::SHADOW_DELETE_REQUESTS );
-    sendRequest( mMqttSender.getTopicConfig().deleteDeviceShadowTopic( _shadowName ),
-                 "{}",
-                 [_reply]( auto errorCode, const auto &errorMessage, const auto &responseDocument ) {
-                     static_cast<void>( responseDocument );
-                     _reply( errorCode, errorMessage );
-                 } );
+    sendRequest(
+        mMqttSender.getTopicConfig().deleteDeviceShadowTopic( _shadowName ),
+        "{}",
+        [_reply = std::move( _reply )]( auto errorCode, const auto &errorMessage, const auto &responseDocument ) {
+            static_cast<void>( responseDocument );
+            _reply( errorCode, errorMessage );
+        } );
 }
 
 } // namespace IoTFleetWise

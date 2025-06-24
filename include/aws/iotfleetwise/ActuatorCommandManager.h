@@ -68,7 +68,7 @@ public:
 
     void onChangeOfCustomSignalDecoderFormatMap(
         const SyncID &currentDecoderManifestID,
-        const SignalIDToCustomSignalDecoderFormatMapPtr &customSignalDecoderFormatMap );
+        std::shared_ptr<const SignalIDToCustomSignalDecoderFormatMap> customSignalDecoderFormatMap );
 
     /**
      * @brief callback to be invoked to receive command request

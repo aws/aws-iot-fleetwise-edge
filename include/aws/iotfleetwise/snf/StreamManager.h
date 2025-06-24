@@ -5,8 +5,7 @@
 
 #include "aws/iotfleetwise/Clock.h"
 #include "aws/iotfleetwise/ClockHandler.h"
-#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
-#include "aws/iotfleetwise/DataSenderProtoWriter.h"
+#include "aws/iotfleetwise/DataSenderTypes.h"
 #include "aws/iotfleetwise/ICollectionScheme.h"
 #include "aws/iotfleetwise/ICollectionSchemeList.h"
 #include "aws/iotfleetwise/SignalTypes.h"
@@ -22,24 +21,31 @@
 #include <set>
 #include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
+
 namespace Store
 {
 
 using CampaignID = std::string;   // full campaign arn
 using CampaignName = std::string; // last part of a campaign id
-using PartitionID = uint32_t;
+
+struct Partition
+{
+    PartitionID id;
+    std::shared_ptr<aws::store::stream::StreamInterface> stream;
+    std::unordered_set<SignalID> signalIDs;
+};
 
 class StreamManager
 {
 
 public:
-    static const PartitionID DEFAULT_PARTITION;
     static const std::string STREAM_ITER_IDENTIFIER;
     static const std::string KV_STORE_IDENTIFIER;
     static const int32_t KV_COMPACT_AFTER;
@@ -68,13 +74,11 @@ public:
         Timestamp triggerTime;
     };
 
-    StreamManager( std::string persistenceRootDir,
-                   std::unique_ptr<DataSenderProtoWriter> protoWriter,
-                   uint32_t transmitThreshold );
+    StreamManager( std::string persistenceRootDir );
     virtual ~StreamManager() = default;
     void onChangeCollectionSchemeList( std::shared_ptr<const ActiveCollectionSchemes> activeCollectionSchemes );
 
-    virtual ReturnCode appendToStreams( const TriggeredCollectionSchemeData &data );
+    virtual ReturnCode appendToStreams( const TelemetryDataToPersist &data );
 
     /**
      * Read a record directly from the stream for a specific campaign and partition.
@@ -99,30 +103,34 @@ public:
     static CampaignName
     getName( const CampaignID &campaignID )
     {
-        auto lastArnSeperator = campaignID.find_last_of( '/' );
-        if ( ( lastArnSeperator == CampaignID::npos ) || ( lastArnSeperator + 1 == campaignID.size() ) )
+        auto lastArnSeparator = campaignID.find_last_of( '/' );
+        if ( ( lastArnSeparator == CampaignID::npos ) || ( lastArnSeparator + 1 == campaignID.size() ) )
         {
             return campaignID;
         }
-        return campaignID.substr( lastArnSeperator + 1 );
+        return campaignID.substr( lastArnSeparator + 1 );
+    }
+
+    virtual std::shared_ptr<const std::vector<Partition>>
+    getPartitions( const std::string &campaignArn )
+    {
+        CampaignName campaignName = getName( campaignArn );
+
+        std::lock_guard<std::mutex> lock( mCampaignsMutex );
+        auto it = mCampaigns.find( campaignName );
+        if ( it == mCampaigns.end() )
+        {
+            return {};
+        }
+        return it->second.partitions;
     }
 
 private:
-    struct Partition
-    {
-        PartitionID id;
-        std::shared_ptr<aws::store::stream::StreamInterface> stream;
-        std::unordered_set<SignalID> signalIDs;
-    };
-
     struct Campaign
     {
-        std::vector<Partition> partitions;
+        std::shared_ptr<const std::vector<Partition>> partitions;
         std::shared_ptr<ICollectionScheme> config;
     };
-
-    std::shared_ptr<Aws::IoTFleetWise::DataSenderProtoWriter> mProtoWriter;
-    uint32_t mTransmitThreshold;
 
     std::string mPersistenceRootDir;
     std::shared_ptr<Aws::IoTFleetWise::Store::Logger> mLogger;
@@ -132,10 +140,9 @@ private:
 
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
 
-    bool serialize( const TriggeredCollectionSchemeData &data, std::string &out );
     void removeOlderRecords();
 
-    ReturnCode store( const TriggeredCollectionSchemeData &data, const Partition &partition );
+    static ReturnCode store( const TelemetryDataToPersist &data, const Partition &partition );
 };
 
 } // namespace Store

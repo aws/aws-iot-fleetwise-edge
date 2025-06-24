@@ -57,28 +57,29 @@ public:
     virtual bool
     Stop( std::shared_ptr<Aws::Crt::Mqtt5::DisconnectPacket> disconnectOptions ) noexcept
     {
-        return mMqttClient->Stop( disconnectOptions );
+        return mMqttClient->Stop( std::move( disconnectOptions ) );
     }
 
     virtual bool
     Publish( std::shared_ptr<Aws::Crt::Mqtt5::PublishPacket> publishOptions,
              Aws::Crt::Mqtt5::OnPublishCompletionHandler onPublishCompletionCallback = nullptr ) noexcept
     {
-        return mMqttClient->Publish( publishOptions, onPublishCompletionCallback );
+        return mMqttClient->Publish( std::move( publishOptions ), std::move( onPublishCompletionCallback ) );
     }
 
     virtual bool
     Subscribe( std::shared_ptr<Aws::Crt::Mqtt5::SubscribePacket> subscribeOptions,
                Aws::Crt::Mqtt5::OnSubscribeCompletionHandler onSubscribeCompletionCallback = nullptr ) noexcept
     {
-        return mMqttClient->Subscribe( subscribeOptions, onSubscribeCompletionCallback );
+        return mMqttClient->Subscribe( std::move( subscribeOptions ), std::move( onSubscribeCompletionCallback ) );
     }
 
     virtual bool
     Unsubscribe( std::shared_ptr<UnsubscribePacket> unsubscribeOptions,
                  Aws::Crt::Mqtt5::OnUnsubscribeCompletionHandler onUnsubscribeCompletionCallback = nullptr ) noexcept
     {
-        return mMqttClient->Unsubscribe( unsubscribeOptions, onUnsubscribeCompletionCallback );
+        return mMqttClient->Unsubscribe( std::move( unsubscribeOptions ),
+                                         std::move( onUnsubscribeCompletionCallback ) );
     }
 
     virtual const Aws::Crt::Mqtt5::Mqtt5ClientOperationStatistics &
@@ -138,7 +139,7 @@ public:
     virtual MqttClientBuilderWrapper &
     WithHostName( Crt::String hostname )
     {
-        mMqttClientBuilder->WithHostName( hostname );
+        mMqttClientBuilder->WithHostName( std::move( hostname ) );
         return *this;
     }
 
@@ -173,7 +174,7 @@ public:
     virtual MqttClientBuilderWrapper &
     WithConnectOptions( std::shared_ptr<ConnectPacket> packetConnect ) noexcept
     {
-        mMqttClientBuilder->WithConnectOptions( packetConnect );
+        mMqttClientBuilder->WithConnectOptions( std::move( packetConnect ) );
         return *this;
     }
 
@@ -244,42 +245,42 @@ public:
     virtual MqttClientBuilderWrapper &
     WithClientConnectionSuccessCallback( OnConnectionSuccessHandler callback ) noexcept
     {
-        mMqttClientBuilder->WithClientConnectionSuccessCallback( callback );
+        mMqttClientBuilder->WithClientConnectionSuccessCallback( std::move( callback ) );
         return *this;
     }
 
     virtual MqttClientBuilderWrapper &
     WithClientConnectionFailureCallback( OnConnectionFailureHandler callback ) noexcept
     {
-        mMqttClientBuilder->WithClientConnectionFailureCallback( callback );
+        mMqttClientBuilder->WithClientConnectionFailureCallback( std::move( callback ) );
         return *this;
     }
 
     virtual MqttClientBuilderWrapper &
     WithClientDisconnectionCallback( OnDisconnectionHandler callback ) noexcept
     {
-        mMqttClientBuilder->WithClientDisconnectionCallback( callback );
+        mMqttClientBuilder->WithClientDisconnectionCallback( std::move( callback ) );
         return *this;
     }
 
     virtual MqttClientBuilderWrapper &
     WithClientStoppedCallback( OnStoppedHandler callback ) noexcept
     {
-        mMqttClientBuilder->WithClientStoppedCallback( callback );
+        mMqttClientBuilder->WithClientStoppedCallback( std::move( callback ) );
         return *this;
     }
 
     virtual MqttClientBuilderWrapper &
     WithClientAttemptingConnectCallback( OnAttemptingConnectHandler callback ) noexcept
     {
-        mMqttClientBuilder->WithClientAttemptingConnectCallback( callback );
+        mMqttClientBuilder->WithClientAttemptingConnectCallback( std::move( callback ) );
         return *this;
     }
 
     virtual MqttClientBuilderWrapper &
     WithPublishReceivedCallback( OnPublishReceivedHandler callback ) noexcept
     {
-        mMqttClientBuilder->WithPublishReceivedCallback( callback );
+        mMqttClientBuilder->WithPublishReceivedCallback( std::move( callback ) );
         return *this;
     }
 

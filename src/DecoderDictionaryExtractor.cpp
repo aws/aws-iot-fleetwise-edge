@@ -109,8 +109,9 @@ CollectionSchemeManager::addSignalToDecoderDictionaryMap(
                  canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID].end() )
             {
                 CANMessageDecoderMethod decoderMethod;
-                decoderMethod.format = mDecoderManifest->getCANMessageFormat( canRawFrameID, interfaceId );
-                canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID][canRawFrameID] = decoderMethod;
+                decoderMethod.format = mDecoderManifest->getCANMessageFormat( canRawFrameID, std::move( interfaceId ) );
+                canDecoderDictionaryPtr->canMessageDecoderMethod[canChannelID][canRawFrameID] =
+                    std::move( decoderMethod );
             }
         }
     }
@@ -284,7 +285,7 @@ CollectionSchemeManager::decoderDictionaryExtractor(
                                              ,
                                              partialSignalTypes,
                                              signalInfo.signalID,
-                                             signalPath
+                                             std::move( signalPath )
 #endif
             );
         }
@@ -485,9 +486,8 @@ CollectionSchemeManager::putComplexSignalInDictionary( ComplexDataMessageFormat 
     {
         auto newPathToInsert = SignalPathAndPartialSignalID{ signalPath, partialSignalID };
         // insert sorted
-        // coverity[autosar_cpp14_a23_0_1_violation] false positive - conversion is from iterator to const_iterator
         complexSignal.mSignalPaths.insert(
-            std::upper_bound( complexSignal.mSignalPaths.begin(), complexSignal.mSignalPaths.end(), newPathToInsert ),
+            std::upper_bound( complexSignal.mSignalPaths.cbegin(), complexSignal.mSignalPaths.cend(), newPathToInsert ),
             newPathToInsert );
 
         auto signalType = findPartialSignalType( complexSignal, newPathToInsert );
@@ -508,7 +508,7 @@ CollectionSchemeManager::decoderDictionaryUpdater(
         // Down cast the CAN Decoder Dictionary to base Decoder Dictionary. We will support more
         // types of Decoder Dictionary in later releases
         auto dictPtr = std::static_pointer_cast<const DecoderDictionary>( dict.second );
-        mActiveDecoderDictionaryChangeListeners.notify( dictPtr, dict.first );
+        mActiveDecoderDictionaryChangeListeners.notify( std::move( dictPtr ), dict.first );
     }
 }
 

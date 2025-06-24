@@ -13,10 +13,17 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <istream>
+#include <memory>
 #include <snappy.h>
+#include <string>
 #include <utility>
 #include <vector>
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+#include "aws/iotfleetwise/snf/StreamManager.h"
+#include <boost/none.hpp>
+#include <unordered_set>
+#endif
 
 namespace Aws
 {
@@ -25,60 +32,15 @@ namespace IoTFleetWise
 
 constexpr uint32_t MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG = 6;
 
-class TelemetryDataToPersist : public DataToPersist
-{
-public:
-    TelemetryDataToPersist( const CollectionSchemeParams &collectionSchemeParams,
-                            unsigned partNumber,
-                            std::shared_ptr<std::string> data )
-        : mCollectionSchemeParams( collectionSchemeParams )
-        , mPartNumber( partNumber )
-        , mData( std::move( data ) )
-    {
-    }
-
-    SenderDataType
-    getDataType() const override
-    {
-        return SenderDataType::TELEMETRY;
-    }
-
-    Json::Value
-    getMetadata() const override
-    {
-        Json::Value metadata;
-        metadata["compressionRequired"] = mCollectionSchemeParams.compression;
-        return metadata;
-    }
-
-    std::string
-    getFilename() const override
-    {
-        return std::to_string( mCollectionSchemeParams.eventID ) + "-" +
-               std::to_string( mCollectionSchemeParams.triggerTime ) + "-" + std::to_string( mPartNumber ) + ".bin";
-    };
-
-    boost::variant<std::shared_ptr<std::string>, std::shared_ptr<std::streambuf>>
-    getData() const override
-    {
-        return mData;
-    }
-
-private:
-    CollectionSchemeParams mCollectionSchemeParams;
-    unsigned mPartNumber;
-    std::shared_ptr<std::string> mData;
-};
-
-TelemetryDataSender::TelemetryDataSender( ISender &mqttSender,
-                                          std::unique_ptr<DataSenderProtoWriter> protoWriter,
-                                          PayloadAdaptionConfig configUncompressed,
-                                          PayloadAdaptionConfig configCompressed
+TelemetryDataSerializer::TelemetryDataSerializer( ISender &mqttSender,
+                                                  std::unique_ptr<DataSenderProtoWriter> protoWriter,
+                                                  PayloadAdaptionConfig configUncompressed,
+                                                  PayloadAdaptionConfig configCompressed
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
-                                          ,
-                                          Aws::IoTFleetWise::Store::StreamManager *streamManager
+                                                  ,
+                                                  Aws::IoTFleetWise::Store::StreamManager *streamManager
 #endif
-                                          )
+                                                  )
     : mMQTTSender( mqttSender )
     , mProtoWriter( std::move( protoWriter ) )
     , mConfigUncompressed( configUncompressed )
@@ -93,14 +55,8 @@ TelemetryDataSender::TelemetryDataSender( ISender &mqttSender,
         ( mMQTTSender.getMaxSendSize() * mConfigCompressed.transmitThresholdStartPercent ) / 100;
 }
 
-bool
-TelemetryDataSender::isAlive()
-{
-    return mMQTTSender.isAlive();
-}
-
 void
-TelemetryDataSender::processData( const DataToSend &data, OnDataProcessedCallback callback )
+TelemetryDataSerializer::processData( const DataToSend &data, std::vector<TelemetryDataToPersist> &payloads )
 {
     // coverity[autosar_cpp14_a5_2_1_violation] Cast by design as we want the sender to know the concrete type.
     // coverity[autosar_cpp14_m5_2_3_violation] Cast by design as we want the sender to know the concrete type.
@@ -111,32 +67,6 @@ TelemetryDataSender::processData( const DataToSend &data, OnDataProcessedCallbac
         FWE_LOG_WARN( "Nothing to send as the input is not a valid TriggeredCollectionSchemeData" );
         return;
     }
-
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-    auto result = Store::StreamManager::ReturnCode::STREAM_NOT_FOUND;
-    if ( mStreamManager != nullptr )
-    {
-        result = mStreamManager->appendToStreams( *triggeredCollectionSchemeDataPtr );
-    }
-    if ( result == Store::StreamManager::ReturnCode::SUCCESS )
-    {
-        // Successfully appended
-        return;
-    }
-    else if ( result == Store::StreamManager::ReturnCode::EMPTY_DATA )
-    {
-        FWE_LOG_INFO( "The trigger for Campaign:  " + triggeredCollectionSchemeDataPtr->metadata.campaignArn +
-                      " activated eventID: " + std::to_string( triggeredCollectionSchemeDataPtr->eventID ) +
-                      " but no data is available to ingest" );
-        return;
-    }
-    else if ( result != Store::StreamManager::ReturnCode::STREAM_NOT_FOUND )
-    {
-        FWE_LOG_ERROR( "Failed to store FWE data with eventID " +
-                       std::to_string( triggeredCollectionSchemeDataPtr->eventID ) );
-        return;
-    }
-#endif
 
     std::string firstSignalValues = "[";
     uint32_t signalPrintCounter = 0;
@@ -232,23 +162,67 @@ TelemetryDataSender::processData( const DataToSend &data, OnDataProcessedCallbac
         FWE_LOG_INFO( message );
 
         setCollectionSchemeParameters( *triggeredCollectionSchemeDataPtr );
-        transformTelemetryDataToProto( *triggeredCollectionSchemeDataPtr, callback );
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        std::shared_ptr<const std::vector<Store::Partition>> partitions;
+        if ( mStreamManager != nullptr )
+        {
+            partitions = mStreamManager->getPartitions( triggeredCollectionSchemeDataPtr->metadata.campaignArn );
+        }
+
+        if ( ( partitions != nullptr ) && ( !partitions->empty() ) )
+        {
+            // each partition requires its own chunk
+            for ( const auto &partition : *partitions )
+            {
+                transformTelemetryDataToProto(
+                    *triggeredCollectionSchemeDataPtr, partition.id, payloads, [&]( SignalID signalID ) -> bool {
+                        return partition.signalIDs.find( signalID ) != partition.signalIDs.end();
+                    } );
+            }
+        }
+        else
+#endif
+        {
+            transformTelemetryDataToProto( *triggeredCollectionSchemeDataPtr
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                                           ,
+                                           boost::none
+#endif
+                                           ,
+                                           payloads,
+                                           [&]( SignalID signalID ) -> bool {
+                                               static_cast<void>( signalID );
+                                               return true;
+                                           } );
+        }
     }
 }
 
 void
-TelemetryDataSender::setCollectionSchemeParameters( const TriggeredCollectionSchemeData &triggeredCollectionSchemeData )
+TelemetryDataSerializer::setCollectionSchemeParameters(
+    const TriggeredCollectionSchemeData &triggeredCollectionSchemeData )
 {
     mCollectionSchemeParams.persist = triggeredCollectionSchemeData.metadata.persist;
     mCollectionSchemeParams.compression = triggeredCollectionSchemeData.metadata.compress;
     mCollectionSchemeParams.priority = triggeredCollectionSchemeData.metadata.priority;
     mCollectionSchemeParams.eventID = triggeredCollectionSchemeData.eventID;
     mCollectionSchemeParams.triggerTime = triggeredCollectionSchemeData.triggerTime;
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    mCollectionSchemeParams.campaignArn = triggeredCollectionSchemeData.metadata.campaignArn;
+#endif
 }
 
 void
-TelemetryDataSender::transformTelemetryDataToProto( const TriggeredCollectionSchemeData &triggeredCollectionSchemeData,
-                                                    OnDataProcessedCallback callback )
+TelemetryDataSerializer::transformTelemetryDataToProto(
+    const TriggeredCollectionSchemeData &triggeredCollectionSchemeData
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    ,
+    const boost::optional<PartitionID> &partitionId
+#endif
+    ,
+    std::vector<TelemetryDataToPersist> &payloads,
+    std::function<bool( SignalID signalID )> signalFilter )
 {
     // Clear old data and setup metadata
     mPartNumber = 0;
@@ -257,13 +231,22 @@ TelemetryDataSender::transformTelemetryDataToProto( const TriggeredCollectionSch
     // Iterate through all the signals and add to the protobuf
     for ( const auto &signal : triggeredCollectionSchemeData.signals )
     {
+        if ( signalFilter( signal.signalID )
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
-        // Filter out the raw data and internal signals
-        if ( ( signal.value.type != SignalType::COMPLEX_SIGNAL ) &&
-             ( ( signal.signalID & INTERNAL_SIGNAL_ID_BITMASK ) == 0 ) )
+             // Filter out the raw data and internal signals
+             && ( signal.value.type != SignalType::COMPLEX_SIGNAL ) &&
+             ( ( signal.signalID & INTERNAL_SIGNAL_ID_BITMASK ) == 0 )
 #endif
+        )
         {
-            appendMessageToProto( triggeredCollectionSchemeData, signal, callback );
+            appendMessageToProto( triggeredCollectionSchemeData
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                                  ,
+                                  partitionId
+#endif
+                                  ,
+                                  signal,
+                                  payloads );
         }
     }
 
@@ -276,37 +259,45 @@ TelemetryDataSender::transformTelemetryDataToProto( const TriggeredCollectionSch
         // Iterate through all the DTC codes and add to the protobuf
         for ( const auto &dtc : dtcCodes )
         {
-            appendMessageToProto( triggeredCollectionSchemeData, dtc, callback );
+            appendMessageToProto( triggeredCollectionSchemeData
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                                  ,
+                                  partitionId
+#endif
+                                  ,
+                                  dtc,
+                                  payloads );
         }
     }
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
     for ( const auto &object : triggeredCollectionSchemeData.uploadedS3Objects )
     {
-        appendMessageToProto( triggeredCollectionSchemeData, object, callback );
+        appendMessageToProto( triggeredCollectionSchemeData
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                              ,
+                              partitionId
+#endif
+                              ,
+                              object,
+                              payloads );
     }
 #endif
 
-    // Serialize and transmit any remaining messages
+    // Serialize any remaining messages
     if ( mProtoWriter->isVehicleDataAdded() )
     {
-        uploadProto( callback );
+        serializeData( payloads
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                       ,
+                       partitionId
+#endif
+        );
     }
 }
 
 bool
-TelemetryDataSender::serialize( std::string &output )
-{
-    if ( !mProtoWriter->serializeVehicleData( &output ) )
-    {
-        FWE_LOG_ERROR( "Serialization failed" );
-        return false;
-    }
-    return true;
-}
-
-bool
-TelemetryDataSender::compress( std::string &input, std::string &output ) const
+TelemetryDataSerializer::compress( std::string &input, std::string &output ) const
 {
     if ( mCollectionSchemeParams.compression )
     {
@@ -320,33 +311,21 @@ TelemetryDataSender::compress( std::string &input, std::string &output ) const
     return true;
 }
 
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-void
-TelemetryDataSender::processSerializedData( std::string &data, OnDataProcessedCallback callback )
-{
-    mMQTTSender.sendBuffer( mMQTTSender.getTopicConfig().telemetryDataTopic,
-                            reinterpret_cast<const uint8_t *>( data.data() ),
-                            data.size(),
-                            [callback, data]( ConnectivityError result ) {
-                                auto success = result == ConnectivityError::Success;
-                                if ( success )
-                                {
-                                    FWE_LOG_INFO( "A Payload of size: " + std::to_string( data.size() ) +
-                                                  " bytes has been uploaded" );
-                                    TraceModule::get().addToVariable( TraceVariable::DATA_FORWARD_BYTES, data.size() );
-                                    TraceModule::get().incrementVariable( TraceVariable::VEHICLE_DATA_PUBLISH_COUNT );
-                                }
-                                callback( success, nullptr );
-                            } );
-}
-#endif
-
 size_t
-TelemetryDataSender::uploadProto( OnDataProcessedCallback callback, unsigned recursionLevel )
+TelemetryDataSerializer::serializeData( std::vector<TelemetryDataToPersist> &payloads
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                                        ,
+                                        const boost::optional<PartitionID> &partitionId
+#endif
+                                        ,
+                                        unsigned recursionLevel )
 {
     auto protoOutput = std::make_shared<std::string>();
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    auto numberOfAppendedMessages = mProtoWriter->getNumberOfAppendedMessages();
+#endif
 
-    if ( !serialize( *protoOutput ) )
+    if ( !mProtoWriter->serializeVehicleData( protoOutput.get() ) )
     {
         FWE_LOG_ERROR( "Data cannot be uploaded due to serialization failure" );
         return 0;
@@ -354,13 +333,13 @@ TelemetryDataSender::uploadProto( OnDataProcessedCallback callback, unsigned rec
 
     if ( mCollectionSchemeParams.compression )
     {
-        auto compressedProtoOutput = std::make_shared<std::string>();
+        auto compressedProtoOutput = std::make_unique<std::string>();
         if ( !compress( *protoOutput, *compressedProtoOutput ) )
         {
             FWE_LOG_ERROR( "Data cannot be uploaded due to compression failure" );
             return 0;
         }
-        protoOutput = compressedProtoOutput;
+        protoOutput = std::move( compressedProtoOutput );
     }
 
     auto maxSendSize = mMQTTSender.getMaxSendSize();
@@ -393,50 +372,170 @@ TelemetryDataSender::uploadProto( OnDataProcessedCallback callback, unsigned rec
             " data. Attempting to split in half and try again. Recursion level: " + std::to_string( recursionLevel ) );
         Schemas::VehicleDataMsg::VehicleData data;
         mProtoWriter->splitVehicleData( data );
-        uploadProto( callback, recursionLevel + 1 );
+        serializeData( payloads
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                       ,
+                       partitionId
+#endif
+                       ,
+                       recursionLevel + 1 );
         mProtoWriter->mergeVehicleData( data );
-        uploadProto( callback, recursionLevel + 1 );
+        serializeData( payloads
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                       ,
+                       partitionId
+#endif
+                       ,
+                       recursionLevel + 1 );
         return protoOutput->size();
     }
 
-    mPartNumber++;
-    mMQTTSender.sendBuffer(
-        mMQTTSender.getTopicConfig().telemetryDataTopic,
-        reinterpret_cast<const uint8_t *>( protoOutput->data() ),
-        protoOutput->size(),
-        [callback,
-         collectionSchemeParams = mCollectionSchemeParams,
-         partNumber = mPartNumber,
-         protoOutput,
-         vehicleDataEstimatedSize = mProtoWriter->getVehicleDataEstimatedSize(),
-         threshold = config.transmitSizeThreshold]( ConnectivityError result ) {
-            if ( result == ConnectivityError::Success )
-            {
-                FWE_LOG_INFO( "Payload has been uploaded, size: " + std::to_string( protoOutput->size() ) +
-                              " bytes, part number: " + std::to_string( partNumber ) +
-                              ", compressed: " + std::to_string( collectionSchemeParams.compression ) +
-                              ", vehicle data estimated size: " + std::to_string( vehicleDataEstimatedSize ) +
-                              ", transmit size threshold: " + std::to_string( threshold ) );
-                TraceModule::get().addToVariable( TraceVariable::DATA_FORWARD_BYTES, protoOutput->size() );
-                TraceModule::get().incrementVariable( TraceVariable::VEHICLE_DATA_PUBLISH_COUNT );
-                callback( true, nullptr );
-            }
-            else
-            {
-                std::shared_ptr<const TelemetryDataToPersist> dataToPersist;
-                if ( collectionSchemeParams.persist )
-                {
-                    dataToPersist =
-                        std::make_shared<TelemetryDataToPersist>( collectionSchemeParams, partNumber, protoOutput );
-                }
-                callback( false, dataToPersist );
-            }
-        } );
+    payloads.emplace_back( mCollectionSchemeParams,
+                           mPartNumber,
+                           protoOutput
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                           ,
+                           partitionId,
+                           numberOfAppendedMessages
+#endif
+    );
 
-    TraceModule::get().sectionEnd( TraceSection::COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA );
-    TraceModule::get().incrementVariable( TraceVariable::MQTT_SIGNAL_MESSAGES_SENT_OUT );
+    auto payloadSizeLimitMin = ( maxSendSize * config.payloadSizeLimitMinPercent ) / 100;
+    if ( ( recursionLevel == 0 ) && ( !protoOutput->empty() ) && ( protoOutput->size() < payloadSizeLimitMin ) )
+    {
+        config.transmitSizeThreshold =
+            ( config.transmitSizeThreshold * ( 100 + config.transmitThresholdAdaptPercent ) ) / 100;
+        FWE_LOG_TRACE( "Payload size " + std::to_string( protoOutput->size() ) + " below minimum limit " +
+                       std::to_string( payloadSizeLimitMin ) + ". Increasing " +
+                       ( mCollectionSchemeParams.compression ? "compressed" : "uncompressed" ) +
+                       " transmit threshold by " + std::to_string( config.transmitThresholdAdaptPercent ) + "% to " +
+                       std::to_string( config.transmitSizeThreshold ) );
+    }
+
+    mPartNumber++;
+    FWE_LOG_INFO( "Payload has been created, size: " + std::to_string( protoOutput->size() ) +
+                  " bytes, part number: " + std::to_string( mPartNumber ) +
+                  ", compressed: " + std::to_string( mCollectionSchemeParams.compression ) +
+                  ", vehicle data estimated size: " + std::to_string( mProtoWriter->getVehicleDataEstimatedSize() ) +
+                  ", transmit size threshold: " + std::to_string( config.transmitSizeThreshold ) );
 
     return protoOutput->size();
+}
+
+TelemetryDataSender::TelemetryDataSender( ISender &mqttSender,
+                                          std::unique_ptr<DataSenderProtoWriter> protoWriter,
+                                          PayloadAdaptionConfig configUncompressed,
+                                          PayloadAdaptionConfig configCompressed
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                                          ,
+                                          Aws::IoTFleetWise::Store::StreamManager *streamManager
+#endif
+                                          )
+    : mMQTTSender( mqttSender )
+    , mSerializer( mqttSender,
+                   std::move( protoWriter ),
+                   configUncompressed,
+                   configCompressed
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                   ,
+                   streamManager
+#endif
+                   )
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    , mStreamManager( streamManager )
+#endif
+{
+}
+
+bool
+TelemetryDataSender::isAlive()
+{
+    return mMQTTSender.isAlive();
+}
+
+void
+TelemetryDataSender::processData( const DataToSend &data, OnDataProcessedCallback callback )
+{
+    // coverity[autosar_cpp14_a5_2_1_violation] Cast by design as we want the sender to know the concrete type.
+    // coverity[autosar_cpp14_m5_2_3_violation] Cast by design as we want the sender to know the concrete type.
+    // coverity[misra_cpp_2008_rule_5_2_3_violation] Cast by design as we want the sender to know the concrete type.
+    auto triggeredCollectionSchemeDataPtr = dynamic_cast<const TriggeredCollectionSchemeData *>( &data );
+    if ( triggeredCollectionSchemeDataPtr == nullptr )
+    {
+        FWE_LOG_WARN( "Nothing to send as the input is not a valid TriggeredCollectionSchemeData" );
+        return;
+    }
+
+    std::vector<TelemetryDataToPersist> payloads;
+    mSerializer.processData( data, payloads );
+    uploadProto( std::move( callback ), payloads );
+}
+
+void
+TelemetryDataSender::uploadProto( OnDataProcessedCallback callback,
+                                  const std::vector<TelemetryDataToPersist> &payloads )
+{
+    for ( const auto &payload : payloads )
+    {
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        if ( payload.getPartitionId().has_value() && ( mStreamManager != nullptr ) )
+        {
+            mStreamManager->appendToStreams( payload );
+        }
+        else
+#endif
+        {
+            std::shared_ptr<std::string> serializedData;
+            try
+            {
+                serializedData = boost::get<std::shared_ptr<std::string>>( payload.getData() );
+            }
+            catch ( boost::bad_get & )
+            {
+                FWE_LOG_ERROR( "Payload is not a string" );
+                return;
+            }
+
+            mMQTTSender.sendBuffer(
+                mMQTTSender.getTopicConfig().telemetryDataTopic,
+                reinterpret_cast<const uint8_t *>( serializedData->data() ),
+                serializedData->size(),
+                [callback,
+                 collectionSchemeParams = payload.getCollectionSchemeParams(),
+                 partNumber = payload.getPartNumber(),
+                 serializedData]( ConnectivityError result ) {
+                    if ( result == ConnectivityError::Success )
+                    {
+                        FWE_LOG_INFO( "Payload has been uploaded, size: " + std::to_string( serializedData->size() ) +
+                                      " bytes, compressed: " + std::to_string( collectionSchemeParams.compression ) );
+
+                        TraceModule::get().addToVariable( TraceVariable::DATA_FORWARD_BYTES, serializedData->size() );
+                        TraceModule::get().incrementVariable( TraceVariable::VEHICLE_DATA_PUBLISH_COUNT );
+                        callback( true, nullptr );
+                    }
+                    else
+                    {
+                        std::shared_ptr<const TelemetryDataToPersist> dataToPersist;
+                        if ( collectionSchemeParams.persist )
+                        {
+                            dataToPersist = std::make_shared<TelemetryDataToPersist>( collectionSchemeParams,
+                                                                                      partNumber,
+                                                                                      serializedData
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                                                                                      ,
+                                                                                      boost::none,
+                                                                                      0
+#endif
+                            );
+                        }
+                        callback( false, dataToPersist );
+                    }
+                } );
+
+            TraceModule::get().sectionEnd( TraceSection::COLLECTION_SCHEME_CHANGE_TO_FIRST_DATA );
+            TraceModule::get().incrementVariable( TraceVariable::MQTT_SIGNAL_MESSAGES_SENT_OUT );
+        }
+    }
 }
 
 void
@@ -453,17 +552,20 @@ TelemetryDataSender::processPersistedData( const uint8_t *buf,
         return;
     }
 
-    mMQTTSender.sendBuffer(
-        mMQTTSender.getTopicConfig().telemetryDataTopic, buf, size, [callback, size]( ConnectivityError result ) {
-            if ( result != ConnectivityError::Success )
-            {
-                callback( false );
-                return;
-            }
+    mMQTTSender.sendBuffer( mMQTTSender.getTopicConfig().telemetryDataTopic,
+                            buf,
+                            size,
+                            [callback = std::move( callback ), size]( ConnectivityError result ) {
+                                if ( result != ConnectivityError::Success )
+                                {
+                                    callback( false );
+                                    return;
+                                }
 
-            FWE_LOG_INFO( "A Payload of size: " + std::to_string( size ) + " bytes has been uploaded" );
-            callback( true );
-        } );
+                                FWE_LOG_INFO( "A Payload of size: " + std::to_string( size ) +
+                                              " bytes has been uploaded" );
+                                callback( true );
+                            } );
 }
 
 } // namespace IoTFleetWise

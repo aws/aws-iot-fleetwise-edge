@@ -622,7 +622,7 @@ class TestStoreAndForwardLoad:
             with attempt:
                 assert self.context.receive_data_bytes >= size
 
-    def test_store_and_forward_load_test(self):
+    def test_store_and_forward_load_test(self, tmp_path: Path):
         campaign_name = "load_test"
         campaign_sync_id = campaign_name + "#8713432"
         partition_storage_location = "abc"
@@ -702,28 +702,37 @@ class TestStoreAndForwardLoad:
 
         self._send_collection_schemes([collect_scheme])
 
-        collect_start_time = time.time()
-        self.context.set_can_signal(collect_signal, 1)
-        # Collect Data until the store is full
-        self._wait_for_partitions_to_have_size(
-            campaign_name=campaign_name,
-            partition_locations=[partition_storage_location],
-            size=500000,
-        )
-        self.context.set_can_signal(collect_signal, 0)
-        collect_end_time = time.time()
+        with attach_perf(
+            self.context.subprocess_helper,
+            pid=self.context.fwe_process.pid,
+            output_svg_file=tmp_path / "perf_fwe.svg",
+        ):
+            self.context.start_cpu_measurement()
 
-        # Forward all data
-        forward_start_time = time.time()
-        self.context.set_can_signal(forward_signal, 1)
-        self._wait_for_all_data_received(size=500000)
-        self.context.set_can_signal(forward_signal, 0)
-        forward_end_time = time.time()
+            collect_start_time = time.time()
+            self.context.set_can_signal(collect_signal, 1)
+            # Collect Data until the store is full
+            self._wait_for_partitions_to_have_size(
+                campaign_name=campaign_name,
+                partition_locations=[partition_storage_location],
+                size=500000,
+            )
+            self.context.set_can_signal(collect_signal, 0)
+            collect_end_time = time.time()
+
+            # Forward all data
+            forward_start_time = time.time()
+            self.context.set_can_signal(forward_signal, 1)
+            self._wait_for_all_data_received(size=500000)
+            self.context.set_can_signal(forward_signal, 0)
+            forward_end_time = time.time()
+
+            self.context.stop_cpu_measurement()
 
         print(f"Storing took {collect_end_time - collect_start_time:.4f} seconds")
         print(f"Forwarding took {forward_end_time - forward_start_time:.4f} seconds")
 
-    def test_store_and_forward_multiple_partitions_load_test(self):
+    def test_store_and_forward_multiple_partitions_load_test(self, tmp_path: Path):
         campaign_name = "load_test_multiple_partitions"
         campaign_sync_id = campaign_name + "#8713432"
         partition_storage_location = "abc_"
@@ -803,31 +812,40 @@ class TestStoreAndForwardLoad:
 
         self._send_collection_schemes([collect_scheme])
 
-        collect_start_time = time.time()
-        self.context.set_can_signal(collect_signal, 1)
-        # Collect Data until the store is full
-        for i in range(5):
-            self._wait_for_partitions_to_have_size(
-                campaign_name=campaign_name,
-                partition_locations=[partition_storage_location + str(i)],
-                size=100000,
-            )
+        with attach_perf(
+            self.context.subprocess_helper,
+            pid=self.context.fwe_process.pid,
+            output_svg_file=tmp_path / "perf_fwe.svg",
+        ):
+            self.context.start_cpu_measurement()
 
-        self.context.set_can_signal(collect_signal, 0)
-        collect_end_time = time.time()
+            collect_start_time = time.time()
+            self.context.set_can_signal(collect_signal, 1)
+            # Collect Data until the store is full
+            for i in range(5):
+                self._wait_for_partitions_to_have_size(
+                    campaign_name=campaign_name,
+                    partition_locations=[partition_storage_location + str(i)],
+                    size=100000,
+                )
 
-        # Forward all data
-        forward_start_time = time.time()
-        self.context.set_can_signal(forward_signal, 1)
-        # 100000 bytes per partition, 5 partitions: 500,000 bytes should be received
-        self._wait_for_all_data_received(size=500000)
-        self.context.set_can_signal(forward_signal, 0)
-        forward_end_time = time.time()
+            self.context.set_can_signal(collect_signal, 0)
+            collect_end_time = time.time()
+
+            # Forward all data
+            forward_start_time = time.time()
+            self.context.set_can_signal(forward_signal, 1)
+            # 100000 bytes per partition, 5 partitions: 500,000 bytes should be received
+            self._wait_for_all_data_received(size=500000)
+            self.context.set_can_signal(forward_signal, 0)
+            forward_end_time = time.time()
+
+            self.context.stop_cpu_measurement()
 
         print(f"Storing took {collect_end_time - collect_start_time:.4f} seconds")
         print(f"Forwarding took {forward_end_time - forward_start_time:.4f} seconds")
 
-    def test_store_and_forward_multiple_campaigns_load_test(self):
+    def test_store_and_forward_multiple_campaigns_load_test(self, tmp_path: Path):
         collect_signal = "Electric_Park_Brake_Switch"
         forward_signal = "Main_Light_Switch"
 
@@ -913,26 +931,35 @@ class TestStoreAndForwardLoad:
 
         self._send_collection_schemes(collection_schemes)
 
-        collect_start_time = time.time()
-        self.context.set_can_signal(collect_signal, 1)
-        # Collect Data until the store is full
-        for i in range(20):
-            campaign_name = campaign_name_format + str(i)
-            self._wait_for_partitions_to_have_size(
-                campaign_name=campaign_name,
-                partition_locations=[partition_storage_location],
-                size=300000,
-            )
-        self.context.set_can_signal(collect_signal, 0)
-        collect_end_time = time.time()
+        with attach_perf(
+            self.context.subprocess_helper,
+            pid=self.context.fwe_process.pid,
+            output_svg_file=tmp_path / "perf_fwe.svg",
+        ):
+            self.context.start_cpu_measurement()
 
-        # Forward all data
-        forward_start_time = time.time()
-        self.context.set_can_signal(forward_signal, 1)
-        # 300000 bytes per campaign, 20 campaigns: 6,000,000 bytes should be received
-        self._wait_for_all_data_received(size=6000000)
-        self.context.set_can_signal(forward_signal, 0)
-        forward_end_time = time.time()
+            collect_start_time = time.time()
+            self.context.set_can_signal(collect_signal, 1)
+            # Collect Data until the store is full
+            for i in range(20):
+                campaign_name = campaign_name_format + str(i)
+                self._wait_for_partitions_to_have_size(
+                    campaign_name=campaign_name,
+                    partition_locations=[partition_storage_location],
+                    size=300000,
+                )
+            self.context.set_can_signal(collect_signal, 0)
+            collect_end_time = time.time()
+
+            # Forward all data
+            forward_start_time = time.time()
+            self.context.set_can_signal(forward_signal, 1)
+            # 300000 bytes per campaign, 20 campaigns: 6,000,000 bytes should be received
+            self._wait_for_all_data_received(size=6000000)
+            self.context.set_can_signal(forward_signal, 0)
+            forward_end_time = time.time()
+
+            self.context.stop_cpu_measurement()
 
         print(f"Storing took {collect_end_time - collect_start_time:.4f} seconds")
         print(f"Forwarding took {forward_end_time - forward_start_time:.4f} seconds")
@@ -1041,47 +1068,52 @@ class TestLoadSomeip:
                     )
             self.collection_schemes.append(condition_scheme)
 
-    def test_load_test_someip(self, someipigen):
+    def test_load_test_someip(self, someipigen, tmp_path: Path):
         self.context.start_fwe()
         self.context.send_decoder_manifest()
         self.create_campaign(self.random)
         self.context.send_collection_schemes(self.collection_schemes)
 
-        self.context.start_cpu_measurement()
-        for i in range(0, 6000):
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.X", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.A", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.B", bool(i % 2))
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.D", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.E", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.F", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.G", bool(i % 2))
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.H", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.I", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.J", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.K", bool(i % 2))
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.L", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.M", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.N", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.O", bool(i % 2))
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.P", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.Q", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A", bool(i % 2))
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.B", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.C", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.D", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.E", bool(i % 2))
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.F", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.G", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.H", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.I", bool(i % 2))
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.J", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.K", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.L", i)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.S", str(i) * 10)
-            someipigen.set_value("Vehicle.ExampleSomeipInterface.Temperature", i)
-            time.sleep(0.01)
-        self.context.stop_cpu_measurement()
+        with attach_perf(
+            self.context.subprocess_helper,
+            pid=self.context.fwe_process.pid,
+            output_svg_file=tmp_path / "perf_fwe.svg",
+        ):
+            self.context.start_cpu_measurement()
+            for i in range(0, 6000):
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.X", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.A", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.B", bool(i % 2))
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.D", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.E", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.F", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.G", bool(i % 2))
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.H", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.I", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.J", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.K", bool(i % 2))
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.L", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.M", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.N", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.O", bool(i % 2))
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.P", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A2.Q", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.A", bool(i % 2))
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.B", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.C", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.D", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.E", bool(i % 2))
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.F", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.G", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.H", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.I", bool(i % 2))
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.J", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.K", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.L", i)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.A1.S", str(i) * 10)
+                someipigen.set_value("Vehicle.ExampleSomeipInterface.Temperature", i)
+                time.sleep(0.01)
+            self.context.stop_cpu_measurement()
 
         counter_per_collection_scheme = {}
         for r in self.context.received_data:

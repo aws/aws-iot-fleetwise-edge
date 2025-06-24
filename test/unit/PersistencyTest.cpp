@@ -7,7 +7,6 @@
 #include "aws/iotfleetwise/CANInterfaceIDTranslator.h"
 #include "aws/iotfleetwise/CacheAndPersist.h"
 #include "aws/iotfleetwise/CheckinSender.h"
-#include "aws/iotfleetwise/ICollectionSchemeList.h"
 #include <boost/filesystem.hpp>
 #include <cstdlib>
 #include <fstream> // IWYU pragma: keep
@@ -170,17 +169,17 @@ TEST( PersistencyTest, StoreAndRetrieve )
     CollectionSchemeManagerWrapper testCollectionSchemeManager(
         testPersistency, canIDTranslator, std::make_shared<CheckinSender>( nullptr ) );
     std::vector<std::shared_ptr<ICollectionScheme>> emptyCP;
-    ICollectionSchemeListPtr storePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
+    auto storePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
     storePL->copyData( reinterpret_cast<const uint8_t *>( dataPL.c_str() ), sizePL );
-    IDecoderManifestPtr storeDM = std::make_shared<IDecoderManifestTest>( "DM" );
+    auto storeDM = std::make_shared<IDecoderManifestTest>( "DM" );
     storeDM->copyData( reinterpret_cast<const uint8_t *>( dataDM.c_str() ), sizeDM );
     testCollectionSchemeManager.setCollectionSchemeList( storePL );
     testCollectionSchemeManager.setDecoderManifest( storeDM );
     testCollectionSchemeManager.store( DataType::COLLECTION_SCHEME_LIST );
     testCollectionSchemeManager.store( DataType::DECODER_MANIFEST );
 
-    ICollectionSchemeListPtr retrievePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
-    IDecoderManifestPtr retrieveDM = std::make_shared<IDecoderManifestTest>( "DM" );
+    auto retrievePL = std::make_shared<ICollectionSchemeListTest>( emptyCP );
+    auto retrieveDM = std::make_shared<IDecoderManifestTest>( "DM" );
     testCollectionSchemeManager.setCollectionSchemeList( retrievePL );
     testCollectionSchemeManager.setDecoderManifest( retrieveDM );
     testCollectionSchemeManager.retrieve( DataType::COLLECTION_SCHEME_LIST );

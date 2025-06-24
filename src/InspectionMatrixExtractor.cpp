@@ -55,7 +55,7 @@ CollectionSchemeManager::updateRawDataBufferConfigStringSignals(
                 signalConfig.interfaceId = customSignalDecoderFormat.mInterfaceId;
                 signalConfig.messageId = customSignalDecoderFormat.mDecoder;
 
-                updatedSignals[signalId] = signalConfig;
+                updatedSignals[signalId] = std::move( signalConfig );
             }
         }
     }
@@ -144,7 +144,7 @@ CollectionSchemeManager::updateRawDataBufferConfigComplexSignals(
                         }
                     }
                 }
-                updatedSignals[signalId] = signalConfig;
+                updatedSignals[signalId] = std::move( signalConfig );
             }
         }
     }
@@ -499,13 +499,13 @@ CollectionSchemeManager::extractCondition( InspectionMatrix &inspectionMatrix,
 void
 CollectionSchemeManager::inspectionMatrixUpdater( std::shared_ptr<const InspectionMatrix> inspectionMatrix )
 {
-    mInspectionMatrixChangeListeners.notify( inspectionMatrix );
+    mInspectionMatrixChangeListeners.notify( std::move( inspectionMatrix ) );
 }
 
 void
 CollectionSchemeManager::fetchMatrixUpdater( std::shared_ptr<const FetchMatrix> fetchMatrix )
 {
-    mFetchMatrixChangeListeners.notify( fetchMatrix );
+    mFetchMatrixChangeListeners.notify( std::move( fetchMatrix ) );
 }
 
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
@@ -539,7 +539,7 @@ CollectionSchemeManager::lastKnownStateExtractor()
 void
 CollectionSchemeManager::lastKnownStateUpdater( std::shared_ptr<StateTemplateList> stateTemplates )
 {
-    mStateTemplatesChangeListeners.notify( stateTemplates );
+    mStateTemplatesChangeListeners.notify( std::move( stateTemplates ) );
 }
 #endif
 

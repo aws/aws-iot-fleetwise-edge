@@ -10,6 +10,7 @@
 #include <string>
 #include <sys/resource.h>
 #include <unistd.h>
+#include <utility>
 
 namespace Aws
 {
@@ -156,7 +157,7 @@ CPUUsageInfo::reportPerThreadUsageData( CPUUsageInfo::ThreadCPUUsageInfos &threa
                     {
                         threadCPUUsageInfos.emplace_back(
                             CPUUsageInfo::ThreadCPUUsageInfo{ tid,
-                                                              comm,
+                                                              std::move( comm ),
                                                               static_cast<double>( uTime ) * clockTickFrequency,
                                                               static_cast<double>( sTime ) * clockTickFrequency } );
                     }

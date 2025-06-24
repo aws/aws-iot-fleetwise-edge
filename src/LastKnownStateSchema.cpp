@@ -4,6 +4,7 @@
 #include "aws/iotfleetwise/LastKnownStateSchema.h"
 #include "aws/iotfleetwise/LoggingModule.h"
 #include "aws/iotfleetwise/TraceModule.h"
+#include <memory>
 
 namespace Aws
 {
@@ -20,7 +21,7 @@ LastKnownStateSchema::LastKnownStateSchema( IReceiver &receiverLastKnownState )
 void
 LastKnownStateSchema::onLastKnownStateReceived( const ReceivedConnectivityMessage &receivedMessage )
 {
-    auto lastKnownStateIngestion = std::make_shared<LastKnownStateIngestion>();
+    auto lastKnownStateIngestion = std::make_unique<LastKnownStateIngestion>();
 
     if ( !lastKnownStateIngestion->copyData( receivedMessage.buf, receivedMessage.size ) )
     {
@@ -28,7 +29,8 @@ LastKnownStateSchema::onLastKnownStateReceived( const ReceivedConnectivityMessag
         return;
     }
 
-    mLastKnownStateListeners.notify( lastKnownStateIngestion );
+    // coverity[autosar_cpp14_a20_8_6_violation] can't use make_shared as unique_ptr is moved
+    mLastKnownStateListeners.notify( std::shared_ptr<LastKnownStateIngestion>( std::move( lastKnownStateIngestion ) ) );
     FWE_LOG_TRACE( "Received state templates" );
     TraceModule::get().incrementVariable( TraceVariable::STATE_TEMPLATES_RECEIVED );
 }

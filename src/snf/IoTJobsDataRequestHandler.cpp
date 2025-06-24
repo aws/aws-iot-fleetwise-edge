@@ -482,7 +482,7 @@ IoTJobsDataRequestHandler::onIotJobDocumentAccepted( const uint8_t *buf, size_t 
                 mStreamForwarder.beginJobForward( campaignArn, endTime );
                 std::lock_guard<std::mutex> lock( mCampaignMutex );
                 mJobToStatus[jobId] = jobStatus::IN_PROGRESS;
-                mJobToCampaignId[jobId] = campaignArn;
+                mJobToCampaignId[jobId] = std::move( campaignArn );
             }
         }
         else
@@ -502,7 +502,7 @@ IoTJobsDataRequestHandler::onIotJobDocumentAccepted( const uint8_t *buf, size_t 
                 mStreamForwarder.beginJobForward( campaignArn, endTime );
                 std::lock_guard<std::mutex> lock( mCampaignMutex );
                 mJobToStatus[jobId] = jobStatus::IN_PROGRESS;
-                mJobToCampaignId[jobId] = campaignArn;
+                mJobToCampaignId[jobId] = std::move( campaignArn );
             }
 
             const std::string data = Json::writeString( builder, updateJobExecution );
@@ -724,6 +724,7 @@ IoTJobsDataRequestHandler::onCanceledJobReceived( const uint8_t *buf, size_t siz
 
         if ( mJobToStatus.find( jobId ) == mJobToStatus.end() )
         {
+            // coverity[LOCK:FALSE] unique_lock's destructor won't try to unlock again
             lock.unlock();
             FWE_LOG_ERROR( "The jobId of the received canceled job is not running on this device" )
             return;
@@ -731,14 +732,16 @@ IoTJobsDataRequestHandler::onCanceledJobReceived( const uint8_t *buf, size_t siz
 
         if ( mJobToCampaignId.find( jobId ) == mJobToCampaignId.end() )
         {
+            // coverity[LOCK:FALSE] unique_lock's destructor won't try to unlock again
             lock.unlock();
             FWE_LOG_ERROR( "The jobId of the received canceled job is not running on this device" )
             return;
         }
 
         // Stop uploading data
-        auto campaignId = mJobToCampaignId[jobId];
+        const auto &campaignId = mJobToCampaignId[jobId];
 
+        // coverity[LOCK:FALSE] unique_lock's destructor won't try to unlock again
         lock.unlock();
 
         auto pIDs = mStreamManager.getPartitionIdsFromCampaign( campaignId );
@@ -752,6 +755,7 @@ IoTJobsDataRequestHandler::onCanceledJobReceived( const uint8_t *buf, size_t siz
         mJobToStatus.erase( jobId );
         // we don't want to erase the jobId to CampaignId until after we cancelForward
         mJobToCampaignId.erase( jobId );
+        // coverity[LOCK:FALSE] unique_lock's destructor won't try to unlock again
         lock.unlock();
 
         // we cannot update the job status to "CANCELED" since this will return an InvalidStateTransition code
@@ -865,7 +869,7 @@ IoTJobsDataRequestHandler::convertEndTimeToMS( const std::string &iso8601 )
 
     if ( ss.fail() )
     {
-        FWE_LOG_WARN( "Malformed IoT Job endTime: " + iso8601 + ". Not setting endTime" );
+        FWE_LOG_ERROR( "Malformed IoT Job endTime: " + iso8601 + ". The endTime will be set to 0 (default)" );
         return 0;
     }
 

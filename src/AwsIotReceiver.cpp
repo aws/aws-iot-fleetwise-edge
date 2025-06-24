@@ -11,6 +11,7 @@
 #include <aws/crt/mqtt/Mqtt5Packets.h>
 #include <aws/crt/mqtt/Mqtt5Types.h>
 #include <future>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -104,13 +105,16 @@ AwsIotReceiver::subscribe()
     FWE_LOG_TRACE( "Subscribing to topic " + mTopicName );
     // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
     Aws::Crt::Mqtt5::Subscription sub1( mTopicName.c_str(), Aws::Crt::Mqtt5::QOS::AWS_MQTT5_QOS_AT_LEAST_ONCE );
-    auto subPacket = std::make_shared<Aws::Crt::Mqtt5::SubscribePacket>();
-    subPacket->WithSubscription( std::move( sub1 ) );
-
-    if ( !mMqttClient.Subscribe( subPacket, onSubAck ) )
     {
-        FWE_LOG_ERROR( "Subscribe failed for topic " + mTopicName );
-        return ConnectivityError::NoConnection;
+        auto subPacket = std::make_unique<Aws::Crt::Mqtt5::SubscribePacket>();
+        subPacket->WithSubscription( std::move( sub1 ) );
+
+        // coverity[autosar_cpp14_a20_8_6_violation] can't use make_shared as unique_ptr is moved
+        if ( !mMqttClient.Subscribe( std::move( subPacket ), onSubAck ) )
+        {
+            FWE_LOG_ERROR( "Subscribe failed for topic " + mTopicName );
+            return ConnectivityError::NoConnection;
+        }
     }
 
     // Blocked call until subscribe finished this call should quickly either fail or succeed but
@@ -128,7 +132,7 @@ AwsIotReceiver::subscribe()
 void
 AwsIotReceiver::subscribeToDataReceived( OnDataReceivedCallback callback )
 {
-    mListeners.subscribe( callback );
+    mListeners.subscribe( std::move( callback ) );
 }
 
 void
@@ -136,10 +140,12 @@ AwsIotReceiver::onDataReceived( const Aws::Crt::Mqtt5::PublishReceivedEventData 
 {
     Timestamp currentTime = mClock->monotonicTimeSinceEpochMs();
     auto mqttTopic = std::string( eventData.publishPacket->getTopic().c_str() );
-    ReceivedConnectivityMessage receivedMessage{
-        eventData.publishPacket->getPayload().ptr, eventData.publishPacket->getPayload().len, currentTime, mqttTopic };
+    ReceivedConnectivityMessage receivedMessage{ eventData.publishPacket->getPayload().ptr,
+                                                 eventData.publishPacket->getPayload().len,
+                                                 currentTime,
+                                                 std::move( mqttTopic ) };
 
-    mListeners.notify( receivedMessage );
+    mListeners.notify( std::move( receivedMessage ) );
 }
 
 bool
@@ -157,7 +163,7 @@ AwsIotReceiver::unsubscribeAsync()
 
     // We can't move the promise into the lambda, because the lambda needs to be copyable. So we
     // don't have much choice but use a shared pointer.
-    auto unsubscribeFinishedPromise = std::make_shared<std::promise<bool>>();
+    auto unsubscribeFinishedPromise = std::make_unique<std::promise<bool>>();
     auto unsubscribeFuture = unsubscribeFinishedPromise->get_future();
 
     if ( !mSubscribed )
@@ -167,12 +173,15 @@ AwsIotReceiver::unsubscribeAsync()
     }
 
     FWE_LOG_TRACE( "Unsubscribing..." );
-    auto unsubPacket = std::make_shared<Aws::Crt::Mqtt5::UnsubscribePacket>();
+    auto unsubPacket = std::make_unique<Aws::Crt::Mqtt5::UnsubscribePacket>();
     // coverity[cert_str51_cpp_violation] - pointer comes from std::string, which can't be null
     unsubPacket->WithTopicFilter( mTopicName.c_str() );
     mMqttClient.Unsubscribe(
-        unsubPacket,
-        [this, unsubscribeFinishedPromise]( int errorCode, std::shared_ptr<UnSubAckPacket> unsubAckPacket ) {
+        // coverity[autosar_cpp14_a20_8_6_violation] can't use make_shared as unique_ptr is moved
+        std::move( unsubPacket ),
+        [this,
+         unsubscribeFinishedPromise = std::shared_ptr<std::promise<bool>>( std::move( unsubscribeFinishedPromise ) )](
+            int errorCode, std::shared_ptr<UnSubAckPacket> unsubAckPacket ) {
             if ( errorCode != 0 )
             {
                 auto errorString = Aws::Crt::ErrorDebugString( errorCode );

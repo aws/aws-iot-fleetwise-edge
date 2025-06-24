@@ -72,7 +72,6 @@ Parameters:
     AllowedValues: ["Trace", "Info", "Warning", "Error"]
 Conditions:
   KeyPairSpecifiedCondition: !Not [!Equals [!Ref Ec2KeyPair, ""]]
-  IsUsingGreengrassV2Connection: !Equals [!Ref MqttConnectionType, "iotGreengrassV2"]
 Resources:
   Ec2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -259,7 +258,7 @@ Resources:
                 version: "2.14.2"
                 configuration:
                   awsRegion: "${IoTCoreRegion}"
-                  iotRoleAlias: "${AWS::StackName}-GreengrassCoreTokenExchangeRoleAlias"
+                  iotRoleAlias: "${CredentialsProviderRoleAlias}"
                   iotDataEndpoint: "${IoTThing.iotEndpoint}"
                   iotCredEndpoint: "${IoTThing.credsEndpoint}"
             EOT
@@ -417,32 +416,6 @@ Resources:
       LaunchTemplate:
         LaunchTemplateId: !Ref Ec2LaunchTemplate
         Version: !GetAtt Ec2LaunchTemplate.LatestVersionNumber
-  GreengrassCoreTokenExchangeRole:
-    Condition: IsUsingGreengrassV2Connection
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - "credentials.iot.amazonaws.com"
-            Action:
-              - "sts:AssumeRole"
-      Policies:
-        - PolicyName: !Sub ${AWS::StackName}-GreengrassCoreTokenExchangeRolePolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - "logs:CreateLogGroup"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
-                  - "logs:DescribeLogStreams"
-                  - "s3:GetBucketLocation"
-                Resource: "*"
   IoTThing:
     Type: Custom::IoTThing
     Properties:
@@ -452,10 +425,6 @@ Resources:
       IoTCoreRegion: !Ref IoTCoreRegion
       MqttConnectionType: !Ref MqttConnectionType
       IoTCoreEndpointUrl: !Ref IoTCoreEndpointUrl
-      GreengrassCoreTokenExchangeRoleArn: !If
-        - IsUsingGreengrassV2Connection
-        - !Sub ${GreengrassCoreTokenExchangeRole.Arn}
-        - ""
   CreateThingFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -518,6 +487,12 @@ Resources:
                               }
                           ]
                       }
+                      if "${MqttConnectionType}" == "iotGreengrassV2":
+                          policyDocument["Statement"].append({
+                              "Effect": "Allow",
+                              "Action": ["greengrass:*"],
+                              "Resource": ["*"]
+                          })
 
                       if "${EnableROS2}" == "true":
                           policyDocument["Statement"][0]["Action"].append("iot:AssumeRoleWithCertificate")
@@ -527,42 +502,6 @@ Resources:
                           policyName=inputThingName+'-policy',
                           policyDocument=json.dumps(policyDocument)
                       )
-
-                      if "${MqttConnectionType}" == "iotGreengrassV2":
-                          response = client.create_role_alias(
-                              roleAlias=f"{inputThingName}-GreengrassCoreTokenExchangeRoleAlias",
-                              roleArn=event['ResourceProperties']['GreengrassCoreTokenExchangeRoleArn']
-                          )
-                          response = client.create_policy(
-                              policyName=f"{inputThingName}-GreengrassCoreTokenExchangeRoleAliasPolicy",
-                              policyDocument=json.dumps(
-                                  {
-                                      "Version": "2012-10-17",
-                                      "Statement": [
-                                          {
-                                              "Effect": "Allow",
-                                              "Action": "iot:AssumeRoleWithCertificate",
-                                              "Resource": f"arn:aws:iot:{iotCoreRegion}:${AWS::AccountId}:{inputThingName}-GreengrassCoreTokenExchangeRoleAlias"
-                                          }
-                                      ]
-                                  }
-                              )
-                          )
-                          response = client.create_policy(
-                              policyName=f"{inputThingName}-GreengrassCorePolicy",
-                              policyDocument=json.dumps(
-                                  {
-                                      "Version": "2012-10-17",
-                                      "Statement": [
-                                          {
-                                              "Effect": "Allow",
-                                              "Action": "greengrass:*",
-                                              "Resource": "*"
-                                          }
-                                      ]
-                                  }
-                              )
-                          )
 
                       for i in range(fleetSize):
                           thingName = inputThingName+("" if fleetSize==1 else "-"+str(i))
@@ -574,17 +513,6 @@ Resources:
                               policyName=inputThingName+'-policy',
                               target=certArn,
                           )
-
-                          if "${MqttConnectionType}" == "iotGreengrassV2":
-                              response = client.attach_policy(
-                                  policyName=f"{inputThingName}-GreengrassCoreTokenExchangeRoleAliasPolicy",
-                                  target=certArn,
-                              )
-                              response = client.attach_policy(
-                                  policyName=f"{inputThingName}-GreengrassCorePolicy",
-                                  target=certArn,
-                              )
-
                           response = client.attach_thing_principal(
                               thingName=thingName,
                               principal=certArn,
@@ -632,18 +560,6 @@ Resources:
                       )
 
                       if "${MqttConnectionType}" == "iotGreengrassV2":
-                          logger.info('Deleting role alias')
-                          response = client.delete_role_alias(
-                              roleAlias=f"{inputThingName}-GreengrassCoreTokenExchangeRoleAlias",
-                          )
-                          logger.info('Deleting GreengrassCoreTokenExchange policy')
-                          response = client.delete_policy(
-                              policyName=f"{inputThingName}-GreengrassCoreTokenExchangeRoleAliasPolicy",
-                          )
-                          logger.info('Deleting Greengrass policy')
-                          response = client.delete_policy(
-                              policyName=f"{inputThingName}-GreengrassCorePolicy",
-                          )
                           logger.info('Deleting Greengrass core device')
                           response = greengrass_v2_client.delete_core_device(
                               coreDeviceThingName=inputThingName
@@ -699,23 +615,12 @@ Resources:
                   - "iot:DeleteCertificate"
                   - "iot:DeletePolicy"
                   - "iot:DeleteThing"
-                  # For Greengrass
-                  - "iot:CreateRoleAlias"
-                  - "iot:DeleteRoleAlias"
-                  - "iam:PassRole"
                   - "greengrass:DeleteCoreDevice"
                 Resource:
                   - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:thing/${AWS::StackName}*
                   - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:cert/*
                   - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:policy/${AWS::StackName}-policy
-                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:policy/${AWS::StackName}-GreengrassCoreTokenExchangeRoleAliasPolicy
-                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:policy/${AWS::StackName}-GreengrassCorePolicy
-                  - !Sub arn:aws:iot:${IoTCoreRegion}:${AWS::AccountId}:rolealias/${AWS::StackName}-GreengrassCoreTokenExchangeRoleAlias
                   - !Sub arn:aws:greengrass:${IoTCoreRegion}:${AWS::AccountId}:coreDevices:${AWS::StackName}
-                  - !If
-                    - IsUsingGreengrassV2Connection
-                    - !Sub ${GreengrassCoreTokenExchangeRole.Arn}
-                    - !Ref AWS::NoValue
 Mappings:
   # Ubuntu 22.04 arm64 AMIs
   AMIRegionMap:

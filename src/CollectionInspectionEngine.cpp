@@ -19,7 +19,7 @@ namespace IoTFleetWise
 
 CollectionInspectionEngine::CollectionInspectionEngine( RawData::BufferManager *rawDataBufferManager,
                                                         uint32_t minFetchTriggerIntervalMs,
-                                                        const std::shared_ptr<FetchRequestQueue> fetchQueue,
+                                                        std::shared_ptr<FetchRequestQueue> fetchQueue,
                                                         bool sendDataOnlyOncePerCondition
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
                                                         ,
@@ -27,7 +27,7 @@ CollectionInspectionEngine::CollectionInspectionEngine( RawData::BufferManager *
 #endif
                                                         )
     : mMinFetchTriggerIntervalMs( minFetchTriggerIntervalMs )
-    , mFetchQueue( fetchQueue )
+    , mFetchQueue( std::move( fetchQueue ) )
     , mSendDataOnlyOncePerCondition( sendDataOnlyOncePerCondition )
     , mRawDataBufferManager( rawDataBufferManager )
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
@@ -101,8 +101,8 @@ CollectionInspectionEngine::onChangeInspectionMatrix( std::shared_ptr<const Insp
     // Clears everything in this class including all data in the signal history buffer
     clear();
 
-    mActiveInspectionMatrix = inspectionMatrix; // Pointers and references into this memory are maintained so hold
-                                                // a shared_ptr to it so it does not get deleted
+    mActiveInspectionMatrix = std::move( inspectionMatrix ); // Pointers and references into this memory are maintained
+                                                             // so hold a shared_ptr to it so it does not get deleted
 
     // Use default id for default fetches (normal collection)
     mFetchRequestToConditionIndexMap[DEFAULT_FETCH_REQUEST_ID] = DEFAULT_SIGNAL_BUFFER_CONDITION_ID;
@@ -1314,10 +1314,8 @@ CollectionInspectionEngine::eval( const ExpressionNode *expression,
 
     InspectionValue leftResult;
     InspectionValue rightResult;
-    ExpressionErrorCode leftRet = ExpressionErrorCode::SUCCESSFUL;
-    ExpressionErrorCode rightRet = ExpressionErrorCode::SUCCESSFUL;
     // Recursion limited depth through last parameter
-    leftRet = eval( expression->left, condition, leftResult, remainingStackDepth - 1, conditionId );
+    ExpressionErrorCode leftRet = eval( expression->left, condition, leftResult, remainingStackDepth - 1, conditionId );
 
     if ( leftRet != ExpressionErrorCode::SUCCESSFUL )
     {
@@ -1328,7 +1326,8 @@ CollectionInspectionEngine::eval( const ExpressionNode *expression,
     if ( expression->nodeType != ExpressionNodeType::OPERATOR_LOGICAL_NOT )
     {
         // No short-circuit evaluation so always evaluate right part
-        rightRet = eval( expression->right, condition, rightResult, remainingStackDepth - 1, conditionId );
+        ExpressionErrorCode rightRet =
+            eval( expression->right, condition, rightResult, remainingStackDepth - 1, conditionId );
 
         if ( rightRet != ExpressionErrorCode::SUCCESSFUL )
         {

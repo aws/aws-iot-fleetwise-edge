@@ -142,13 +142,12 @@ public:
         CollectionSchemeManager::mSchemaPersistency = collectionSchemePersistency;
     }
     void
-    setDecoderManifest( const IDecoderManifestPtr &dm )
+    setDecoderManifest( std::shared_ptr<IDecoderManifest> dm )
     {
-        // CollectionSchemeManager::mDecoderManifest = dm;
         mDecoderManifest = dm;
     }
     void
-    setCollectionSchemeList( const ICollectionSchemeListPtr &pl )
+    setCollectionSchemeList( std::shared_ptr<ICollectionSchemeList> pl )
     {
         mCollectionSchemeList = pl;
     }
@@ -321,7 +320,7 @@ public:
     }
 
 public:
-    IDecoderManifestPtr mDmTest;
+    std::shared_ptr<IDecoderManifest> mDmTest;
     std::shared_ptr<ICollectionSchemeListTest> mPlTest;
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
     std::shared_ptr<LastKnownStateIngestion> mLastKnownStateIngestionTest;

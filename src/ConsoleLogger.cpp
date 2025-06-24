@@ -49,10 +49,6 @@ forwardLog( LogLevel level,
             const std::string &function,
             const std::string &logEntry )
 {
-    if ( gLogForwarder == nullptr )
-    {
-        return;
-    }
     std::lock_guard<std::mutex> lock( gLogForwardingMutex );
     if ( gLogForwarder == nullptr )
     {
@@ -180,16 +176,12 @@ ILogger::levelToString( LogLevel level )
     {
     case LogLevel::Error:
         return error;
-        break;
     case LogLevel::Warning:
         return warn;
-        break;
     case LogLevel::Info:
         return info;
-        break;
     case LogLevel::Trace:
         return trace;
-        break;
     default:
         return none;
     }

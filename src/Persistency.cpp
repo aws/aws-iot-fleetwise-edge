@@ -23,8 +23,6 @@ namespace IoTFleetWise
 bool
 CollectionSchemeManager::retrieve( DataType retrieveType )
 {
-    size_t protoSize = 0;
-    ErrorCode ret = ErrorCode::SUCCESS;
     std::vector<uint8_t> protoOutput;
     std::string infoStr;
     std::string errStr;
@@ -55,14 +53,14 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
         return false;
     }
 
-    protoSize = mSchemaPersistency->getSize( retrieveType );
+    size_t protoSize = mSchemaPersistency->getSize( retrieveType );
     if ( protoSize <= 0 )
     {
         FWE_LOG_INFO( infoStr + "zero" );
         return false;
     }
     protoOutput.resize( protoSize );
-    ret = mSchemaPersistency->read( protoOutput.data(), protoSize, retrieveType );
+    ErrorCode ret = mSchemaPersistency->read( protoOutput.data(), protoSize, retrieveType );
     if ( ret != ErrorCode::SUCCESS )
     {
         auto error = mSchemaPersistency->getErrorString( ret );
@@ -112,7 +110,6 @@ CollectionSchemeManager::retrieve( DataType retrieveType )
 void
 CollectionSchemeManager::store( DataType storeType )
 {
-    ErrorCode ret = ErrorCode::SUCCESS;
     std::vector<uint8_t> protoInput;
     std::string logStr;
 
@@ -193,7 +190,8 @@ CollectionSchemeManager::store( DataType storeType )
         FWE_LOG_ERROR( logStr + " data size is zero" );
         return;
     }
-    ret = mSchemaPersistency->write( protoInput.data(), protoInput.size(), storeType );
+
+    ErrorCode ret = mSchemaPersistency->write( protoInput.data(), protoInput.size(), storeType );
     if ( ret != ErrorCode::SUCCESS )
     {
         logStr += " because of this error: ";

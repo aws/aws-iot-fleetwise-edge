@@ -5,8 +5,6 @@
 
 #include "aws/iotfleetwise/Clock.h"
 #include "aws/iotfleetwise/ClockHandler.h"
-#include "aws/iotfleetwise/CollectionSchemeIngestionList.h"
-#include "aws/iotfleetwise/DecoderManifestIngestion.h"
 #include "aws/iotfleetwise/ICollectionSchemeList.h"
 #include "aws/iotfleetwise/IDecoderManifest.h"
 #include "aws/iotfleetwise/IReceiver.h"
@@ -20,16 +18,13 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace Aws
 {
 namespace IoTFleetWise
 {
-
-/// Use shared pointers to the derived class
-using CollectionSchemeListPtr = std::shared_ptr<CollectionSchemeIngestionList>;
-using DecoderManifestPtr = std::shared_ptr<DecoderManifestIngestion>;
 
 /**
  * @brief This class handles the receipt of Decoder Manifests and CollectionScheme Lists from the Cloud.
@@ -44,7 +39,7 @@ public:
      * @param collectionSchemeList ICollectionSchemeList from CollectionScheme Ingestion
      */
     using OnCollectionSchemeUpdateCallback =
-        std::function<void( const ICollectionSchemeListPtr &collectionSchemeList )>;
+        std::function<void( std::shared_ptr<ICollectionSchemeList> collectionSchemeList )>;
 
     /**
      * @brief Callback function that Schema uses to notify CollectionSchemeManagement when a new Decoder
@@ -52,7 +47,7 @@ public:
      *
      * @param decoderManifest IDecoderManifest from CollectionScheme Ingestion
      */
-    using OnDecoderManifestUpdateCallback = std::function<void( const IDecoderManifestPtr &decoderManifest )>;
+    using OnDecoderManifestUpdateCallback = std::function<void( std::shared_ptr<IDecoderManifest> decoderManifest )>;
 
     /**
      * @brief Constructor for the Schema class that handles receiving CollectionSchemes and DecoderManifest protobuffers
@@ -74,13 +69,13 @@ public:
     void
     subscribeToCollectionSchemeUpdate( OnCollectionSchemeUpdateCallback callback )
     {
-        mCollectionSchemeListeners.subscribe( callback );
+        mCollectionSchemeListeners.subscribe( std::move( callback ) );
     }
 
     void
     subscribeToDecoderManifestUpdate( OnDecoderManifestUpdateCallback callback )
     {
-        mDecoderManifestListeners.subscribe( callback );
+        mDecoderManifestListeners.subscribe( std::move( callback ) );
     }
 
     /**

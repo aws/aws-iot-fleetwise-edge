@@ -125,7 +125,7 @@ SomeipCommandDispatcher::setActuatorValue( const std::string &actuatorName,
         commandId,
         issuedTimestampMs,
         executionTimeoutMs,
-        [commandId, notifyStatusCallback, actuatorName](
+        [commandId, notifyStatusCallback = std::move( notifyStatusCallback ), actuatorName](
             CommandStatus status, CommandReasonCode reasonCode, const CommandReasonDescription &reasonDescription ) {
             std::string msg = "Actuator " + actuatorName + " response with command ID: " + commandId +
                               ", status: " + commandStatusToString( status ) +

@@ -6,6 +6,7 @@
 #include "aws/iotfleetwise/AwsGreengrassV2Sender.h"
 #include "aws/iotfleetwise/LoggingModule.h"
 #include <future>
+#include <utility>
 
 namespace Aws
 {
@@ -70,7 +71,7 @@ AwsGreengrassV2ConnectivityModule::createReceiver( const std::string &topicName 
 void
 AwsGreengrassV2ConnectivityModule::subscribeToConnectionEstablished( OnConnectionEstablishedCallback callback )
 {
-    mConnectionEstablishedListeners.subscribe( callback );
+    mConnectionEstablishedListeners.subscribe( std::move( callback ) );
 }
 
 bool

@@ -28,24 +28,55 @@ runs:
         # prettier-ignore
         key: ${{ inputs.dist-name }}-${{ inputs.build-arch }}-${{ hashFiles('tools/install-deps-*.sh') }}
 
+    - name: restore-cache-deps
+      # Explicitly checking against true as the cache-hit output is a string value : "true", "false"
+      # or "". According to GitHub documentation : https://github.com/marketplace/actions/cache#outputs,
+      # it returns 'true' only on an exact primary key match, 'false' when using fallback restore-keys, and an
+      # empty string when no cache exists at all. In the current workflow configuration, cache-hit output would
+      # either return a "" when the cache is not available or a "true" if there is an exact key match.
+      if: steps.cache-deps.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        echo "Cache found! Restoring cached dependencies..."
+        IFS=":"
+        CACHE_PATHS=${{ inputs.cache-paths }}
+        for P in ${CACHE_PATHS}; do
+          sudo mkdir -p `dirname ${P}`
+          sudo cp -r cache${P} ${P}
+        done
+
     - name: install-deps
       shell: bash
       run: |
+        # Add --use-cache flag if cache hit
+        EXTRA_OPTIONS="${{ inputs.extra-options }}"
+        # Explicitly checking against true as the cache-hit output is a string value : "true", "false" or ""
+        if [[ "${{ steps.cache-deps.outputs.cache-hit }}" == 'true' ]]; then
+          echo "Using cached dependencies, adding --use-cache flag"
+          EXTRA_OPTIONS="${EXTRA_OPTIONS} --use-cache"
+        else
+          echo "No cache hit, installing dependencies from scratch"
+        fi
+
+        echo "Running installation with options: ${EXTRA_OPTIONS}"
+        sudo ./tools/install-deps-${{ inputs.build-arch }}.sh ${EXTRA_OPTIONS}
+
+    - name: create-cache
+      # Explicitly checking against "" as the cache-hit output is a string value : "true", "false"
+      # or "". According to GitHub documentation : https://github.com/marketplace/actions/cache#outputs,
+      # it returns 'true' only on an exact primary key match, 'false' when using fallback restore-keys, and an
+      # empty string when no cache exists at all. In the current workflow configuration, cache-hit output would
+      # either return a "" when the cache is not available or a "true" if there is an exact key match.
+      if: steps.cache-deps.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "Creating cache for future runs..."
         IFS=":"
         CACHE_PATHS=${{ inputs.cache-paths }}
-        if [ -d cache ]; then
-          for P in ${CACHE_PATHS}; do
-            sudo mkdir -p `dirname ${P}`
-            sudo cp -r cache${P} ${P}
-          done
-        fi
-        sudo ./tools/install-deps-${{ inputs.build-arch }}.sh ${{ inputs.extra-options }}
-        if [ ! -d cache ]; then
-          for P in ${CACHE_PATHS}; do
-            mkdir -p cache`dirname ${P}`
-            cp -r ${P} cache${P}
-          done
-        fi
+        for P in ${CACHE_PATHS}; do
+          sudo mkdir -p "$(dirname "cache${P}")"
+          sudo cp -r "${P}" "cache${P}"
+        done
 
     - name: build
       shell: bash

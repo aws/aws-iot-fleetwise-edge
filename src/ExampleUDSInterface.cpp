@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <atomic>
 #include <fstream> // IWYU pragma: keep
-#include <functional>
 #include <utility>
 
 namespace Aws
@@ -53,9 +52,9 @@ ExampleUDSInterface::readDTCInfo( int32_t targetAddress,
     std::vector<uint8_t> sendPDU = { 0x19, static_cast<uint8_t>( subfn ), static_cast<uint8_t>( mask ) };
     Aws::IoTFleetWise::UdsDtcRequest udsDTCrequest;
     udsDTCrequest.targetAddress = targetAddress;
-    udsDTCrequest.sendPDU = sendPDU;
+    udsDTCrequest.sendPDU = std::move( sendPDU );
     udsDTCrequest.token = token;
-    udsDTCrequest.callback = callback;
+    udsDTCrequest.callback = std::move( callback );
     addUdsDtcRequest( udsDTCrequest );
 }
 
@@ -77,9 +76,9 @@ ExampleUDSInterface::readDTCInfoByDTCAndRecordNumber( int32_t targetAddress,
 
     Aws::IoTFleetWise::UdsDtcRequest udsDTCrequest;
     udsDTCrequest.targetAddress = targetAddress;
-    udsDTCrequest.sendPDU = sendPDU;
+    udsDTCrequest.sendPDU = std::move( sendPDU );
     udsDTCrequest.token = token;
-    udsDTCrequest.callback = callback;
+    udsDTCrequest.callback = std::move( callback );
 
     addUdsDtcRequest( udsDTCrequest );
 }
@@ -188,7 +187,7 @@ ExampleUDSInterface::executeRequest( std::vector<uint8_t> &sendPDU, int32_t targ
                 // Only send back dtc info if data was received
                 if ( !dtcInfo.dtcBuffer.empty() )
                 {
-                    response.dtcInfo.push_back( dtcInfo );
+                    response.dtcInfo.push_back( std::move( dtcInfo ) );
                     response.result = 1;
                 }
             }
@@ -217,7 +216,7 @@ ExampleUDSInterface::executeRequest( std::vector<uint8_t> &sendPDU, int32_t targ
             return false;
         }
 
-        EcuConnectionInfo phyInfo{ ecu, std::move( receiver ), {} };
+        EcuConnectionInfo phyInfo{ std::move( ecu ), std::move( receiver ), {} };
 
         if ( !phyInfo.isotpSenderReceiver->sendPDU( sendPDU ) )
         {
@@ -243,12 +242,11 @@ ExampleUDSInterface::executeRequest( std::vector<uint8_t> &sendPDU, int32_t targ
         // Only send back dtc info if data was received
         if ( !dtcInfo.dtcBuffer.empty() )
         {
-            response.dtcInfo.push_back( dtcInfo );
+            response.dtcInfo.push_back( std::move( dtcInfo ) );
             response.result = 1;
         }
         return true;
     }
-    return false;
 }
 
 void
@@ -277,7 +275,7 @@ ExampleUDSInterface::doWork()
                 {
                     UdsDtcResponse responseToSend;
                     responseToSend.callback = query.callback;
-                    responseToSend.response = response;
+                    responseToSend.response = std::move( response );
                     // Unblock request queue for incoming requests from callbacks
                     mDtcResponseQueue.push( responseToSend );
                 }
@@ -287,7 +285,7 @@ ExampleUDSInterface::doWork()
 
         while ( ( !mDtcResponseQueue.empty() ) && ( !shouldStop() ) )
         {
-            auto query = mDtcResponseQueue.front();
+            const auto &query = mDtcResponseQueue.front();
             query.callback( query.response );
             mDtcResponseQueue.pop();
         }

@@ -235,7 +235,8 @@ DecoderManifestIngestion::getCustomSignalDecoderFormat( SignalID signalID ) cons
     return it->second;
 }
 
-SignalIDToCustomSignalDecoderFormatMapPtr
+std::shared_ptr<const SignalIDToCustomSignalDecoderFormatMap>
+
 DecoderManifestIngestion::getSignalIDToCustomSignalDecoderFormatMap() const
 {
     return mSignalToCustomDecoder;

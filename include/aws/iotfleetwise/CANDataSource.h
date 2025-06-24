@@ -64,7 +64,9 @@ stringToCanTimestampType( std::string const &timestampType, CanTimestampType &ou
 class CANDataSource
 {
 public:
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used in the cpp file
     static constexpr int PARALLEL_RECEIVED_FRAMES_FROM_KERNEL = 10;
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used in the cpp file
     static constexpr int DEFAULT_THREAD_IDLE_TIME_MS = 1000;
 
     /**

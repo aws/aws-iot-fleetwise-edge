@@ -135,7 +135,7 @@ cd ~/aws-iot-fleetwise-edge/examples/network_agnostic_actuator_commands \
    {
      "executionId": "<COMMAND_EXECUTION_ID>",
      "commandArn": "arn:aws:iot:us-east-1:<ACCOUNT_ID>:command/activateAC",
-     "targetArn": "arn:aws:iot:us-east-1:<ACCOUNT_ID>:thing/fwe-example-network-agnostic-actuator-commands
+     "targetArn": "arn:aws:iot:us-east-1:<ACCOUNT_ID>:thing/fwe-example-network-agnostic-actuator-commands",
      "status": "SUCCEEDED",
      "statusReason": {
        "reasonCode": "4660",

@@ -55,6 +55,7 @@
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
 #include "StreamManagerMock.h"
 #include "aws/iotfleetwise/snf/StreamManager.h"
+#include <unordered_set>
 #endif
 
 namespace Aws
@@ -83,9 +84,6 @@ public:
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
         , mUploadedS3Objects( 100, "Uploaded S3 Objects" )
 #endif
-#ifdef FWE_FEATURE_STORE_AND_FORWARD
-        , mStreamManagerMock( std::make_unique<DataSenderProtoWriter>( mCANIDTranslator, nullptr ) )
-#endif
     {
     }
 
@@ -107,9 +105,11 @@ public:
             .WillByDefault( InvokeArgument<3>( ConnectivityError::Success ) );
 
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
-        EXPECT_CALL( mStreamManagerMock, appendToStreams( _ ) )
+        ON_CALL( mStreamManagerMock, appendToStreams( _ ) )
+            .WillByDefault( Return( Store::StreamManager::ReturnCode::STREAM_NOT_FOUND ) );
+        EXPECT_CALL( mStreamManagerMock, getPartitions( _ ) )
             .Times( AnyNumber() )
-            .WillRepeatedly( Return( Store::StreamManager::ReturnCode::STREAM_NOT_FOUND ) );
+            .WillRepeatedly( Return( std::make_shared<std::vector<Store::Partition>>() ) );
 #endif
         auto telemetryDataSender =
             std::make_unique<TelemetryDataSender>( mMqttSender,
@@ -1686,6 +1686,14 @@ TEST_F( DataSenderManagerTest, StoreAndForward )
     auto signal1 = CollectedSignal( 1234, 789654, 40.5, SignalType::DOUBLE );
     mTriggeredCollectionSchemeData.signals.push_back( signal1 );
     mTriggeredCollectionSchemeData.metadata.compress = true;
+
+    EXPECT_CALL( mStreamManagerMock, getPartitions( _ ) )
+        .Times( 3 )
+        .WillRepeatedly( Return( std::make_shared<std::vector<Store::Partition>>( std::vector<Store::Partition>{ {
+            1,
+            nullptr,
+            std::unordered_set<SignalID>{ signal1.signalID },
+        } } ) ) );
 
     EXPECT_CALL( mStreamManagerMock, appendToStreams( _ ) )
         .WillOnce( Return( Store::StreamManager::ReturnCode::SUCCESS ) );

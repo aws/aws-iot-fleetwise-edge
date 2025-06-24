@@ -66,7 +66,7 @@ S3Sender::disconnect()
         // TODO: queued uploads should be persisted
         mQueuedUploads = std::queue<QueuedUploadMetadata>();
 
-        for ( auto ongoingUpload : mOngoingUploads )
+        for ( const auto &ongoingUpload : mOngoingUploads )
         {
             FWE_LOG_INFO( "Ongoing upload will be canceled for object " +
                           ongoingUpload.second.transferHandle->GetKey() );
@@ -98,7 +98,8 @@ S3Sender::sendStream( std::unique_ptr<StreambufBuilder> streambufBuilder,
 
         FWE_LOG_INFO( "Queuing async upload for object " + objectKey + " to the bucket " + uploadMetadata.bucketName +
                       " , Current queue size: " + std::to_string( mQueuedUploads.size() ) );
-        mQueuedUploads.push( { std::move( streambufBuilder ), uploadMetadata, objectKey, resultCallback } );
+        mQueuedUploads.push(
+            { std::move( streambufBuilder ), uploadMetadata, objectKey, std::move( resultCallback ) } );
         TraceModule::get().setVariable( TraceVariable::QUEUED_S3_OBJECTS, mQueuedUploads.size() );
     }
 
@@ -115,8 +116,8 @@ S3Sender::submitQueuedUploads()
         ResultCallback resultCallback;
         QueuedUploadMetadata &queuedUploadMetadata = mQueuedUploads.front();
         auto streambuf = queuedUploadMetadata.streambufBuilder->build();
-        auto uploadMetadata = queuedUploadMetadata.uploadMetadata;
-        auto objectKey = queuedUploadMetadata.objectKey;
+        S3UploadMetadata uploadMetadata = queuedUploadMetadata.uploadMetadata;
+        std::string objectKey = queuedUploadMetadata.objectKey;
         resultCallback = queuedUploadMetadata.resultCallback;
         mQueuedUploads.pop();
         TraceModule::get().setVariable( TraceVariable::QUEUED_S3_OBJECTS, mQueuedUploads.size() );
@@ -150,8 +151,11 @@ S3Sender::submitQueuedUploads()
                                                                   Aws::Map<Aws::String, Aws::String>() );
 
         // Store streambuf pointer in the member map
-        mOngoingUploads[objectKey] = {
-            std::move( streambuf ), resultCallback, transferManagerWrapper, transferHandle, 1 };
+        mOngoingUploads[objectKey] = { std::move( streambuf ),
+                                       std::move( resultCallback ),
+                                       std::move( transferManagerWrapper ),
+                                       std::move( transferHandle ),
+                                       1 };
     }
 }
 
@@ -178,15 +182,15 @@ S3Sender::getTransferManagerWrapper( const S3UploadMetadata &uploadMetadata )
 
         Aws::S3::Model::PutObjectRequest putObjectTemplate;
         putObjectTemplate.WithExpectedBucketOwner( uploadMetadata.bucketOwner );
-        transferConfig.putObjectTemplate = putObjectTemplate;
+        transferConfig.putObjectTemplate = std::move( putObjectTemplate );
 
         Aws::S3::Model::CreateMultipartUploadRequest createMultipartUploadTemplate;
         createMultipartUploadTemplate.WithExpectedBucketOwner( uploadMetadata.bucketOwner );
-        transferConfig.createMultipartUploadTemplate = createMultipartUploadTemplate;
+        transferConfig.createMultipartUploadTemplate = std::move( createMultipartUploadTemplate );
 
         Aws::S3::Model::UploadPartRequest uploadPartTemplate;
         uploadPartTemplate.WithExpectedBucketOwner( uploadMetadata.bucketOwner );
-        transferConfig.uploadPartTemplate = uploadPartTemplate;
+        transferConfig.uploadPartTemplate = std::move( uploadPartTemplate );
 
         transferConfig.transferStatusUpdatedCallback =
             // coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
@@ -275,7 +279,8 @@ S3Sender::transferStatusUpdatedCallback( const std::shared_ptr<const Aws::Transf
 
     submitQueuedUploads();
 
-    resultCallback( result ? ConnectivityError::Success : ConnectivityError::TransmissionError, streambuf );
+    resultCallback( result ? ConnectivityError::Success : ConnectivityError::TransmissionError,
+                    std::move( streambuf ) );
 }
 
 } // namespace IoTFleetWise
