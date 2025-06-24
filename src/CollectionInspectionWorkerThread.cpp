@@ -88,7 +88,7 @@ void
 CollectionInspectionWorkerThread::onChangeInspectionMatrix( std::shared_ptr<const InspectionMatrix> inspectionMatrix )
 {
     std::lock_guard<std::mutex> lock( mInspectionMatrixMutex );
-    mUpdatedInspectionMatrix = inspectionMatrix;
+    mUpdatedInspectionMatrix = std::move( inspectionMatrix );
     mUpdatedInspectionMatrixAvailable = true;
     FWE_LOG_TRACE( "New inspection matrix handed over" );
     // Wake up the thread.
@@ -121,11 +121,17 @@ CollectionInspectionWorkerThread::doWork()
                 newInspectionMatrix = mUpdatedInspectionMatrix;
             }
 
-            mCollectionInspectionEngine.onChangeInspectionMatrix( newInspectionMatrix, mClock->timeSinceEpoch() );
+            mCollectionInspectionEngine.onChangeInspectionMatrix( std::move( newInspectionMatrix ),
+                                                                  mClock->timeSinceEpoch() );
         }
         // Only run the main inspection loop if there is an inspection matrix
         // Otherwise, go to sleep.
-        if ( mUpdatedInspectionMatrix )
+        std::shared_ptr<const InspectionMatrix> updatedInspectionMatrix;
+        {
+            std::lock_guard<std::mutex> lock( mInspectionMatrixMutex );
+            updatedInspectionMatrix = mUpdatedInspectionMatrix;
+        }
+        if ( updatedInspectionMatrix )
         {
             TimePoint currentTime = mClock->timeSinceEpoch();
             uint32_t waitTimeMs = mIdleTimeMs;
@@ -284,7 +290,7 @@ CollectionInspectionWorkerThread::doWork()
                     TraceModule::get().decrementAtomicVariable(
                         TraceAtomicVariable::QUEUE_CONSUMER_TO_INSPECTION_DTCS );
                     TraceModule::get().incrementVariable( TraceVariable::CE_PROCESSED_DTCS );
-                    mCollectionInspectionEngine.setActiveDTCs( *dataFrame.mActiveDTCs.get() );
+                    mCollectionInspectionEngine.setActiveDTCs( *dataFrame.mActiveDTCs );
                     statisticInputMessagesProcessed++;
                 }
 

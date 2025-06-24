@@ -75,7 +75,7 @@ NamedSignalDataSource::ingestMultipleSignalValues(
     }
     if ( !collectedSignalsGroup.empty() )
     {
-        mSignalBufferDistributor.push( CollectedDataFrame( collectedSignalsGroup ) );
+        mSignalBufferDistributor.push( CollectedDataFrame( std::move( collectedSignalsGroup ) ) );
     }
 }
 

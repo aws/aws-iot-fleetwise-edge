@@ -41,7 +41,6 @@
 #include "aws/iotfleetwise/Clock.h"
 #include "aws/iotfleetwise/ClockHandler.h"
 #include "aws/iotfleetwise/DataSenderProtoWriter.h"
-#include "aws/iotfleetwise/IDecoderManifest.h"
 #include "aws/iotfleetwise/ISender.h"
 #include "aws/iotfleetwise/TelemetryDataSender.h"
 #include "aws/iotfleetwise/snf/RateLimiter.h"
@@ -82,8 +81,7 @@ protected:
 
     CollectionInspectionEngineTest()
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
-        : mStreamManager( std::make_unique<DataSenderProtoWriter>( mCANIDTranslator, nullptr ) )
-        , mTelemetryDataSender(
+        : mTelemetryDataSender(
               [this]() -> ISender & {
                   EXPECT_CALL( mMqttSender, getMaxSendSize() )
                       .Times( ::testing::AnyNumber() )
@@ -910,7 +908,7 @@ TYPED_TEST( CollectionInspectionEngineTest, RealCampaignWithForwardAndCollection
     CANInterfaceIDTranslator canIDTranslator;
     auto collectionSchemeManager = std::make_shared<CollectionSchemeManagerWrapper>(
         nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), decoderManifestID );
-    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>( decoderManifestID );
+    auto DM1 = std::make_shared<IDecoderManifestTest>( decoderManifestID );
     collectionSchemeManager->onDecoderManifestUpdate( DM1 );
     collectionSchemeManager->onCollectionSchemeUpdate( campaignWithSinglePartition );
     collectionSchemeManager->updateAvailable();
@@ -1224,7 +1222,7 @@ TYPED_TEST( CollectionInspectionEngineTest, MultipleCampaignsAndPartitionsWithFo
     CANInterfaceIDTranslator canIDTranslator;
     auto collectionSchemeManager = std::make_shared<Aws::IoTFleetWise::CollectionSchemeManagerWrapper>(
         nullptr, canIDTranslator, std::make_shared<CheckinSender>( nullptr ), decoderManifestID );
-    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>( decoderManifestID );
+    auto DM1 = std::make_shared<IDecoderManifestTest>( decoderManifestID );
     collectionSchemeManager->onDecoderManifestUpdate( DM1 );
 
     // generate inspection matrix based on campaigns

@@ -66,7 +66,7 @@ private:
         ResultCallback resultCallback;
         std::shared_ptr<TransferManagerWrapper> transferManagerWrapper;
         std::shared_ptr<Aws::Transfer::TransferHandle> transferHandle;
-        uint8_t attempts;
+        uint8_t attempts{ 0 };
     };
     std::mutex mQueuedAndOngoingUploadsLookupMutex;
     std::unordered_map<std::string, OngoingUploadMetadata> mOngoingUploads;

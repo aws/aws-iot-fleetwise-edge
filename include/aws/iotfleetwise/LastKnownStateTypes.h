@@ -41,7 +41,7 @@ struct StateTemplateInformation
     SyncID id;
     SyncID decoderManifestID;
     std::vector<LastKnownStateSignalInformation> signals;
-    LastKnownStateUpdateStrategy updateStrategy;
+    LastKnownStateUpdateStrategy updateStrategy{};
     // For periodic update strategy only. Indicates the interval to periodically send the data.
     uint64_t periodMs{ 0 };
 };
@@ -63,7 +63,7 @@ struct StateTemplateCollectedSignals
 
 struct LastKnownStateCollectedData : DataToSend
 {
-    Timestamp triggerTime;
+    Timestamp triggerTime{ 0 };
     std::vector<StateTemplateCollectedSignals> stateTemplateCollectedSignals;
 
     ~LastKnownStateCollectedData() override = default;

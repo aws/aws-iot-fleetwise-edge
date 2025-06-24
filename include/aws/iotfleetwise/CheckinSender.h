@@ -69,6 +69,7 @@ public:
 
 private:
     // default checkin interval set to 5 mins
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     static constexpr uint32_t DEFAULT_CHECKIN_INTERVAL_IN_MILLISECOND = 300000;
 
     bool shouldStop() const;

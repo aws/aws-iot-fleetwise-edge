@@ -177,6 +177,7 @@ private:
     // socket can receiver ID
     std::string mStreamRxID;
     // Per J1979, maximum 6 PIDs can be requested in one message
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     static constexpr size_t MAX_PID_RANGE = 6U;
 };
 

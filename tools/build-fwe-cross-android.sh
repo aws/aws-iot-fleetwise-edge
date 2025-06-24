@@ -10,7 +10,7 @@ WITH_CUSTOM_FUNCTION_EXAMPLES="false"
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 source ${SCRIPT_DIR}/install-deps-versions.sh
 
-NATIVE_PREFIX="/usr/local/`gcc -dumpmachine`"
+NATIVE_PREFIX="/usr/local"
 ARCHS="x86_64:x86_64-linux-android \
        armeabi-v7a:armv7a-linux-androideabi \
        arm64-v8a:aarch64-linux-android"
@@ -35,7 +35,7 @@ parse_args() {
         --help)
             echo "Usage: $0 [OPTION]"
             echo "  --archs <ARCHS>                   Space separated list of archs in the format <ARCH>:<HOST_PLATFORM>"
-            echo "  --native-prefix                   Native install prefix, default ${NATIVE_PREFIX}"
+            echo "  --native-prefix <PREFIX>          Native install prefix, default ${NATIVE_PREFIX}"
             echo "  --with-lks-support                Build with LastKnownState support"
             echo "  --with-custom-function-examples   Build with custom function examples"
             exit 0

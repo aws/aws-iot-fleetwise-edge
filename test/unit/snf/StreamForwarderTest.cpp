@@ -11,12 +11,12 @@
 #include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
 #include "aws/iotfleetwise/CollectionSchemeIngestion.h"
 #include "aws/iotfleetwise/DataSenderProtoWriter.h"
+#include "aws/iotfleetwise/DataSenderTypes.h"
 #include "aws/iotfleetwise/ICollectionScheme.h"
 #include "aws/iotfleetwise/ICollectionSchemeList.h"
 #include "aws/iotfleetwise/IConnectionTypes.h"
 #include "aws/iotfleetwise/ISender.h"
 #include "aws/iotfleetwise/OBDDataTypes.h"
-#include "aws/iotfleetwise/SignalTypes.h"
 #include "aws/iotfleetwise/TelemetryDataSender.h"
 #include "aws/iotfleetwise/TimeTypes.h"
 #include "aws/iotfleetwise/snf/RateLimiter.h"
@@ -32,7 +32,6 @@
 #include <memory>
 #include <string>
 #include <thread>
-#include <utility>
 #include <vector>
 
 namespace Aws
@@ -74,7 +73,7 @@ protected:
     {
         Store::CampaignID campaignID;
         TriggeredCollectionSchemeData data = {};
-        std::map<Store::PartitionID, std::vector<CollectedSignal>> signals;
+        std::map<PartitionID, std::vector<CollectedSignal>> signals;
     };
 
     StreamForwarderTest()
@@ -89,8 +88,7 @@ protected:
               std::make_unique<DataSenderProtoWriter>( mCANIDTranslator, nullptr ),
               mPayloadAdaptionConfigUncompressed,
               mPayloadAdaptionConfigCompressed )
-        , mStreamManager(
-              mPersistenceRootDir.string(), std::make_unique<DataSenderProtoWriter>( mCANIDTranslator, nullptr ), 0 )
+        , mStreamManager( mPersistenceRootDir.string() )
         , mStreamForwarder( mStreamManager, mTelemetryDataSender, mRateLimiter, 10 )
     {
     }
@@ -100,6 +98,7 @@ protected:
     {
         mClock = ClockHandler::getClock();
         mCANIDTranslator.add( "can123" );
+        EXPECT_CALL( mMqttSender, isAlive() ).Times( AnyNumber() ).WillRepeatedly( Return( true ) );
         ON_CALL( mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, _, _ ) )
             .WillByDefault( InvokeArgument<3>( ConnectivityError::Success ) );
     }
@@ -230,60 +229,54 @@ protected:
     }
 
     void
-    storeAll( std::vector<CollectedSignals> collectedSignals )
+    storeAll( const std::vector<TelemetryDataToPersist> &collectedSignals )
     {
-        for ( auto signal : collectedSignals )
+        for ( const auto &data : collectedSignals )
         {
-            ASSERT_EQ( mStreamManager.appendToStreams( signal.data ), Store::StreamManager::ReturnCode::SUCCESS );
+            ASSERT_EQ( mStreamManager.appendToStreams( data ), Store::StreamManager::ReturnCode::SUCCESS );
         }
     }
 
     void
-    forwardAll( std::vector<CollectedSignals> collectedSignals )
+    forwardAll( const std::vector<TelemetryDataToPersist> &collectedSignals )
     {
-        for ( auto signals : collectedSignals )
+        for ( const auto &data : collectedSignals )
         {
-            for ( auto entry : signals.signals )
-            {
-                mStreamForwarder.beginForward(
-                    signals.campaignID, entry.first, Aws::IoTFleetWise::Store::StreamForwarder::Source::CONDITION );
-            }
+            mStreamForwarder.beginForward( data.getCollectionSchemeParams().collectionSchemeID,
+                                           0,
+                                           Aws::IoTFleetWise::Store::StreamForwarder::Source::CONDITION );
+            mStreamForwarder.beginForward( data.getCollectionSchemeParams().collectionSchemeID,
+                                           1,
+                                           Aws::IoTFleetWise::Store::StreamForwarder::Source::CONDITION );
         }
     }
 
     void
-    forwardAllIoTJob( std::vector<CollectedSignals> collectedSignals, uint64_t endTime )
+    forwardAllIoTJob( const std::vector<TelemetryDataToPersist> &collectedSignals, uint64_t endTime )
     {
-        for ( auto signals : collectedSignals )
+        for ( const auto &data : collectedSignals )
         {
-            mStreamForwarder.beginJobForward( signals.campaignID, endTime );
+            mStreamForwarder.beginJobForward( data.getCollectionSchemeParams().collectionSchemeID, endTime );
         }
     }
 
-    std::vector<CollectedSignals>
+    static std::vector<TelemetryDataToPersist>
     buildTestData( std::shared_ptr<Aws::IoTFleetWise::ActiveCollectionSchemes> campaign, Timestamp triggerTime = 0 )
     {
-        std::vector<CollectedSignals> collectedSignals;
-        for ( auto scheme : campaign->activeCollectionSchemes )
+        std::vector<TelemetryDataToPersist> serializedData;
+        for ( const auto &scheme : campaign->activeCollectionSchemes )
         {
-            CollectedSignals signals;
-            signals.campaignID = scheme->getCampaignArn();
+            auto rawData =
+                std::make_shared<std::string>( "fake raw data for campaign " + scheme->getCollectionSchemeID() );
+            CollectionSchemeParams collectionSchemeParams;
+            collectionSchemeParams.triggerTime = triggerTime;
+            collectionSchemeParams.collectionSchemeID = scheme->getCollectionSchemeID();
+            collectionSchemeParams.campaignArn = scheme->getCampaignArn();
 
-            signals.data.eventID = 1234;
-            signals.data.metadata.collectionSchemeID = scheme->getCollectionSchemeID();
-            signals.data.metadata.campaignArn = signals.campaignID;
-            signals.data.mDTCInfo = fakeDtcInfo();
-            for ( auto signal : scheme->getCollectSignals() )
-            {
-                CollectedSignal collectedSignal = {
-                    signal.signalID, mClock->systemTimeSinceEpochMs(), 5, SignalType::UINT8 };
-                signals.signals[signal.dataPartitionId].emplace_back( collectedSignal );
-                signals.data.signals.emplace_back( collectedSignal );
-                signals.data.triggerTime = triggerTime;
-            }
-            collectedSignals.emplace_back( signals );
+            serializedData.emplace_back( collectionSchemeParams, 1, rawData, 0, 0 );
+            serializedData.emplace_back( collectionSchemeParams, 1, rawData, 1, 0 );
         }
-        return collectedSignals;
+        return serializedData;
     }
 };
 
@@ -300,7 +293,7 @@ TEST_F( StreamForwarderTest, StoreAndForwardDataFromMultipleCampaignsAndPartitio
     ASSERT_TRUE( mStreamForwarder.start() );
     ASSERT_TRUE( mStreamForwarder.isAlive() );
 
-    storeAll( collectedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( collectedSignals ) );
     EXPECT_CALL( mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 4 );
     forwardAll( collectedSignals );
 
@@ -321,7 +314,7 @@ TEST_F( StreamForwarderTest, ForwardStopsForPartitionWhenRequested )
     ASSERT_TRUE( mStreamForwarder.isAlive() );
 
     // store and forward all partitions
-    storeAll( collectedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( collectedSignals ) );
     EXPECT_CALL( mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 4 );
     forwardAll( collectedSignals );
     WAIT_ASSERT_EQ( mMqttSender.getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 4U );
@@ -332,7 +325,7 @@ TEST_F( StreamForwarderTest, ForwardStopsForPartitionWhenRequested )
                                     Aws::IoTFleetWise::Store::StreamForwarder::Source::CONDITION );
     mMqttSender.clearSentBufferData();
     EXPECT_CALL( mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 3 );
-    storeAll( collectedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( collectedSignals ) );
     WAIT_ASSERT_EQ( mMqttSender.getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 3U );
 }
 
@@ -349,7 +342,7 @@ TEST_F( StreamForwarderTest, ForwardStopsForCampaignsThatAreRemoved )
     ASSERT_TRUE( mStreamForwarder.start() );
     ASSERT_TRUE( mStreamForwarder.isAlive() );
 
-    storeAll( collectedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( collectedSignals ) );
 
     // remove the campaign entirely
     mStreamManager.onChangeCollectionSchemeList( {} );
@@ -372,7 +365,7 @@ TEST_F( StreamForwarderTest, StoreAndForwardDataFromMultipleCampaignsAndPartitio
     ASSERT_TRUE( mStreamForwarder.start() );
     ASSERT_TRUE( mStreamForwarder.isAlive() );
 
-    storeAll( collectedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( collectedSignals ) );
     EXPECT_CALL( mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 4 );
     forwardAllIoTJob( collectedSignals, 0 );
 
@@ -393,7 +386,7 @@ TEST_F( StreamForwarderTest, ForwardStopsForIoTJobWhenEndOfStream )
     ASSERT_TRUE( mStreamForwarder.isAlive() );
 
     // store and forward all partitions
-    storeAll( collectedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( collectedSignals ) );
     EXPECT_CALL( mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 4 );
     forwardAllIoTJob( collectedSignals, 0 );
     WAIT_ASSERT_EQ( mMqttSender.getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 4U );
@@ -402,7 +395,7 @@ TEST_F( StreamForwarderTest, ForwardStopsForIoTJobWhenEndOfStream )
 
     mMqttSender.clearSentBufferData();
     // End of Stream is hit so forwarding has stopped
-    storeAll( collectedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( collectedSignals ) );
     DELAY_ASSERT_TRUE( mMqttSender.getSentBufferDataByTopic( mTelemetryDataTopic ).size() == 0U );
 }
 
@@ -436,7 +429,7 @@ TEST_F( StreamForwarderTest, ForwardAgainWhenAPayloadFailsToBeUploaded )
 
     mMqttSender.clearSentBufferData();
     // End of Stream is hit so forwarding has stopped
-    storeAll( collectedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( collectedSignals ) );
     DELAY_ASSERT_TRUE( mMqttSender.getSentBufferDataByTopic( mTelemetryDataTopic ).size() == 0U );
 }
 
@@ -454,7 +447,7 @@ TEST_F( StreamForwarderTest, ForwardWhenBothIotJobAndConditionAreActive )
     ASSERT_TRUE( mStreamForwarder.isAlive() );
 
     // store and forward all partitions
-    storeAll( collectedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( collectedSignals ) );
     EXPECT_CALL( mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 4 );
     forwardAllIoTJob( collectedSignals, 0 );
     forwardAll( collectedSignals );
@@ -469,7 +462,7 @@ TEST_F( StreamForwarderTest, ForwardWhenBothIotJobAndConditionAreActive )
                                     Aws::IoTFleetWise::Store::StreamForwarder::Source::CONDITION );
     mMqttSender.clearSentBufferData();
     EXPECT_CALL( mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 3 );
-    storeAll( collectedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( collectedSignals ) );
     WAIT_ASSERT_EQ( mMqttSender.getSentBufferDataByTopic( mTelemetryDataTopic ).size(), 3U );
 }
 
@@ -487,7 +480,7 @@ TEST_F( StreamForwarderTest, ForwarderStopsForIoTJobWhenEndTime )
     // isolate the endTime
     auto endTime = mClock->systemTimeSinceEpochMs();
 
-    // build same test data but with collection triggertime after the endTime
+    // build same test data but with collection triggerTime after the endTime
     auto collectedSignals2 = buildTestData( campaign, endTime + 1 );
 
     auto combinedSignals = collectedSignals;
@@ -497,7 +490,7 @@ TEST_F( StreamForwarderTest, ForwarderStopsForIoTJobWhenEndTime )
     ASSERT_TRUE( mStreamForwarder.start() );
     ASSERT_TRUE( mStreamForwarder.isAlive() );
 
-    storeAll( combinedSignals );
+    ASSERT_NO_FATAL_FAILURE( storeAll( combinedSignals ) );
     // endTime will be after the collectedSignals collection trigger time, but before the collectedSignals2 collection
     // trigger time
     EXPECT_CALL( mMqttSender, mockedSendBuffer( mTelemetryDataTopic, _, Gt( 0 ), _ ) ).Times( 4 );

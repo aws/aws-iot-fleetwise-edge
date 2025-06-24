@@ -171,7 +171,7 @@ protected:
 
     std::string mCanInterfaceName = getCanInterfaceName();
     std::shared_ptr<RemoteDiagnosticDataSource> mUdsModule;
-    SignalBufferPtr mSignalBuffer;
+    std::shared_ptr<SignalBuffer> mSignalBuffer;
     SignalBufferDistributor mSignalBufferDistributor;
     std::shared_ptr<NamedSignalDataSource> mNamedSignalDataSource;
     std::shared_ptr<CustomDecoderDictionary> mDictionary;

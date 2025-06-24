@@ -197,10 +197,15 @@ private:
     OBDDecoderDictionary mDecoderDictionary;
 
     // Sleep backoff time in seconds for retrial in case an error is encountered during ECU auto-detection.
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     static constexpr int SLEEP_TIME_SECS = 1;
-    static constexpr uint32_t MASKING_GET_BYTE = 0xFF;             // Get last byte
-    static constexpr uint32_t MASKING_SHIFT_BITS = 8;              // Shift 8 bits
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
+    static constexpr uint32_t MASKING_GET_BYTE = 0xFF; // Get last byte
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
+    static constexpr uint32_t MASKING_SHIFT_BITS = 8; // Shift 8 bits
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     static constexpr uint32_t MASKING_TEMPLATE_TX_ID = 0x18DA00F1; // All 29-bit tx id has the same bytes
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     static constexpr uint32_t MASKING_REMOVE_BYTE = 0x8;
 };
 

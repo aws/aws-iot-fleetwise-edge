@@ -30,6 +30,7 @@
 #include <queue>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
@@ -118,9 +119,9 @@ public:
      * @param currentDecoderManifestID sync id of the decoder manifest that is used
      * @param customSignalDecoderFormatMap const shared pointer pointing to a constant custom signal decoder format map
      * */
-    using OnCustomSignalDecoderFormatMapChangeCallback =
-        std::function<void( const SyncID &currentDecoderManifestID,
-                            const SignalIDToCustomSignalDecoderFormatMapPtr &customSignalDecoderFormatMap )>;
+    using OnCustomSignalDecoderFormatMapChangeCallback = std::function<void(
+        const SyncID &currentDecoderManifestID,
+        std::shared_ptr<const SignalIDToCustomSignalDecoderFormatMap> customSignalDecoderFormatMap )>;
 
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
     using OnStateTemplatesChangeCallback = std::function<void( std::shared_ptr<StateTemplateList> stateTemplates )>;
@@ -187,7 +188,7 @@ public:
      * A lock in the function is applied to handle the race condition between AwdIoT context and PM context.
      *
      */
-    void onCollectionSchemeUpdate( const ICollectionSchemeListPtr &collectionSchemeList );
+    void onCollectionSchemeUpdate( std::shared_ptr<ICollectionSchemeList> collectionSchemeList );
 
     /**
      * @brief callback for CollectionScheme Ingestion to send update of IDecoderManifest
@@ -199,7 +200,7 @@ public:
      * A lock in the function is applied to handle the race condition between AwdIoT context and PM context.
 
      */
-    void onDecoderManifestUpdate( const IDecoderManifestPtr &decoderManifest );
+    void onDecoderManifestUpdate( std::shared_ptr<IDecoderManifest> decoderManifest );
 
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
     void onStateTemplatesChanged( std::shared_ptr<LastKnownStateIngestion> lastKnownStateIngestion );
@@ -218,7 +219,7 @@ public:
     void
     subscribeToActiveDecoderDictionaryChange( OnActiveDecoderDictionaryChangeCallback callback )
     {
-        mActiveDecoderDictionaryChangeListeners.subscribe( callback );
+        mActiveDecoderDictionaryChangeListeners.subscribe( std::move( callback ) );
     }
 
     /**
@@ -228,7 +229,7 @@ public:
     void
     subscribeToInspectionMatrixChange( OnInspectionMatrixChangeCallback callback )
     {
-        mInspectionMatrixChangeListeners.subscribe( callback );
+        mInspectionMatrixChangeListeners.subscribe( std::move( callback ) );
     }
 
     /**
@@ -238,7 +239,7 @@ public:
     void
     subscribeToFetchMatrixChange( OnFetchMatrixChangeCallback callback )
     {
-        mFetchMatrixChangeListeners.subscribe( callback );
+        mFetchMatrixChangeListeners.subscribe( std::move( callback ) );
     }
 
     /**
@@ -248,7 +249,7 @@ public:
     void
     subscribeToCollectionSchemeListChange( OnCollectionSchemeListChangeCallback callback )
     {
-        mCollectionSchemeListChangeListeners.subscribe( callback );
+        mCollectionSchemeListChangeListeners.subscribe( std::move( callback ) );
     }
 
     /**
@@ -258,14 +259,14 @@ public:
     void
     subscribeToCustomSignalDecoderFormatMapChange( OnCustomSignalDecoderFormatMapChangeCallback callback )
     {
-        mCustomSignalDecoderFormatMapChangeListeners.subscribe( callback );
+        mCustomSignalDecoderFormatMapChangeListeners.subscribe( std::move( callback ) );
     }
 
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
     void
     subscribeToStateTemplatesChange( OnStateTemplatesChangeCallback callback )
     {
-        mStateTemplatesChangeListeners.subscribe( callback );
+        mStateTemplatesChangeListeners.subscribe( std::move( callback ) );
     }
 #endif
 
@@ -503,8 +504,8 @@ protected:
      * PM Local storage of CollectionSchemeList and mDecoderManifest so that PM can work on these objects
      * out of critical section
      */
-    ICollectionSchemeListPtr mCollectionSchemeList;
-    IDecoderManifestPtr mDecoderManifest;
+    std::shared_ptr<ICollectionSchemeList> mCollectionSchemeList;
+    std::shared_ptr<IDecoderManifest> mDecoderManifest;
     /* Timeline keeps track on StartTime and StopTime of all existing collectionSchemes */
     std::priority_queue<TimeData, std::vector<TimeData>, std::greater<TimeData>> mTimeLine;
     /* lock used in callback functions onCollectionSchemeAvailable and onDecoderManifest */
@@ -528,7 +529,7 @@ protected:
      * parameters used in  onCollectionSchemeAvailable()
      * mCollectionSchemeListInput: a shared pointer of ICollectionSchemeList PI copies into
      */
-    ICollectionSchemeListPtr mCollectionSchemeListInput;
+    std::shared_ptr<ICollectionSchemeList> mCollectionSchemeListInput;
 
     /*
      * parameters used in  onDecoderManifestAvailable()
@@ -539,7 +540,7 @@ protected:
      * parameters used in  onDecoderManifestAvailable()
      * mDecoderManifestInput: a shared pointer of IDecoderManifest PI copies into
      */
-    IDecoderManifestPtr mDecoderManifestInput;
+    std::shared_ptr<IDecoderManifest> mDecoderManifestInput;
 
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
     bool mStateTemplatesAvailable{ false };

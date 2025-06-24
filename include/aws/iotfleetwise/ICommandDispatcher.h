@@ -45,6 +45,7 @@ commandStatusToString( CommandStatus status )
 using CommandReasonCode = uint32_t;
 // clang-format off
 static constexpr CommandReasonCode REASON_CODE_UNSPECIFIED                             = 0x00000000;
+// coverity[autosar_cpp14_a0_1_1_violation] variable is intentionally not used
 static constexpr CommandReasonCode REASON_CODE_IOTFLEETWISE_RANGE_START                = 0x00000001;
 static constexpr CommandReasonCode REASON_CODE_PRECONDITION_FAILED                     = 0x00000001;
 static constexpr CommandReasonCode REASON_CODE_DECODER_MANIFEST_OUT_OF_SYNC            = 0x00000002;
@@ -54,8 +55,10 @@ static constexpr CommandReasonCode REASON_CODE_NO_COMMAND_DISPATCHER_FOUND      
 static constexpr CommandReasonCode REASON_CODE_STATE_TEMPLATE_OUT_OF_SYNC              = 0x00000006;
 static constexpr CommandReasonCode REASON_CODE_ARGUMENT_TYPE_MISMATCH                  = 0x00000007;
 static constexpr CommandReasonCode REASON_CODE_NOT_SUPPORTED                           = 0x00000008;
+// coverity[autosar_cpp14_a0_1_1_violation] variable not used yet
 static constexpr CommandReasonCode REASON_CODE_BUSY                                    = 0x00000009;
 static constexpr CommandReasonCode REASON_CODE_REJECTED                                = 0x0000000A;
+// coverity[autosar_cpp14_a0_1_1_violation] variable not used yet
 static constexpr CommandReasonCode REASON_CODE_ACCESS_DENIED                           = 0x0000000B;
 static constexpr CommandReasonCode REASON_CODE_ARGUMENT_OUT_OF_RANGE                   = 0x0000000C;
 static constexpr CommandReasonCode REASON_CODE_INTERNAL_ERROR                          = 0x0000000D;
@@ -65,8 +68,11 @@ static constexpr CommandReasonCode REASON_CODE_STATE_TEMPLATE_ALREADY_ACTIVATED 
 static constexpr CommandReasonCode REASON_CODE_STATE_TEMPLATE_ALREADY_DEACTIVATED      = 0x00000011;
 static constexpr CommandReasonCode REASON_CODE_TIMED_OUT_BEFORE_DISPATCH               = 0x00000012;
 static constexpr CommandReasonCode REASON_CODE_NO_RESPONSE                             = 0x00000013;
+// coverity[autosar_cpp14_a0_1_1_violation] variable is intentionally not used
 static constexpr CommandReasonCode REASON_CODE_IOTFLEETWISE_RANGE_END                  = 0x0000FFFF;
+// coverity[autosar_cpp14_a0_1_1_violation] variable is intentionally not used
 static constexpr CommandReasonCode REASON_CODE_OEM_RANGE_START                         = 0x00010000;
+// coverity[autosar_cpp14_a0_1_1_violation] variable is intentionally not used
 static constexpr CommandReasonCode REASON_CODE_OEM_RANGE_END                           = 0x0001FFFF;
 // clang-format on
 using CommandReasonDescription = std::string;

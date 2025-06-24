@@ -10,6 +10,9 @@ const char FWE_VERSION_GIT_TAG[] = "@FWE_VERSION_GIT_TAG@";
 const char FWE_VERSION_BUILD_TIME[] = "@FWE_VERSION_CURRENT_TIME@";
 const char FWE_VERSION_PROJECT_VERSION[] = "@PROJECT_VERSION@";
 
+// coverity[autosar_cpp14_a0_1_1_violation] the variable isn't used by FWE itself
 const char FWE_VERSION_PROJECT_VERSION_MAJOR[] = "@PROJECT_VERSION_MAJOR@";
+// coverity[autosar_cpp14_a0_1_1_violation] the variable isn't used by FWE itself
 const char FWE_VERSION_PROJECT_VERSION_MINOR[] = "@PROJECT_VERSION_MINOR@";
+// coverity[autosar_cpp14_a0_1_1_violation] the variable isn't used by FWE itself
 const char FWE_VERSION_PROJECT_VERSION_PATCH[] = "@PROJECT_VERSION_PATCH@";

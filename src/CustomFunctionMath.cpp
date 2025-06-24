@@ -102,6 +102,7 @@ powFunc( CustomFunctionInvocationID invocationId, const std::vector<InspectionVa
     // coverity[autosar_cpp14_m19_3_1_violation] errno is used by `pow` to indicate a domain error
     errno = 0;
     // coverity[autosar_cpp14_a0_4_4_violation] Range errors are detected via errno
+    // coverity[misra_cpp_2008_rule_14_8_2_violation] - intentionally call the non-template version
     auto powRes = std::pow( args[0].asDouble(), args[1].asDouble() );
     // coverity[misra_cpp_2008_rule_19_3_1_violation] errno is used by `pow` to indicate a domain error
     // coverity[autosar_cpp14_m19_3_1_violation] errno is used by `pow` to indicate a domain error

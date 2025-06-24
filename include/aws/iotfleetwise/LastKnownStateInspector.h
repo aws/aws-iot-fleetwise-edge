@@ -85,8 +85,10 @@ public:
     void inspectNewSignal( SignalID id, const TimePoint &receiveTime, T value );
 
 private:
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     static const uint32_t MAX_SAMPLE_MEMORY = 20 * 1024 * 1024; // 20MB max for all samples
     // For Last Known State, we set the signal history buffer sample size as 1.
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     static const uint32_t MAX_SIGNAL_HISTORY_BUFFER_SIZE = 1;
     // coverity[autosar_cpp14_a0_1_3_violation] EVAL_EQUAL_DISTANCE is used in template function below
     static inline double
@@ -254,10 +256,10 @@ private:
     struct PersistedStateTemplateMetadata
     {
         SyncID stateTemplateId;
-        bool activated;
+        bool activated{ false };
         // We need to store the system time since the monotonic clock can be reset between system or
         // application restarts.
-        Timestamp deactivateAfterSystemTimeMs;
+        Timestamp deactivateAfterSystemTimeMs{ 0 };
     };
     Json::Value mPersistedMetadata;
 

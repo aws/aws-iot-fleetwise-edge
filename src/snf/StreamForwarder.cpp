@@ -3,7 +3,6 @@
 
 #include "aws/iotfleetwise/snf/StreamForwarder.h"
 #include "aws/iotfleetwise/Clock.h"
-#include "aws/iotfleetwise/DataSenderTypes.h"
 #include "aws/iotfleetwise/LoggingModule.h"
 #include "aws/iotfleetwise/Signal.h"
 #include "aws/iotfleetwise/TelemetryDataSender.h"
@@ -14,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <json/json.h>
 #include <utility>
 #include <vector>
 
@@ -125,7 +125,7 @@ StreamForwarder::doWork()
                 else if ( partitionIsEnabled( ( campaignPartition ) ) )
                 {
                     uint64_t endTime = 0;
-                    auto campaignId = campaignPartition.first;
+                    const auto &campaignId = campaignPartition.first;
                     if ( mJobCampaignToEndTime.find( campaignId ) != mJobCampaignToEndTime.end() )
                     {
                         endTime = mJobCampaignToEndTime[campaignId];
@@ -190,11 +190,12 @@ StreamForwarder::doWork()
 
                 FWE_LOG_INFO( "Processing campaign " + campaignPartition.first + " partition " +
                               std::to_string( campaignPartition.second ) );
-                mDataSender.processSerializedData(
-                    schemeData,
-                    // coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
-                    [this, checkpoint, metadata]( bool success, std::shared_ptr<const DataToPersist> unused ) {
-                        static_cast<void>( unused );
+                Json::Value jsonMetadata;
+                mDataSender.processPersistedData(
+                    reinterpret_cast<const uint8_t *>( schemeData.data() ),
+                    schemeData.size(),
+                    jsonMetadata,
+                    [this, checkpoint = std::move( checkpoint ), metadata]( bool success ) {
                         if ( success )
                         {
                             checkpoint();
@@ -271,6 +272,7 @@ StreamForwarder::checkIfJobCompleted( const CampaignPartition &campaignPartition
             mJobCampaignToEndTime.erase( campaignPartition.first );
 
             // don't hold the mPartitionMutex in the job completion callback
+            // coverity[LOCK:FALSE] unique_lock's destructor won't try to unlock again
             lock.unlock();
 
             if ( mJobCompletionCallback )

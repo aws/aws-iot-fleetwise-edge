@@ -104,11 +104,11 @@ public:
     void
     subscribeToNewDataAvailable( std::function<void()> callback )
     {
-        mListeners.subscribe( callback );
+        mListeners.subscribe( std::move( callback ) );
     }
 
-    // coverity[misra_cpp_2008_rule_14_7_1_violation] Required in unit tests
     bool
+    // coverity[misra_cpp_2008_rule_14_7_1_violation] Required in unit tests
     isEmpty()
     {
         std::lock_guard<std::mutex> lock( mMutex );

@@ -120,9 +120,8 @@ public:
         RawData::BufferManager *rawDataBufferManager, /**< the buffer manager to use for the raw data buffer */
         uint32_t minFetchTriggerIntervalMs =
             MIN_FETCH_TRIGGER_MS, /**< the minimum interval in milliseconds between two fetch triggers */
-        const std::shared_ptr<FetchRequestQueue> fetchQueue =
-            nullptr, /**< fetch requests will be pushed to this queue and executed by fetch manager when condition is
-                        true */
+        std::shared_ptr<FetchRequestQueue> fetchQueue = nullptr, /**< fetch requests will be pushed to this queue and
+                                                                    executed by fetch manager when condition is true */
         bool sendDataOnlyOncePerCondition = true /**< if true only data with a millisecond timestamp, bigger than the
                                                     timestamp the condition last sent out data, will be included */
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
@@ -198,6 +197,7 @@ public:
     void registerCustomFunction( const std::string &name, CustomFunctionCallbacks callbacks );
 
 private:
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     static const uint32_t MAX_SAMPLE_MEMORY = 20 * 1024 * 1024; // 20MB max for all samples
     uint32_t mMinFetchTriggerIntervalMs;
     std::shared_ptr<FetchRequestQueue> mFetchQueue;
@@ -553,7 +553,13 @@ private:
         std::vector<SignalHistoryBuffer<T>> *resVec = nullptr;
 
         auto outerMapIt = mSignalBuffers.find( signalBufferConditionIndex );
-        if ( outerMapIt == mSignalBuffers.end() || outerMapIt->second.find( signalID ) == outerMapIt->second.end() )
+        if ( outerMapIt == mSignalBuffers.end() )
+        {
+            outerMapIt = mSignalBuffers.insert( { signalBufferConditionIndex, {} } ).first;
+        }
+        auto signalBufferVectorPtr = outerMapIt->second.find( signalID );
+
+        if ( signalBufferVectorPtr == outerMapIt->second.end() )
         {
             // create a new map entry
             auto mapEntryVec = std::vector<SignalHistoryBuffer<T>>{};
@@ -562,7 +568,7 @@ private:
                 SignalHistoryBuffersVar mapEntry = mapEntryVec;
                 FWE_LOG_TRACE( "Creating new signalHistoryBuffer vector for Signal " + std::to_string( signalID ) +
                                " with type " + boost::core::demangle( typeid( T ).name() ) );
-                mSignalBuffers[signalBufferConditionIndex].insert( { signalID, mapEntry } );
+                signalBufferVectorPtr = outerMapIt->second.insert( { signalID, mapEntry } ).first;
             }
             catch ( ... )
             {
@@ -574,7 +580,6 @@ private:
 
         try
         {
-            auto signalBufferVectorPtr = mSignalBuffers.find( signalBufferConditionIndex )->second.find( signalID );
             resVec = boost::get<std::vector<SignalHistoryBuffer<T>>>( &( signalBufferVectorPtr->second ) );
             if ( resVec == nullptr )
             {

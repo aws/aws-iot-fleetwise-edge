@@ -7,6 +7,7 @@
 #include "aws/iotfleetwise/TimeTypes.h"
 #include <cstdint>
 #include <google/protobuf/message.h>
+#include <utility>
 #include <vector>
 
 namespace Aws
@@ -72,7 +73,7 @@ DataSenderProtoReader::deserializeVehicleData( TriggeredCollectionSchemeData &ou
         {
             info.mDTCCodes.emplace_back( code );
         }
-        out.mDTCInfo = info;
+        out.mDTCInfo = std::move( info );
     }
 
     return true;

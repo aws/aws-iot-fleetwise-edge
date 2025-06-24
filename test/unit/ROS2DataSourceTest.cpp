@@ -350,7 +350,7 @@ protected:
     NiceMock<rclcpp::TypeSupportMock> typeSupportMock;
     NiceMock<RawBufferManagerMock> rawBufferManagerMock;
     const int MINIMUM_WAIT_TIME_ONE_CYCLE_MS = 300;
-    SignalBufferPtr signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
+    std::shared_ptr<SignalBuffer> signalBuffer = std::make_shared<SignalBuffer>( 100, "Signal Buffer" );
     SignalBufferDistributor signalBufferDistributor;
 
 public:

@@ -25,7 +25,7 @@ public:
     Activate( const Greengrass::SubscribeToIoTCoreRequest &request,
               OnMessageFlushCallback onMessageFlushCallback = nullptr ) noexcept
     {
-        return mOperation->Activate( request, onMessageFlushCallback );
+        return mOperation->Activate( request, std::move( onMessageFlushCallback ) );
     }
 
     virtual std::future<Greengrass::SubscribeToIoTCoreResult>
@@ -37,7 +37,7 @@ public:
     virtual std::future<RpcError>
     Close( OnMessageFlushCallback onMessageFlushCallback = nullptr ) noexcept
     {
-        return mOperation->Close( onMessageFlushCallback );
+        return mOperation->Close( std::move( onMessageFlushCallback ) );
     }
 
 private:
@@ -56,7 +56,7 @@ public:
     Activate( const Greengrass::PublishToIoTCoreRequest &request,
               OnMessageFlushCallback onMessageFlushCallback = nullptr ) noexcept
     {
-        return mOperation->Activate( request, onMessageFlushCallback );
+        return mOperation->Activate( request, std::move( onMessageFlushCallback ) );
     }
 
     virtual std::future<Greengrass::PublishToIoTCoreResult>
@@ -68,7 +68,7 @@ public:
     virtual std::future<RpcError>
     Close( OnMessageFlushCallback onMessageFlushCallback = nullptr ) noexcept
     {
-        return mOperation->Close( onMessageFlushCallback );
+        return mOperation->Close( std::move( onMessageFlushCallback ) );
     }
 
 private:
@@ -126,7 +126,7 @@ public:
     NewSubscribeToIoTCore( std::shared_ptr<Greengrass::SubscribeToIoTCoreStreamHandler> streamHandler ) noexcept
     {
         return std::make_shared<SubscribeToIoTCoreOperationWrapper>(
-            mGreengrassClient->NewSubscribeToIoTCore( streamHandler ) );
+            mGreengrassClient->NewSubscribeToIoTCore( std::move( streamHandler ) ) );
     }
 
     virtual std::shared_ptr<Greengrass::ResumeComponentOperation>
@@ -145,7 +145,7 @@ public:
     NewSubscribeToConfigurationUpdate(
         std::shared_ptr<Greengrass::SubscribeToConfigurationUpdateStreamHandler> streamHandler ) noexcept
     {
-        return mGreengrassClient->NewSubscribeToConfigurationUpdate( streamHandler );
+        return mGreengrassClient->NewSubscribeToConfigurationUpdate( std::move( streamHandler ) );
     }
 
     virtual std::shared_ptr<Greengrass::DeleteThingShadowOperation>
@@ -170,7 +170,7 @@ public:
     NewSubscribeToValidateConfigurationUpdates(
         std::shared_ptr<Greengrass::SubscribeToValidateConfigurationUpdatesStreamHandler> streamHandler ) noexcept
     {
-        return mGreengrassClient->NewSubscribeToValidateConfigurationUpdates( streamHandler );
+        return mGreengrassClient->NewSubscribeToValidateConfigurationUpdates( std::move( streamHandler ) );
     }
     virtual std::shared_ptr<Greengrass::GetConfigurationOperation>
     NewGetConfiguration() noexcept
@@ -180,7 +180,7 @@ public:
     virtual std::shared_ptr<Greengrass::SubscribeToTopicOperation>
     NewSubscribeToTopic( std::shared_ptr<Greengrass::SubscribeToTopicStreamHandler> streamHandler ) noexcept
     {
-        return mGreengrassClient->NewSubscribeToTopic( streamHandler );
+        return mGreengrassClient->NewSubscribeToTopic( std::move( streamHandler ) );
     }
 
     virtual std::shared_ptr<Greengrass::GetComponentDetailsOperation>
@@ -205,7 +205,7 @@ public:
     NewSubscribeToCertificateUpdates(
         std::shared_ptr<Greengrass::SubscribeToCertificateUpdatesStreamHandler> streamHandler ) noexcept
     {
-        return mGreengrassClient->NewSubscribeToCertificateUpdates( streamHandler );
+        return mGreengrassClient->NewSubscribeToCertificateUpdates( std::move( streamHandler ) );
     }
 
     virtual std::shared_ptr<Greengrass::VerifyClientDeviceIdentityOperation>
@@ -302,7 +302,7 @@ public:
     NewSubscribeToComponentUpdates(
         std::shared_ptr<Greengrass::SubscribeToComponentUpdatesStreamHandler> streamHandler ) noexcept
     {
-        return mGreengrassClient->NewSubscribeToComponentUpdates( streamHandler );
+        return mGreengrassClient->NewSubscribeToComponentUpdates( std::move( streamHandler ) );
     }
 
     virtual std::shared_ptr<Greengrass::ListLocalDeploymentsOperation>

@@ -438,7 +438,7 @@ LastKnownStateInspector::clearUnused( const StateTemplateList &newStateTemplates
             stateTemplatesToRemove.emplace_back( stateTemplateId );
         }
     }
-    for ( auto stateTemplateId : stateTemplatesToRemove )
+    for ( const auto &stateTemplateId : stateTemplatesToRemove )
     {
         mStateTemplates.erase( stateTemplateId );
     }

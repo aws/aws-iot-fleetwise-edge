@@ -79,7 +79,7 @@ LastKnownStateIngestion::build()
         return false;
     }
 
-    auto decoderManifestId = mProtoStateTemplates.decoder_manifest_sync_id();
+    const auto &decoderManifestId = mProtoStateTemplates.decoder_manifest_sync_id();
     if ( decoderManifestId.empty() )
     {
         FWE_LOG_ERROR( "Missing decoder manifest ID" );
@@ -93,7 +93,7 @@ LastKnownStateIngestion::build()
 
     for ( auto &protoStateTemplateInformation : mProtoStateTemplates.state_templates_to_add() )
     {
-        auto stateTemplateId = protoStateTemplateInformation.state_template_sync_id();
+        const auto &stateTemplateId = protoStateTemplateInformation.state_template_sync_id();
         if ( stateTemplateId.empty() )
         {
             FWE_LOG_ERROR( "State template does not have a valid ID" );

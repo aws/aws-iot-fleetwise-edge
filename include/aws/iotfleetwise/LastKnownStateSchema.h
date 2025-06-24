@@ -8,6 +8,7 @@
 #include "aws/iotfleetwise/Listener.h"
 #include <functional>
 #include <memory>
+#include <utility>
 
 namespace Aws
 {
@@ -44,7 +45,7 @@ public:
     void
     subscribeToLastKnownStateReceived( OnLastKnownStateReceivedCallback callback )
     {
-        mLastKnownStateListeners.subscribe( callback );
+        mLastKnownStateListeners.subscribe( std::move( callback ) );
     }
 
 private:

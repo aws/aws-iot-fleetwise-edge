@@ -44,6 +44,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #ifdef FWE_FEATURE_UDS_DTC
@@ -188,7 +189,7 @@ public:
     void
     setConnectivityModuleConfigHook( std::function<bool( const IoTFleetWiseConfig &config )> hook )
     {
-        mConnectivityModuleConfigHook = hook;
+        mConnectivityModuleConfigHook = std::move( hook );
     }
 
     /**
@@ -199,7 +200,7 @@ public:
     void
     setNetworkInterfaceConfigHook( std::function<bool( const IoTFleetWiseConfig &networkInterfaceConfig )> hook )
     {
-        mNetworkInterfaceConfigHook = hook;
+        mNetworkInterfaceConfigHook = std::move( hook );
     }
 
     /**
@@ -211,7 +212,7 @@ public:
     void
     setStartupConfigHook( std::function<void( const IoTFleetWiseConfig &config )> hook )
     {
-        mStartupConfigHook = hook;
+        mStartupConfigHook = std::move( hook );
     }
 
     /**
@@ -222,7 +223,7 @@ public:
     void
     setShutdownConfigHook( std::function<bool()> hook )
     {
-        mShutdownConfigHook = hook;
+        mShutdownConfigHook = std::move( hook );
     }
 
     SignalBufferDistributor mSignalBufferDistributor;

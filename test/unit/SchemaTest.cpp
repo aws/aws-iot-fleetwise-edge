@@ -103,11 +103,11 @@ protected:
             std::make_unique<Schema>( mReceiverDecoderManifest, mReceiverCollectionSchemeList, mSender );
 
         mCollectionSchemeIngestion->subscribeToDecoderManifestUpdate(
-            [&]( const IDecoderManifestPtr &decoderManifest ) {
+            [&]( std::shared_ptr<IDecoderManifest> decoderManifest ) {
                 mReceivedDecoderManifest = decoderManifest;
             } );
         mCollectionSchemeIngestion->subscribeToCollectionSchemeUpdate(
-            [&]( const ICollectionSchemeListPtr &collectionSchemeList ) {
+            [&]( std::shared_ptr<ICollectionSchemeList> collectionSchemeList ) {
                 mReceivedCollectionSchemeList = collectionSchemeList;
             } );
     }
@@ -134,8 +134,8 @@ protected:
     StrictMock<Testing::SenderMock> mSender;
     std::unique_ptr<Schema> mCollectionSchemeIngestion;
 
-    IDecoderManifestPtr mReceivedDecoderManifest;
-    ICollectionSchemeListPtr mReceivedCollectionSchemeList;
+    std::shared_ptr<IDecoderManifest> mReceivedDecoderManifest;
+    std::shared_ptr<ICollectionSchemeList> mReceivedCollectionSchemeList;
 };
 
 TEST_F( SchemaTest, Checkins )

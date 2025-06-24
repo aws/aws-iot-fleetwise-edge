@@ -19,6 +19,13 @@
 #include <unistd.h>
 #include <utility>
 
+#ifdef __COVERITY__
+// coverity[misra_cpp_2008_rule_16_0_3_violation]
+#undef CMSG_FIRSTHDR
+// coverity[autosar_cpp14_a7_1_7_violation]
+#define CMSG_FIRSTHDR( mhdr ) ( reinterpret_cast<struct cmsghdr *>( mhdr ) )
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -139,6 +146,7 @@ CANDataSource::extractTimestamp( struct msghdr &msgHeader )
 void
 CANDataSource::doWork()
 {
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     Timestamp lastFrameTime = 0;
     uint32_t activations = 0;
     bool wokeUpFromSleep =
@@ -148,7 +156,12 @@ CANDataSource::doWork()
     while ( true )
     {
         activations++;
-        if ( mDecoderDictionary == nullptr )
+        std::shared_ptr<const CANDecoderDictionary> decoderDictionary;
+        {
+            std::lock_guard<std::mutex> lock( mDecoderDictMutex );
+            decoderDictionary = mDecoderDictionary;
+        }
+        if ( decoderDictionary == nullptr )
         {
             // We either just started or there was a decoder manifest update that we can't use
             // We should sleep
@@ -214,7 +227,7 @@ CANDataSource::doWork()
                 TraceModule::get().setVariable( traceFrames, mReceivedMessages );
                 std::lock_guard<std::mutex> lock( mDecoderDictMutex );
                 mConsumer.processMessage(
-                    mChannelId, mDecoderDictionary.get(), frame[i].can_id, frame[i].data, frame[i].len, timestamp );
+                    mChannelId, decoderDictionary.get(), frame[i].can_id, frame[i].data, frame[i].len, timestamp );
             }
         }
         if ( nmsgs < PARALLEL_RECEIVED_FRAMES_FROM_KERNEL )
@@ -229,6 +242,7 @@ CANDataSource::doWork()
                 logTimer.reset();
             }
             mWait.wait( static_cast<uint32_t>( mIdleTimeMs ) );
+            // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
             wokeUpFromSleep = false;
         }
         if ( shouldStop() )

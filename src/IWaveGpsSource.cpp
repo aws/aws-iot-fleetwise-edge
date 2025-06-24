@@ -45,7 +45,9 @@ IWaveGpsSource::pollData()
     }
 
     // search for $GPGGA line and extract data from it
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     double lastValidLongitude = 0;
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     double lastValidLatitude = 0;
     bool foundValid = false;
     int i = 0;
@@ -58,6 +60,7 @@ IWaveGpsSource::pollData()
             double latitudeRaw = HUGE_VAL;
             bool north = true;
             bool east = true;
+            // coverity[INTEGER_OVERFLOW:FALSE] bytes - ( i + 7 ) won't overflow as i depends on bytes, which is limited
             int processedBytes = extractLongAndLatitudeFromLine(
                 &mBuffer[i + 7], static_cast<int>( bytes ) - ( i + 7 ), longitudeRaw, latitudeRaw, north, east );
             i += processedBytes;
@@ -78,10 +81,8 @@ IWaveGpsSource::pollData()
         mValidCoordinateCounter++;
 
         std::vector<std::pair<std::string, DecodedSignalValue>> values;
-        values.emplace_back(
-            std::make_pair( mLatitudeSignalName, DecodedSignalValue( lastValidLatitude, SignalType::DOUBLE ) ) );
-        values.emplace_back(
-            std::make_pair( mLongitudeSignalName, DecodedSignalValue( lastValidLongitude, SignalType::DOUBLE ) ) );
+        values.emplace_back( mLatitudeSignalName, DecodedSignalValue( lastValidLatitude, SignalType::DOUBLE ) );
+        values.emplace_back( mLongitudeSignalName, DecodedSignalValue( lastValidLongitude, SignalType::DOUBLE ) );
         mNamedSignalDataSource->ingestMultipleSignalValues( 0, values );
     }
 

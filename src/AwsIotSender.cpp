@@ -10,6 +10,7 @@
 #include <aws/crt/Types.h>
 #include <aws/crt/mqtt/Mqtt5Packets.h>
 #include <functional>
+#include <utility>
 
 namespace Aws
 {
@@ -100,7 +101,7 @@ AwsIotSender::sendBuffer(
         break;
     }
 
-    publishMessageToTopic( topic, buf, size, callback, sdkQos );
+    publishMessageToTopic( topic, buf, size, std::move( callback ), sdkQos );
 }
 
 void
@@ -139,9 +140,10 @@ AwsIotSender::publishMessageToTopic(
             callback( ConnectivityError::Success );
         };
 
-    std::shared_ptr<Aws::Crt::Mqtt5::PublishPacket> publishPacket = std::make_shared<Aws::Crt::Mqtt5::PublishPacket>(
-        topic.c_str(), Aws::Crt::ByteCursorFromByteBuf( payload ), qos );
-    if ( !mMqttClient.Publish( publishPacket, onPublishComplete ) )
+    // coverity[autosar_cpp14_a20_8_6_violation] can't use make_shared as unique_ptr is moved
+    if ( !mMqttClient.Publish( std::make_shared<Aws::Crt::Mqtt5::PublishPacket>(
+                                   topic.c_str(), Aws::Crt::ByteCursorFromByteBuf( payload ), qos ),
+                               onPublishComplete ) )
     {
         callback( ConnectivityError::TransmissionError );
     }

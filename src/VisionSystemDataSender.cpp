@@ -11,6 +11,7 @@
 #include "aws/iotfleetwise/TimeTypes.h"
 #include <boost/variant.hpp>
 #include <cstdint>
+#include <functional>
 #include <istream>
 #include <utility>
 #include <vector>
@@ -133,7 +134,7 @@ VisionSystemDataSender::processData( const DataToSend &data, OnDataProcessedCall
         " Signals:" + std::to_string( triggeredVisionSystemData->signals.size() ) + " " + firstSignalValues +
         firstSignalTimestamp + " trigger timestamp: " + std::to_string( triggeredVisionSystemData->triggerTime ) );
 
-    transformVisionSystemDataToIon( *triggeredVisionSystemData, callback );
+    transformVisionSystemDataToIon( *triggeredVisionSystemData, std::move( callback ) );
 }
 
 void
@@ -218,7 +219,7 @@ VisionSystemDataSender::transformVisionSystemDataToIon( const TriggeredVisionSys
                            metadata = triggeredVisionSystemData.metadata,
                            eventID = triggeredVisionSystemData.eventID,
                            triggerTime = triggeredVisionSystemData.triggerTime,
-                           callback]
+                           callback = std::move( callback )]
         // coverity[autosar_cpp14_a8_4_11_violation] smart pointer needed to match the expected signature
         ( ConnectivityError result, std::shared_ptr<std::streambuf> data ) -> void {
         if ( result != ConnectivityError::Success )

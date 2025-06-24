@@ -222,7 +222,7 @@ void
 LastKnownStateWorkerThread::onStateTemplatesChanged( std::shared_ptr<StateTemplateList> stateTemplates )
 {
     std::lock_guard<std::mutex> lock( mStateTemplatesMutex );
-    mStateTemplatesInput = stateTemplates;
+    mStateTemplatesInput = std::move( stateTemplates );
     mStateTemplatesAvailable = true;
     FWE_LOG_TRACE( "State templates were updated" );
     // Wake up the thread.

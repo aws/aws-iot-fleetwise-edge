@@ -35,7 +35,7 @@ public:
     virtual ~SubscribeStreamHandler() = default;
 
 private:
-    // coverity[autosar_cpp14_a0_1_3_violation] false positive - function overrides sdk's virtual function.
+    // coverity[autosar_cpp14_a0_1_3_violation:FALSE] function overrides sdk's virtual function.
     void OnStreamEvent( Aws::Greengrass::IoTCoreMessage *response ) override;
 
     SubscribeCallback mCallback;

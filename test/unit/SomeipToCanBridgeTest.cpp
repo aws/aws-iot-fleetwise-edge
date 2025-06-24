@@ -197,7 +197,7 @@ protected:
         ASSERT_DOUBLE_EQ( signal.value.value.doubleVal, 0x4050607 );
     }
 
-    SignalBufferPtr mSignalBuffer;
+    std::shared_ptr<SignalBuffer> mSignalBuffer;
     SignalBufferDistributor mSignalBufferDistributor;
     CANDataConsumer mCanConsumer{ mSignalBufferDistributor };
     std::shared_ptr<StrictMock<SomeipApplicationMock>> mSomeipApplicationMock;

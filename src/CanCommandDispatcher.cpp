@@ -243,6 +243,7 @@ CanCommandDispatcher::setupReception()
     {
         mIoStream.async_read_some(
             boost::asio::null_buffers(),
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             std::bind(
                 &CanCommandDispatcher::handleCanFrameReception, this, std::placeholders::_1, std::placeholders::_2 ) );
     }
@@ -260,7 +261,9 @@ CanCommandDispatcher::setupTimeout( boost::asio::steady_timer &timer, std::strin
     try
     {
         timer.expires_after( std::chrono::milliseconds( timeoutMs ) );
-        timer.async_wait( std::bind( &CanCommandDispatcher::handleTimeout, this, std::placeholders::_1, commandId ) );
+        timer.async_wait(
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            std::bind( &CanCommandDispatcher::handleTimeout, this, std::placeholders::_1, commandId ) );
     }
     catch ( const std::exception &e )
     {

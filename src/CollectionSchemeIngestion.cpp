@@ -9,12 +9,12 @@
 #include <exception>
 #include <google/protobuf/message.h>
 #include <string>
+#include <utility>
 #include <vector>
 
 #ifdef FWE_FEATURE_VISION_SYSTEM_DATA
 #include "aws/iotfleetwise/MessageTypes.h"
 #include <unordered_map>
-#include <utility>
 #endif
 
 namespace Aws
@@ -62,7 +62,7 @@ bool
 CollectionSchemeIngestion::copyData(
     std::shared_ptr<Schemas::CollectionSchemesMsg::CollectionScheme> protoCollectionSchemeMessagePtr )
 {
-    mProtoCollectionSchemeMessagePtr = protoCollectionSchemeMessagePtr;
+    mProtoCollectionSchemeMessagePtr = std::move( protoCollectionSchemeMessagePtr );
     return true;
 }
 
@@ -612,15 +612,12 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
         return nullptr;
     }
     expressionNodes.emplace_back();
-    ExpressionNode *currentNode = nullptr;
-    if ( expressionNodes.empty() || ( expressionNodes.size() <= nextIndex ) )
+    if ( expressionNodes.size() <= nextIndex )
     {
         return nullptr;
     }
-    else
-    {
-        currentNode = &( expressionNodes[nextIndex] );
-    }
+
+    ExpressionNode *currentNode = &( expressionNodes[nextIndex] );
     nextIndex++;
 
     if ( node.node_case() == Schemas::CommonTypesMsg::ConditionNode::kNodeSignalId )
@@ -694,7 +691,7 @@ CollectionSchemeIngestion::serializeNode( const Schemas::CommonTypesMsg::Conditi
             currentNode->function.customFunctionName = node.node_function().custom_function().function_name();
             // Generate a (probably) unique ID for the custom function invocation based on the collection scheme sync ID
             // and the invocation index:
-            auto collectionSchemeId = mProtoCollectionSchemeMessagePtr->campaign_sync_id();
+            const auto &collectionSchemeId = mProtoCollectionSchemeMessagePtr->campaign_sync_id();
             auto invocationInfo = collectionSchemeId + ":" + std::to_string( mCustomFunctionInvocationCounter );
             boost::uuids::detail::sha1 invocationHash;
             try

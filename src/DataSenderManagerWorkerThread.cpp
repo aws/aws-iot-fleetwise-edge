@@ -15,6 +15,7 @@ namespace Aws
 namespace IoTFleetWise
 {
 
+// coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
 const uint32_t DataSenderManagerWorkerThread::MAX_NUMBER_OF_SIGNAL_TO_TRACE_LOG = 6;
 
 DataSenderManagerWorkerThread::DataSenderManagerWorkerThread(

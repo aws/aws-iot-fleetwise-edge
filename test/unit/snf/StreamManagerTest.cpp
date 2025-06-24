@@ -6,13 +6,10 @@
 #include "aws/iotfleetwise/CANInterfaceIDTranslator.h"
 #include "aws/iotfleetwise/Clock.h"
 #include "aws/iotfleetwise/ClockHandler.h"
-#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
 #include "aws/iotfleetwise/CollectionSchemeIngestion.h"
-#include "aws/iotfleetwise/DataSenderProtoWriter.h"
+#include "aws/iotfleetwise/DataSenderTypes.h"
 #include "aws/iotfleetwise/ICollectionScheme.h"
 #include "aws/iotfleetwise/ICollectionSchemeList.h"
-#include "aws/iotfleetwise/OBDDataTypes.h"
-#include "aws/iotfleetwise/SignalTypes.h"
 #include "aws/iotfleetwise/snf/DataSenderProtoReader.h"
 #include "aws/iotfleetwise/snf/StoreFileSystem.h"
 #include "aws/iotfleetwise/snf/StoreLogger.h"
@@ -23,15 +20,14 @@
 #include <aws/store/stream/fileStream.hpp>
 #include <aws/store/stream/stream.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/optional/optional.hpp>
 #include <chrono>
-#include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <functional>
 #include <gtest/gtest.h>
 #include <memory>
 #include <set>
-#include <snappy.h>
 #include <string>
 #include <thread>
 #include <vector>
@@ -51,30 +47,29 @@ protected:
         mTranslator.add( "can123" );
         mPersistenceRootDir = getTempDir();
         auto protoReader = std::make_shared<DataSenderProtoReader>( mTranslator );
-        mStreamManager = std::make_shared<Store::StreamManager>(
-            mPersistenceRootDir.string(), std::make_unique<DataSenderProtoWriter>( mTranslator, nullptr ), 0 );
+        mStreamManager = std::make_shared<Store::StreamManager>( mPersistenceRootDir.string() );
         mProtoReader = std::make_shared<DataSenderProtoReader>( mTranslator );
         setupCampaignTestData();
     }
 
     CANInterfaceIDTranslator mTranslator;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
-    std::shared_ptr<Store::Logger> mLogger = std::make_shared<Aws::IoTFleetWise::Store::Logger>();
+    std::shared_ptr<Store::Logger> mLogger = std::make_shared<Store::Logger>();
     boost::filesystem::path mPersistenceRootDir;
     std::shared_ptr<Store::StreamManager> mStreamManager;
     std::shared_ptr<DataSenderProtoReader> mProtoReader;
 
     // campaign test data
-    std::shared_ptr<const Aws::IoTFleetWise::ActiveCollectionSchemes> noCampaigns;
-    std::shared_ptr<const Aws::IoTFleetWise::ActiveCollectionSchemes> campaignWithSinglePartition;
-    std::shared_ptr<const Aws::IoTFleetWise::ActiveCollectionSchemes> campaignWithTwoPartitions;
-    std::shared_ptr<const Aws::IoTFleetWise::ActiveCollectionSchemes> campaignWithInvalidStorageLocation;
-    std::shared_ptr<const Aws::IoTFleetWise::ActiveCollectionSchemes> campaignWithOneSecondTTL;
+    std::shared_ptr<const Aws::IoTFleetWise::ActiveCollectionSchemes> mNoCampaigns;
+    std::shared_ptr<const Aws::IoTFleetWise::ActiveCollectionSchemes> mCampaignWithSinglePartition;
+    std::shared_ptr<const Aws::IoTFleetWise::ActiveCollectionSchemes> mCampaignWithTwoPartitions;
+    std::shared_ptr<const Aws::IoTFleetWise::ActiveCollectionSchemes> mCampaignWithInvalidStorageLocation;
+    std::shared_ptr<const Aws::IoTFleetWise::ActiveCollectionSchemes> mCampaignWithOneSecondTTL;
 
     void
     TearDown() override
     {
-        mStreamManager->onChangeCollectionSchemeList( noCampaigns );
+        mStreamManager->onChangeCollectionSchemeList( mNoCampaigns );
         ASSERT_TRUE( boost::filesystem::is_empty( mPersistenceRootDir ) );
         boost::filesystem::remove( mPersistenceRootDir );
     }
@@ -86,7 +81,7 @@ protected:
         {
             Aws::IoTFleetWise::ActiveCollectionSchemes out;
             convertSchemes( {}, out );
-            noCampaigns = std::make_shared<const Aws::IoTFleetWise::ActiveCollectionSchemes>( out );
+            mNoCampaigns = std::make_shared<const Aws::IoTFleetWise::ActiveCollectionSchemes>( out );
         }
         // campaign with one partition
         {
@@ -113,7 +108,7 @@ protected:
 
             Aws::IoTFleetWise::ActiveCollectionSchemes out;
             convertScheme( scheme, out );
-            campaignWithSinglePartition = std::make_shared<const Aws::IoTFleetWise::ActiveCollectionSchemes>( out );
+            mCampaignWithSinglePartition = std::make_shared<const Aws::IoTFleetWise::ActiveCollectionSchemes>( out );
         }
         // campaign with two partitions
         {
@@ -153,7 +148,7 @@ protected:
 
             Aws::IoTFleetWise::ActiveCollectionSchemes out;
             convertScheme( scheme, out );
-            campaignWithTwoPartitions = std::make_shared<const Aws::IoTFleetWise::ActiveCollectionSchemes>( out );
+            mCampaignWithTwoPartitions = std::make_shared<const Aws::IoTFleetWise::ActiveCollectionSchemes>( out );
         }
         // campaign with invalid storage location
         {
@@ -179,7 +174,7 @@ protected:
 
             Aws::IoTFleetWise::ActiveCollectionSchemes out;
             convertScheme( scheme, out );
-            campaignWithInvalidStorageLocation =
+            mCampaignWithInvalidStorageLocation =
                 std::make_shared<const Aws::IoTFleetWise::ActiveCollectionSchemes>( out );
         }
         // campaign with no ttl
@@ -206,7 +201,7 @@ protected:
 
             Aws::IoTFleetWise::ActiveCollectionSchemes out;
             convertScheme( scheme, out );
-            campaignWithOneSecondTTL = std::make_shared<const Aws::IoTFleetWise::ActiveCollectionSchemes>( out );
+            mCampaignWithOneSecondTTL = std::make_shared<const Aws::IoTFleetWise::ActiveCollectionSchemes>( out );
         }
     }
 
@@ -234,16 +229,6 @@ protected:
             activeSchemes.activeCollectionSchemes.emplace_back( campaign );
         }
         convertedSchemes = activeSchemes;
-    }
-
-    inline DTCInfo
-    fakeDtcInfo()
-    {
-        DTCInfo info{};
-        info.receiveTime = mClock->systemTimeSinceEpochMs();
-        info.mSID = SID::TESTING;
-        info.mDTCCodes.emplace_back( "code" );
-        return info;
     }
 
     static inline std::string
@@ -276,9 +261,9 @@ protected:
     getStream( boost::filesystem::path streamLocation, std::shared_ptr<aws::store::stream::FileStream> &out )
     {
         const std::shared_ptr<aws::store::filesystem::FileSystemInterface> fs =
-            std::make_shared<Aws::IoTFleetWise::Store::PosixFileSystem>( streamLocation );
+            std::make_shared<Store::PosixFileSystem>( streamLocation );
         auto stream_or = aws::store::stream::FileStream::openOrCreate( aws::store::stream::StreamOptions{
-            mStreamManager->STREAM_DEFAULT_MIN_SEGMENT_SIZE,
+            Store::StreamManager::STREAM_DEFAULT_MIN_SEGMENT_SIZE,
             static_cast<uint32_t>( partitionMaximumSizeInBytes ),
             true,
             fs,
@@ -287,8 +272,8 @@ protected:
                 true,
                 fs,
                 mLogger,
-                mStreamManager->KV_STORE_IDENTIFIER,
-                mStreamManager->KV_COMPACT_AFTER,
+                Store::StreamManager::KV_STORE_IDENTIFIER,
+                Store::StreamManager::KV_COMPACT_AFTER,
             },
         } );
         ASSERT_TRUE( stream_or.ok() );
@@ -310,30 +295,17 @@ protected:
         }
         return numFiles;
     }
-
-    void
-    deserialize( std::string record, bool decompress, TriggeredCollectionSchemeData &data )
-    {
-        if ( decompress )
-        {
-            std::string out;
-            ASSERT_TRUE( snappy::Uncompress( record.data(), record.size(), &out ) );
-            record = out;
-        }
-        ASSERT_TRUE( mProtoReader->setupVehicleData( record ) );
-        ASSERT_TRUE( mProtoReader->deserializeVehicleData( data ) );
-    }
 };
 
 TEST_F( StreamManagerTest, StreamAppendFailsIfEmptyData )
 {
-    TriggeredCollectionSchemeData data{};
+    TelemetryDataToPersist data( CollectionSchemeParams(), 1, std::make_shared<std::string>(), 1, 0 );
     ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::STREAM_NOT_FOUND );
 }
 
-TEST_F( StreamManagerTest, StreamHasCamapaign )
+TEST_F( StreamManagerTest, StreamHasCampaign )
 {
-    auto campaign = campaignWithSinglePartition;
+    auto campaign = mCampaignWithSinglePartition;
     auto campaignID = getCampaignID( campaign );
     std::string unknownCampaignID = "unknownCampaignID";
 
@@ -343,257 +315,159 @@ TEST_F( StreamManagerTest, StreamHasCamapaign )
     ASSERT_FALSE( mStreamManager->hasCampaign( unknownCampaignID ) );
 }
 
-TEST_F( StreamManagerTest, StreamAppendsNoSignals )
-{
-    auto campaign = campaignWithSinglePartition;
-    auto campaignID = getCampaignID( campaign );
-    mStreamManager->onChangeCollectionSchemeList( campaign );
-
-    TriggeredCollectionSchemeData data{};
-    data.metadata.collectionSchemeID = campaignID;
-    data.metadata.campaignArn = campaignID;
-    data.metadata.persist = true;
-    data.signals = {};
-
-    ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::EMPTY_DATA );
-}
-
 TEST_F( StreamManagerTest, StreamAppendFailsWhenStorageLocationIsInvalid )
 {
-    auto campaign = campaignWithInvalidStorageLocation;
+    auto campaign = mCampaignWithInvalidStorageLocation;
     auto campaignID = getCampaignID( campaign );
     mStreamManager->onChangeCollectionSchemeList( campaign );
 
-    TriggeredCollectionSchemeData data{};
-    data.metadata.collectionSchemeID = campaignID;
-    data.metadata.campaignArn = campaignID;
-    data.metadata.persist = true;
-    data.signals = {};
+    CollectionSchemeParams collectionSchemeParams;
+    collectionSchemeParams.collectionSchemeID = campaignID;
+    collectionSchemeParams.campaignArn = campaignID;
+    collectionSchemeParams.persist = true;
+    TelemetryDataToPersist data( collectionSchemeParams, 1, std::make_shared<std::string>(), 1, 0 );
 
     ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::STREAM_NOT_FOUND );
 }
 
 TEST_F( StreamManagerTest, StreamAppendFailsForNonExistantCampaign )
 {
-    auto campaign = campaignWithSinglePartition;
+    auto campaign = mCampaignWithSinglePartition;
     mStreamManager->onChangeCollectionSchemeList( campaign );
 
-    TriggeredCollectionSchemeData data{};
-    data.metadata.collectionSchemeID = "unknown";
-    data.metadata.campaignArn = "unknown";
-    data.signals = { CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 0, SignalType::UINT8 } };
-    data.mDTCInfo = fakeDtcInfo();
+    CollectionSchemeParams collectionSchemeParams;
+    collectionSchemeParams.collectionSchemeID = "unknown";
+    collectionSchemeParams.campaignArn = "unknown";
+    TelemetryDataToPersist data( collectionSchemeParams, 1, std::make_shared<std::string>(), 1, 0 );
 
     ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::STREAM_NOT_FOUND );
 }
 
 TEST_F( StreamManagerTest, StreamAppendOneSignalOnePartition )
 {
-    auto campaign = campaignWithSinglePartition;
+    auto campaign = mCampaignWithSinglePartition;
     auto campaignID = getCampaignID( campaign );
     auto campaignArn = getCampaignArn( campaign );
     mStreamManager->onChangeCollectionSchemeList( campaign );
 
-    TriggeredCollectionSchemeData data{};
-    data.eventID = 1234;
-    data.triggerTime = 12345567;
-    data.metadata.collectionSchemeID = campaignID;
-    data.metadata.campaignArn = campaignArn;
-    data.signals = { CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 0, SignalType::UINT8 },
-                     CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 1, SignalType::UINT8 },
-                     // signals that are not part of the campaign
-                     CollectedSignal{ 1, mClock->systemTimeSinceEpochMs(), 2, SignalType::UINT8 },
-                     CollectedSignal{ 2, mClock->systemTimeSinceEpochMs(), 3, SignalType::UINT8 },
-                     CollectedSignal{ 3, mClock->systemTimeSinceEpochMs(), 4, SignalType::UINT8 } };
-    data.mDTCInfo = fakeDtcInfo();
+    auto serializedData = std::make_shared<std::string>( "fake raw data" );
+    CollectionSchemeParams collectionSchemeParams;
+    collectionSchemeParams.triggerTime = 1234567;
+    collectionSchemeParams.collectionSchemeID = campaignID;
+    collectionSchemeParams.campaignArn = campaignArn;
+    TelemetryDataToPersist data( collectionSchemeParams, 1, serializedData, 0, 0 );
 
     ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::SUCCESS );
 
     // ensure stream files are written to expected location
     auto expectedPartitionLocation =
-        mPersistenceRootDir / boost::filesystem::path{ mStreamManager->getName( campaignID ) } /
+        mPersistenceRootDir / boost::filesystem::path{ Store::StreamManager::getName( campaignID ) } /
         campaign->activeCollectionSchemes[0]->getStoreAndForwardConfiguration()[0].storageOptions.storageLocation;
     verifyStreamLocationAndSize( expectedPartitionLocation, 1 );
 
     // verify we can read back the data
     std::string record;
-    Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+    Store::StreamManager::RecordMetadata metadata;
     std::function<void()> checkpoint;
     ASSERT_EQ( mStreamManager->readFromStream( campaignID, 0, record, metadata, checkpoint ),
-               Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-    ASSERT_EQ( metadata.triggerTime, data.triggerTime );
+               Store::StreamManager::ReturnCode::SUCCESS );
+    ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
     checkpoint();
 
-    TriggeredCollectionSchemeData readData;
-    deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
-
-    // verify data contents are correct
-    ASSERT_EQ( readData.eventID, data.eventID );
-    ASSERT_EQ( readData.triggerTime, data.triggerTime );
-    // metadata
-    ASSERT_EQ( readData.metadata.collectionSchemeID, data.metadata.collectionSchemeID );
-    ASSERT_EQ( readData.metadata.decoderID, data.metadata.decoderID );
-    ASSERT_EQ( readData.metadata.persist, data.metadata.persist );
-    ASSERT_EQ( readData.metadata.compress, data.metadata.compress );
-    ASSERT_EQ( readData.metadata.priority, data.metadata.priority );
-    // signals
-    size_t expectedNumSignals = 2;
-    ASSERT_EQ( readData.signals.size(), expectedNumSignals );
-    for ( size_t i = 0; i < expectedNumSignals; ++i )
-    {
-        ASSERT_EQ( readData.signals[i].receiveTime, data.signals[i].receiveTime );
-        ASSERT_EQ( readData.signals[i].signalID, data.signals[i].signalID );
-        ASSERT_EQ( readData.signals[i].value.value.doubleVal,
-                   static_cast<double>( data.signals[i].value.value.uint8Val ) );
-    }
-    // DTC
-    ASSERT_FALSE( readData.mDTCInfo.hasItems() );
+    ASSERT_EQ( record, *serializedData );
 }
 
 TEST_F( StreamManagerTest, StreamAppendSignalsAcrossMultiplePartitions )
 {
-    auto campaign = campaignWithTwoPartitions;
+    auto campaign = mCampaignWithTwoPartitions;
     auto campaignID = getCampaignID( campaign );
     auto campaignArn = getCampaignArn( campaign );
     mStreamManager->onChangeCollectionSchemeList( campaign );
 
-    TriggeredCollectionSchemeData data{};
-    data.triggerTime = 12345567;
-    data.metadata.collectionSchemeID = campaignID;
-    data.metadata.campaignArn = campaignArn;
-    // two signals for each of the two partitions
-    data.signals = { CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 0, SignalType::UINT8 },
-                     CollectedSignal{ 1, mClock->systemTimeSinceEpochMs(), 1, SignalType::UINT8 },
-                     CollectedSignal{ 2, mClock->systemTimeSinceEpochMs(), 2, SignalType::UINT8 },
-                     CollectedSignal{ 3, mClock->systemTimeSinceEpochMs(), 3, SignalType::UINT8 } };
-    data.mDTCInfo = fakeDtcInfo();
+    auto serializedData1 = std::make_shared<std::string>( "fake raw data partition 0" );
+    auto serializedData2 = std::make_shared<std::string>( "fake raw data partition 1" );
+    CollectionSchemeParams collectionSchemeParams;
+    collectionSchemeParams.triggerTime = 1234567;
+    collectionSchemeParams.collectionSchemeID = campaignID;
+    collectionSchemeParams.campaignArn = campaignArn;
+    TelemetryDataToPersist data1( collectionSchemeParams, 1, serializedData1, 0, 0 );
+    TelemetryDataToPersist data2( collectionSchemeParams, 1, serializedData2, 1, 0 );
 
-    ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::SUCCESS );
+    ASSERT_EQ( mStreamManager->appendToStreams( data1 ), Store::StreamManager::ReturnCode::SUCCESS );
+    ASSERT_EQ( mStreamManager->appendToStreams( data2 ), Store::StreamManager::ReturnCode::SUCCESS );
 
     // ensure partition 0 is written to disk at the proper location and contains 1 entry
     auto expectedPartitionLocation =
-        mPersistenceRootDir / boost::filesystem::path{ mStreamManager->getName( campaignID ) } /
+        mPersistenceRootDir / boost::filesystem::path{ Store::StreamManager::getName( campaignID ) } /
         campaign->activeCollectionSchemes[0]->getStoreAndForwardConfiguration()[0].storageOptions.storageLocation;
     verifyStreamLocationAndSize( expectedPartitionLocation, 1 );
 
     // ensure partition 1 is written to disk at the proper location and contains 1 entry
     expectedPartitionLocation =
-        mPersistenceRootDir / boost::filesystem::path{ mStreamManager->getName( campaignID ) } /
+        mPersistenceRootDir / boost::filesystem::path{ Store::StreamManager::getName( campaignID ) } /
         campaign->activeCollectionSchemes[0]->getStoreAndForwardConfiguration()[1].storageOptions.storageLocation;
     verifyStreamLocationAndSize( expectedPartitionLocation, 1 );
 
     // verify we can read back partition 0 data
     {
         std::string record;
-        Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+        Store::StreamManager::RecordMetadata metadata;
         std::function<void()> checkpoint;
         ASSERT_EQ( mStreamManager->readFromStream( campaignID, 0, record, metadata, checkpoint ),
-                   Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-        ASSERT_EQ( metadata.triggerTime, data.triggerTime );
+                   Store::StreamManager::ReturnCode::SUCCESS );
+        ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
         checkpoint();
 
-        TriggeredCollectionSchemeData readData;
-        deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
-
-        // verify data contents are correct
-        ASSERT_EQ( readData.eventID, data.eventID );
-        ASSERT_EQ( readData.triggerTime, data.triggerTime );
-        // metadata
-        ASSERT_EQ( readData.metadata.collectionSchemeID, data.metadata.collectionSchemeID );
-        ASSERT_EQ( readData.metadata.decoderID, data.metadata.decoderID );
-        ASSERT_EQ( readData.metadata.persist, data.metadata.persist );
-        ASSERT_EQ( readData.metadata.compress, data.metadata.compress );
-        ASSERT_EQ( readData.metadata.priority, data.metadata.priority );
-        // signals
-        ASSERT_EQ( readData.signals.size(), 2 );
-        ASSERT_EQ( readData.signals[0].receiveTime, data.signals[0].receiveTime );
-        ASSERT_EQ( readData.signals[0].signalID, data.signals[0].signalID );
-        ASSERT_EQ( readData.signals[0].value.value.doubleVal,
-                   static_cast<double>( data.signals[0].value.value.uint8Val ) );
-        ASSERT_EQ( readData.signals[1].receiveTime, data.signals[1].receiveTime );
-        ASSERT_EQ( readData.signals[1].signalID, data.signals[1].signalID );
-        ASSERT_EQ( readData.signals[1].value.value.doubleVal,
-                   static_cast<double>( data.signals[1].value.value.uint8Val ) );
-        // DTC
-        ASSERT_FALSE( readData.mDTCInfo.hasItems() );
+        ASSERT_EQ( record, *serializedData1 );
     }
     {
         // verify we can read back partition 1 data
         std::string record;
-        Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+        Store::StreamManager::RecordMetadata metadata;
         std::function<void()> checkpoint;
         ASSERT_EQ( mStreamManager->readFromStream( campaignID, 1, record, metadata, checkpoint ),
-                   Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-        ASSERT_EQ( metadata.triggerTime, data.triggerTime );
+                   Store::StreamManager::ReturnCode::SUCCESS );
+        ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
         checkpoint();
 
-        TriggeredCollectionSchemeData readData;
-        deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
-
-        // verify data contents are correct
-        ASSERT_EQ( readData.eventID, data.eventID );
-        ASSERT_EQ( readData.triggerTime, data.triggerTime );
-        // metadata
-        ASSERT_EQ( readData.metadata.collectionSchemeID, data.metadata.collectionSchemeID );
-        ASSERT_EQ( readData.metadata.decoderID, data.metadata.decoderID );
-        ASSERT_EQ( readData.metadata.persist, data.metadata.persist );
-        ASSERT_EQ( readData.metadata.compress, data.metadata.compress );
-        ASSERT_EQ( readData.metadata.priority, data.metadata.priority );
-        // signals
-        ASSERT_EQ( readData.signals.size(), 2 );
-        ASSERT_EQ( readData.signals[0].receiveTime, data.signals[2].receiveTime );
-        ASSERT_EQ( readData.signals[0].signalID, data.signals[2].signalID );
-        ASSERT_EQ( readData.signals[0].value.value.doubleVal,
-                   static_cast<double>( data.signals[2].value.value.uint8Val ) );
-        ASSERT_EQ( readData.signals[1].receiveTime, data.signals[3].receiveTime );
-        ASSERT_EQ( readData.signals[1].signalID, data.signals[3].signalID );
-        ASSERT_EQ( readData.signals[1].value.value.doubleVal,
-                   static_cast<double>( data.signals[3].value.value.uint8Val ) );
-        // DTC
-        ASSERT_FALSE( readData.mDTCInfo.hasItems() );
+        ASSERT_EQ( record, *serializedData2 );
     }
 }
 
 TEST_F( StreamManagerTest, StreamMultipleAppendSignalsAcrossMultiplePartitions )
 {
-    auto campaign = campaignWithTwoPartitions;
+    auto campaign = mCampaignWithTwoPartitions;
     auto campaignID = getCampaignID( campaign );
     auto campaignArn = getCampaignArn( campaign );
     mStreamManager->onChangeCollectionSchemeList( campaign );
 
-    TriggeredCollectionSchemeData data{};
-    data.triggerTime = 12345567;
-    data.metadata.collectionSchemeID = campaignID;
-    data.metadata.campaignArn = campaignArn;
-    // two signals for each of the two partitions
-    data.signals = { CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 0, SignalType::UINT8 },
-                     CollectedSignal{ 1, mClock->systemTimeSinceEpochMs(), 1, SignalType::UINT8 },
-                     CollectedSignal{ 2, mClock->systemTimeSinceEpochMs(), 2, SignalType::UINT8 },
-                     CollectedSignal{ 3, mClock->systemTimeSinceEpochMs(), 3, SignalType::UINT8 } };
-    data.mDTCInfo = fakeDtcInfo();
-    ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::SUCCESS );
+    auto serializedData1Partition0 = std::make_shared<std::string>( "fake raw data 1 partition 0" );
+    auto serializedData2Partition0 = std::make_shared<std::string>( "fake raw data 2 partition 0" );
+    auto serializedData1Partition1 = std::make_shared<std::string>( "fake raw data 1 partition 1" );
+    auto serializedData2Partition1 = std::make_shared<std::string>( "fake raw data 2 partition 1" );
+    CollectionSchemeParams collectionSchemeParams;
+    collectionSchemeParams.triggerTime = 1234567;
+    collectionSchemeParams.collectionSchemeID = campaignID;
+    collectionSchemeParams.campaignArn = campaignArn;
+    TelemetryDataToPersist data1Partition0( collectionSchemeParams, 1, serializedData1Partition0, 0, 0 );
+    TelemetryDataToPersist data2Partition0( collectionSchemeParams, 1, serializedData2Partition0, 0, 0 );
+    TelemetryDataToPersist data1Partition1( collectionSchemeParams, 1, serializedData1Partition1, 1, 0 );
+    TelemetryDataToPersist data2Partition1( collectionSchemeParams, 1, serializedData2Partition1, 1, 0 );
 
-    TriggeredCollectionSchemeData data2{};
-    data2.triggerTime = 12345567;
-    data2.metadata.collectionSchemeID = campaignID;
-    data2.metadata.campaignArn = campaignID;
-    // two signals for each of the two partitions
-    data2.signals = { CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 4, SignalType::UINT8 },
-                      CollectedSignal{ 1, mClock->systemTimeSinceEpochMs(), 5, SignalType::UINT8 },
-                      CollectedSignal{ 2, mClock->systemTimeSinceEpochMs(), 6, SignalType::UINT8 },
-                      CollectedSignal{ 3, mClock->systemTimeSinceEpochMs(), 7, SignalType::UINT8 } };
-    data2.mDTCInfo = fakeDtcInfo();
-    ASSERT_EQ( mStreamManager->appendToStreams( data2 ), Store::StreamManager::ReturnCode::SUCCESS );
+    ASSERT_EQ( mStreamManager->appendToStreams( data1Partition0 ), Store::StreamManager::ReturnCode::SUCCESS );
+    ASSERT_EQ( mStreamManager->appendToStreams( data1Partition1 ), Store::StreamManager::ReturnCode::SUCCESS );
+    ASSERT_EQ( mStreamManager->appendToStreams( data2Partition0 ), Store::StreamManager::ReturnCode::SUCCESS );
+    ASSERT_EQ( mStreamManager->appendToStreams( data2Partition1 ), Store::StreamManager::ReturnCode::SUCCESS );
 
     // ensure partition 0 is written to disk at the proper location and contains 2 entries
     auto expectedPartitionLocation =
-        mPersistenceRootDir / boost::filesystem::path{ mStreamManager->getName( campaignID ) } /
+        mPersistenceRootDir / boost::filesystem::path{ Store::StreamManager::getName( campaignID ) } /
         campaign->activeCollectionSchemes[0]->getStoreAndForwardConfiguration()[0].storageOptions.storageLocation;
     verifyStreamLocationAndSize( expectedPartitionLocation, 2 );
 
     // ensure partition 1 is written to disk at the proper location and contains 2 entries
     expectedPartitionLocation =
-        mPersistenceRootDir / boost::filesystem::path{ mStreamManager->getName( campaignID ) } /
+        mPersistenceRootDir / boost::filesystem::path{ Store::StreamManager::getName( campaignID ) } /
         campaign->activeCollectionSchemes[0]->getStoreAndForwardConfiguration()[1].storageOptions.storageLocation;
     verifyStreamLocationAndSize( expectedPartitionLocation, 2 );
 
@@ -602,73 +476,27 @@ TEST_F( StreamManagerTest, StreamMultipleAppendSignalsAcrossMultiplePartitions )
     {
         // partition 0 entry 1
         std::string record;
-        Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+        Store::StreamManager::RecordMetadata metadata;
         std::function<void()> checkpoint;
         ASSERT_EQ( mStreamManager->readFromStream( campaignID, 0, record, metadata, checkpoint ),
-                   Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-        ASSERT_EQ( metadata.triggerTime, data.triggerTime );
+                   Store::StreamManager::ReturnCode::SUCCESS );
+        ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
         checkpoint();
 
-        TriggeredCollectionSchemeData readData;
-        deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
-
-        // verify data contents are correct
-        ASSERT_EQ( readData.eventID, data.eventID );
-        ASSERT_EQ( readData.triggerTime, data.triggerTime );
-        // metadata
-        ASSERT_EQ( readData.metadata.collectionSchemeID, data.metadata.collectionSchemeID );
-        ASSERT_EQ( readData.metadata.decoderID, data.metadata.decoderID );
-        ASSERT_EQ( readData.metadata.persist, data.metadata.persist );
-        ASSERT_EQ( readData.metadata.compress, data.metadata.compress );
-        ASSERT_EQ( readData.metadata.priority, data.metadata.priority );
-        // signals
-        ASSERT_EQ( readData.signals.size(), 2 );
-        ASSERT_EQ( readData.signals[0].receiveTime, data.signals[0].receiveTime );
-        ASSERT_EQ( readData.signals[0].signalID, data.signals[0].signalID );
-        ASSERT_EQ( readData.signals[0].value.value.doubleVal,
-                   static_cast<double>( data.signals[0].value.value.uint8Val ) );
-        ASSERT_EQ( readData.signals[1].receiveTime, data.signals[1].receiveTime );
-        ASSERT_EQ( readData.signals[1].signalID, data.signals[1].signalID );
-        ASSERT_EQ( readData.signals[1].value.value.doubleVal,
-                   static_cast<double>( data.signals[1].value.value.uint8Val ) );
-        // DTC
-        ASSERT_FALSE( readData.mDTCInfo.hasItems() );
+        ASSERT_EQ( record, *serializedData1Partition0 );
     }
 
     {
         // partition 0 entry 2
         std::string record;
-        Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+        Store::StreamManager::RecordMetadata metadata;
         std::function<void()> checkpoint;
         ASSERT_EQ( mStreamManager->readFromStream( campaignID, 0, record, metadata, checkpoint ),
-                   Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-        ASSERT_EQ( metadata.triggerTime, data2.triggerTime );
+                   Store::StreamManager::ReturnCode::SUCCESS );
+        ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
         checkpoint();
 
-        TriggeredCollectionSchemeData readData;
-        deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
-
-        // verify data contents are correct
-        ASSERT_EQ( readData.eventID, data2.eventID );
-        ASSERT_EQ( readData.triggerTime, data2.triggerTime );
-        // metadata
-        ASSERT_EQ( readData.metadata.collectionSchemeID, data2.metadata.collectionSchemeID );
-        ASSERT_EQ( readData.metadata.decoderID, data2.metadata.decoderID );
-        ASSERT_EQ( readData.metadata.persist, data2.metadata.persist );
-        ASSERT_EQ( readData.metadata.compress, data2.metadata.compress );
-        ASSERT_EQ( readData.metadata.priority, data2.metadata.priority );
-        // signals
-        ASSERT_EQ( readData.signals.size(), 2 );
-        ASSERT_EQ( readData.signals[0].receiveTime, data2.signals[0].receiveTime );
-        ASSERT_EQ( readData.signals[0].signalID, data2.signals[0].signalID );
-        ASSERT_EQ( readData.signals[0].value.value.doubleVal,
-                   static_cast<double>( data2.signals[0].value.value.uint8Val ) );
-        ASSERT_EQ( readData.signals[1].receiveTime, data2.signals[1].receiveTime );
-        ASSERT_EQ( readData.signals[1].signalID, data2.signals[1].signalID );
-        ASSERT_EQ( readData.signals[1].value.value.doubleVal,
-                   static_cast<double>( data2.signals[1].value.value.uint8Val ) );
-        // DTC
-        ASSERT_FALSE( readData.mDTCInfo.hasItems() );
+        ASSERT_EQ( record, *serializedData2Partition0 );
     }
 
     // verify we can read back partition 1 data
@@ -676,246 +504,124 @@ TEST_F( StreamManagerTest, StreamMultipleAppendSignalsAcrossMultiplePartitions )
     {
         // partition 1 entry 1
         std::string record;
-        Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+        Store::StreamManager::RecordMetadata metadata;
         std::function<void()> checkpoint;
         ASSERT_EQ( mStreamManager->readFromStream( campaignID, 1, record, metadata, checkpoint ),
-                   Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-        ASSERT_EQ( metadata.triggerTime, data.triggerTime );
+                   Store::StreamManager::ReturnCode::SUCCESS );
+        ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
         checkpoint();
 
-        TriggeredCollectionSchemeData readData;
-        deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
-
-        // verify data contents are correct
-        ASSERT_EQ( readData.eventID, data.eventID );
-        ASSERT_EQ( readData.triggerTime, data.triggerTime );
-        // metadata
-        ASSERT_EQ( readData.metadata.collectionSchemeID, data.metadata.collectionSchemeID );
-        ASSERT_EQ( readData.metadata.decoderID, data.metadata.decoderID );
-        ASSERT_EQ( readData.metadata.persist, data.metadata.persist );
-        ASSERT_EQ( readData.metadata.compress, data.metadata.compress );
-        ASSERT_EQ( readData.metadata.priority, data.metadata.priority );
-        // signals
-        ASSERT_EQ( readData.signals.size(), 2 );
-        ASSERT_EQ( readData.signals[0].receiveTime, data.signals[2].receiveTime );
-        ASSERT_EQ( readData.signals[0].signalID, data.signals[2].signalID );
-        ASSERT_EQ( readData.signals[0].value.value.doubleVal,
-                   static_cast<double>( data.signals[2].value.value.uint8Val ) );
-        ASSERT_EQ( readData.signals[1].receiveTime, data.signals[3].receiveTime );
-        ASSERT_EQ( readData.signals[1].signalID, data.signals[3].signalID );
-        ASSERT_EQ( readData.signals[1].value.value.doubleVal,
-                   static_cast<double>( data.signals[3].value.value.uint8Val ) );
-        // DTC
-        ASSERT_FALSE( readData.mDTCInfo.hasItems() );
+        ASSERT_EQ( record, *serializedData1Partition1 );
     }
 
     {
         // partition 1 entry 2
         std::string record;
-        Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+        Store::StreamManager::RecordMetadata metadata;
         std::function<void()> checkpoint;
         ASSERT_EQ( mStreamManager->readFromStream( campaignID, 1, record, metadata, checkpoint ),
-                   Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-        ASSERT_EQ( metadata.triggerTime, data2.triggerTime );
+                   Store::StreamManager::ReturnCode::SUCCESS );
+
+        ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
         checkpoint();
 
-        TriggeredCollectionSchemeData readData;
-        deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
-
-        // verify data contents are correct
-        ASSERT_EQ( readData.eventID, data2.eventID );
-        ASSERT_EQ( readData.triggerTime, data2.triggerTime );
-        // metadata
-        ASSERT_EQ( readData.metadata.collectionSchemeID, data2.metadata.collectionSchemeID );
-        ASSERT_EQ( readData.metadata.decoderID, data2.metadata.decoderID );
-        ASSERT_EQ( readData.metadata.persist, data2.metadata.persist );
-        ASSERT_EQ( readData.metadata.compress, data2.metadata.compress );
-        ASSERT_EQ( readData.metadata.priority, data2.metadata.priority );
-        // signals
-        ASSERT_EQ( readData.signals.size(), 2 );
-        ASSERT_EQ( readData.signals[0].receiveTime, data2.signals[2].receiveTime );
-        ASSERT_EQ( readData.signals[0].signalID, data2.signals[2].signalID );
-        ASSERT_EQ( readData.signals[0].value.value.doubleVal,
-                   static_cast<double>( data2.signals[2].value.value.uint8Val ) );
-        ASSERT_EQ( readData.signals[1].receiveTime, data2.signals[3].receiveTime );
-        ASSERT_EQ( readData.signals[1].signalID, data2.signals[3].signalID );
-        ASSERT_EQ( readData.signals[1].value.value.doubleVal,
-                   static_cast<double>( data2.signals[3].value.value.uint8Val ) );
-        // DTC
-        ASSERT_FALSE( readData.mDTCInfo.hasItems() );
+        ASSERT_EQ( record, *serializedData2Partition1 );
     }
 }
 
 TEST_F( StreamManagerTest, StreamConfigChangeWithSameName )
 {
     // test prereq: campaigns must have same name
-    ASSERT_EQ( getCampaignID( campaignWithSinglePartition ), getCampaignID( campaignWithTwoPartitions ) );
+    ASSERT_EQ( getCampaignID( mCampaignWithSinglePartition ), getCampaignID( mCampaignWithTwoPartitions ) );
 
     // verify we can set campaign config and append to a stream
     {
-        auto campaign = campaignWithSinglePartition;
+        auto campaign = mCampaignWithSinglePartition;
         auto campaignID = getCampaignID( campaign );
         auto campaignArn = getCampaignArn( campaign );
         mStreamManager->onChangeCollectionSchemeList( campaign );
 
-        TriggeredCollectionSchemeData data{};
-        data.eventID = 1234;
-        data.triggerTime = 12345567;
-        data.metadata.collectionSchemeID = campaignID;
-        data.metadata.campaignArn = campaignArn;
-        data.signals = { CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 0, SignalType::UINT8 },
-                         CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 1, SignalType::UINT8 },
-                         // signals that are not part of the campaign
-                         CollectedSignal{ 1, mClock->systemTimeSinceEpochMs(), 2, SignalType::UINT8 },
-                         CollectedSignal{ 2, mClock->systemTimeSinceEpochMs(), 3, SignalType::UINT8 },
-                         CollectedSignal{ 3, mClock->systemTimeSinceEpochMs(), 4, SignalType::UINT8 } };
-
-        data.mDTCInfo = fakeDtcInfo();
+        auto serializedData = std::make_shared<std::string>( "fake raw data" );
+        CollectionSchemeParams collectionSchemeParams;
+        collectionSchemeParams.triggerTime = 1234567;
+        collectionSchemeParams.collectionSchemeID = campaignID;
+        collectionSchemeParams.campaignArn = campaignArn;
+        TelemetryDataToPersist data( collectionSchemeParams, 1, serializedData, 0, 0 );
 
         ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::SUCCESS );
 
         // ensure stream files are written to expected location
         auto expectedPartitionLocation =
-            mPersistenceRootDir / boost::filesystem::path{ mStreamManager->getName( campaignID ) } /
+            mPersistenceRootDir / boost::filesystem::path{ Store::StreamManager::getName( campaignID ) } /
             campaign->activeCollectionSchemes[0]->getStoreAndForwardConfiguration()[0].storageOptions.storageLocation;
         verifyStreamLocationAndSize( expectedPartitionLocation, 1 );
 
         // verify we can read back the data
         std::string record;
-        Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+        Store::StreamManager::RecordMetadata metadata;
         std::function<void()> checkpoint;
         ASSERT_EQ( mStreamManager->readFromStream( campaignID, 0, record, metadata, checkpoint ),
-                   Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-        ASSERT_EQ( metadata.triggerTime, data.triggerTime );
+                   Store::StreamManager::ReturnCode::SUCCESS );
+        ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
         checkpoint();
 
-        TriggeredCollectionSchemeData readData;
-        deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
-
-        // verify data contents are correct
-        ASSERT_EQ( readData.eventID, data.eventID );
-        ASSERT_EQ( readData.triggerTime, data.triggerTime );
-        // metadata
-        ASSERT_EQ( readData.metadata.collectionSchemeID, data.metadata.collectionSchemeID );
-        ASSERT_EQ( readData.metadata.decoderID, data.metadata.decoderID );
-        ASSERT_EQ( readData.metadata.persist, data.metadata.persist );
-        ASSERT_EQ( readData.metadata.compress, data.metadata.compress );
-        ASSERT_EQ( readData.metadata.priority, data.metadata.priority );
-        // signals
-        size_t expectedNumSignals = 2;
-        ASSERT_EQ( readData.signals.size(), expectedNumSignals );
-        for ( size_t i = 0; i < expectedNumSignals; ++i )
-        {
-            ASSERT_EQ( readData.signals[i].receiveTime, data.signals[i].receiveTime );
-            ASSERT_EQ( readData.signals[i].signalID, data.signals[i].signalID );
-            ASSERT_EQ( readData.signals[i].value.value.doubleVal,
-                       static_cast<double>( data.signals[i].value.value.uint8Val ) );
-        }
-        // DTC
-        ASSERT_FALSE( readData.mDTCInfo.hasItems() );
+        ASSERT_EQ( record, *serializedData );
     }
     // verify we can set a new campaign config, with the same name as the previous, and the new config will take effect
     {
-        auto campaign = campaignWithTwoPartitions;
+        auto campaign = mCampaignWithTwoPartitions;
         auto campaignID = getCampaignID( campaign );
         auto campaignArn = getCampaignArn( campaign );
         mStreamManager->onChangeCollectionSchemeList( campaign );
 
-        TriggeredCollectionSchemeData data{};
-        data.triggerTime = 12345567;
-        data.metadata.collectionSchemeID = campaignID;
-        data.metadata.campaignArn = campaignArn;
-        // two signals for each of the two partitions
-        data.signals = { CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 0, SignalType::UINT8 },
-                         CollectedSignal{ 1, mClock->systemTimeSinceEpochMs(), 1, SignalType::UINT8 },
-                         CollectedSignal{ 2, mClock->systemTimeSinceEpochMs(), 2, SignalType::UINT8 },
-                         CollectedSignal{ 3, mClock->systemTimeSinceEpochMs(), 3, SignalType::UINT8 } };
+        auto serializedData1 = std::make_shared<std::string>( "fake raw data partition 0" );
+        auto serializedData2 = std::make_shared<std::string>( "fake raw data partition 1" );
+        CollectionSchemeParams collectionSchemeParams;
+        collectionSchemeParams.triggerTime = 1234567;
+        collectionSchemeParams.collectionSchemeID = campaignID;
+        collectionSchemeParams.campaignArn = campaignArn;
+        TelemetryDataToPersist data1( collectionSchemeParams, 1, serializedData1, 0, 0 );
+        TelemetryDataToPersist data2( collectionSchemeParams, 1, serializedData2, 1, 0 );
 
-        data.mDTCInfo = fakeDtcInfo();
-
-        ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::SUCCESS );
+        ASSERT_EQ( mStreamManager->appendToStreams( data1 ), Store::StreamManager::ReturnCode::SUCCESS );
+        ASSERT_EQ( mStreamManager->appendToStreams( data2 ), Store::StreamManager::ReturnCode::SUCCESS );
 
         // ensure partition 0 is written to disk at the proper location and contains 1 entry
         auto expectedPartitionLocation =
-            mPersistenceRootDir / boost::filesystem::path{ mStreamManager->getName( campaignID ) } /
+            mPersistenceRootDir / boost::filesystem::path{ Store::StreamManager::getName( campaignID ) } /
             campaign->activeCollectionSchemes[0]->getStoreAndForwardConfiguration()[0].storageOptions.storageLocation;
         verifyStreamLocationAndSize( expectedPartitionLocation, 1 );
 
         // ensure partition 1 is written to disk at the proper location and contains 1 entry
         expectedPartitionLocation =
-            mPersistenceRootDir / boost::filesystem::path{ mStreamManager->getName( campaignID ) } /
+            mPersistenceRootDir / boost::filesystem::path{ Store::StreamManager::getName( campaignID ) } /
             campaign->activeCollectionSchemes[0]->getStoreAndForwardConfiguration()[1].storageOptions.storageLocation;
         verifyStreamLocationAndSize( expectedPartitionLocation, 1 );
 
         // verify we can read back partition 0 data
         {
             std::string record;
-            Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+            Store::StreamManager::RecordMetadata metadata;
             std::function<void()> checkpoint;
             ASSERT_EQ( mStreamManager->readFromStream( campaignID, 0, record, metadata, checkpoint ),
-                       Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-            ASSERT_EQ( metadata.triggerTime, data.triggerTime );
+                       Store::StreamManager::ReturnCode::SUCCESS );
+            ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
             checkpoint();
 
-            TriggeredCollectionSchemeData readData;
-            deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
-
-            // verify data contents are correct
-            ASSERT_EQ( readData.eventID, data.eventID );
-            ASSERT_EQ( readData.triggerTime, data.triggerTime );
-            // metadata
-            ASSERT_EQ( readData.metadata.collectionSchemeID, data.metadata.collectionSchemeID );
-            ASSERT_EQ( readData.metadata.decoderID, data.metadata.decoderID );
-            ASSERT_EQ( readData.metadata.persist, data.metadata.persist );
-            ASSERT_EQ( readData.metadata.compress, data.metadata.compress );
-            ASSERT_EQ( readData.metadata.priority, data.metadata.priority );
-            // signals
-            ASSERT_EQ( readData.signals.size(), 2 );
-            ASSERT_EQ( readData.signals[0].receiveTime, data.signals[0].receiveTime );
-            ASSERT_EQ( readData.signals[0].signalID, data.signals[0].signalID );
-            ASSERT_EQ( readData.signals[0].value.value.doubleVal,
-                       static_cast<double>( data.signals[0].value.value.uint8Val ) );
-            ASSERT_EQ( readData.signals[1].receiveTime, data.signals[1].receiveTime );
-            ASSERT_EQ( readData.signals[1].signalID, data.signals[1].signalID );
-            ASSERT_EQ( readData.signals[1].value.value.doubleVal,
-                       static_cast<double>( data.signals[1].value.value.uint8Val ) );
-            // DTC
-            ASSERT_FALSE( readData.mDTCInfo.hasItems() );
+            ASSERT_EQ( record, *serializedData1 );
         }
         {
             // verify we can read back partition 1 data
             std::string record;
-            Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+            Store::StreamManager::RecordMetadata metadata;
             std::function<void()> checkpoint;
             ASSERT_EQ( mStreamManager->readFromStream( campaignID, 1, record, metadata, checkpoint ),
-                       Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-            ASSERT_EQ( metadata.triggerTime, data.triggerTime );
+                       Store::StreamManager::ReturnCode::SUCCESS );
+
+            ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
             checkpoint();
 
-            TriggeredCollectionSchemeData readData;
-            deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
-
-            // verify data contents are correct
-            ASSERT_EQ( readData.eventID, data.eventID );
-            ASSERT_EQ( readData.triggerTime, data.triggerTime );
-            // metadata
-            ASSERT_EQ( readData.metadata.collectionSchemeID, data.metadata.collectionSchemeID );
-            ASSERT_EQ( readData.metadata.decoderID, data.metadata.decoderID );
-            ASSERT_EQ( readData.metadata.persist, data.metadata.persist );
-            ASSERT_EQ( readData.metadata.compress, data.metadata.compress );
-            ASSERT_EQ( readData.metadata.priority, data.metadata.priority );
-            // signals
-            ASSERT_EQ( readData.signals.size(), 2 );
-            ASSERT_EQ( readData.signals[0].receiveTime, data.signals[2].receiveTime );
-            ASSERT_EQ( readData.signals[0].signalID, data.signals[2].signalID );
-            ASSERT_EQ( readData.signals[0].value.value.doubleVal,
-                       static_cast<double>( data.signals[2].value.value.uint8Val ) );
-            ASSERT_EQ( readData.signals[1].receiveTime, data.signals[3].receiveTime );
-            ASSERT_EQ( readData.signals[1].signalID, data.signals[3].signalID );
-            ASSERT_EQ( readData.signals[1].value.value.doubleVal,
-                       static_cast<double>( data.signals[3].value.value.uint8Val ) );
-            // DTC
-            ASSERT_FALSE( readData.mDTCInfo.hasItems() );
+            ASSERT_EQ( record, *serializedData2 );
         }
     }
 }
@@ -925,30 +631,30 @@ TEST_F( StreamManagerTest, ExtraStreamFilesAreDeleted )
     ASSERT_TRUE( boost::filesystem::is_empty( mPersistenceRootDir ) );
 
     // add one campaign/partition to stream manager
-    auto campaign = campaignWithSinglePartition;
+    auto campaign = mCampaignWithSinglePartition;
     auto campaignID = getCampaignID( campaign );
     auto campaignArn = getCampaignArn( campaign );
     mStreamManager->onChangeCollectionSchemeList( campaign ); // creates the kv store file
 
-    TriggeredCollectionSchemeData data{};
-    data.eventID = 1234;
-    data.triggerTime = 12345567;
-    data.metadata.collectionSchemeID = campaignID;
-    data.metadata.campaignArn = campaignArn;
-    data.signals = { CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 0, SignalType::UINT8 },
-                     CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 1, SignalType::UINT8 } };
-    data.mDTCInfo = fakeDtcInfo();
-    ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::SUCCESS ); // creates log file
+    auto serializedData = std::make_shared<std::string>( "fake raw data" );
+    CollectionSchemeParams collectionSchemeParams;
+    collectionSchemeParams.triggerTime = 1234567;
+    collectionSchemeParams.collectionSchemeID = campaignID;
+    collectionSchemeParams.campaignArn = campaignArn;
+    TelemetryDataToPersist data( collectionSchemeParams, 1, serializedData, 0, 0 );
+
+    ASSERT_EQ( mStreamManager->appendToStreams( data ),
+               Store::StreamManager::ReturnCode::SUCCESS ); // creates log file
 
     ASSERT_EQ( getNumStoreFiles(), 2 ); // stream log, kv store
 
     // create files for a stream that's unknown to stream manager
-    std::set<boost::filesystem::path> paths = { mPersistenceRootDir / boost::filesystem::path{ "fake-campaign" } /
-                                                    boost::filesystem::path{ "fake-storage-location" } /
-                                                    boost::filesystem::path{ "0.log" },
-                                                mPersistenceRootDir / boost::filesystem::path{ "fake-campaign" } /
-                                                    boost::filesystem::path{ "fake-storage-location" } /
-                                                    boost::filesystem::path{ mStreamManager->KV_STORE_IDENTIFIER } };
+    std::set<boost::filesystem::path> paths = {
+        mPersistenceRootDir / boost::filesystem::path{ "fake-campaign" } /
+            boost::filesystem::path{ "fake-storage-location" } / boost::filesystem::path{ "0.log" },
+        mPersistenceRootDir / boost::filesystem::path{ "fake-campaign" } /
+            boost::filesystem::path{ "fake-storage-location" } /
+            boost::filesystem::path{ Store::StreamManager::KV_STORE_IDENTIFIER } };
     for ( auto path : paths )
     {
         boost::filesystem::create_directories( path.parent_path() );
@@ -964,35 +670,28 @@ TEST_F( StreamManagerTest, ExtraStreamFilesAreDeleted )
 
 TEST_F( StreamManagerTest, StreamExpiresOldRecordsOnCollectionSchemeChange )
 {
-    auto campaign = campaignWithOneSecondTTL;
+    auto campaign = mCampaignWithOneSecondTTL;
     auto campaignID = getCampaignID( campaign );
     auto campaignArn = getCampaignArn( campaign );
     mStreamManager->onChangeCollectionSchemeList( campaign );
 
-    TriggeredCollectionSchemeData data{};
-    data.triggerTime = 12345567;
-    data.metadata.collectionSchemeID = campaignID;
-    data.metadata.campaignArn = campaignArn;
-    // two signals for each of the two partitions
-    data.signals = { CollectedSignal{ 0, mClock->systemTimeSinceEpochMs(), 0, SignalType::UINT8 },
-                     CollectedSignal{ 1, mClock->systemTimeSinceEpochMs(), 1, SignalType::UINT8 },
-                     CollectedSignal{ 2, mClock->systemTimeSinceEpochMs(), 2, SignalType::UINT8 },
-                     CollectedSignal{ 3, mClock->systemTimeSinceEpochMs(), 3, SignalType::UINT8 } };
-    data.mDTCInfo = fakeDtcInfo();
+    auto serializedData = std::make_shared<std::string>( "fake raw data" );
+    CollectionSchemeParams collectionSchemeParams;
+    collectionSchemeParams.triggerTime = 1234567;
+    collectionSchemeParams.collectionSchemeID = campaignID;
+    collectionSchemeParams.campaignArn = campaignArn;
+    TelemetryDataToPersist data( collectionSchemeParams, 1, serializedData, 0, 0 );
 
     // add a record to the stream
     ASSERT_EQ( mStreamManager->appendToStreams( data ), Store::StreamManager::ReturnCode::SUCCESS );
     std::string record;
-    Aws::IoTFleetWise::Store::StreamManager::RecordMetadata metadata;
+    Store::StreamManager::RecordMetadata metadata;
     std::function<void()> checkpoint;
     ASSERT_EQ( mStreamManager->readFromStream( campaignID, 0, record, metadata, checkpoint ),
-               Aws::IoTFleetWise::Store::StreamManager::ReturnCode::SUCCESS );
-    ASSERT_EQ( metadata.triggerTime, data.triggerTime );
+               Store::StreamManager::ReturnCode::SUCCESS );
+    ASSERT_EQ( metadata.triggerTime, collectionSchemeParams.triggerTime );
 
     checkpoint();
-
-    TriggeredCollectionSchemeData readData;
-    deserialize( record, campaign->activeCollectionSchemes[0]->isCompressionNeeded(), readData );
 
     // expire records
     std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
@@ -1000,7 +699,7 @@ TEST_F( StreamManagerTest, StreamExpiresOldRecordsOnCollectionSchemeChange )
 
     // verify records were removed
     ASSERT_EQ( mStreamManager->readFromStream( campaignID, 0, record, metadata, checkpoint ),
-               Aws::IoTFleetWise::Store::StreamManager::ReturnCode::END_OF_STREAM );
+               Store::StreamManager::ReturnCode::END_OF_STREAM );
 }
 
 } // namespace IoTFleetWise

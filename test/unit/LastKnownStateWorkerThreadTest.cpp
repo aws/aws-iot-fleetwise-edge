@@ -78,7 +78,7 @@ protected:
     std::unique_ptr<LastKnownStateInspector> mLastKnownStateInspector;
     std::unique_ptr<LastKnownStateWorkerThread> mLastKnownStateWorkerThread;
     std::shared_ptr<DataSenderQueue> mCommandResponses;
-    SignalBufferPtr mSignalBufferPtr;
+    std::shared_ptr<SignalBuffer> mSignalBufferPtr;
     std::shared_ptr<const Clock> mClock = ClockHandler::getClock();
     std::shared_ptr<DataSenderQueue> mCollectedSignals;
 };

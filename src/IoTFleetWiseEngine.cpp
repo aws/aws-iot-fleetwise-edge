@@ -82,8 +82,8 @@
 
 extern "C"
 {
-    // coverity[cert_msc54_cpp_violation] False positive - function does have C linkage
     static void
+    // coverity[cert_msc54_cpp_violation:FALSE] function does have C linkage
     signalHandler( int signum )
     {
         // Very few things are safe in a signal handler. So we never do anything other than set the atomic int, not even
@@ -91,20 +91,22 @@ extern "C"
         Aws::IoTFleetWise::gSignal = signum;
     }
 
-    // coverity[cert_msc54_cpp_violation] False positive - function does have C linkage
     static void
+    // coverity[cert_msc54_cpp_violation:FALSE] function does have C linkage
     segFaultHandler( int signum )
     {
         static_cast<void>( signum );
         // SIGSEGV handlers should never return. We have to abort:
         // https://wiki.sei.cmu.edu/confluence/display/c/SIG35-C.+Do+not+return+from+a+computational+exception+signal+handler
         // coverity[autosar_cpp14_m18_0_3_violation]
+        // coverity[autosar_cpp14_a15_5_2_violation]
         // coverity[misra_cpp_2008_rule_18_0_3_violation]
+        // coverity[cert_err50_cpp_violation]
         abort();
     }
 
-    // coverity[cert_msc54_cpp_violation] False positive - function does have C linkage
     static void
+    // coverity[cert_msc54_cpp_violation:FALSE] function does have C linkage
     abortHandler( int signum )
     {
         static_cast<void>( signum );
@@ -116,6 +118,7 @@ extern "C"
         // directly anywhere else, flushing should be safe here.
         if ( Aws::IoTFleetWise::gOngoingLogMessage == 0 )
         {
+            // coverity[cert_msc54_cpp_violation] as commented above, this should be fine in this situation
             Aws::IoTFleetWise::LoggingModule::flush();
         }
     }
@@ -381,10 +384,9 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         auto awsSdkLogLevel = AwsBootstrap::logLevelFromString(
             config["staticConfig"]["internalParameters"]["awsSdkLogLevel"].asStringOptional().get_value_or( "Warn" ) );
         auto bootstrapPtr = AwsBootstrap::getInstance( awsSdkLogLevel ).getClientBootStrap();
-        std::size_t maxAwsSdkHeapMemoryBytes = 0U;
         if ( config["staticConfig"]["internalParameters"].isMember( "maximumAwsSdkHeapMemoryBytes" ) )
         {
-            maxAwsSdkHeapMemoryBytes =
+            std::size_t maxAwsSdkHeapMemoryBytes =
                 config["staticConfig"]["internalParameters"]["maximumAwsSdkHeapMemoryBytes"].asSizeRequired();
             if ( ( maxAwsSdkHeapMemoryBytes != 0U ) &&
                  AwsSDKMemoryManager::getInstance().setLimit( maxAwsSdkHeapMemoryBytes ) )
@@ -427,10 +429,9 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             }
             else if ( mqttConfig.isMember( "privateKeyFilename" ) )
             {
-                auto privKeyPathAbs =
+                privateKey = getFileContents(
                     getAbsolutePath( mqttConfig["privateKeyFilename"].asStringRequired(), configFileDirectoryPath )
-                        .string();
-                privateKey = getFileContents( privKeyPathAbs );
+                        .string() );
             }
             if ( mqttConfig.isMember( "certificate" ) )
             {
@@ -438,10 +439,9 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             }
             else if ( mqttConfig.isMember( "certificateFilename" ) )
             {
-                auto certPathAbs =
+                certificate = getFileContents(
                     getAbsolutePath( mqttConfig["certificateFilename"].asStringRequired(), configFileDirectoryPath )
-                        .string();
-                certificate = getFileContents( certPathAbs );
+                        .string() );
             }
             if ( mqttConfig.isMember( "rootCA" ) )
             {
@@ -449,10 +449,9 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             }
             else if ( mqttConfig.isMember( "rootCAFilename" ) )
             {
-                auto rootCAPathAbs =
+                rootCA = getFileContents(
                     getAbsolutePath( mqttConfig["rootCAFilename"].asStringRequired(), configFileDirectoryPath )
-                        .string();
-                rootCA = getFileContents( rootCAPathAbs );
+                        .string() );
             }
             // coverity[autosar_cpp14_a20_8_5_violation] - can't use make_unique as the constructor is private
             auto builder = std::unique_ptr<Aws::Iot::Mqtt5ClientBuilder>(
@@ -698,10 +697,7 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         {
             const auto persistencyPath = config["staticConfig"]["persistency"]["persistencyPath"].asStringRequired();
 
-            mStreamManager = std::make_unique<Aws::IoTFleetWise::Store::StreamManager>(
-                persistencyPath,
-                std::make_unique<DataSenderProtoWriter>( mCANIDTranslator, mRawDataBufferManager.get() ),
-                config["staticConfig"]["publishToCloudParameters"]["maxPublishMessageCount"].asU32Required() );
+            mStreamManager = std::make_unique<Aws::IoTFleetWise::Store::StreamManager>( persistencyPath );
         }
 #endif
 
@@ -797,8 +793,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                                                              *mStreamForwarder,
                                                              clientId );
 
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             mConnectivityModule->subscribeToConnectionEstablished(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 std::bind( &IoTJobsDataRequestHandler::onConnectionEstablished, mIoTJobsDataRequestHandler.get() ) );
         }
 #endif
@@ -824,10 +820,10 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 clientConfiguration.maxConnections = s3MaxConnections;
                 transferManagerConfiguration.transferExecutor = getTransferManagerExecutor().get();
                 auto s3Client =
-                    std::make_shared<Aws::S3::S3Client>( mAwsCredentialsProvider,
+                    std::make_unique<Aws::S3::S3Client>( mAwsCredentialsProvider,
                                                          Aws::MakeShared<Aws::S3::S3EndpointProvider>( "S3Client" ),
                                                          clientConfiguration );
-                transferManagerConfiguration.s3Client = s3Client;
+                transferManagerConfiguration.s3Client = std::move( s3Client );
                 return std::make_shared<TransferManagerWrapper>(
                     Aws::Transfer::TransferManager::Create( transferManagerConfiguration ) );
             };
@@ -892,13 +888,13 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             return false;
         }
 
-        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
         mCollectedDataReadyToPublish->subscribeToNewDataAvailable(
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             std::bind( &DataSenderManagerWorkerThread::onDataReadyToPublish, mDataSenderManagerWorkerThread.get() ) );
 
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
-        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
         mLastKnownStateDataReadyToPublish->subscribeToNewDataAvailable(
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             std::bind( &DataSenderManagerWorkerThread::onDataReadyToPublish, mDataSenderManagerWorkerThread.get() ) );
 #endif
         /*************************DataSender bootstrap end*********************************/
@@ -964,8 +960,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
 
         // Make sure the CollectionScheme Manager can notify the Inspection Engine about the availability of
         // a new set of collection CollectionSchemes.
-        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
         mCollectionSchemeManagerPtr->subscribeToInspectionMatrixChange(
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             std::bind( &CollectionInspectionWorkerThread::onChangeInspectionMatrix,
                        mCollectionInspectionWorkerThread.get(),
                        std::placeholders::_1 ) );
@@ -975,8 +971,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         // a new set of collection CollectionSchemes.
         if ( visionSystemDataSender != nullptr )
         {
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             mCollectionSchemeManagerPtr->subscribeToCollectionSchemeListChange(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 std::bind( &VisionSystemDataSender::onChangeCollectionSchemeList,
                            visionSystemDataSender,
                            std::placeholders::_1 ) );
@@ -984,8 +980,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
 
         if ( ionWriter != nullptr )
         {
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 std::bind( &DataSenderIonWriter::onChangeOfActiveDictionary,
                            ionWriter,
                            std::placeholders::_1,
@@ -995,8 +991,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
 #ifdef FWE_FEATURE_STORE_AND_FORWARD
         if ( mStoreAndForwardEnabled )
         {
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             mCollectionSchemeManagerPtr->subscribeToCollectionSchemeListChange(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 std::bind( &Aws::IoTFleetWise::Store::StreamManager::onChangeCollectionSchemeList,
                            mStreamManager.get(),
                            std::placeholders::_1 ) );
@@ -1007,9 +1003,10 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
 
         mDataFetchManager = std::make_shared<DataFetchManager>( mFetchQueue );
         mFetchQueue->subscribeToNewDataAvailable(
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             std::bind( &DataFetchManager::onNewFetchRequestAvailable, mDataFetchManager.get() ) );
-        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
         mCollectionSchemeManagerPtr->subscribeToFetchMatrixChange(
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             std::bind( &DataFetchManager::onChangeFetchMatrix, mDataFetchManager.get(), std::placeholders::_1 ) );
         /********************************Data source bootstrap start*******************************/
 
@@ -1048,8 +1045,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                     FWE_LOG_ERROR( "Failed to initialize CANDataSource" );
                     return false;
                 }
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &CANDataSource::onChangeOfActiveDictionary,
                                canSourcePtr.get(),
                                std::placeholders::_1,
@@ -1077,15 +1074,17 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                         return false;
                     }
 
-                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                         std::bind( &OBDOverCANModule::onChangeOfActiveDictionary,
                                    mOBDOverCANModule.get(),
                                    std::placeholders::_1,
                                    std::placeholders::_2 ) );
-                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
-                    mCollectionSchemeManagerPtr->subscribeToInspectionMatrixChange( std::bind(
-                        &OBDOverCANModule::onChangeInspectionMatrix, mOBDOverCANModule.get(), std::placeholders::_1 ) );
+                    mCollectionSchemeManagerPtr->subscribeToInspectionMatrixChange(
+                        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                        std::bind( &OBDOverCANModule::onChangeInspectionMatrix,
+                                   mOBDOverCANModule.get(),
+                                   std::placeholders::_1 ) );
                 }
                 else
                 {
@@ -1099,8 +1098,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                     continue;
                 }
                 mExternalCANDataSource = std::make_unique<ExternalCANDataSource>( mCANIDTranslator, *mCANDataConsumer );
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &ExternalCANDataSource::onChangeOfActiveDictionary,
                                mExternalCANDataSource.get(),
                                std::placeholders::_1,
@@ -1114,8 +1113,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 }
                 mNamedSignalDataSource =
                     std::make_shared<NamedSignalDataSource>( interfaceId, mSignalBufferDistributor );
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &NamedSignalDataSource::onChangeOfActiveDictionary,
                                mNamedSignalDataSource.get(),
                                std::placeholders::_1,
@@ -1131,8 +1130,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 // coverity[autosar_cpp14_a20_8_4_violation] Shared pointer interface required for unit testing
                 auto namedSignalDataSource =
                     std::make_shared<NamedSignalDataSource>( interfaceId, mSignalBufferDistributor );
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &NamedSignalDataSource::onChangeOfActiveDictionary,
                                namedSignalDataSource.get(),
                                std::placeholders::_1,
@@ -1161,8 +1160,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 FWE_LOG_INFO( "UDS Template DTC Interface Type received" );
                 mDiagnosticNamedSignalDataSource =
                     std::make_shared<NamedSignalDataSource>( interfaceId, mSignalBufferDistributor );
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &NamedSignalDataSource::onChangeOfActiveDictionary,
                                mDiagnosticNamedSignalDataSource.get(),
                                std::placeholders::_1,
@@ -1215,8 +1214,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 mROS2DataSource = std::make_shared<ROS2DataSource>(
                     ros2Config, mSignalBufferDistributor, mRawDataBufferManager.get() );
                 mROS2DataSource->connect();
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &ROS2DataSource::onChangeOfActiveDictionary,
                                mROS2DataSource.get(),
                                std::placeholders::_1,
@@ -1247,8 +1246,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                     FWE_LOG_ERROR( "Failed to initialize SomeipToCanBridge" );
                     return false;
                 }
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &SomeipToCanBridge::onChangeOfActiveDictionary,
                                bridge.get(),
                                std::placeholders::_1,
@@ -1303,8 +1302,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                     continue;
                 }
                 mAaosVhalSource = std::make_shared<AaosVhalSource>( interfaceId, mSignalBufferDistributor );
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &AaosVhalSource::onChangeOfActiveDictionary,
                                mAaosVhalSource.get(),
                                std::placeholders::_1,
@@ -1321,8 +1320,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 // coverity[autosar_cpp14_a20_8_4_violation] Shared pointer interface required for unit testing
                 auto namedSignalDataSource =
                     std::make_shared<NamedSignalDataSource>( interfaceId, mSignalBufferDistributor );
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &NamedSignalDataSource::onChangeOfActiveDictionary,
                                namedSignalDataSource.get(),
                                std::placeholders::_1,
@@ -1351,8 +1350,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 // coverity[autosar_cpp14_a20_8_4_violation] Shared pointer interface required for unit testing
                 auto namedSignalDataSource =
                     std::make_shared<NamedSignalDataSource>( interfaceId, mSignalBufferDistributor );
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 mCollectionSchemeManagerPtr->subscribeToActiveDecoderDictionaryChange(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &NamedSignalDataSource::onChangeOfActiveDictionary,
                                namedSignalDataSource.get(),
                                std::placeholders::_1,
@@ -1387,12 +1386,14 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             FWE_LOG_ERROR( "Failed to start the Remote Diagnostics Data Source" );
             return false;
         }
-        mDataFetchManager->registerCustomFetchFunction( "DTC_QUERY",
-                                                        std::bind( &RemoteDiagnosticDataSource::DTC_QUERY,
-                                                                   mDiagnosticDataSource.get(),
-                                                                   std::placeholders::_1,
-                                                                   std::placeholders::_2,
-                                                                   std::placeholders::_3 ) );
+        mDataFetchManager->registerCustomFetchFunction(
+            "DTC_QUERY",
+            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+            std::bind( &RemoteDiagnosticDataSource::DTC_QUERY,
+                       mDiagnosticDataSource.get(),
+                       std::placeholders::_1,
+                       std::placeholders::_2,
+                       std::placeholders::_3 ) );
 #endif
 /********************************Data source bootstrap end*******************************/
 
@@ -1480,10 +1481,10 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 clientConfiguration.region = bucketRegion;
                 clientConfiguration.maxConnections = s3MaxConnections;
                 auto s3Client =
-                    std::make_shared<Aws::S3::S3Client>( mAwsCredentialsProvider,
+                    std::make_unique<Aws::S3::S3Client>( mAwsCredentialsProvider,
                                                          Aws::MakeShared<Aws::S3::S3EndpointProvider>( "S3Client" ),
                                                          clientConfiguration );
-                transferManagerConfiguration->s3Client = s3Client;
+                transferManagerConfiguration->s3Client = std::move( s3Client );
                 return std::make_shared<TransferManagerWrapper>(
                     Aws::Transfer::TransferManager::Create( *transferManagerConfiguration ) );
             };
@@ -1557,26 +1558,27 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 *receiverCommandRequest, mCommandResponses, mRawDataBufferManager.get() );
             if ( receiverRejectedCommandResponse != nullptr )
             {
-                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 receiverRejectedCommandResponse->subscribeToDataReceived(
+                    // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                     std::bind( &CommandSchema::onRejectedCommandResponseReceived, std::placeholders::_1 ) );
             }
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
-            mCommandResponses->subscribeToNewDataAvailable( std::bind(
-                &DataSenderManagerWorkerThread::onDataReadyToPublish, mDataSenderManagerWorkerThread.get() ) );
+            mCommandResponses->subscribeToNewDataAvailable(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
+                std::bind( &DataSenderManagerWorkerThread::onDataReadyToPublish,
+                           mDataSenderManagerWorkerThread.get() ) );
             if ( !mActuatorCommandManager->start() )
             {
                 FWE_LOG_ERROR( "Failed to init and start the Command Manager" );
                 return false;
             }
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             mCollectionSchemeManagerPtr->subscribeToCustomSignalDecoderFormatMapChange(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 std::bind( &ActuatorCommandManager::onChangeOfCustomSignalDecoderFormatMap,
                            mActuatorCommandManager.get(),
                            std::placeholders::_1,
                            std::placeholders::_2 ) );
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             mCommandSchema->subscribeToActuatorCommandRequestReceived(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 std::bind( &ActuatorCommandManager::onReceivingCommandRequest,
                            mActuatorCommandManager.get(),
                            std::placeholders::_1 ) );
@@ -1617,8 +1619,8 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 std::bind( &LastKnownStateWorkerThread::onNewCommandReceived,
                            mLastKnownStateWorkerThread.get(),
                            std::placeholders::_1 ) );
-            // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
             lastKnownStateSignalBuffer->subscribeToNewDataAvailable(
+                // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
                 std::bind( &LastKnownStateWorkerThread::onNewDataAvailable, mLastKnownStateWorkerThread.get() ) );
 
             if ( !mLastKnownStateWorkerThread->start() )
