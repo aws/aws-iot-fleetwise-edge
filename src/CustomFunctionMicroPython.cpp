@@ -21,6 +21,24 @@ extern "C"
 #include <py/runtime.h>
 }
 
+#ifdef __COVERITY__
+// coverity[misra_cpp_2008_rule_16_0_3_violation]
+#undef mp_obj_is_bool
+#define mp_obj_is_bool( o ) ( true )
+// coverity[misra_cpp_2008_rule_16_0_3_violation]
+#undef mp_obj_is_float
+#define mp_obj_is_float( o ) ( true )
+// coverity[misra_cpp_2008_rule_16_0_3_violation]
+#undef mp_const_none
+#define mp_const_none reinterpret_cast<mp_obj_t>( 0 )
+// coverity[misra_cpp_2008_rule_16_0_3_violation]
+#undef MP_OBJ_NEW_SMALL_INT
+#define MP_OBJ_NEW_SMALL_INT( small_int ) reinterpret_cast<mp_obj_t>( 0 )
+// coverity[misra_cpp_2008_rule_16_0_3_violation]
+#undef MP_OBJ_NEW_QSTR
+#define MP_OBJ_NEW_QSTR( qst ) reinterpret_cast<mp_obj_t>( 0 )
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise

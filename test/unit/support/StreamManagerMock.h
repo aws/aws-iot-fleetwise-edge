@@ -5,6 +5,7 @@
 
 #include "aws/iotfleetwise/snf/StreamManager.h"
 #include <gmock/gmock.h>
+#include <memory>
 #include <string>
 
 namespace Aws
@@ -17,12 +18,20 @@ namespace Testing
 class StreamManagerMock : public Aws::IoTFleetWise::Store::StreamManager
 {
 public:
-    explicit StreamManagerMock( std::unique_ptr<DataSenderProtoWriter> protoWriter )
-        : StreamManager( "", std::move( protoWriter ), 0 ){};
+    explicit StreamManagerMock()
+        : StreamManager( "" ){};
 
-    MOCK_METHOD( Store::StreamManager::ReturnCode, appendToStreams, ( const TriggeredCollectionSchemeData &data ) );
+    MOCK_METHOD( Store::StreamManager::ReturnCode,
+                 appendToStreams,
+                 ( const TelemetryDataToPersist &data ),
+                 ( override ) );
 
-    MOCK_METHOD( bool, hasCampaign, ( const Aws::IoTFleetWise::Store::CampaignName &campaignName ) );
+    MOCK_METHOD( bool, hasCampaign, ( const Aws::IoTFleetWise::Store::CampaignName &campaignName ), ( override ) );
+
+    MOCK_METHOD( std::shared_ptr<const std::vector<Store::Partition>>,
+                 getPartitions,
+                 ( const std::string &campaignArn ),
+                 ( override ) );
 };
 
 } // namespace Testing

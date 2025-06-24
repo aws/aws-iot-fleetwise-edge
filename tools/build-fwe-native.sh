@@ -69,7 +69,7 @@ parse_args() {
 
 parse_args "$@"
 
-PREFIX="/usr/local/`gcc -dumpmachine`"
+PREFIX="/usr/local"
 export PATH=${PREFIX}/bin:${PATH}
 
 CMAKE_OPTIONS="

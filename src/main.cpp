@@ -4,6 +4,7 @@
 #include "aws/iotfleetwise/IoTFleetWiseConfig.h"
 #include "aws/iotfleetwise/IoTFleetWiseEngine.h"
 #include <boost/filesystem.hpp>
+#include <cstdio>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
@@ -63,12 +64,14 @@ main( int argc, char *argv[] )
     }
     catch ( const std::exception &e )
     {
-        std::cerr << "Unhandled exception: " << std::string( e.what() ) << std::endl;
+        // Use fprintf to avoid other exceptions
+        std::fprintf( stderr, "Unhandled exception: %s\n", e.what() );
         return EXIT_FAILURE;
     }
     catch ( ... )
     {
-        std::cerr << "Unknown exception" << std::endl;
+        // Use fprintf to avoid other exceptions
+        std::fprintf( stderr, "Unknown exception\n" );
         return EXIT_FAILURE;
     }
 }

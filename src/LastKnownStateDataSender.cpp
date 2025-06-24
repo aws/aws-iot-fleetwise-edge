@@ -143,7 +143,7 @@ void
 LastKnownStateDataSender::sendProto( std::stringstream &logMessageIds,
                                      const Aws::IoTFleetWise::OnDataProcessedCallback &callback )
 {
-    auto protoOutput = std::make_shared<std::string>();
+    auto protoOutput = std::make_unique<std::string>();
 
     // Note: a class member is used to store the serialized proto output to avoid heap fragmentation
     if ( !mProtoMsg.SerializeToString( protoOutput.get() ) )
@@ -152,14 +152,14 @@ LastKnownStateDataSender::sendProto( std::stringstream &logMessageIds,
         return;
     }
 
-    auto compressedProtoOutput = std::make_shared<std::string>();
+    auto compressedProtoOutput = std::make_unique<std::string>();
     if ( snappy::Compress( protoOutput->data(), protoOutput->size(), compressedProtoOutput.get() ) == 0U )
     {
         FWE_LOG_ERROR( "Data cannot be uploaded due to compression failure for state template data with IDs: " +
                        logMessageIds.str() );
         return;
     }
-    protoOutput = compressedProtoOutput;
+    protoOutput = std::move( compressedProtoOutput );
 
     mMqttSender.sendBuffer(
         mMqttSender.getTopicConfig().lastKnownStateDataTopic,

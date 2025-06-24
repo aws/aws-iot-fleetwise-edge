@@ -88,10 +88,11 @@ ROS2DataSourceNode::subscribe( std::string topic,
         rclcpp::SubscriptionOptions sub_options;
         sub_options.callback_group = mCallbackGroup;
 
-        auto subscription = this->create_generic_subscription( topic, type, queueLength, callback, sub_options );
+        auto subscription =
+            this->create_generic_subscription( topic, type, queueLength, std::move( callback ), sub_options );
         if ( subscription )
         {
-            mSubscriptions.push_back( subscription );
+            mSubscriptions.push_back( std::move( subscription ) );
             FWE_LOG_INFO( "Subscribed to topic: '" + topic + "' with type: '" + type + "'" );
             return true;
         }
@@ -112,7 +113,6 @@ ROS2DataSourceNode::subscribe( std::string topic,
         FWE_LOG_ERROR( "Unknown Exception while subscribing to topic: '" + topic + "' with type: '" + type + "'" );
         return false;
     }
-    return false;
 }
 
 ROS2DataSource::ROS2DataSource( ROS2DataSourceConfig config,
@@ -138,7 +138,7 @@ ROS2DataSource::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &dict
         auto decoderDictionaryPtr = std::dynamic_pointer_cast<const ComplexDataDecoderDictionary>( dictionary );
         {
             std::lock_guard<std::mutex> lock( mDecoderDictMutex );
-            mAvailableDict = decoderDictionaryPtr;
+            mAvailableDict = std::move( decoderDictionaryPtr );
             mEventNewDecoderManifestAvailable = true;
         }
         mShouldSleep = false;
@@ -250,7 +250,7 @@ ROS2DataSource::topicCallback( std::shared_ptr<rclcpp::SerializedMessage> msg, s
             }
         }
     }
-    mSignalBufferDistributor.push( CollectedDataFrame( collectedSignalsGroup ) );
+    mSignalBufferDistributor.push( CollectedDataFrame( std::move( collectedSignalsGroup ) ) );
 }
 
 void
@@ -372,7 +372,7 @@ ROS2DataSource::readPrimitiveDataFromCDR( eprosima::fastcdr::Cdr &cdr,
 }
 
 bool
-ROS2DataSource::sanityCheckType( std::string dictionaryMessageId, std::string type )
+ROS2DataSource::sanityCheckType( const std::string &dictionaryMessageId, const std::string &type )
 {
     if ( mConfig.mIntrospectionLibraryCompare == CompareToIntrospection::NO_CHECK )
     {
@@ -427,18 +427,17 @@ ROS2DataSource::compareToIntrospectionTypeTree( std::string dictionaryMessageId,
     }
     const struct ComplexDataMessageFormat &messageFormat = message->second;
 
-    auto introspectionSharedLibrary =
-        rclcpp::get_typesupport_library( type,
-                                         ( rosidl_typesupport_introspection_cpp::typesupport_identifier == nullptr
-                                               ? ""
-                                               : rosidl_typesupport_introspection_cpp::typesupport_identifier ) );
+    std::string typeSupportIdentifier = rosidl_typesupport_introspection_cpp::typesupport_identifier == nullptr
+                                            ? ""
+                                            : rosidl_typesupport_introspection_cpp::typesupport_identifier;
+    auto introspectionSharedLibrary = rclcpp::get_typesupport_library( type, typeSupportIdentifier );
     if ( !introspectionSharedLibrary )
     {
         FWE_LOG_ERROR( "Can not load introspection library" );
         return false;
     }
-    auto introspectionTypeSupport = rclcpp::get_typesupport_handle(
-        type, rosidl_typesupport_introspection_cpp::typesupport_identifier, *introspectionSharedLibrary );
+    auto introspectionTypeSupport =
+        rclcpp::get_typesupport_handle( type, typeSupportIdentifier, *introspectionSharedLibrary );
 
     if ( introspectionTypeSupport == nullptr )
     {
@@ -549,7 +548,6 @@ ROS2DataSource::recursiveCompareToIntrospectionTypeTree(
              ( member.type_id_ != rosidl_typesupport_introspection_cpp::ROS_TYPE_WSTRING ) &&
              ( member.type_id_ != rosidl_typesupport_introspection_cpp::ROS_TYPE_MESSAGE ) )
         {
-            auto primitiveData = boost::get<ComplexStruct>( complexType->second );
             if ( !isTypeIdCompatiblePrimitiveToIntrospectionType(
                      complexStruct.mOrderedTypeIds[i], format, member.type_id_ ) )
             {
@@ -888,7 +886,7 @@ ROS2DataSource::processNewDecoderManifest()
         mWait.notify();
         return;
     }
-    for ( auto m : interface->second )
+    for ( const auto &m : interface->second )
     {
         mMissingMessageIdsWaitingForSubscription.push_back( m.first );
     }
@@ -931,11 +929,12 @@ ROS2DataSource::trySubscribe( std::vector<std::string> &toSubscribe )
 
                 // create_generic_subscription
                 if ( ( !sanityCheckType( s, type ) ) ||
-                     mNode->subscribe( topic,
-                                       type,
-                                       // coverity[autosar_cpp14_a18_9_1_violation] std::bind is a standard way to use
-                                       // subscribe for ROS2
+                     mNode->subscribe( std::move( topic ),
+                                       std::move( type ),
+                                       // clang-format off
+                                       // coverity[autosar_cpp14_a18_9_1_violation] std::bind is a standard way to use subscribe for ROS2
                                        std::bind( &ROS2DataSource::topicCallback, this, _1, s ),
+                                       // clang-format on
                                        mConfig.mSubscribeQueueLength ) )
                 {
                     s = ""; // Set to empty after successful subscribe or failed sanity check
@@ -944,21 +943,24 @@ ROS2DataSource::trySubscribe( std::vector<std::string> &toSubscribe )
             else
             {
                 // expand topic for example relative topic 'topic1' will get expanded to '/topic1'
-                std::string nodeName = mNode->get_name() == nullptr ? "" : mNode->get_name();
-                std::string namespaceName = mNode->get_namespace() == nullptr ? "" : mNode->get_namespace();
+                auto nodeNameCString = mNode->get_name();
+                std::string nodeName = nodeNameCString == nullptr ? "" : nodeNameCString;
+                auto namespaceNameCString = mNode->get_namespace();
+                std::string namespaceName = namespaceNameCString == nullptr ? "" : namespaceNameCString;
                 auto expandedTopic = rclcpp::expand_topic_or_service_name( s, nodeName, namespaceName, false );
                 for ( auto &found : topicAndTypes )
                 {
                     if ( ( found.first == expandedTopic ) && ( found.second.size() == 1 ) )
                     {
-                        auto type = found.second[0]; // take first type for this topic
+                        const auto &type = found.second[0]; // take first type for this topic
                         // create_generic_subscription
                         if ( ( !sanityCheckType( s, type ) ) ||
                              mNode->subscribe( found.first,
                                                type,
-                                               // coverity[autosar_cpp14_a18_9_1_violation] std::bind is a standard way
-                                               // to use subscribe for ROS2
+                                               // clang-format off
+                                               // coverity[autosar_cpp14_a18_9_1_violation] std::bind is a standard way to use subscribe for ROS2
                                                std::bind( &ROS2DataSource::topicCallback, this, _1, s ),
+                                               // clang-format on
                                                mConfig.mSubscribeQueueLength ) )
                         {
                             s = ""; // Set to empty after successful subscribe or failed sanity check

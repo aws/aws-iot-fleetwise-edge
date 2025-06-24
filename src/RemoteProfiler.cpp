@@ -227,9 +227,9 @@ RemoteProfiler::collectExecutionEnvironmentMetrics()
 
     CPUUsageInfo::ThreadCPUUsageInfos threadStatsPrevious = fLastThreadUsage;
     CPUUsageInfo::reportPerThreadUsageData( fLastThreadUsage );
-    for ( auto currentThreadCPUUsageInfo : fLastThreadUsage )
+    for ( const auto &currentThreadCPUUsageInfo : fLastThreadUsage )
     {
-        for ( auto previousThreadCPUUsageInfo : threadStatsPrevious )
+        for ( const auto &previousThreadCPUUsageInfo : threadStatsPrevious )
         {
             if ( currentThreadCPUUsageInfo.threadId == previousThreadCPUUsageInfo.threadId )
             {

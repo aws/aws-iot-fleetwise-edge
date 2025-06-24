@@ -74,7 +74,7 @@ parse_args() {
 
 parse_args "$@"
 
-NATIVE_PREFIX="/usr/local/`gcc -dumpmachine`"
+NATIVE_PREFIX="/usr/local"
 export PATH=${NATIVE_PREFIX}/bin:${PATH}
 
 CMAKE_OPTIONS="

@@ -173,7 +173,7 @@ OBDOverCANECU::pushPIDs( const EmissionInfo &info,
         }
     }
 
-    signalBufferDistributor.push( CollectedDataFrame( collectedSignalsGroup ) );
+    signalBufferDistributor.push( CollectedDataFrame( std::move( collectedSignalsGroup ) ) );
 }
 
 bool
@@ -388,7 +388,7 @@ OBDOverCANECU::updatePIDRequestList( const SID sid,
                           }
                       } );
         FWE_LOG_TRACE( "The PIDs to request from " + mStreamRxID + " are: " + getStringFromBytes( pidsToRequest ) );
-        mPIDsToRequest[sid] = pidsToRequest;
+        mPIDsToRequest[sid] = std::move( pidsToRequest );
     }
 }
 

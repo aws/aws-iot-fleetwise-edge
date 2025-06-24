@@ -199,10 +199,6 @@ struct SignalConfig
     size_t maxBytesPerSample{ 0 };
     size_t maxOverallBytes{ 0 };
     size_t reservedBytes{ 0 };
-
-    static const size_t DEFAULT_MAX_BYTES_PER_SAMPLE = 10 * 1024 * 1024; // Ten MiB
-    static const size_t DEFAULT_MAX_SAMPLES_OF_ONE_TYPE = 1000;
-    static const size_t DEFAULT_MAX_OVERALL_BYTES_PER_TYPE = 500 * 1024 * 1024; // Five hundred MiB
 };
 
 struct TypeStatistics
@@ -253,9 +249,10 @@ struct SignalBufferOverrides
     boost::optional<size_t> maxBytes;
 };
 
-// coverity[cert_dcl60_cpp_violation] false positive - class only defined once
-// coverity[autosar_cpp14_m3_2_2_violation] false positive - class only defined once
-// coverity[misra_cpp_2008_rule_3_2_2_violation ] false positive - class only defined once
+// coverity[cert_dcl60_cpp_violation:FALSE] class only defined once
+// coverity[autosar_cpp14_m3_2_2_violation:FALSE] class only defined once
+// coverity[misra_cpp_2008_rule_3_2_2_violation:FALSE] class only defined once
+// coverity[ODR_VIOLATION:FALSE] class only defined once
 class BufferManagerConfig
 {
 public:
@@ -263,6 +260,10 @@ public:
 
     BufferManagerConfig( const BufferManagerConfig & ) = default;
     BufferManagerConfig &operator=( const BufferManagerConfig & ) = default;
+    // coverity[autosar_cpp14_m3_2_2_violation:FALSE] not defined anywhere else
+    // coverity[misra_cpp_2008_rule_3_2_2_violation:FALSE] not defined anywhere else
+    // coverity[cert_dcl60_cpp_violation:FALSE] not defined anywhere else
+    // coverity[ODR_VIOLATION:FALSE] not defined anywhere else
     BufferManagerConfig( BufferManagerConfig && ) = default;
     BufferManagerConfig &operator=( BufferManagerConfig && ) = default;
 
@@ -331,7 +332,7 @@ private:
 
 struct SignalUpdateConfig
 {
-    BufferTypeId typeId;
+    BufferTypeId typeId{ 0 };
     InterfaceID interfaceId;
     std::string messageId;
 };
@@ -582,7 +583,7 @@ private:
         {
         }
 
-        BufferTypeId mTypeID;           // TypeID of the signal stored
+        BufferTypeId mTypeID{ 0 };      // TypeID of the signal stored
         size_t mMaxNumOfSamples{ 0 };   // Max number of samples that this buffer can store
         size_t mMaxBytesPerSample{ 0 }; // Max size per signal sample
         size_t mMaxOverallBytes{ 0 };   // Max size that can be stored considering all samples

@@ -121,13 +121,20 @@ OBDOverCANModule::doWork()
     while ( ( !finishECUsDetection ) && ( !shouldStop() ) )
     {
         std::vector<uint32_t> canIDResponses;
-        // If we don't have an OBD decoder manifest and we should not request DTCs,
-        // Take the thread to sleep
-        if ( ( !mShouldRequestDTCs.load( std::memory_order_relaxed ) ) && mDecoderDictionary.empty() )
         {
-            FWE_LOG_TRACE(
-                "No valid decoding dictionary available and DTC requests disabled, Module Thread going to sleep " );
-            mDataAvailableWait.wait( Signal::WaitWithPredicate );
+            bool decoderDictionaryEmpty = false;
+            {
+                std::lock_guard<std::mutex> lock( mDecoderDictMutex );
+                decoderDictionaryEmpty = mDecoderDictionary.empty();
+            }
+            // If we don't have an OBD decoder manifest and we should not request DTCs,
+            // Take the thread to sleep
+            if ( ( !mShouldRequestDTCs.load( std::memory_order_relaxed ) ) && decoderDictionaryEmpty )
+            {
+                FWE_LOG_TRACE(
+                    "No valid decoding dictionary available and DTC requests disabled, Module Thread going to sleep " );
+                mDataAvailableWait.wait( Signal::WaitWithPredicate );
+            }
         }
         // Now we will determine whether the ECUs are using extended IDs
         bool isExtendedID = false;
@@ -180,12 +187,12 @@ OBDOverCANModule::doWork()
         {
             // Reschedule
             mPIDTimer.reset();
+            // besides this thread, onChangeOfActiveDictionary can update mPIDsToRequestPerECU.
+            // Use mutex to ensure only one thread is doing the update.
+            std::lock_guard<std::mutex> lock( mDecoderDictMutex );
             // Request PID if decoder dictionary is valid and it is time to do so
             if ( !mDecoderDictionary.empty() )
             {
-                // besides this thread, onChangeOfActiveDictionary can update mPIDsToRequestPerECU.
-                // Use mutex to ensure only one thread is doing the update.
-                std::lock_guard<std::mutex> lock( mDecoderDictMutex );
                 // This should execute only once
                 if ( !hasAcquiredSupportedPIDs )
                 {
@@ -641,7 +648,7 @@ OBDOverCANModule::onChangeOfActiveDictionary( ConstDecoderDictionaryConstPtr &di
     std::sort( pidsRequestedByDecoderDict.begin(), pidsRequestedByDecoderDict.end() );
     FWE_LOG_TRACE( "Decoder Dictionary requests PIDs: " + getStringFromBytes( pidsRequestedByDecoderDict ) );
     // For now we only support OBD Service Mode 1 PID
-    mPIDsRequestedByDecoderDict[SID::CURRENT_STATS] = pidsRequestedByDecoderDict;
+    mPIDsRequestedByDecoderDict[SID::CURRENT_STATS] = std::move( pidsRequestedByDecoderDict );
 
     // If the program already know the supported PIDs from ECU, below two update will update
     // For each ecu update the PIDs requested by the Dict

@@ -52,8 +52,10 @@ OBDDataDecoder::decodeSupportedPIDs( const SID sid,
     // from the J1979 spec
     // 0x41(Positive response), 0x00( requested PID range), 4 Bytes, 0x20( requested PID range), 4 Bytes. etc
     // basePID is the requested PID range such as 0x00, 0x20
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     PID basePID = 0;
     // baseIdx is the byte index for the base PID. e.g: 1 for 0x00, 6 for 0x20.
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     size_t baseIdx = 0;
     for ( size_t i = 1; i < inputData.size(); ++i )
     {

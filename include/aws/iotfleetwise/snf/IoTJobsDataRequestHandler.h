@@ -74,6 +74,7 @@ private:
 
     void sendGetPendingExecutions();
 
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     constexpr static size_t RANDOM_STRING_SIZE = 10;
 
     enum struct jobStatus

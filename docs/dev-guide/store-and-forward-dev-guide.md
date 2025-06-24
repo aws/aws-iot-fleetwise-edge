@@ -185,7 +185,7 @@ Install the dependencies for FWE:
 
 ```bash
 cd ~/aws-iot-fleetwise-edge &&
-sudo -H ./tools/install-deps-native.sh --with-store-and-forward-support --prefix /usr/local &&
+sudo -H ./tools/install-deps-native.sh --with-store-and-forward-support &&
 sudo ldconfig
 ```
 

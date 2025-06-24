@@ -36,6 +36,7 @@ CustomFunctionCPython::~CustomFunctionCPython()
 ExpressionErrorCode
 CustomFunctionCPython::addToSysPath( const std::string &directory )
 {
+    // coverity[ autosar_cpp14_a20_8_5_violation] can't use std::make_unique
     PyObjectUniquePtr directoryObj(
         PyUnicode_DecodeUTF8( directory.c_str(), static_cast<Py_ssize_t>( directory.size() ), "replace" ),
         _Py_XDECREF );
@@ -87,6 +88,7 @@ CustomFunctionCPython::invokeScript( CustomFunctionInvocationID invocationId, co
     }
 
     // Positional params to the function are the remaining args:
+    // coverity[ autosar_cpp14_a20_8_5_violation] can't use std::make_unique
     PyObjectUniquePtr params( PyTuple_New( static_cast<Py_ssize_t>( args.size() ) - 2 ), _Py_XDECREF );
     if ( params.get() == nullptr )
     {
@@ -133,6 +135,7 @@ CustomFunctionCPython::invokeScript( CustomFunctionInvocationID invocationId, co
     }
 
     // Find the 'invoke' function in the module:
+    // coverity[ autosar_cpp14_a20_8_5_violation] can't use std::make_unique
     PyObjectUniquePtr invokeFunction(
         PyObject_GetAttrString( reinterpret_cast<PyObject *>( stateIt->second.mod ), "invoke" ), _Py_XDECREF );
     if ( invokeFunction.get() == nullptr )
@@ -141,6 +144,7 @@ CustomFunctionCPython::invokeScript( CustomFunctionInvocationID invocationId, co
         return ExpressionErrorCode::TYPE_MISMATCH;
     }
     // Call the function:
+    // coverity[ autosar_cpp14_a20_8_5_violation] can't use std::make_unique
     PyObjectUniquePtr res( PyObject_CallObject( invokeFunction.get(), params.get() ), _Py_XDECREF );
     if ( res.get() == nullptr )
     {
@@ -149,6 +153,7 @@ CustomFunctionCPython::invokeScript( CustomFunctionInvocationID invocationId, co
     }
 
     // If a tuple is returned, the first value is the result and the second value is collected data
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     PyObject *resVal{};
     // coverity[misra_cpp_2008_rule_5_0_10_violation] Error from library header macro
     // coverity[autosar_cpp14_m5_0_10_violation] Error from library header macro
@@ -286,6 +291,7 @@ CustomFunctionCPython::cleanup( CustomFunctionInvocationID invocationId )
     {
         auto gilState = PyGILState_Ensure();
         // Call the module's cleanup method if it exists:
+        // coverity[ autosar_cpp14_a20_8_5_violation] can't use std::make_unique
         PyObjectUniquePtr cleanupFunction(
             PyObject_GetAttrString( reinterpret_cast<PyObject *>( stateIt->second.mod ), "cleanup" ), _Py_XDECREF );
         if ( cleanupFunction.get() == nullptr )
@@ -295,6 +301,7 @@ CustomFunctionCPython::cleanup( CustomFunctionInvocationID invocationId )
         else
         {
             // Call the function:
+            // coverity[ autosar_cpp14_a20_8_5_violation] can't use std::make_unique
             PyObjectUniquePtr res( PyObject_CallObject( cleanupFunction.get(), nullptr ), _Py_XDECREF );
             if ( res.get() == nullptr )
             {

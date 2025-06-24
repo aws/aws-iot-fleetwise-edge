@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 source ${SCRIPT_DIR}/install-deps-versions.sh
 
-USE_CACHE="true"
+USE_CACHE="false"
 INSTALL_BUILD_TIME_DEPS="true"
 WITH_GREENGRASSV2_SUPPORT="false"
 SHARED_LIBS="OFF"
@@ -42,7 +42,6 @@ parse_args() {
             ;;
         --prefix)
             PREFIX="$2"
-            USE_CACHE="false"
             shift
             ;;
         --runtime-only)
@@ -50,6 +49,9 @@ parse_args() {
             ;;
         --shared-libs)
             SHARED_LIBS="ON"
+            ;;
+        --use-cache)
+            USE_CACHE="true"
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
@@ -135,9 +137,9 @@ if ${INSTALL_BUILD_TIME_DEPS} && [ ! -f /usr/include/linux/can/isotp.h ]; then
     rm -rf can-isotp
 fi
 
-: ${PREFIX:="/usr/local/`gcc -dumpmachine`"}
+: ${PREFIX:="/usr/local"}
 
-if ${INSTALL_BUILD_TIME_DEPS} && ( ! ${USE_CACHE} || [ ! -d ${PREFIX} ] ); then
+if ${INSTALL_BUILD_TIME_DEPS} && ( ! ${USE_CACHE} ); then
     mkdir -p ${PREFIX}
     mkdir deps-native
     cd deps-native

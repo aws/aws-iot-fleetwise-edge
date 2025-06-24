@@ -7,6 +7,7 @@
 #include "aws/iotfleetwise/TraceModule.h"
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -282,28 +283,26 @@ CollectionSchemeManager::doWork()
                 mRawDataBufferManager->updateConfig( updatedSignals );
             }
 
-            auto canDecoderDictionaryPtr = std::dynamic_pointer_cast<CANDecoderDictionary>(
-                decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] );
-            std::string decoderCanChannels = std::to_string(
-                ( decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET ) != decoderDictionaryMap.end() &&
-                  std::dynamic_pointer_cast<CANDecoderDictionary>(
-                      decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] ) != nullptr )
-                    ? std::dynamic_pointer_cast<CANDecoderDictionary>(
-                          decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] )
-                          ->canMessageDecoderMethod.size()
-                    : 0 );
-            std::string obdPids = std::to_string(
-                ( ( decoderDictionaryMap.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap.end() ) &&
-                  ( std::dynamic_pointer_cast<CANDecoderDictionary>(
-                        decoderDictionaryMap[VehicleDataSourceProtocol::OBD] ) != nullptr ) &&
-                  ( !std::dynamic_pointer_cast<CANDecoderDictionary>(
-                         decoderDictionaryMap[VehicleDataSourceProtocol::OBD] )
-                         ->canMessageDecoderMethod.empty() ) )
-                    ? std::dynamic_pointer_cast<CANDecoderDictionary>(
-                          decoderDictionaryMap[VehicleDataSourceProtocol::OBD] )
-                          ->canMessageDecoderMethod.cbegin()
-                          ->second.size()
-                    : 0 );
+            std::string decoderCanChannels = "0";
+            if ( decoderDictionaryMap.find( VehicleDataSourceProtocol::RAW_SOCKET ) != decoderDictionaryMap.end() )
+            {
+                auto canDecoderDictionary = std::dynamic_pointer_cast<CANDecoderDictionary>(
+                    decoderDictionaryMap[VehicleDataSourceProtocol::RAW_SOCKET] );
+                if ( canDecoderDictionary != nullptr )
+                {
+                    decoderCanChannels = std::to_string( canDecoderDictionary->canMessageDecoderMethod.size() );
+                }
+            }
+            std::string obdPids = "0";
+            if ( decoderDictionaryMap.find( VehicleDataSourceProtocol::OBD ) != decoderDictionaryMap.end() )
+            {
+                auto obdDecoderDictionary = std::dynamic_pointer_cast<CANDecoderDictionary>(
+                    decoderDictionaryMap[VehicleDataSourceProtocol::OBD] );
+                if ( obdDecoderDictionary != nullptr && ( !obdDecoderDictionary->canMessageDecoderMethod.empty() ) )
+                {
+                    obdPids = std::to_string( obdDecoderDictionary->canMessageDecoderMethod.cbegin()->second.size() );
+                }
+            }
             FWE_LOG_INFO( "FWE activated Decoder Manifest:" + std::string( " using decoder manifest:" ) +
                           mCurrentDecoderManifestID + " resulting in decoding rules for " +
                           std::to_string( decoderDictionaryMap.size() ) +
@@ -373,19 +372,19 @@ CollectionSchemeManager::updateCheckinDocuments()
 
 /* callback function */
 void
-CollectionSchemeManager::onCollectionSchemeUpdate( const ICollectionSchemeListPtr &collectionSchemeList )
+CollectionSchemeManager::onCollectionSchemeUpdate( std::shared_ptr<ICollectionSchemeList> collectionSchemeList )
 {
     std::lock_guard<std::mutex> lock( mSchemaUpdateMutex );
-    mCollectionSchemeListInput = collectionSchemeList;
+    mCollectionSchemeListInput = std::move( collectionSchemeList );
     mCollectionSchemeAvailable = true;
     mWait.notify();
 }
 
 void
-CollectionSchemeManager::onDecoderManifestUpdate( const IDecoderManifestPtr &decoderManifest )
+CollectionSchemeManager::onDecoderManifestUpdate( std::shared_ptr<IDecoderManifest> decoderManifest )
 {
     std::lock_guard<std::mutex> lock( mSchemaUpdateMutex );
-    mDecoderManifestInput = decoderManifest;
+    mDecoderManifestInput = std::move( decoderManifest );
     mDecoderManifestAvailable = true;
     mWait.notify();
 }
@@ -395,7 +394,7 @@ void
 CollectionSchemeManager::onStateTemplatesChanged( std::shared_ptr<LastKnownStateIngestion> lastKnownStateIngestion )
 {
     std::lock_guard<std::mutex> lock( mSchemaUpdateMutex );
-    mLastKnownStateIngestionInput = lastKnownStateIngestion;
+    mLastKnownStateIngestionInput = std::move( lastKnownStateIngestion );
     mStateTemplatesAvailable = true;
     mWait.notify();
 }
@@ -596,7 +595,7 @@ CollectionSchemeManager::rebuildMapsandTimeLine( const TimePoint &currTime )
     {
         auto startTime = collectionScheme->getStartTime();
         auto stopTime = collectionScheme->getExpiryTime();
-        auto id = collectionScheme->getCollectionSchemeID();
+        const auto &id = collectionScheme->getCollectionSchemeID();
         if ( startTime > currTime.systemTimeMs )
         {
             /* for idleCollectionSchemes, push both startTime and stopTime to timeLine */
@@ -677,7 +676,7 @@ CollectionSchemeManager::updateMapsandTimeLine( const TimePoint &currTime )
         Timestamp startTime = collectionScheme->getStartTime();
         Timestamp stopTime = collectionScheme->getExpiryTime();
 
-        auto id = collectionScheme->getCollectionSchemeID();
+        const auto &id = collectionScheme->getCollectionSchemeID();
         newCollectionSchemeIDs.insert( id );
         auto itEnabled = mEnabledCollectionSchemeMap.find( id );
         auto itIdle = mIdleCollectionSchemeMap.find( id );
@@ -973,7 +972,7 @@ void
 CollectionSchemeManager::updateActiveCollectionSchemeListeners()
 {
     // Create vector of active collection schemes to notify interested components about new schemes
-    auto activeCollectionSchemesOutput = std::make_shared<ActiveCollectionSchemes>();
+    auto activeCollectionSchemesOutput = std::make_unique<ActiveCollectionSchemes>();
 
     if ( isCollectionSchemesInSyncWithDm() )
     {
@@ -983,7 +982,9 @@ CollectionSchemeManager::updateActiveCollectionSchemeListeners()
         }
     }
 
-    mCollectionSchemeListChangeListeners.notify( activeCollectionSchemesOutput );
+    mCollectionSchemeListChangeListeners.notify(
+        // coverity[autosar_cpp14_a20_8_6_violation] can't use make_shared as unique_ptr is moved
+        std::shared_ptr<const ActiveCollectionSchemes>( std::move( activeCollectionSchemesOutput ) ) );
 }
 
 } // namespace IoTFleetWise

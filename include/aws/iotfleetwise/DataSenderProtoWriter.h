@@ -84,6 +84,13 @@ public:
     void setupDTCInfo( const DTCInfo &msg );
 
     /**
+     * @brief Return the number of messages currently appended to the protobuf
+     *
+     * @return the number of messages appended
+     */
+    size_t getNumberOfAppendedMessages() const;
+
+    /**
      * @brief Gets the estimated vehicle data size in bytes
      *
      * @return the size in bytes
@@ -125,7 +132,7 @@ private:
     Timestamp mTriggerTime;
     size_t mMetaDataEstimatedSize{};    // The estimated size in bytes of the metadata
     size_t mVehicleDataEstimatedSize{}; // The total estimated size in bytes of the mVehicleData including the metadata
-    Schemas::VehicleDataMsg::VehicleData mVehicleData{};
+    Schemas::VehicleDataMsg::VehicleData mVehicleData;
     CANInterfaceIDTranslator mIDTranslator;
     RawData::BufferManager *mRawDataBufferManager;
 };

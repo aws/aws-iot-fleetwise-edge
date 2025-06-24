@@ -100,7 +100,7 @@ struct AwsBootstrap::Impl
             if ( !eventLoopGroup )
             {
                 auto errString = Crt::ErrorDebugString( eventLoopGroup.LastError() );
-                auto errLog = errString != nullptr ? std::string( errString ) : std::string( "Unknown error" );
+                std::string errLog = errString != nullptr ? errString : "Unknown error";
                 FWE_LOG_ERROR( "Event Loop Group Creation failed with error " + errLog );
             }
             else

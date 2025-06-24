@@ -72,7 +72,7 @@ struct LastKnownStateCommandRequest
     /**
      * @brief The operation that should be applied to this state template
      */
-    LastKnownStateOperation operation;
+    LastKnownStateOperation operation{};
 
     /**
      * @brief Make the collection to be stopped after this time.

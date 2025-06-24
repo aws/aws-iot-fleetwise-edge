@@ -4,6 +4,7 @@
 #include "aws/iotfleetwise/Thread.h"
 #include <string>
 #include <sys/prctl.h>
+#include <utility>
 
 namespace Aws
 {
@@ -23,7 +24,7 @@ bool
 Thread::create( WorkerFunction workerFunction )
 {
     mExecParams.mSelf = this;
-    mExecParams.mWorkerFunction = workerFunction;
+    mExecParams.mWorkerFunction = std::move( workerFunction );
 
     mDone.store( false );
     mTerminateSignal = std::make_unique<Signal>();

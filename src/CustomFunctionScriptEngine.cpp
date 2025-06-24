@@ -278,7 +278,7 @@ CustomFunctionScriptEngine::setup( CustomFunctionInvocationID invocationId, cons
         {
             mTransferManagerWrapper = mCreateTransferManagerWrapper();
         }
-        auto s3Prefix = *args[0].stringVal;
+        const auto &s3Prefix = *args[0].stringVal;
         if ( boost::ends_with( s3Prefix, ".tar.gz" ) )
         {
             transferInitiatedCallback(

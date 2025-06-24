@@ -4,18 +4,14 @@
 #include "aws/iotfleetwise/snf/StreamManager.h"
 #include "aws/iotfleetwise/Assert.h"
 #include "aws/iotfleetwise/Clock.h"
-#include "aws/iotfleetwise/CollectionInspectionAPITypes.h"
-#include "aws/iotfleetwise/DataSenderProtoWriter.h"
 #include "aws/iotfleetwise/ICollectionScheme.h"
 #include "aws/iotfleetwise/ICollectionSchemeList.h"
 #include "aws/iotfleetwise/LoggingModule.h"
-#include "aws/iotfleetwise/OBDDataTypes.h"
 #include "aws/iotfleetwise/SignalTypes.h"
-#include "aws/iotfleetwise/snf/StoreFileSystem.h"
-#include "aws/iotfleetwise/snf/StoreLogger.h"
-
 #include "aws/iotfleetwise/TimeTypes.h"
 #include "aws/iotfleetwise/TraceModule.h"
+#include "aws/iotfleetwise/snf/StoreFileSystem.h"
+#include "aws/iotfleetwise/snf/StoreLogger.h"
 #include <algorithm>
 #include <aws/store/common/expected.hpp>
 #include <aws/store/common/slices.hpp>
@@ -25,13 +21,14 @@
 #include <aws/store/stream/fileStream.hpp>
 #include <aws/store/stream/stream.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/range/iterator_range_core.hpp>
 #include <boost/system/error_code.hpp>
-#include <climits>
+#include <boost/variant.hpp>
 #include <cstring>
+#include <memory>
 #include <mutex>
 #include <set>
-#include <snappy.h>
 #include <unordered_set>
 #include <utility>
 
@@ -42,18 +39,13 @@ namespace IoTFleetWise
 namespace Store
 {
 
-const PartitionID StreamManager::DEFAULT_PARTITION = 0;
 const std::string StreamManager::STREAM_ITER_IDENTIFIER = "i";
 const std::string StreamManager::KV_STORE_IDENTIFIER = "s";
 const int32_t StreamManager::KV_COMPACT_AFTER = 1024;
 const uint32_t StreamManager::STREAM_DEFAULT_MIN_SEGMENT_SIZE = 16U * 1024U;
 
-StreamManager::StreamManager( std::string persistenceRootDir,
-                              std::unique_ptr<DataSenderProtoWriter> protoWriter,
-                              uint32_t transmitThreshold )
-    : mProtoWriter( std::move( protoWriter ) )
-    , mTransmitThreshold{ ( transmitThreshold > 0U ) ? transmitThreshold : UINT_MAX }
-    , mPersistenceRootDir( std::move( persistenceRootDir ) )
+StreamManager::StreamManager( std::string persistenceRootDir )
+    : mPersistenceRootDir( std::move( persistenceRootDir ) )
     , mLogger{ std::make_shared<Aws::IoTFleetWise::Store::Logger>() }
 {
 }
@@ -160,6 +152,7 @@ StreamManager::onChangeCollectionSchemeList(
             // Do not continue and actually create anything on disk or in memory for this invalid campaign
         }
 
+        auto partitions = std::make_unique<std::vector<Partition>>();
         for ( PartitionID pID = 0; pID < campaignConfig->getStoreAndForwardConfiguration().size(); ++pID )
         {
             // create stream partition on disk
@@ -205,11 +198,13 @@ StreamManager::onChangeCollectionSchemeList(
                         signalIDs.emplace( signal.signalID );
                     }
                 }
-                mCampaigns[getName( campaignConfig->getCampaignArn() )].config = campaignConfig;
-                mCampaigns[getName( campaignConfig->getCampaignArn() )].partitions.emplace_back(
-                    Partition{ pID, stream.val(), signalIDs } );
+                partitions->emplace_back( Partition{ pID, stream.val(), std::move( signalIDs ) } );
             }
         }
+
+        auto &campaign = mCampaigns.emplace( getName( campaignConfig->getCampaignArn() ), Campaign() ).first->second;
+        campaign.config = campaignConfig;
+        campaign.partitions = std::move( partitions );
     }
 
     // cleanup any stray campaigns.
@@ -223,7 +218,7 @@ StreamManager::onChangeCollectionSchemeList(
     for ( auto &rootEntry : boost::make_iterator_range(
               boost::filesystem::directory_iterator( boost::filesystem::path{ mPersistenceRootDir }, ec ) ) )
     {
-        auto potentialCampaignDir = rootEntry.path();
+        const auto &potentialCampaignDir = rootEntry.path();
         if ( boost::filesystem::is_directory( potentialCampaignDir, ec ) &&
              ( potentialCampaignDir.filename() != boost::filesystem::path{ "FWE_Persistency" } ) &&
              ( mCampaigns.find( potentialCampaignDir.filename().string() ) == mCampaigns.end() ) )
@@ -232,14 +227,14 @@ StreamManager::onChangeCollectionSchemeList(
             for ( auto &depth1Entry : boost::make_iterator_range(
                       boost::filesystem::directory_iterator( boost::filesystem::path{ potentialCampaignDir }, ec ) ) )
             {
-                auto potentialPartitionDir = depth1Entry.path();
+                const auto &potentialPartitionDir = depth1Entry.path();
                 if ( boost::filesystem::is_directory( potentialPartitionDir, ec ) )
                 {
                     // look for stream manager files at depth 2
                     for ( auto &depth2Entry : boost::make_iterator_range( boost::filesystem::directory_iterator(
                               boost::filesystem::path{ potentialPartitionDir }, ec ) ) )
                     {
-                        auto potentialStreamManagerFile = depth2Entry.path();
+                        const auto &potentialStreamManagerFile = depth2Entry.path();
                         if ( boost::filesystem::is_regular_file( potentialStreamManagerFile, ec ) &&
                              ( ( potentialStreamManagerFile.extension().string() == ".log" ) ||
                                potentialStreamManagerFile.filename().string() == KV_STORE_IDENTIFIER ) )
@@ -270,11 +265,11 @@ StreamManager::onChangeCollectionSchemeList(
 void
 StreamManager::removeOlderRecords()
 {
-    for ( auto campaign : mCampaigns )
+    for ( const auto &campaign : mCampaigns )
     {
-        for ( PartitionID pID = 0; pID < campaign.second.partitions.size(); ++pID )
+        for ( PartitionID pID = 0; pID < campaign.second.partitions->size(); ++pID )
         {
-            auto partition = campaign.second.partitions[pID];
+            const auto &partition = campaign.second.partitions->at( pID );
             auto minimumTTl = campaign.second.config->getStoreAndForwardConfiguration()[pID]
                                   .storageOptions.minimumTimeToLiveInSeconds;
             if ( minimumTTl > 0 )
@@ -295,101 +290,73 @@ StreamManager::removeOlderRecords()
 }
 
 StreamManager::ReturnCode
-StreamManager::appendToStreams( const TriggeredCollectionSchemeData &data )
+StreamManager::appendToStreams( const TelemetryDataToPersist &data )
 {
+    if ( !data.getPartitionId().has_value() )
+    {
+        FWE_LOG_ERROR( "Partition ID is not set, discarding data" );
+        return ReturnCode::ERROR;
+    }
+
+    PartitionID partitionId = *data.getPartitionId();
     // Holding lock for the entire method because we do not want to append to a stream which is being deleted
     // by reconfiguring the campaigns. The assumption is that this is low-contention because campaigns change
     // infrequently.
     std::lock_guard<std::mutex> lock( mCampaignsMutex );
 
-    CampaignName campaign = getName( data.metadata.campaignArn );
-    if ( mCampaigns.find( campaign ) == mCampaigns.end() )
+    CampaignName campaignName = getName( data.getCollectionSchemeParams().campaignArn );
+    auto it = mCampaigns.find( campaignName );
+    if ( it == mCampaigns.end() )
     {
+        FWE_LOG_WARN( "No partition found for campaign '" + campaignName +
+                      "', the campaign was likely deleted since the data was serialized. Discarding it." );
         return ReturnCode::STREAM_NOT_FOUND;
     }
-    if ( data.signals.empty() )
+
+    auto partitionIt = std::find_if( it->second.partitions->cbegin(),
+                                     it->second.partitions->cend(),
+                                     [partitionId]( const Partition &partition ) -> bool {
+                                         return partition.id == partitionId;
+                                     } );
+    if ( partitionIt == it->second.partitions->cend() )
     {
-        return ReturnCode::EMPTY_DATA;
+        FWE_LOG_WARN( "Partition " + std::to_string( partitionId ) + " not found for campaign '" + campaignName +
+                      "', the campaign was likely deleted since the data was serialized. Discarding it." );
+        return ReturnCode::STREAM_NOT_FOUND;
     }
 
-    TriggeredCollectionSchemeData emptyChunk;
-    emptyChunk.metadata = data.metadata;
-    emptyChunk.triggerTime = data.triggerTime;
-    emptyChunk.eventID = data.eventID;
-
-    for ( const auto &partition : mCampaigns[campaign].partitions )
-    {
-        // each partition requires its own chunk
-        TriggeredCollectionSchemeData currChunk = emptyChunk;
-        uint32_t currChunkSize = 0;
-        for ( auto collectedSignal : data.signals )
-        {
-            if ( partition.signalIDs.find( collectedSignal.signalID ) != partition.signalIDs.end() )
-            {
-                currChunk.signals.emplace_back( collectedSignal );
-                currChunkSize++;
-                if ( currChunkSize >= mTransmitThreshold )
-                {
-                    auto res = store( currChunk, partition );
-                    if ( res != ReturnCode::SUCCESS )
-                    {
-                        return res;
-                    }
-                    currChunk = emptyChunk;
-                    currChunkSize = 0;
-                }
-            }
-        }
-
-        // send out the chunk if we haven't already
-        if ( currChunkSize > 0 )
-        {
-            auto res = store( currChunk, partition );
-            if ( res != ReturnCode::SUCCESS )
-            {
-                return res;
-            }
-        }
-    }
-    return ReturnCode::SUCCESS;
+    return store( data, *partitionIt );
 }
 
 StreamManager::ReturnCode
-StreamManager::store( const TriggeredCollectionSchemeData &data, const Partition &partition )
+StreamManager::store( const TelemetryDataToPersist &data, const Partition &partition )
 {
-    std::string dataToStore;
-    if ( !serialize( data, dataToStore ) )
+
+    // coverity[autosar_cpp14_a20_8_4_violation:FALSE] rawData ownership is shared, it is reassigned inside the try
+    std::shared_ptr<std::string> rawData;
+    try
     {
-        FWE_LOG_WARN( "Failed to serialize data. cID: " + data.metadata.collectionSchemeID +
-                      " partition: " + std::to_string( partition.id ) )
+        rawData = boost::get<std::shared_ptr<std::string>>( data.getData() );
+    }
+    catch ( boost::bad_get & )
+    {
+        FWE_LOG_ERROR( "Payload is not a string" );
         return ReturnCode::ERROR;
     }
 
-    if ( mCampaigns[getName( data.metadata.campaignArn )].config->isCompressionNeeded() )
-    {
-        std::string out;
-        if ( snappy::Compress( dataToStore.data(), dataToStore.size(), &out ) == 0U )
-        {
-            FWE_LOG_TRACE( "Error in compressing the payload. cID: " + data.metadata.collectionSchemeID +
-                           " partition: " + std::to_string( partition.id ) );
-            return ReturnCode::ERROR;
-        }
-        dataToStore = out;
-    }
-
-    auto dataBufSize = sizeof( RecordMetadata ) + dataToStore.size();
+    auto dataBufSize = sizeof( RecordMetadata ) + rawData->size();
     std::vector<uint8_t> dataBuf( dataBufSize );
 
-    auto metadata = RecordMetadata{ data.signals.size(), data.triggerTime };
+    auto metadata = RecordMetadata{ data.getNumberOfSignals(), data.getCollectionSchemeParams().triggerTime };
     std::memcpy( dataBuf.data(), &metadata, sizeof( RecordMetadata ) );
 
-    std::memcpy( dataBuf.data() + sizeof( RecordMetadata ), dataToStore.data(), dataToStore.size() );
+    std::memcpy( dataBuf.data() + sizeof( RecordMetadata ), rawData->data(), rawData->size() );
 
     auto append_or = partition.stream->append( aws::store::common::BorrowedSlice{ dataBuf.data(), dataBuf.size() },
                                                aws::store::stream::AppendOptions{ false, true } );
     if ( !append_or.ok() )
     {
-        FWE_LOG_WARN( "Failed to append data to stream. cID: " + data.metadata.collectionSchemeID +
+        FWE_LOG_WARN( "Failed to append data to stream. cID: " + data.getCollectionSchemeParams().collectionSchemeID +
                       " partition: " + std::to_string( partition.id ) +
                       " errCode: " + std::to_string( static_cast<uint8_t>( append_or.err().code ) ) +
                       " errMsg: " + append_or.err().msg )
@@ -397,36 +364,9 @@ StreamManager::store( const TriggeredCollectionSchemeData &data, const Partition
         return ReturnCode::ERROR;
     }
 
-    TraceModule::get().addToVariable( TraceVariable::DATA_STORE_BYTES, dataToStore.size() );
-    TraceModule::get().addToVariable( TraceVariable::DATA_STORE_SIGNAL_COUNT, data.signals.size() );
+    TraceModule::get().addToVariable( TraceVariable::DATA_STORE_BYTES, rawData->size() );
+    TraceModule::get().addToVariable( TraceVariable::DATA_STORE_SIGNAL_COUNT, data.getNumberOfSignals() );
     return ReturnCode::SUCCESS;
-}
-
-bool
-StreamManager::serialize( const TriggeredCollectionSchemeData &data, std::string &out )
-{
-    mProtoWriter->setupVehicleData( data, data.eventID );
-
-    // Add signals to the protobuf
-    for ( const auto &signal : data.signals )
-    {
-        {
-            mProtoWriter->append( signal );
-        }
-    }
-
-    // Add DTC info to the payload
-    if ( data.mDTCInfo.hasItems() )
-    {
-        mProtoWriter->setupDTCInfo( data.mDTCInfo );
-        const auto &dtcCodes = data.mDTCInfo.mDTCCodes;
-        for ( const auto &dtc : dtcCodes )
-        {
-            mProtoWriter->append( dtc );
-        }
-    }
-
-    return mProtoWriter->serializeVehicleData( &out );
 }
 
 StreamManager::ReturnCode
@@ -444,11 +384,11 @@ StreamManager::readFromStream( const CampaignID &cID,
         {
             return StreamManager::ReturnCode::STREAM_NOT_FOUND;
         }
-        if ( pID >= mCampaigns[campaign].partitions.size() )
+        if ( pID >= mCampaigns.at( campaign ).partitions->size() )
         {
             return StreamManager::ReturnCode::STREAM_NOT_FOUND;
         }
-        stream = mCampaigns[campaign].partitions[pID].stream;
+        stream = mCampaigns.at( campaign ).partitions->at( pID ).stream;
     }
 
     auto iter = stream->openOrCreateIterator( STREAM_ITER_IDENTIFIER, aws::store::stream::IteratorOptions{} );
@@ -466,7 +406,7 @@ StreamManager::readFromStream( const CampaignID &cID,
         return StreamManager::ReturnCode::ERROR;
     }
 
-    checkpoint = [stream, sequenceNumber = iter.sequence_number, cID, pID]() {
+    checkpoint = [stream = std::move( stream ), sequenceNumber = iter.sequence_number, cID, pID]() {
         auto err = stream->setCheckpoint( STREAM_ITER_IDENTIFIER, sequenceNumber );
         if ( !err.ok() )
         {
@@ -508,11 +448,16 @@ StreamManager::getPartitionIdsFromCampaign( const CampaignID &campaignID )
     auto campaign = getName( campaignID );
 
     std::lock_guard<std::mutex> lock( mCampaignsMutex );
-    auto partitions = mCampaigns[campaign].partitions;
+    auto it = mCampaigns.find( campaign );
+    if ( it == mCampaigns.end() )
+    {
+        return {};
+    }
+
+    auto &partitions = it->second.partitions;
 
     std::set<PartitionID> pIDs;
-
-    for ( auto &partition : partitions )
+    for ( auto &partition : *partitions )
     {
         pIDs.insert( partition.id );
     }

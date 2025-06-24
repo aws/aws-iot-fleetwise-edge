@@ -103,7 +103,7 @@ AaosVhalSource::setVehicleProperty( SignalID signalId, const DecodedSignalValue 
     CollectedSignalsGroup collectedSignalsGroup;
     collectedSignalsGroup.push_back( CollectedSignal::fromDecodedSignal( signalId, timestamp, value, signalType ) );
 
-    mSignalBufferDistributor.push( CollectedDataFrame( collectedSignalsGroup ) );
+    mSignalBufferDistributor.push( CollectedDataFrame( std::move( collectedSignalsGroup ) ) );
 }
 
 } // namespace IoTFleetWise

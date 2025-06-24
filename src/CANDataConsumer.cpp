@@ -117,7 +117,7 @@ CANDataConsumer::processMessage( CANChannelNumericID channelId,
                         signal.mSignalID, timestamp, signal.mPhysicalValue, signal.mSignalType ) );
                 }
             }
-            collectedDataFrame.mCollectedSignals = collectedSignalsGroup;
+            collectedDataFrame.mCollectedSignals = std::move( collectedSignalsGroup );
         }
         else
         {

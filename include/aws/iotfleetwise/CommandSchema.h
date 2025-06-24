@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <utility>
 
 namespace Aws
 {
@@ -22,6 +23,7 @@ namespace IoTFleetWise
 /**
  * @brief Setting a CommandRequest proto byte size limit for file received from Cloud
  */
+// coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
 constexpr size_t COMMAND_REQUEST_BYTE_SIZE_LIMIT = 128000000;
 
 /**
@@ -65,13 +67,13 @@ public:
     void
     subscribeToActuatorCommandRequestReceived( OnActuatorCommandRequestReceivedCallback callback )
     {
-        mActuatorCommandRequestListeners.subscribe( callback );
+        mActuatorCommandRequestListeners.subscribe( std::move( callback ) );
     }
 
     void
     subscribeToLastKnownStateCommandRequestReceived( OnLastKnownStateCommandRequestReceivedCallback callback )
     {
-        mLastKnownStateCommandRequestListeners.subscribe( callback );
+        mLastKnownStateCommandRequestListeners.subscribe( std::move( callback ) );
     }
 
     /**

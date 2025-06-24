@@ -70,7 +70,6 @@ protected:
               std::make_unique<DataSenderProtoWriter>( mCANIDTranslator, nullptr ),
               mPayloadAdaptionConfigUncompressed,
               mPayloadAdaptionConfigCompressed )
-        , mStreamManager( std::make_unique<DataSenderProtoWriter>( mCANIDTranslator, nullptr ) )
         , mStreamForwarder( mStreamManager, mTelemetryDataSender, mRateLimiter )
 
     {

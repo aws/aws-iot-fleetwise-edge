@@ -9,10 +9,6 @@
 #include <streambuf>
 #include <string>
 
-// max buffer to be allocated for a read buffer
-// this matches the Max Send Size on the AWS IoT channel
-constexpr size_t MAX_DATA_RD_SIZE = 131072;
-
 // file size assigned for an invalid data type
 constexpr size_t INVALID_FILE_SIZE = (size_t)-1;
 

@@ -123,15 +123,15 @@ struct DTCInfo
 // e.g. PID = 0x0C( RPM)
 struct EmissionInfo
 {
-    SID mSID;
+    SID mSID{ SID::INVALID_SERVICE_MODE };
     std::map<uint32_t, DecodedSignalValue> mPIDsToValues;
 };
 
 // Structure of a single PID OBD request.
 struct OBDRequest
 {
-    SID mSID;
-    PID mPID;
+    SID mSID{ SID::INVALID_SERVICE_MODE };
+    PID mPID{ 0 };
 };
 // DTC related types
 enum class DTCDomains

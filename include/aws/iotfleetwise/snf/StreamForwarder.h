@@ -5,6 +5,7 @@
 
 #include "aws/iotfleetwise/Clock.h"
 #include "aws/iotfleetwise/ClockHandler.h"
+#include "aws/iotfleetwise/DataSenderTypes.h"
 #include "aws/iotfleetwise/Signal.h"
 #include "aws/iotfleetwise/TelemetryDataSender.h"
 #include "aws/iotfleetwise/Thread.h"

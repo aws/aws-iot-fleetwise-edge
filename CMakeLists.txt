@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.10.2)
 
-project(iotfleetwise VERSION 1.3.1)
+project(iotfleetwise VERSION 1.3.2)
 
 # FWE uses C++14 for compatibility reasons with Automotive middlewares (Adaptive AUTOSAR, ROS2)
 # Note: When built with FWE_FEATURE_ROS2, colcon will override these settings

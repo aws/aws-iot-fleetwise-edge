@@ -10,7 +10,7 @@ WITH_CUSTOM_FUNCTION_EXAMPLES="false"
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 source ${SCRIPT_DIR}/install-deps-versions.sh
 
-NATIVE_PREFIX="/usr/local/`gcc -dumpmachine`"
+NATIVE_PREFIX="/usr/local"
 ARCHS="x86_64:x86_64-linux-android \
        armeabi-v7a:armv7a-linux-androideabi \
        arm64-v8a:aarch64-linux-android"

@@ -263,7 +263,7 @@ protected:
 
     std::string mCanInterface = getCanInterfaceName();
     std::unique_ptr<OBDOverCANModule> obdModule;
-    SignalBufferPtr signalBuffer;
+    std::shared_ptr<SignalBuffer> signalBuffer;
     SignalBufferDistributor signalBufferDistributor;
     std::vector<std::unique_ptr<ECUMock>> ecus;
 };

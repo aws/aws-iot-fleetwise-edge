@@ -9,6 +9,20 @@
 #include <string>
 #include <vector>
 
+#ifdef __COVERITY__
+// coverity[misra_cpp_2008_rule_16_0_3_violation]
+// coverity[autosar_cpp14_a17_0_1_violation]
+// coverity[misra_cpp_2008_rule_17_0_1_violation]
+// coverity[cert_dcl51_cpp_violation]
+#undef __FUNCTION__
+// sometimes coverity gets confused and thinks that the function name is assigned to a variable that isn't used,
+// reporting an autosar_cpp14_a0_1_1_violation
+// coverity[autosar_cpp14_a17_0_1_violation]
+// coverity[misra_cpp_2008_rule_17_0_1_violation]
+// coverity[cert_dcl51_cpp_violation]
+#define __FUNCTION__ ""
+#endif
+
 namespace Aws
 {
 namespace IoTFleetWise
@@ -64,6 +78,7 @@ getShortFilename( const char *path )
 class LoggingModule
 {
 public:
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     static const uint64_t LOG_AGGREGATION_TIME_MS =
         1000; /*< Periodic logging for one module should have a maximum frequency of this */
 

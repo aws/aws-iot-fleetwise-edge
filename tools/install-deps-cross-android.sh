@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 source ${SCRIPT_DIR}/install-deps-versions.sh
 
-USE_CACHE="true"
+USE_CACHE="false"
 SDK_PREFIX="/usr/local/android_sdk"
 ARCHS="x86_64:x86_64-linux-android:android-x86_64 \
        armeabi-v7a:armv7a-linux-androideabi:android-arm \
@@ -26,8 +26,10 @@ parse_args() {
             ;;
         --native-prefix)
             NATIVE_PREFIX="$2"
-            USE_CACHE="false"
             shift
+            ;;
+        --use-cache)
+            USE_CACHE="true"
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
@@ -70,7 +72,7 @@ if [ ! -d ${SDK_PREFIX} ]; then
 fi
 export PATH=${SDK_PREFIX}/cmake/${VERSION_CMAKE}/bin/:${PATH}
 
-: ${NATIVE_PREFIX:="/usr/local/`gcc -dumpmachine`"}
+: ${NATIVE_PREFIX:="/usr/local"}
 
 install_deps() {
     TARGET_ARCH="$1"
@@ -286,25 +288,15 @@ install_deps() {
     cd ..
 }
 
+if ${USE_CACHE}; then
+    echo "using cache, not building..."
+    exit 0
+fi
+
 for ARCH in ${ARCHS}; do
     TARGET_ARCH=`echo $ARCH | cut -d ':' -f1`
     HOST_PLATFORM=`echo $ARCH | cut -d ':' -f2`
     SSL_TARGET=`echo $ARCH | cut -d ':' -f3`
-    BUILD="false"
-    if ! ${USE_CACHE}; then
-        echo "--native-prefix defined, building..."
-        BUILD="true"
-    elif [ ! -d ${NATIVE_PREFIX} ]; then
-        echo "${NATIVE_PREFIX} does not exist, building..."
-        BUILD="true"
-    elif [  ! -d /usr/local/${HOST_PLATFORM} ]; then
-        echo "/usr/local/${HOST_PLATFORM} does not exist, building..."
-        BUILD="true"
-    else
-        echo "/usr/local/${HOST_PLATFORM} exists, not building."
-    fi
-    if ${BUILD}; then
-        install_deps ${TARGET_ARCH} ${HOST_PLATFORM} ${SSL_TARGET}
-    fi
+    install_deps ${TARGET_ARCH} ${HOST_PLATFORM} ${SSL_TARGET}
 done
 rm -rf deps-cross-android

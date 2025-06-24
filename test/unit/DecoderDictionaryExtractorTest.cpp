@@ -8,7 +8,6 @@
 #include "aws/iotfleetwise/CheckinSender.h"
 #include "aws/iotfleetwise/Clock.h"
 #include "aws/iotfleetwise/ClockHandler.h"
-#include "aws/iotfleetwise/ICollectionSchemeList.h"
 #include "aws/iotfleetwise/IDecoderDictionary.h"
 #include "aws/iotfleetwise/OBDDataTypes.h"
 #include "aws/iotfleetwise/TimeTypes.h"
@@ -272,12 +271,12 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
     list1.emplace_back( collectionScheme2 );
     list1.emplace_back( collectionScheme3 );
 
-    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>(
+    auto DM1 = std::make_shared<IDecoderManifestTest>(
         "DM1", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, signalIDToCustomDecoderFormat );
 
     // Set input as DM1, list1
     test.setDecoderManifest( DM1 );
-    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    auto PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setCollectionSchemeList( PL1 );
     // Both collectionScheme1 and collectionScheme2 are expected to be enabled
     ASSERT_TRUE( test.updateMapsandTimeLine( currTime ) );
@@ -457,12 +456,12 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryExtractorTest )
     list2.emplace_back( collectionSchemeOBD ); // OBD Signals
     list2.emplace_back( collectionSchemeCAN ); // CAN Signals
 
-    IDecoderManifestPtr DM2 = std::make_shared<IDecoderManifestTest>(
+    auto DM2 = std::make_shared<IDecoderManifestTest>(
         "DM2", formatMap, signalToFrameAndNodeID, signalIDToPIDDecoderFormat, signalIDToCustomDecoderFormat );
 
     // Set input as DM1, list1
     test2.setDecoderManifest( DM2 );
-    ICollectionSchemeListPtr PL2 = std::make_shared<ICollectionSchemeListTest>( list2 );
+    auto PL2 = std::make_shared<ICollectionSchemeListTest>( list2 );
     test2.setCollectionSchemeList( PL2 );
     // Both collectionScheme1 and collectionScheme2 are expected to be enabled
     ASSERT_TRUE( test2.updateMapsandTimeLine( { 1635951061244, 100 } ) );
@@ -540,17 +539,17 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryComplexDataExtractor )
     std::vector<std::shared_ptr<ICollectionScheme>> list1;
     list1.emplace_back( collectionScheme1 );
 
-    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>( "DM1",
-                                                                      formatMap,
-                                                                      signalToFrameAndNodeID,
-                                                                      signalIDToPIDDecoderFormat,
-                                                                      signalIDToCustomDecoderFormat,
-                                                                      complexSignalMap,
-                                                                      complexDataTypeMap );
+    auto DM1 = std::make_shared<IDecoderManifestTest>( "DM1",
+                                                       formatMap,
+                                                       signalToFrameAndNodeID,
+                                                       signalIDToPIDDecoderFormat,
+                                                       signalIDToCustomDecoderFormat,
+                                                       complexSignalMap,
+                                                       complexDataTypeMap );
 
     // Set input as DM1, list1
     test.setDecoderManifest( DM1 );
-    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    auto PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setCollectionSchemeList( PL1 );
     // Both collectionScheme1 and collectionScheme2 are expected to be enabled
     ASSERT_TRUE( test.updateMapsandTimeLine( currTime ) );
@@ -665,16 +664,16 @@ TEST( DecoderDictionaryExtractorTest, DecoderDictionaryInvalidPartialSignalIDAnd
     std::vector<std::shared_ptr<ICollectionScheme>> list1;
     list1.emplace_back( collectionScheme1 );
 
-    IDecoderManifestPtr DM1 = std::make_shared<IDecoderManifestTest>( "DM1",
-                                                                      formatMap,
-                                                                      signalToFrameAndNodeID,
-                                                                      signalIDToPIDDecoderFormat,
-                                                                      signalIDToCustomDecoderFormat,
-                                                                      complexSignalMap,
-                                                                      complexDataTypeMap );
+    auto DM1 = std::make_shared<IDecoderManifestTest>( "DM1",
+                                                       formatMap,
+                                                       signalToFrameAndNodeID,
+                                                       signalIDToPIDDecoderFormat,
+                                                       signalIDToCustomDecoderFormat,
+                                                       complexSignalMap,
+                                                       complexDataTypeMap );
 
     test.setDecoderManifest( DM1 );
-    ICollectionSchemeListPtr PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
+    auto PL1 = std::make_shared<ICollectionSchemeListTest>( list1 );
     test.setCollectionSchemeList( PL1 );
 
     ASSERT_TRUE( test.updateMapsandTimeLine( currTime ) );

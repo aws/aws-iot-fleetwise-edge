@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 source ${SCRIPT_DIR}/install-deps-versions.sh
 
-USE_CACHE="true"
+USE_CACHE="false"
 WITH_GREENGRASSV2_SUPPORT="false"
 SHARED_LIBS="OFF"
 WITH_VISION_SYSTEM_DATA="false"
@@ -41,11 +41,13 @@ parse_args() {
             ;;
         --native-prefix)
             NATIVE_PREFIX="$2"
-            USE_CACHE="false"
             shift
             ;;
         --shared-libs)
             SHARED_LIBS="ON"
+            ;;
+        --use-cache)
+            USE_CACHE="true"
             ;;
         --help)
             echo "Usage: $0 [OPTION]"
@@ -134,9 +136,9 @@ if [ ! -f /usr/include/linux/can/isotp.h ]; then
     rm -rf can-isotp
 fi
 
-: ${NATIVE_PREFIX:="/usr/local/`gcc -dumpmachine`"}
+: ${NATIVE_PREFIX:="/usr/local"}
 
-if ! ${USE_CACHE} || [ ! -d /usr/local/arm-linux-gnueabihf ] || [ ! -d ${NATIVE_PREFIX} ]; then
+if ! ${USE_CACHE}; then
     mkdir -p /usr/local/arm-linux-gnueabihf/lib/cmake/
     mkdir -p ${NATIVE_PREFIX}
     cp ${SCRIPT_DIR}/armhf-toolchain.cmake /usr/local/arm-linux-gnueabihf/lib/cmake/

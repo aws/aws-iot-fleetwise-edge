@@ -130,7 +130,7 @@ CommandResponseDataSender::processData( const DataToSend &data, OnDataProcessedC
         mMqttSender.getTopicConfig().commandResponseTopic( commandResponse->id ),
         reinterpret_cast<const uint8_t *>( protoOutput->data() ),
         protoOutput->size(),
-        [protoOutput, commandId = commandResponse->id, callback]( ConnectivityError result ) {
+        [protoOutput, commandId = commandResponse->id, callback = std::move( callback )]( ConnectivityError result ) {
             if ( result == ConnectivityError::Success )
             {
                 FWE_LOG_INFO( "A command response payload of size: " + std::to_string( protoOutput->size() ) +
@@ -168,7 +168,7 @@ CommandResponseDataSender::processPersistedData( const uint8_t *buf,
         mMqttSender.getTopicConfig().commandResponseTopic( commandID ),
         buf,
         size,
-        [callback, size]( ConnectivityError result ) {
+        [callback = std::move( callback ), size]( ConnectivityError result ) {
             if ( result != ConnectivityError::Success )
             {
                 callback( false );

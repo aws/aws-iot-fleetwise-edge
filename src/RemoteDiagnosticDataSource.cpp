@@ -143,7 +143,7 @@ RemoteDiagnosticDataSource::doWork()
                     pushSnapshotJsonToRawDataBufferManager(
                         it->second.signalName, it->second.fetchRequestID, jsonString );
                 }
-                auto queryID = it->first;
+                std::string queryID = it->first;
                 it = mQueuedDTCQueries.erase( it );
                 // Erase from all maps
                 removeQuery( queryID );
@@ -352,6 +352,7 @@ RemoteDiagnosticDataSource::processDtcQueryRequest( const std::string &parentQue
         requestParameters.ecuID,
         requestParameters.subFn,
         requestParameters.stMask,
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
         std::bind( &RemoteDiagnosticDataSource::processUDSQueryResponse, this, std::placeholders::_1 ),
         newQueryID );
     return FetchErrorCode::SUCCESSFUL;
@@ -382,6 +383,7 @@ RemoteDiagnosticDataSource::processDtcSnapshotQueryRequest( const std::string &p
         requestParameters.subFn,
         static_cast<uint32_t>( requestParameters.dtc ),
         static_cast<uint8_t>( requestParameters.recordNumber ),
+        // coverity[autosar_cpp14_a18_9_1_violation] std::bind is easier to maintain than extra lambda
         std::bind( &RemoteDiagnosticDataSource::processUDSQueryResponse, this, std::placeholders::_1 ),
         newQueryID.c_str() );
     return FetchErrorCode::SUCCESSFUL;
@@ -406,7 +408,7 @@ RemoteDiagnosticDataSource::processUDSQueryResponse( const DTCResponse &response
         FWE_LOG_ERROR( "No associated request found for the received hash " + receivedQueryID );
         return;
     }
-    auto originalRequestID = originalRequestIDIt->second;
+    std::string originalRequestID = originalRequestIDIt->second;
     auto dtcQuery = mQueuedDTCQueries.find( originalRequestID );
     if ( dtcQuery == mQueuedDTCQueries.end() )
     {
@@ -661,6 +663,8 @@ RemoteDiagnosticDataSource::generateRandomString( int length )
     const std::string ASCII_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     std::random_device randomStr;
     std::mt19937 generator( randomStr() );
+    // coverity[autosar_cpp14_m5_0_9_violation] statically cast int is guaranteed to be positive
+    // coverity[misra_cpp_2008_rule_5_0_9_violation] statically cast int is guaranteed to be positive
     std::uniform_int_distribution<> distribution( 0, static_cast<int>( ASCII_CHARACTERS.size() - 1 ) );
 
     std::string random_string;

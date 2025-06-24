@@ -106,6 +106,7 @@ private:
     };
     std::shared_ptr<CustomFunctionScriptEngine> mScriptEngine;
     std::unordered_map<CustomFunctionInvocationID, InvocationState> mInvocationStates;
+    // coverity[autosar_cpp14_a0_1_1_violation:FALSE] variable is used
     static constexpr size_t HEAP_SIZE = 16 * 1024;
     uint8_t mHeap[HEAP_SIZE]{};
     void printError( const char *str, size_t len );

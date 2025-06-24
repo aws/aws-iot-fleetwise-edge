@@ -4,6 +4,7 @@
 #pragma once
 
 #include "aws/iotfleetwise/QueueTypes.h"
+#include "aws/iotfleetwise/SignalTypes.h"
 #include <boost/variant.hpp>
 #include <json/json.h>
 #include <memory>
@@ -218,6 +219,112 @@ public:
 };
 
 using DataSenderQueue = LockedQueue<std::shared_ptr<const DataToSend>>;
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+using PartitionID = uint32_t;
+#endif
+
+/**
+ * @brief Struct that specifies the persistence and transmission attributes
+ *        regarding the edge to cloud payload
+ */
+struct CollectionSchemeParams
+{
+    bool persist{ false };     // specifies if data needs to be persisted in case of connection loss
+    bool compression{ false }; // specifies if data needs to be compressed for cloud
+    uint32_t priority{ 0 };    // collectionScheme priority specified by the cloud
+    uint64_t triggerTime{ 0 }; // timestamp of event ocurred
+    uint32_t eventID{ 0 };     // event id
+    SyncID collectionSchemeID;
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    std::string campaignArn;
+#endif
+};
+
+class TelemetryDataToPersist : public DataToPersist
+{
+public:
+    TelemetryDataToPersist( CollectionSchemeParams collectionSchemeParams,
+                            unsigned partNumber,
+                            std::shared_ptr<std::string> data
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+                            ,
+                            boost::optional<PartitionID> partitionId,
+                            size_t numberOfSignals
+#endif
+                            )
+        : mCollectionSchemeParams( std::move( collectionSchemeParams ) )
+        , mPartNumber( partNumber )
+        , mData( std::move( data ) )
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+        , mPartitionId( partitionId )
+        , mNumberOfSignals( numberOfSignals )
+#endif
+    {
+    }
+
+    SenderDataType
+    getDataType() const override
+    {
+        return SenderDataType::TELEMETRY;
+    }
+
+    Json::Value
+    getMetadata() const override
+    {
+        Json::Value metadata;
+        metadata["compressionRequired"] = mCollectionSchemeParams.compression;
+        return metadata;
+    }
+
+    std::string
+    getFilename() const override
+    {
+        return std::to_string( mCollectionSchemeParams.eventID ) + "-" +
+               std::to_string( mCollectionSchemeParams.triggerTime ) + "-" + std::to_string( mPartNumber ) + ".bin";
+    };
+
+    boost::variant<std::shared_ptr<std::string>, std::shared_ptr<std::streambuf>>
+    getData() const override
+    {
+        return mData;
+    }
+
+    const CollectionSchemeParams &
+    getCollectionSchemeParams() const
+    {
+        return mCollectionSchemeParams;
+    }
+
+    unsigned
+    getPartNumber() const
+    {
+        return mPartNumber;
+    }
+
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    boost::optional<PartitionID>
+    getPartitionId() const
+    {
+        return mPartitionId;
+    };
+
+    size_t
+    getNumberOfSignals() const
+    {
+        return mNumberOfSignals;
+    }
+#endif
+
+private:
+    CollectionSchemeParams mCollectionSchemeParams;
+    unsigned mPartNumber;
+    std::shared_ptr<std::string> mData;
+#ifdef FWE_FEATURE_STORE_AND_FORWARD
+    boost::optional<PartitionID> mPartitionId;
+    size_t mNumberOfSignals{ 0 };
+#endif
+};
 
 } // namespace IoTFleetWise
 } // namespace Aws

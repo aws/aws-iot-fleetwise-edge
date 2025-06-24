@@ -238,7 +238,7 @@ private:
      * @param type this type will be used to get the type information from the ros2 introspection library
      * @return depending on mConfig.mIntrospectionLibraryCompare true if messages of this type should be processed
      */
-    bool sanityCheckType( std::string dictionaryMessageId, std::string type );
+    bool sanityCheckType( const std::string &dictionaryMessageId, const std::string &type );
 
     /**
      * @brief compares cloud information recursively with type information from introspection library

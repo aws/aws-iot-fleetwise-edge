@@ -49,67 +49,77 @@ DataSenderProtoWriter::append( const CollectedSignal &msg )
     capturedSignal.set_relative_time_ms( relativeTime );
     capturedSignal.set_signal_id( msg.signalID );
     auto signalValue = msg.getValue();
-    // TODO :: Change the datatype of the signal here when the DataPlane supports it
-    double signalPhysicalValue{ 0 };
     size_t size{ sizeof( msg.signalID ) + sizeof( relativeTime ) };
     switch ( signalValue.getType() )
     {
 
-    case SignalType::UINT8:
-        signalPhysicalValue = static_cast<double>( signalValue.value.uint8Val );
+    case SignalType::UINT8: {
+        // TODO :: Change the datatype of the signal here when the DataPlane supports it
+        double signalPhysicalValue = static_cast<double>( signalValue.value.uint8Val );
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
-    case SignalType::INT8:
-        signalPhysicalValue = static_cast<double>( signalValue.value.int8Val );
+    }
+    case SignalType::INT8: {
+        double signalPhysicalValue = static_cast<double>( signalValue.value.int8Val );
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
-    case SignalType::UINT16:
-        signalPhysicalValue = static_cast<double>( signalValue.value.uint16Val );
+    }
+    case SignalType::UINT16: {
+        double signalPhysicalValue = static_cast<double>( signalValue.value.uint16Val );
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
-    case SignalType::INT16:
-        signalPhysicalValue = static_cast<double>( signalValue.value.int16Val );
+    }
+    case SignalType::INT16: {
+        double signalPhysicalValue = static_cast<double>( signalValue.value.int16Val );
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
-    case SignalType::UINT32:
-        signalPhysicalValue = static_cast<double>( signalValue.value.uint32Val );
+    }
+    case SignalType::UINT32: {
+        double signalPhysicalValue = static_cast<double>( signalValue.value.uint32Val );
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
-    case SignalType::INT32:
-        signalPhysicalValue = static_cast<double>( signalValue.value.int32Val );
+    }
+    case SignalType::INT32: {
+        double signalPhysicalValue = static_cast<double>( signalValue.value.int32Val );
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
-    case SignalType::UINT64:
-        signalPhysicalValue = static_cast<double>( signalValue.value.uint64Val );
+    }
+    case SignalType::UINT64: {
+        double signalPhysicalValue = static_cast<double>( signalValue.value.uint64Val );
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
-    case SignalType::INT64:
-        signalPhysicalValue = static_cast<double>( signalValue.value.int64Val );
+    }
+    case SignalType::INT64: {
+        double signalPhysicalValue = static_cast<double>( signalValue.value.int64Val );
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
-    case SignalType::FLOAT:
-        signalPhysicalValue = static_cast<double>( signalValue.value.floatVal );
+    }
+    case SignalType::FLOAT: {
+        double signalPhysicalValue = static_cast<double>( signalValue.value.floatVal );
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
-    case SignalType::DOUBLE:
-        signalPhysicalValue = signalValue.value.doubleVal;
+    }
+    case SignalType::DOUBLE: {
+        double signalPhysicalValue = signalValue.value.doubleVal;
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
-    case SignalType::BOOLEAN:
-        signalPhysicalValue = static_cast<double>( signalValue.value.boolVal );
+    }
+    case SignalType::BOOLEAN: {
+        double signalPhysicalValue = static_cast<double>( signalValue.value.boolVal );
         capturedSignal.set_double_value( signalPhysicalValue );
         size += sizeof( double );
         break;
+    }
     case SignalType::STRING: {
         if ( mRawDataBufferManager == nullptr )
         {
@@ -182,6 +192,14 @@ DataSenderProtoWriter::append( const UploadedS3Object &uploadedS3Object )
     mVehicleDataEstimatedSize += sizeof( uploadedS3Object.dataFormat ) + STRING_OVERHEAD + uploadedS3Object.key.size();
 }
 #endif
+
+size_t
+DataSenderProtoWriter::getNumberOfAppendedMessages() const
+{
+    return static_cast<size_t>( mVehicleData.captured_signals_size() ) +
+           static_cast<size_t>( mVehicleData.dtc_data().active_dtc_codes_size() ) +
+           static_cast<size_t>( mVehicleData.s3_objects_size() );
+}
 
 size_t
 DataSenderProtoWriter::getVehicleDataEstimatedSize() const

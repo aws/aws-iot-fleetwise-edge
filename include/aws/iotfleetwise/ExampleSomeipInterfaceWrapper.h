@@ -55,8 +55,11 @@ public:
                           auto issuedTimestampMs,
                           auto executionTimeoutMs,
                           auto notifyStatusCallback ) {
-                      referenceMethodWrapper1(
-                          signalValue, commandId, issuedTimestampMs, executionTimeoutMs, notifyStatusCallback );
+                      referenceMethodWrapper1( signalValue,
+                                               commandId,
+                                               issuedTimestampMs,
+                                               executionTimeoutMs,
+                                               std::move( notifyStatusCallback ) );
                   } } },
               { "Vehicle.actuator2",
                 { SignalType::INT64,
@@ -65,8 +68,11 @@ public:
                           auto issuedTimestampMs,
                           auto executionTimeoutMs,
                           auto notifyStatusCallback ) {
-                      referenceMethodWrapper2(
-                          signalValue, commandId, issuedTimestampMs, executionTimeoutMs, notifyStatusCallback );
+                      referenceMethodWrapper2( signalValue,
+                                               commandId,
+                                               issuedTimestampMs,
+                                               executionTimeoutMs,
+                                               std::move( notifyStatusCallback ) );
                   } } },
               { "Vehicle.actuator3",
                 { SignalType::BOOLEAN,
@@ -75,8 +81,11 @@ public:
                           auto issuedTimestampMs,
                           auto executionTimeoutMs,
                           auto notifyStatusCallback ) {
-                      referenceMethodWrapper3(
-                          signalValue, commandId, issuedTimestampMs, executionTimeoutMs, notifyStatusCallback );
+                      referenceMethodWrapper3( signalValue,
+                                               commandId,
+                                               issuedTimestampMs,
+                                               executionTimeoutMs,
+                                               std::move( notifyStatusCallback ) );
                   } } },
               { "Vehicle.actuator4",
                 { SignalType::FLOAT,
@@ -85,8 +94,11 @@ public:
                           auto issuedTimestampMs,
                           auto executionTimeoutMs,
                           auto notifyStatusCallback ) {
-                      referenceMethodWrapper4(
-                          signalValue, commandId, issuedTimestampMs, executionTimeoutMs, notifyStatusCallback );
+                      referenceMethodWrapper4( signalValue,
+                                               commandId,
+                                               issuedTimestampMs,
+                                               executionTimeoutMs,
+                                               std::move( notifyStatusCallback ) );
                   } } },
               { "Vehicle.actuator5",
                 { SignalType::DOUBLE,
@@ -95,8 +107,11 @@ public:
                           auto issuedTimestampMs,
                           auto executionTimeoutMs,
                           auto notifyStatusCallback ) {
-                      referenceMethodWrapper5(
-                          signalValue, commandId, issuedTimestampMs, executionTimeoutMs, notifyStatusCallback );
+                      referenceMethodWrapper5( signalValue,
+                                               commandId,
+                                               issuedTimestampMs,
+                                               executionTimeoutMs,
+                                               std::move( notifyStatusCallback ) );
                   } } },
               { "Vehicle.actuator9",
                 { SignalType::STRING,
@@ -105,8 +120,11 @@ public:
                           auto issuedTimestampMs,
                           auto executionTimeoutMs,
                           auto notifyStatusCallback ) {
-                      referenceMethodWrapper9(
-                          signalValue, commandId, issuedTimestampMs, executionTimeoutMs, notifyStatusCallback );
+                      referenceMethodWrapper9( signalValue,
+                                               commandId,
+                                               issuedTimestampMs,
+                                               executionTimeoutMs,
+                                               std::move( notifyStatusCallback ) );
                   } } },
               { "Vehicle.actuator20",
                 { SignalType::INT32,
@@ -115,8 +133,11 @@ public:
                           auto issuedTimestampMs,
                           auto executionTimeoutMs,
                           auto notifyStatusCallback ) {
-                      referenceMethodWrapper20(
-                          signalValue, commandId, issuedTimestampMs, executionTimeoutMs, notifyStatusCallback );
+                      referenceMethodWrapper20( signalValue,
+                                                commandId,
+                                                issuedTimestampMs,
+                                                executionTimeoutMs,
+                                                std::move( notifyStatusCallback ) );
                   } } },
           } )
     {
@@ -193,7 +214,7 @@ public:
         mProxy->setInt32Async(
             signalValue.value.int32Val,
             // coverity[autosar_cpp14_a5_1_9_violation] Local variables need to be captured, so cannot be made common
-            [notifyStatusCallback]( const CommonAPI::CallStatus &callStatus ) {
+            [notifyStatusCallback = std::move( notifyStatusCallback )]( const CommonAPI::CallStatus &callStatus ) {
                 notifyStatusCallback( commonapiCallStatusToCommandStatus( callStatus ),
                                       commonapiCallStatusToReasonCode( callStatus ),
                                       commonapiCallStatusToString( callStatus ) );
@@ -214,7 +235,7 @@ public:
         mProxy->setInt64Async(
             signalValue.value.int64Val,
             // coverity[autosar_cpp14_a5_1_9_violation] Local variables need to be captured, so cannot be made common
-            [notifyStatusCallback]( const CommonAPI::CallStatus &callStatus ) {
+            [notifyStatusCallback = std::move( notifyStatusCallback )]( const CommonAPI::CallStatus &callStatus ) {
                 notifyStatusCallback( commonapiCallStatusToCommandStatus( callStatus ),
                                       commonapiCallStatusToReasonCode( callStatus ),
                                       commonapiCallStatusToString( callStatus ) );
@@ -235,7 +256,7 @@ public:
         mProxy->setBooleanAsync(
             signalValue.value.boolVal,
             // coverity[autosar_cpp14_a5_1_9_violation] Local variables need to be captured, so cannot be made common
-            [notifyStatusCallback]( const CommonAPI::CallStatus &callStatus ) {
+            [notifyStatusCallback = std::move( notifyStatusCallback )]( const CommonAPI::CallStatus &callStatus ) {
                 notifyStatusCallback( commonapiCallStatusToCommandStatus( callStatus ),
                                       commonapiCallStatusToReasonCode( callStatus ),
                                       commonapiCallStatusToString( callStatus ) );
@@ -256,7 +277,7 @@ public:
         mProxy->setFloatAsync(
             signalValue.value.floatVal,
             // coverity[autosar_cpp14_a5_1_9_violation] Local variables need to be captured, so cannot be made common
-            [notifyStatusCallback]( const CommonAPI::CallStatus &callStatus ) {
+            [notifyStatusCallback = std::move( notifyStatusCallback )]( const CommonAPI::CallStatus &callStatus ) {
                 notifyStatusCallback( commonapiCallStatusToCommandStatus( callStatus ),
                                       commonapiCallStatusToReasonCode( callStatus ),
                                       commonapiCallStatusToString( callStatus ) );
@@ -277,7 +298,7 @@ public:
         mProxy->setDoubleAsync(
             signalValue.value.doubleVal,
             // coverity[autosar_cpp14_a5_1_9_violation] Local variables need to be captured, so cannot be made common
-            [notifyStatusCallback]( const CommonAPI::CallStatus &callStatus ) {
+            [notifyStatusCallback = std::move( notifyStatusCallback )]( const CommonAPI::CallStatus &callStatus ) {
                 notifyStatusCallback( commonapiCallStatusToCommandStatus( callStatus ),
                                       commonapiCallStatusToReasonCode( callStatus ),
                                       commonapiCallStatusToString( callStatus ) );
@@ -306,7 +327,7 @@ public:
         mProxy->setStringAsync(
             stringVal,
             // coverity[autosar_cpp14_a5_1_9_violation] Local variables need to be captured, so cannot be made common
-            [notifyStatusCallback]( const CommonAPI::CallStatus &callStatus ) {
+            [notifyStatusCallback = std::move( notifyStatusCallback )]( const CommonAPI::CallStatus &callStatus ) {
                 notifyStatusCallback( commonapiCallStatusToCommandStatus( callStatus ),
                                       commonapiCallStatusToReasonCode( callStatus ),
                                       commonapiCallStatusToString( callStatus ) );
@@ -315,6 +336,10 @@ public:
     }
 
     void
+    // coverity[autosar_cpp14_m3_2_2_violation:FALSE] not defined anywhere else
+    // coverity[misra_cpp_2008_rule_3_2_2_violation:FALSE] not defined anywhere else
+    // coverity[cert_dcl60_cpp_violation:FALSE] not defined anywhere else
+    // coverity[ODR_VIOLATION:FALSE] not defined anywhere else
     referenceMethodWrapper20( SignalValueWrapper signalValue,
                               const CommandID &commandId,
                               Timestamp issuedTimestampMs,
@@ -337,7 +362,12 @@ public:
             commandId,
             signalValue.value.int32Val,
             // coverity[autosar_cpp14_a5_1_9_violation] Local variables need to be captured, so cannot be made common
-            [this, commandId, notifyStatusCallback]( const CommonAPI::CallStatus &callStatus ) {
+            // coverity[autosar_cpp14_m3_2_2_violation:FALSE] not defined anywhere else
+            // coverity[misra_cpp_2008_rule_3_2_2_violation:FALSE] not defined anywhere else
+            // coverity[cert_dcl60_cpp_violation:FALSE] not defined anywhere else
+            // coverity[ODR_VIOLATION:FALSE] not defined anywhere else
+            [this, commandId, notifyStatusCallback = std::move( notifyStatusCallback )](
+                const CommonAPI::CallStatus &callStatus ) {
                 notifyStatusCallback( commonapiCallStatusToCommandStatus( callStatus ),
                                       commonapiCallStatusToReasonCode( callStatus ),
                                       commonapiCallStatusToString( callStatus ) );
