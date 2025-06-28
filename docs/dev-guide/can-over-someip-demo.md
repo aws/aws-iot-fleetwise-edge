@@ -7,8 +7,8 @@ available to nodes on the Ethernet network.
 
 This demo generates CAN data on a virtual CAN bus, and bridges this data onto SOME/IP. The Reference
 Implementation for AWS IoT FleetWise (FWE) is then provisioned and run to collect the CAN data from
-SOME/IP and upload it to the cloud. The data is then downloaded from Amazon Timestream and plotted
-in an HTML graph format.
+SOME/IP and upload it to the cloud. The data is then downloaded from the specified data destination
+and plotted in an HTML graph format.
 
 The following diagram illustrates the dataflow and artifacts consumed and produced by this demo:
 
@@ -227,8 +227,8 @@ collect data from it.
    The demo script:
 
    1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
-   1. Creates an Amazon Timestream database and table.
-   1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
+   1. Creates an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
+      bucket.
    1. Creates a signal catalog based on `can-nodes.json`.
    1. Creates a model manifest that references the signal catalog with all of the CAN signals.
    1. Activates the model manifest.
@@ -242,11 +242,28 @@ collect data from it.
    1. Creates a campaign from `campaign-brake-event.json` that contains a condition-based collection
       scheme to capture the engine torque and the brake pressure when the brake pressure is above
       7000, and targets the campaign at the fleet.
+   1. The data uploaded to S3 would be in JSON format, or Parquet format if the
+      `--s3-format PARQUET` option is passed.
    1. Approves the campaign.
    1. Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to
       the fleet.
-   1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
+   1. Wait 20 minutes for the data to propagate to S3 and then download it.
    1. Saves the data to an HTML file.
+
+   If `TIMESTREAM` upload is enabled (**Note**: Amazon Timestream for Live Analytics is only
+   available to customers who have already been onboarded in that region. See
+   [the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html)),
+   the demo script will instead:
+
+   1. Creates an Amazon Timestream database and table.
+   1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
+   1. Creates a campaign from `campaign-brake-event.json` that contains a condition-based collection
+      scheme to capture the engine torque and the brake pressure when the brake pressure is above
+      7000, and targets the campaign at the fleet.
+   1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
+   1. Save the data to an HTML file.
+
+   This script will not delete Amazon Timestream or S3 resources.
 
 1. When the script completes, a path to an HTML file is given. _On your local machine_, use `scp` to
    download it, then open it in your web browser:
@@ -259,15 +276,18 @@ collect data from it.
    simulated brake pressure signal. As you can see that when hard braking events occur (value above
    7000), collection is triggered and the engine torque signal data is collected.
 
-   Alternatively, if your AWS account is enrolled with Amazon QuickSight or Amazon Managed Grafana,
-   you may use them to browse the data from Amazon Timestream directly.
+   Alternatively, if your upload destination was set to `TIMESTREAM` and AWS account is enrolled
+   with Amazon QuickSight or Amazon Managed Grafana, you may use them to browse the data from Amazon
+   Timestream directly. **Note**: Amazon Timestream for Live Analytics is only available to
+   customers who have already been onboarded in that region. See
+   [the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html).
 
    ![](./images/collected_data_plot.png)
 
 ## Clean up
 
 1. Run the following _on the development machine_ to clean up resources created by the
-   `provision.sh` and `demo.sh` scripts. **Note:** The Amazon Timestream resources are not deleted.
+   `provision.sh` and `demo.sh` scripts. **Note:** The S3 resources are not deleted.
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
