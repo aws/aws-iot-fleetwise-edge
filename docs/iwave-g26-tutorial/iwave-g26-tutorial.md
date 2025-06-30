@@ -526,7 +526,8 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    The demo script:
 
    1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
-   1. Creates an Amazon Timestream database and table.
+   1. Creates an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
+      bucket.
    1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
    1. Creates a signal catalog based on `obd-nodes.json` and `custom-nodes-location.json`.
    1. Creates a model manifest that references the signal catalog with all of the OBD and location
@@ -542,13 +543,15 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
    1. Associates the vehicle with the fleet.
    1. Creates a campaign from `campaign-obd-heartbeat.json` that contains a time-based collection
       scheme that collects OBD and location data and targets the campaign at the fleet.
+   1. The data uploaded to S3 would be in JSON format, or Parquet format if the
+      `--s3-format PARQUET` option is passed.
    1. Approves the campaign.
    1. Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to
       the fleet.
-   1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
+   1. Wait 20 minutes for the data to propagate to S3 and then download it.
    1. Saves the data to an HTML file.
 
-   This script will not delete Amazon Timestream resources.
+   This script will not delete S3 resources.
 
 1. When the script completes, a path to an HTML file is given. _On your local machine_, use `scp` to
    download it, then open it in your web browser:
@@ -559,8 +562,11 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 
 1. To explore the collected data, you can click and drag to zoom in.
 
-   Alternatively, if your AWS account is enrolled with Amazon QuickSight or Amazon Managed Grafana,
-   you may use them to browse the data from Amazon Timestream directly.
+   Alternatively, if your upload destination was set to `TIMESTREAM` and AWS account is enrolled
+   with Amazon QuickSight or Amazon Managed Grafana, you may use them to browse the data from Amazon
+   Timestream directly. **Note**: Amazon Timestream for Live Analytics is only available to
+   customers who have already been onboarded in that region. See
+   [the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html).
 
 **Note:**
 
@@ -592,7 +598,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 ## Step 8: Clean up
 
 1. Run the following _on the development machine_ to clean up resources created by the
-   `provision.sh` and `demo.sh` scripts. **Note:** The Amazon Timestream resources are not deleted.
+   `provision.sh` and `demo.sh` scripts. **Note:** The S3 resources are not deleted.
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \

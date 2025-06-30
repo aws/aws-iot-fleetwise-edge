@@ -168,9 +168,12 @@ collect data from it.
       --campaign-file campaign-brake-event.json
    ```
 
-   - (Optional) To enable S3 upload, append the option `--data-destination S3`. By default the
-     upload format will be JSON. You can change this to Parquet format for S3 by passing
-     `--s3-format PARQUET`.
+   - The default `--data-destination` is S3, and the default upload format is JSON. You can change
+     this to Parquet format for S3 by passing `--s3-format PARQUET`.
+   - (Optional) To enable Amazon Timestream as destination, add the flag
+     `--data-destination TIMESTREAM`. **Note**: Amazon Timestream for Live Analytics is only
+     available to customers who are already onboarded in that region. See
+     [the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html).
    - (Optional) To enable IoT topic as destination, add the flag `--data-destination IOT_TOPIC`. To
      define the custom IoT topic use the flag `--iot-topic <TOPIC_NAME>`. Note: The IoT topic data
      destination is a "gated" feature of AWS IoT FleetWise for which you will need to request
@@ -188,8 +191,8 @@ collect data from it.
    The demo script:
 
    1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
-   1. Creates an Amazon Timestream database and table.
-   1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
+   1. Creates an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
+      bucket.
    1. Creates a signal catalog based on `can-nodes.json`.
    1. Creates a model manifest that references the signal catalog with all of the CAN signals.
    1. Activates the model manifest.
@@ -203,19 +206,25 @@ collect data from it.
    1. Creates a campaign from `campaign-brake-event.json` that contains a condition-based collection
       scheme to capture the engine torque and the brake pressure when the brake pressure is above
       7000, and targets the campaign at the fleet.
+   1. The data uploaded to S3 would be in JSON format, or Parquet format if the
+      `--s3-format PARQUET` option is passed.
    1. Approves the campaign.
    1. Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to
       the fleet.
-   1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
+   1. Wait 20 minutes for the data to propagate to S3 and then download it.
    1. Saves the data to an HTML file.
 
-   If S3 upload is enabled, the demo script will instead:
+   If `TIMESTREAM` upload is enabled (**Note**: Amazon Timestream for Live Analytics is only
+   available to customers who have already been onboarded in that region. See
+   [the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html)),
+   the demo script will instead:
 
-   1. Create an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
-      bucket.
-   1. Creates a campaign from `campaign-brake-event.json` to upload the data to S3 in JSON format,
-      or Parquet format if the `--s3-format PARQUET` option is passed.
-   1. Wait 20 minutes for the data to propagate to S3 and then download it.
+   1. Creates an Amazon Timestream database and table.
+   1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
+   1. Creates a campaign from `campaign-brake-event.json` that contains a condition-based collection
+      scheme to capture the engine torque and the brake pressure when the brake pressure is above
+      7000, and targets the campaign at the fleet.
+   1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
    1. Save the data to an HTML file.
 
    This script will not delete Amazon Timestream or S3 resources.
@@ -229,8 +238,11 @@ collect data from it.
    simulated brake pressure signal. As you can see that when hard braking events occur (value above
    7000), collection is triggered and the engine torque signal data is collected.
 
-   Alternatively, if your AWS account is enrolled with Amazon QuickSight or Amazon Managed Grafana,
-   you may use them to browse the data from Amazon Timestream directly.
+   Alternatively, if your upload destination was set to `TIMESTREAM` and AWS account is enrolled
+   with Amazon QuickSight or Amazon Managed Grafana, you may use them to browse the data from Amazon
+   Timestream directly. **Note**: Amazon Timestream for Live Analytics is only available to
+   customers who have already been onboarded in that region. See
+   [the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html).
 
    ![](./images/collected_data_plot.png)
 
@@ -452,9 +464,12 @@ collect data from it.
       --campaign-file campaign-brake-event.json
    ```
 
-   - (Optional) To enable S3 upload, append the option `--data-destination S3`. By default the
-     upload format will be JSON. You can change this to Parquet format by passing
-     `--s3-format PARQUET`.
+   - The default `--data-destination` is S3, and the default upload format is JSON. You can change
+     this to Parquet format for S3 by passing `--s3-format PARQUET`.
+   - (Optional) To enable Amazon Timestream as destination, add the flag
+     `--data-destination TIMESTREAM`. **Note**: Amazon Timestream for Live Analytics is only
+     available to customers who are already onboarded in that region. See
+     [the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html).
    - (Optional) To enable IoT topic as destination, add the flag `--data-destination IOT_TOPIC` To
      define the custom IoT topic use the flag `--iot-topic <TOPIC_NAME>`. Note: The IoT topic data
      destination is a "gated" feature of AWS IoT FleetWise for which you will need to request
@@ -468,8 +483,8 @@ collect data from it.
    The demo script:
 
    1. Registers your AWS account with AWS IoT FleetWise, if not already registered.
-   1. Creates an Amazon Timestream database and table.
-   1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
+   1. Creates an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
+      bucket.
    1. Creates a signal catalog based on `can-nodes.json`.
    1. Creates a model manifest that references the signal catalog with all of the CAN signals.
    1. Activates the model manifest.
@@ -483,22 +498,27 @@ collect data from it.
    1. Creates a campaign from `campaign-brake-event.json` that contains a condition-based collection
       scheme to capture the engine torque and the brake pressure when the brake pressure is above
       7000, and targets the campaign at the fleet.
+   1. The data uploaded to S3 would be in JSON format, or Parquet format if the
+      `--s3-format PARQUET` option is passed.
    1. Approves the campaign.
    1. Waits until the campaign status is `HEALTHY`, which means the campaign has been deployed to
       the fleet.
-   1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
+   1. Wait 20 minutes for the data to propagate to S3 and then download it.
    1. Saves the data to an HTML file.
 
-   If S3 upload is enabled, the demo script will additionally:
+   If `TIMESTREAM` upload is enabled, the demo script will instead:
 
-   1. Create an S3 bucket with a bucket policy that allows AWS IoT FleetWise to write data to the
-      bucket.
-   1. Creates an additional campaign from `campaign-brake-event.json` to upload the data to S3 in
-      JSON format, or Parquet format if the `--s3-format PARQUET` option is passed.
-   1. Wait 20 minutes for the data to propagate to S3 and then download it.
-   1. Save the data to an HTML file.
+   **Note**: Amazon Timestream for Live Analytics is only available to customers who have already
+   been onboarded in that region. See
+   [the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html).
 
-   This script will not delete Amazon Timestream or S3 resources.
+   1. Creates an Amazon Timestream database and table.
+   1. Creates IAM role and policy required for the service to write data to Amazon Timestream.
+   1. Creates a campaign from `campaign-brake-event.json` that contains a condition-based collection
+      scheme to capture the engine torque and the brake pressure when the brake pressure is above
+      7000, and targets the campaign at the fleet.
+   1. Waits 30 seconds and then downloads the collected data from Amazon Timestream.
+   1. Save the data to an HTML file. This script will not delete Amazon Timestream or S3 resources.
 
 1. When the script completes, a path to an HTML file is given. _On your local machine_, use `scp` to
    download it, then open it in your web browser:
@@ -511,8 +531,11 @@ collect data from it.
    simulated brake pressure signal. As you can see that when hard braking events occur (value above
    7000), collection is triggered and the engine torque signal data is collected.
 
-   Alternatively, if your AWS account is enrolled with Amazon QuickSight or Amazon Managed Grafana,
-   you may use them to browse the data from Amazon Timestream directly.
+   Alternatively, if your upload destination was set to `TIMESTREAM` and AWS account is enrolled
+   with Amazon QuickSight or Amazon Managed Grafana, you may use them to browse the data from Amazon
+   Timestream directly. **Note**: Amazon Timestream for Live Analytics is only available to
+   customers who have already been onboarded in that region. See
+   [the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html).
 
    ![](./images/collected_data_plot.png)
 

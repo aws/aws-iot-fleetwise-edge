@@ -191,7 +191,7 @@ mkdir -p ~/aws-iot-fleetwise-deploy \
 ## Clean up
 
 1. Run the following _on the development machine_ to clean up resources created by the
-   `provision.sh` and `demo.sh` scripts. **Note:** The Amazon Timestream resources are not deleted.
+   `provision.sh` and `demo.sh` scripts. **Note:** The S3 resources are not deleted.
 
    ```bash
    cd ~/aws-iot-fleetwise-edge/tools/cloud \
