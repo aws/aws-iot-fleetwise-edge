@@ -116,16 +116,19 @@ previous section.
    The demo script will save a set of varables about the run to a demo.env file, which can be used
    by other scripts such as request-forward.sh or cleanup.sh.
 
-   When the script completes, you can view the data forwarded by the second and third campaigns in
-   Timestream, as well as the demo output file(s). A path to an HTML file is given. _On your local
-   machine_, use `scp` to download it, then open it in your web browser:
+   When the script completes, you can view the data forwarded by the second and third campaigns to
+   S3, as well as the demo output file(s). A path to an HTML file is given. _On your local machine_,
+   use `scp` to download it, then open it in your web browser:
 
    ```bash
    scp -i <PATH_TO_PEM> ubuntu@<EC2_IP_ADDRESS>:<PATH_TO_HTML_FILE> .
    ```
 
-   Alternatively, if your AWS account is enrolled with Amazon QuickSight or Amazon Managed Grafana,
-   you may use them to browse the data from Amazon Timestream directly.
+   Alternatively, if your upload destination was set to `TIMESTREAM` and AWS account is enrolled
+   with Amazon QuickSight or Amazon Managed Grafana, you may use them to browse the data from Amazon
+   Timestream directly. **Note**: Amazon Timestream for Live Analytics is only available to
+   customers who have already been onboarded in that region. See
+   [the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html).
 
    As you explore the forwarded data, you can see the brake data from campaign 2 as well as the
    network type signal from campaign 3.
@@ -163,16 +166,18 @@ end time will be passed through to the IoT Job document by the script. The scrip
 argument must be an ISO 8601 UTC formatted time string. e.g. `--end-time 2024-05-25T01:21:23Z`
 
 When the request-forward.sh script completes, you can view the data forwarded by the first campaign
-which was requested through IoT Jobs in Timestream, as well as the demo output file(s). A path to an
-HTML file is given. _On your local machine_, use `scp` to download it, then open it in your web
-browser:
+which was requested through IoT Jobs in S3, as well as the demo output file(s). A path to an HTML
+file is given. _On your local machine_, use `scp` to download it, then open it in your web browser:
 
 ```bash
 scp -i <PATH_TO_PEM> ubuntu@<EC2_IP_ADDRESS>:<PATH_TO_HTML_FILE> .
 ```
 
-Alternatively, if your AWS account is enrolled with Amazon QuickSight or Amazon Managed Grafana, you
-may use them to browse the data from Amazon Timestream directly.
+Alternatively, if your upload destination was set to `TIMESTREAM` and AWS account is enrolled with
+Amazon QuickSight or Amazon Managed Grafana, you may use them to browse the data from Amazon
+Timestream directly. **Note**: Amazon Timestream for Live Analytics is only available to customers
+who have already been onboarded in that region. See
+[the availability change documentation](https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html).
 
 As you explore the forwarded data, you can now see the engine data from campaign 1, in addition to
 the data from the other campaigns.
