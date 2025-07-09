@@ -1,0 +1,48 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: Update AMI IDs Monthly
+
+on:
+  schedule:
+    # Run on the first day of every month at 2 AM UTC
+    - cron: "0 2 1 * *"
+  workflow_dispatch:
+
+jobs:
+  update-cfn-ami-ids:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+    if: github.repository == 'aws/aws-iot-fleetwise-edge'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.UPDATE_CFN_AMI_IDS_ROLE }}
+          aws-region: us-east-1
+      - name: update-files
+        run: |
+          set -xeuo pipefail
+          python3 tools/update-cfn-ami-ids.py --file tools/cfn-templates/fwdemo.yml                     --mapping AMIRegionMap      --image-filter "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"
+          python3 tools/update-cfn-ami-ids.py --file tools/cfn-templates/fwdev.yml                      --mapping AMIRegionMapArm64 --image-filter "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"
+          python3 tools/update-cfn-ami-ids.py --file tools/cfn-templates/fwdev.yml                      --mapping AMIRegionMapAmd64 --image-filter "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
+          python3 tools/update-cfn-ami-ids.py --file tools/cfn-templates/vision-system-data-jupyter.yml --mapping AMIRegionMap      --image-filter "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"
+          if git diff --quiet; then
+            echo "No AMI updates needed"
+          else
+            echo "AMI updates detected"
+            MESSAGE="Update AMIs $(date +'%Y-%m-%d')"
+            BRANCH="update-cfn-ami-ids-$(date +'%Y-%m-%d')"
+            git config --global user.name "GitHub Actions"
+            git config --global user.email "iotfleetwise@amazonaws.com"
+            git checkout -b ${BRANCH}
+            git add .
+            git commit -m "${MESSAGE}"
+            git push origin ${BRANCH}
+            gh pr create -B main -H ${BRANCH} --title "${MESSAGE}" --body-file .github/PULL_REQUEST_TEMPLATE.md
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
