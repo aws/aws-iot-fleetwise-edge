@@ -625,39 +625,39 @@ Mappings:
   # Ubuntu 22.04 arm64 AMIs
   AMIRegionMap:
     ap-northeast-1:
-      AMIID: ami-02b8b87a5bfed4c7a
+      AMIID: ami-0fb95e7bb4ab88d73
     ap-northeast-2:
-      AMIID: ami-0ee413af3d419b913
+      AMIID: ami-05904600e594addce
     ap-northeast-3:
-      AMIID: ami-0707b5724f3d370a1
+      AMIID: ami-07efed9d2fa853e2e
     ap-south-1:
-      AMIID: ami-0041facac80f93bbe
+      AMIID: ami-00adf533fd135ce62
     ap-southeast-1:
-      AMIID: ami-084594bed915f5e8f
+      AMIID: ami-08236e16f8ee14acf
     ap-southeast-2:
-      AMIID: ami-07bf7b6acb5db5e13
+      AMIID: ami-0a3ff59a725373043
     ca-central-1:
-      AMIID: ami-0d1bde699564f5a7a
+      AMIID: ami-0c88fe157af6decde
     eu-central-1:
-      AMIID: ami-0bc586dd8476ba5b1
+      AMIID: ami-09f4c409d55852e90
     eu-north-1:
-      AMIID: ami-008e58f8f6505bf76
+      AMIID: ami-09dfffbbe2f9875ef
     eu-west-1:
-      AMIID: ami-04434961757c31b63
+      AMIID: ami-0fd301a23be2fbe30
     eu-west-2:
-      AMIID: ami-02c510094a29f0052
+      AMIID: ami-00eba26d2b9b1cb52
     eu-west-3:
-      AMIID: ami-0bbeecfe5196eab29
+      AMIID: ami-07ca702a56e7d61d0
     sa-east-1:
-      AMIID: ami-080924daa71cbdad8
+      AMIID: ami-02a5478d1b0d6d00d
     us-east-1:
-      AMIID: ami-06daf9c2d2cf1cb37
+      AMIID: ami-04abdba8d57480cde
     us-east-2:
-      AMIID: ami-0edd45507c30e47d4
+      AMIID: ami-0a5ee0f0c6f60deaa
     us-west-1:
-      AMIID: ami-01557579a54cccc40
+      AMIID: ami-02b16b76c2ed386c5
     us-west-2:
-      AMIID: ami-057a2512faa740640
+      AMIID: ami-039aad0ef6d1c0b87
   FleetSizeEc2InstanceTypeMap:
     "1":
       InstanceType: m6g.xlarge
