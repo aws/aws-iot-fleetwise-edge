@@ -113,7 +113,7 @@ previous section.
       --campaign-file campaign-upload-during-wifi.json
    ```
 
-   The demo script will save a set of varables about the run to a demo.env file, which can be used
+   The demo script will save a set of variables about the run to a demo.env file, which can be used
    by other scripts such as request-forward.sh or cleanup.sh.
 
    When the script completes, you can view the data forwarded by the second and third campaigns to
