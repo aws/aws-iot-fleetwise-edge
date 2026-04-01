@@ -1,5 +1,15 @@
 # Change Log
 
+## v1.3.3 (2026-04-01)
+
+Service update:
+
+- Added note to README.md on AWS IoT FleetWise entering maintenance mode.
+
+Improvements:
+
+- Work-around for ROS2 dependency issue in cross-builds.
+
 ## v1.3.2 (2025-06-24)
 
 Bug fixes:
