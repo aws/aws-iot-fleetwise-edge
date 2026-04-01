@@ -429,6 +429,27 @@ if ! ${USE_CACHE}; then
         vcs import --input https://raw.githubusercontent.com/ros2/ros2/release-humble-20241205/ros2.repos src
         rosdep init
         rosdep update
+        # Work-around ROS2 dependency issue - rosidl_default_generators now needs to be built and installed before the other components
+        colcon build \
+            --merge-install \
+            --install-base /opt/ros/humble \
+            --packages-up-to rosidl_default_generators \
+            --cmake-args \
+            -DCMAKE_TOOLCHAIN_FILE=/usr/local/aarch64-linux-gnu/lib/cmake/arm64-toolchain.cmake \
+            -DBUILD_TESTING=OFF \
+            -DPythonExtra_EXTENSION_SUFFIX=.cpython-310-aarch64-linux-gnu \
+            --no-warn-unused-cli
+        export AMENT_TRACE_SETUP_FILES=""
+        export AMENT_PYTHON_EXECUTABLE=""
+        export AMENT_PREFIX_PATH=""
+        export CMAKE_PREFIX_PATH=""
+        export COLCON_PREFIX_PATH=""
+        export COLCON_PYTHON_EXECUTABLE=""
+        export COLCON_TRACE=""
+        export LD_LIBRARY_PATH=""
+        export PYTHONPATH=""
+        export PKG_CONFIG_PATH=""
+        source /opt/ros/humble/setup.bash
         # Without setting PythonExtra_EXTENSION_SUFFIX the .so file are aarch64 but have x86_64 in the name
         colcon build \
             --merge-install \
