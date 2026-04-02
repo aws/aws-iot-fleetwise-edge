@@ -451,6 +451,8 @@ if ! ${USE_CACHE}; then
         export PKG_CONFIG_PATH=""
         source /opt/ros/humble/setup.bash
         # Without setting PythonExtra_EXTENSION_SUFFIX the .so file are aarch64 but have x86_64 in the name
+        # Set PYTHONPATH to include install directory so Python packages built earlier are available
+        export PYTHONPATH=/opt/ros/humble/lib/python3.10/site-packages:${PYTHONPATH:-}
         colcon build \
             --merge-install \
             --install-base /opt/ros/humble \

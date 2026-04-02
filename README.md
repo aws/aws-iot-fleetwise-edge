@@ -221,4 +221,4 @@ The following documents provide more information about FWE.
 The following documents provide more information about the cloud component of AWS IoT FleetWise.
 
 1. [AWS IoT FleetWise API Reference](https://docs.aws.amazon.com/iot-fleetwise/latest/APIReference/Welcome.html)
-   describes all the API operations for FleetWise
+   describes all the API operations for FleetWise.
