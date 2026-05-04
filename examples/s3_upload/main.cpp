@@ -104,6 +104,12 @@ main( int argc, char *argv[] )
             Aws::Client::ClientConfiguration clientConfiguration( initValues );
             clientConfiguration.region = bucketRegion;
             clientConfiguration.maxConnections = maxConnections;
+            if ( engine.mRootCAFilename.empty() && ( !engine.mRootCA.empty() ) )
+            {
+                // Only possible to configure the root CA filename, not file content
+                FWE_LOG_WARN( "rootCAFilename should be configured instead of rootCA for S3 support" );
+            }
+            clientConfiguration.caFile = engine.mRootCAFilename; // Blank means not configured
             auto s3Client =
                 std::make_shared<Aws::S3::S3Client>( engine.mAwsCredentialsProvider,
                                                      Aws::MakeShared<Aws::S3::S3EndpointProvider>( "S3Client" ),

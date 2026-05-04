@@ -96,7 +96,7 @@ class NetworkNamespace:
         for i in range(10):
             try:
                 self._subprocess_helper.target_check_call(
-                    self.exec + ["ping", "-c", "1", "amazon.com"], timeout=10
+                    self.exec + ["ping", "-c", "1", "aws.amazon.com"], timeout=10
                 )
                 break
             except Exception:

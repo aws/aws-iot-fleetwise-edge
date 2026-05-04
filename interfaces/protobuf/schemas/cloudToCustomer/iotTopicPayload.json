@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "IoT Topic Payload",
+  "description": "Schema for IoT Topic Payload data format used in AWS IoT FleetWise",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "campaignName",
+    "vehicleName",
+    "eventId",
+    "msgId",
+    "collectionEventTime",
+    "dimensions",
+    "signals"
+  ],
+  "properties": {
+    "campaignName": {
+      "type": "string",
+      "description": "Name of the campaign that generated this data"
+    },
+    "vehicleName": {
+      "type": "string",
+      "description": "Name of the vehicle that generated this data"
+    },
+    "eventId": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unique identifier for this event (unsigned integer)"
+    },
+    "msgId": {
+      "type": "string",
+      "description": "Unique message identifier"
+    },
+    "collectionEventTime": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Timestamp when the data was collected (epoch time in milliseconds)"
+    },
+    "dimensions": {
+      "type": "object",
+      "description": "Key-value pairs of dimension data",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "signals": {
+      "type": "object",
+      "description": "Map of signal names to their collected data points",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["value", "dataType", "time"],
+          "properties": {
+            "value": {
+              "description": "The value of the signal, can be of any type"
+            },
+            "dataType": {
+              "type": "string",
+              "description": "The data type of the value"
+            },
+            "time": {
+              "type": "integer",
+              "format": "int64",
+              "description": "Timestamp when this specific signal value was collected (epoch time in milliseconds)"
+            }
+          }
+        }
+      }
+    }
+  }
+}

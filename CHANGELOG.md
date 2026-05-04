@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.3.4 (2026-04-30)
+
+Service update:
+
+- README.md updated to reflect that AWS IoT FleetWise is in maintenance mode.
+
 ## v1.3.3 (2026-04-01)
 
 Service update:

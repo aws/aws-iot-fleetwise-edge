@@ -420,7 +420,6 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
         {
             std::string privateKey;
             std::string certificate;
-            std::string rootCA;
             FWE_LOG_INFO( "ConnectionType is iotCore" );
             // fetch connection parameters from config
             if ( mqttConfig.isMember( "privateKey" ) )
@@ -445,13 +444,12 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
             }
             if ( mqttConfig.isMember( "rootCA" ) )
             {
-                rootCA = mqttConfig["rootCA"].asStringRequired();
+                mRootCA = mqttConfig["rootCA"].asStringRequired();
             }
             else if ( mqttConfig.isMember( "rootCAFilename" ) )
             {
-                rootCA = getFileContents(
-                    getAbsolutePath( mqttConfig["rootCAFilename"].asStringRequired(), configFileDirectoryPath )
-                        .string() );
+                mRootCAFilename = mqttConfig["rootCAFilename"].asStringRequired();
+                mRootCA = getFileContents( getAbsolutePath( mRootCAFilename, configFileDirectoryPath ).string() );
             }
             // coverity[autosar_cpp14_a20_8_5_violation] - can't use make_unique as the constructor is private
             auto builder = std::unique_ptr<Aws::Iot::Mqtt5ClientBuilder>(
@@ -484,13 +482,14 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                     MQTT_SESSION_EXPIRY_INTERVAL_SECONDS );
 
             mConnectivityModule = std::make_shared<AwsIotConnectivityModule>(
-                rootCA, clientId, *mBuilderWrapper, *mTopicConfig, mqttConnectionConfig );
+                mRootCA, clientId, *mBuilderWrapper, *mTopicConfig, mqttConnectionConfig );
 
 #ifdef FWE_FEATURE_S3
             if ( config["staticConfig"].isMember( "credentialsProvider" ) )
             {
                 auto crtCredentialsProvider = createX509CredentialsProvider(
                     bootstrapPtr,
+                    mRootCA,
                     clientId,
                     privateKey,
                     certificate,
@@ -819,6 +818,12 @@ IoTFleetWiseEngine::connect( const Json::Value &jsonConfig, const boost::filesys
                 -> std::shared_ptr<TransferManagerWrapper> {
                 clientConfiguration.maxConnections = s3MaxConnections;
                 transferManagerConfiguration.transferExecutor = getTransferManagerExecutor().get();
+                if ( mRootCAFilename.empty() && ( !mRootCA.empty() ) )
+                {
+                    // Only possible to configure the root CA filename, not file content
+                    FWE_LOG_WARN( "rootCAFilename should be configured instead of rootCA for S3 support" );
+                }
+                clientConfiguration.caFile = mRootCAFilename; // Blank means not configured
                 auto s3Client =
                     std::make_unique<Aws::S3::S3Client>( mAwsCredentialsProvider,
                                                          Aws::MakeShared<Aws::S3::S3EndpointProvider>( "S3Client" ),
