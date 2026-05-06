@@ -226,6 +226,8 @@ public:
         mShutdownConfigHook = std::move( hook );
     }
 
+    std::string mRootCAFilename;
+    std::string mRootCA;
     SignalBufferDistributor mSignalBufferDistributor;
     std::shared_ptr<CollectionSchemeManager> mCollectionSchemeManagerPtr;
     std::shared_ptr<CollectionInspectionEngine> mCollectionInspectionEngine;

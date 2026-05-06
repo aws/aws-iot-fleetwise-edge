@@ -65,6 +65,7 @@ CrtCredentialsProviderAdapter::GetAWSCredentials()
 
 std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>
 createX509CredentialsProvider( Aws::Crt::Io::ClientBootstrap *clientBootstrap,
+                               const std::string &rootCA,
                                const std::string &clientId,
                                const std::string &privateKey,
                                const std::string &certificate,
@@ -82,6 +83,17 @@ createX509CredentialsProvider( Aws::Crt::Io::ClientBootstrap *clientBootstrap,
         errStr = errStr != nullptr ? errStr : "Unknown error";
         FWE_LOG_ERROR( "Unable to initialize tls context options, error: " + std::string( errStr ) );
         return nullptr;
+    }
+    if ( !rootCA.empty() )
+    {
+        const auto rootCaBytes = Aws::Crt::ByteCursorFromCString( rootCA.c_str() );
+        if ( !tlsCtxOptions.OverrideDefaultTrustStore( rootCaBytes ) )
+        {
+            auto errStr = Aws::Crt::ErrorDebugString( tlsCtxOptions.LastError() );
+            errStr = errStr != nullptr ? errStr : "Unknown error";
+            FWE_LOG_ERROR( "Unable to override default trust store, error: " + std::string( errStr ) );
+            return nullptr;
+        }
     }
     auto x509TlsCtx = Aws::Crt::Io::TlsContext( tlsCtxOptions, Aws::Crt::Io::TlsMode::CLIENT );
     if ( !x509TlsCtx )

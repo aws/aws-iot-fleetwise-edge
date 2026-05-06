@@ -84,6 +84,15 @@
    ...
 }
 {
+   ROS2 - spdlog registry use-after-free during shutdown
+   Memcheck:Addr8
+   ...
+   obj:*libspdlog*
+   ...
+   fun:rcl_logging_external_shutdown
+   ...
+}
+{
    PythonReachable
    Memcheck:Leak
    match-leak-kinds: reachable

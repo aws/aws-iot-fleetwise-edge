@@ -1,2 +1,4 @@
 testframework/gen/
 run/
+logs/
+.attach_*

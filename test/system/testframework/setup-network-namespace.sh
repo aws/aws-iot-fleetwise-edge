@@ -102,7 +102,7 @@ for i in $(seq 0 $((NUM_NAMESPACES-1))); do
         # being dropped or routed to the wrong interface:
         #    1. Run `sudo watch -n1 'iptables-save -c'` on a separate terminal either on the docker
         #       image or host (in this case you might need to run iptables-legacy-save instead).
-        #    2. In another terminal keep a ping command running: `sudo ip netns exec ns<NUMBER> ping amazon.com`
+        #    2. In another terminal keep a ping command running: `sudo ip netns exec ns<NUMBER> ping aws.amazon.com`
         #       Note that you should run the ping on the environment where you are trying to use the network
         #       namespace.
         #    3. Observe the output of the `watch` command. When everything is fine you should see all
@@ -113,6 +113,6 @@ for i in $(seq 0 $((NUM_NAMESPACES-1))); do
         #       are being correctly routed. For example, if the forwarded traffic is being routed to the
         #       wrong interface, you will be able to see in the logs.
         #
-        ip netns exec ${NS} ping -c 1 amazon.com
+        ip netns exec ${NS} ping -c 1 aws.amazon.com
     fi
 done

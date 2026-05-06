@@ -40,6 +40,7 @@ private:
  * @brief Helper function to wire up dependencies and create a X509 credentials provider
  * @param clientBootstrap pointer to AWS client bootstrap. Note AwsBootstrap is responsible for the client
  *        bootstrap lifecycle
+ * @param rootCA Contents of the CA store .pem file, e.g. AmazonRootCA1.pem, or blank to use the default system CA store
  * @param clientId the id that is used to identify this connection instance
  * @param privateKey Contents of the private key .pem file provided during setup of the AWS
  *                   Iot Thing.
@@ -51,6 +52,7 @@ private:
  */
 std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> createX509CredentialsProvider(
     Aws::Crt::Io::ClientBootstrap *clientBootstrap,
+    const std::string &rootCA,
     const std::string &clientId,
     const std::string &privateKey,
     const std::string &certificate,

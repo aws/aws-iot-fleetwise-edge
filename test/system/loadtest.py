@@ -258,7 +258,7 @@ class TestLoad:
         self, additional_depth: int, number_of_campaigns: int, max_number_of_signals_to_collect: int
     ):
         nested_collection_schemes = []
-        for i in range(1, 81):
+        for i in range(1, number_of_campaigns + 1):
             nested_condition_scheme = {
                 "campaignSyncId": f"nested_condition_{i}",
                 "collectionScheme": {
