@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.3.5 (2026-05-21)
+
+Bug fixes:
+
+- Fixed state template version not being persisted sometimes after cloud re-sync.
+
 ## v1.3.4 (2026-04-30)
 
 Service update:

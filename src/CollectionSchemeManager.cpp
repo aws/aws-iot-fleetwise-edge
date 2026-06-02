@@ -558,16 +558,13 @@ CollectionSchemeManager::processStateTemplates()
     {
         if ( mStateTemplates.find( stateTemplate->id ) != mStateTemplates.end() )
         {
-            continue;
+            FWE_LOG_TRACE( "Overwriting state template: " + stateTemplate->id );
         }
         modified = true;
-        mStateTemplates.emplace( stateTemplate->id, stateTemplate );
+        mStateTemplates[stateTemplate->id] = stateTemplate;
     }
 
-    if ( modified )
-    {
-        store( DataType::STATE_TEMPLATE_LIST );
-    }
+    store( DataType::STATE_TEMPLATE_LIST );
 
     return modified;
 }
