@@ -24,6 +24,7 @@
 
 #ifdef FWE_FEATURE_LAST_KNOWN_STATE
 #include "aws/iotfleetwise/LastKnownStateTypes.h"
+#include "state_templates.pb.h"
 #endif
 
 namespace Aws
@@ -478,6 +479,71 @@ TEST_F( CollectionSchemeManagerTest, StateTemplatesUpdateRemoveNonExistingTempla
     mCollectionSchemeManager.onStateTemplatesChanged( lastKnownStateIngestionMock );
 
     DELAY_ASSERT_TRUE( getReceivedStateTemplates().size() == previousSize );
+}
+
+TEST_F( CollectionSchemeManagerTest, StateTemplateVersionPersistedOnResend )
+{
+    // This test verifies that when the cloud re-sends a state template with the same ID
+    // but a newer version, FWE persists the new version to disk.
+    // Without the fix, the version is updated in memory but never persisted because
+    // the template ID already exists (skip logic) and modified=false prevents store().
+
+    auto storage = createCacheAndPersist();
+
+    uint32_t checkinIntervalMs = 100;
+    auto schemaListenerMock = std::make_shared<NiceMock<SchemaListenerMock>>();
+    EXPECT_CALL( *schemaListenerMock, mockedSendCheckin( _, _ ) ).WillRepeatedly( InvokeArgument<1>( true ) );
+    auto checkinSender = std::make_shared<CheckinSender>( schemaListenerMock, checkinIntervalMs );
+    CollectionSchemeManagerWrapper collectionSchemeManager( storage, mCanIDTranslator, checkinSender );
+
+    auto lastKnownStateIngestionMock = std::make_shared<LastKnownStateIngestionMock>();
+    EXPECT_CALL( *lastKnownStateIngestionMock, build() ).WillRepeatedly( Return( true ) );
+
+    ASSERT_TRUE( checkinSender->start() );
+    ASSERT_TRUE( collectionSchemeManager.connect() );
+
+    auto stateTemplate1 = std::make_shared<StateTemplateInformation>(
+        StateTemplateInformation{ "template1",
+                                  "decoder1",
+                                  { LastKnownStateSignalInformation{ 1 }, LastKnownStateSignalInformation{ 2 } },
+                                  LastKnownStateUpdateStrategy::PERIODIC,
+                                  500 } );
+
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillOnce(
+            Return( std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 1000, { stateTemplate1 }, {} } ) ) );
+
+    collectionSchemeManager.mLastKnownStateIngestionTest = lastKnownStateIngestionMock;
+    collectionSchemeManager.myInvokeStateTemplates();
+
+    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+
+    auto stateTemplate1Resend = std::make_shared<StateTemplateInformation>(
+        StateTemplateInformation{ "template1",
+                                  "decoder1",
+                                  { LastKnownStateSignalInformation{ 1 }, LastKnownStateSignalInformation{ 2 } },
+                                  LastKnownStateUpdateStrategy::PERIODIC,
+                                  500 } );
+
+    EXPECT_CALL( *lastKnownStateIngestionMock, getStateTemplatesDiff() )
+        .WillOnce( Return(
+            std::make_shared<StateTemplatesDiff>( StateTemplatesDiff{ 2000, { stateTemplate1Resend }, {} } ) ) );
+
+    collectionSchemeManager.myInvokeStateTemplates();
+
+    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+
+    auto readSize = storage->getSize( DataType::STATE_TEMPLATE_LIST );
+    ASSERT_GT( readSize, 0U );
+    std::vector<uint8_t> readBuffer( readSize );
+    ASSERT_EQ( storage->read( readBuffer.data(), readSize, DataType::STATE_TEMPLATE_LIST ), ErrorCode::SUCCESS );
+    Schemas::LastKnownState::StateTemplates protoStateTemplatesAfter;
+    ASSERT_TRUE( protoStateTemplatesAfter.ParseFromArray( readBuffer.data(), static_cast<int>( readSize ) ) );
+
+    ASSERT_EQ( protoStateTemplatesAfter.version(), 2000U );
+
+    ASSERT_EQ( protoStateTemplatesAfter.state_templates_to_add_size(), 1 );
+    ASSERT_EQ( protoStateTemplatesAfter.state_templates_to_add( 0 ).state_template_sync_id(), "template1" );
 }
 #endif
 
