@@ -456,36 +456,36 @@ Mappings:
   # Ubuntu 22.04 arm64 AMIs
   AMIRegionMap:
     ap-northeast-1:
-      AMIID: ami-058013ead35756db9
+      AMIID: ami-0acdd5fd55875530d
     ap-northeast-2:
-      AMIID: ami-0929f2ca1ca2cb360
+      AMIID: ami-02e366ee9398689c9
     ap-northeast-3:
-      AMIID: ami-0f13f8651267703fa
+      AMIID: ami-0945685bbd144b049
     ap-south-1:
-      AMIID: ami-0ddbde802a7e63160
+      AMIID: ami-0c3797ddbac261ed3
     ap-southeast-1:
-      AMIID: ami-00aad785da98b1712
+      AMIID: ami-0d56af334ae4840f1
     ap-southeast-2:
-      AMIID: ami-0cb34c2908b4319f7
+      AMIID: ami-01f727a732a77763e
     ca-central-1:
-      AMIID: ami-0d4242490aedfb09d
+      AMIID: ami-0a94561773dddae17
     eu-central-1:
-      AMIID: ami-0e61fa0475e5cdf7d
+      AMIID: ami-08201cd6f43903980
     eu-north-1:
-      AMIID: ami-00206433c6d5ede13
+      AMIID: ami-0cee1cfdac3e1afe7
     eu-west-1:
-      AMIID: ami-0b583f82e876e016c
+      AMIID: ami-0df045a42e8accacc
     eu-west-2:
-      AMIID: ami-04c030a301180ff5d
+      AMIID: ami-0447bb05e69293e70
     eu-west-3:
-      AMIID: ami-0bf754104e8c1f644
+      AMIID: ami-08bdbd48b7bfc3ca0
     sa-east-1:
-      AMIID: ami-0451448694eaff49a
+      AMIID: ami-080e9b8a1a31fca23
     us-east-1:
-      AMIID: ami-0b4bd73825cba9663
+      AMIID: ami-029f1e8b2d0665554
     us-east-2:
-      AMIID: ami-076cf0fb251ab32fd
+      AMIID: ami-00730526624f70bf5
     us-west-1:
-      AMIID: ami-0f9007b2c4b36c874
+      AMIID: ami-0a5213e24f1cd7c54
     us-west-2:
-      AMIID: ami-009a456dbbce26032
+      AMIID: ami-04cc50fef61be8f92
